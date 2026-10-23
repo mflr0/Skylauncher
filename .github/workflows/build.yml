@@ -47,12 +47,14 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
             libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols libegl1-mesa-dev \
             libgl1-mesa-dev libgles2-mesa-dev libdbus-1-dev libudev-dev libdrm-dev libgbm-dev librsvg2-bin libfuse2
       - name: Build
+        # XenonUtils' headers rely on Clang (anonymous structs with non-trivial members), as XenonRecomp does.
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSKYLAUNCHER_VERSION="${VERSION#v}"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DSKYLAUNCHER_VERSION="${VERSION#v}"
           cmake --build build --target Skylauncher
           cmake --install build --prefix AppDir/usr
       - name: AppImage
@@ -91,7 +93,7 @@ jobs:
             rsvg-convert -w $((size * 2)) -h $((size * 2)) resources/icons/skylauncher.svg -o icon.iconset/icon_${size}x${size}@2x.png
           done
           iconutil -c icns icon.iconset -o "$app/Contents/Resources/Skylauncher.icns"
-          /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string Skylauncher" "$app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Skylauncher" "$app/Contents/Info.plist" || /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string Skylauncher" "$app/Contents/Info.plist"
           codesign --force --deep --sign - "$app"   # ad hoc: not notarized, see the README
           mkdir -p dist dmg
           cp -R "$app" dmg/
