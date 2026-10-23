@@ -267,9 +267,11 @@ namespace
         bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
         bool PillButton(const char* label, bool primary = false, float width = 0);
         bool Toggle(const char* id, bool* value);
-        template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback);
+        template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
-        void BeginCard(const char* id, ImVec2 size);
+        bool BeginSettingsTable(const char* id);
+        void EndSettingsTable();
+        void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
         void EndCard();
         void Title(const char* text, float size = TitleSize, unsigned color = Gold);
 
@@ -394,6 +396,7 @@ namespace
         ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = nullptr;
+        io.ConfigDebugHighlightIdConflicts = false;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
         Apply(ImGui::GetStyle());
         if (!LoadFonts())
@@ -689,9 +692,9 @@ namespace
 
     void App::SettingRow(const char* label, const char* hint)
     {
-        ImGui::TableNextRow();
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, 62);
         ImGui::TableSetColumnIndex(0);
-        ImGui::AlignTextToFramePadding();
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 3));
         ImGui::TextUnformatted(label);
         if (hint != nullptr)
         {
@@ -701,15 +704,41 @@ namespace
             ImGui::PopStyleColor();
             ImGui::PopFont();
         }
+        ImGui::PopStyleVar();
         ImGui::TableSetColumnIndex(1);
     }
 
+    bool App::BeginSettingsTable(const char* id)
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4, 14));
+        ImGui::PushStyleColor(ImGuiCol_TableBorderLight, Rgb(Border, 110));
+        bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp);
+        if (open)
+        {
+            ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthFixed, 320);
+        }
+        else
+        {
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar();
+        }
+        return open;
+    }
+
+    void App::EndSettingsTable()
+    {
+        ImGui::EndTable();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+    }
+
     template<size_t N>
-    bool App::Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback)
+    bool App::Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width)
     {
         int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
         bool changed = false;
-        ImGui::SetNextItemWidth(-1);
+        ImGui::SetNextItemWidth(width);
         if (ImGui::BeginCombo(label, choices[index].label))
         {
             for (size_t i = 0; i < N; i++)
@@ -723,12 +752,12 @@ namespace
         return changed;
     }
 
-    void App::BeginCard(const char* id, ImVec2 size)
+    void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)
     {
         ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Panel, 235));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusLarge);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
-        ImGui::BeginChild(id, size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+        ImGui::BeginChild(id, size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | flags);
     }
 
     void App::EndCard()
@@ -992,10 +1021,8 @@ namespace
 
     void App::DrawGraphics()
     {
-        if (!ImGui::BeginTable("##graphics", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX))
+        if (!BeginSettingsTable("##graphics"))
             return;
-        ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch, 0.55f);
-        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch, 0.45f);
 
         SettingRow("Fullscreen", "Play in fullscreen instead of a window.");
         bool fullscreen = ParseBool(SettingGet(m_config, "video", "fullscreen"));
@@ -1021,7 +1048,7 @@ namespace
 
         SettingRow("Texture filtering", "Anisotropic filtering keeps ground textures sharp at an angle.");
         Combo("##filter", "video", "anisotropy", FilterChoices, 0);
-        ImGui::EndTable();
+        EndSettingsTable();
     }
 
     void App::DrawControls()
@@ -1046,7 +1073,7 @@ namespace
             currentLabel = "Saved gamepad (not connected)";
 
         Title("Controller", TitleSize, Text);
-        ImGui::SetNextItemWidth(520);
+        ImGui::SetNextItemWidth(440);
         if (ImGui::BeginCombo("##device", currentLabel.c_str()))
         {
             for (const auto& [value, label] : options)
@@ -1068,8 +1095,7 @@ namespace
         ImGui::Dummy(ImVec2(0, 12));
 
         Title("Portal of Power", TitleSize, Text);
-        ImGui::SetNextItemWidth(520);
-        Combo("##portal", "portal", "mode", PortalChoices, 0);
+        Combo("##portal", "portal", "mode", PortalChoices, 0, 440);
         ImGui::Dummy(ImVec2(0, 12));
 
         // Keyboard bindings, two columns of actions.
@@ -1086,8 +1112,13 @@ namespace
             ImGui::TextColored(ImColor(Rgb(Gold)), "Press a key for \"%s\" (Escape cancels)", m_capturing->label);
         else
             ImGui::TextColored(ImColor(Rgb(TextDim)), "Click a key to change it.");
-        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingStretchProp))
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
+        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingFixedFit))
         {
+            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 190);
+            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 150);
+            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 190);
+            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 150);
             for (size_t i = 0; i < std::size(KeyActions); i++)
             {
                 const KeyAction& action = KeyActions[i];
@@ -1105,7 +1136,7 @@ namespace
                 ImGui::PushID(action.id);
                 ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Gold : Field));
                 ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? GoldInk : duplicate ? Danger : Text));
-                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(160, 34)))
+                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(140, 32)))
                     m_capturing = &action;
                 ImGui::PopStyleColor(2);
                 if (duplicate && ImGui::IsItemHovered())
@@ -1114,6 +1145,7 @@ namespace
             }
             ImGui::EndTable();
         }
+        ImGui::PopStyleVar();
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
         ImGui::TextUnformatted("F6/Tab opens the Toy Box, F7 places the next figure, F8 removes them all.");
         ImGui::PopStyleColor();
@@ -1121,15 +1153,13 @@ namespace
 
     void App::DrawLanguage()
     {
-        if (!ImGui::BeginTable("##language", 2, ImGuiTableFlags_SizingStretchProp))
+        if (!BeginSettingsTable("##language"))
             return;
-        ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch, 0.55f);
-        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch, 0.45f);
         SettingRow("Text", "Menus, subtitles and on-screen text.");
         Combo("##text", m_game.id, "language", LanguageChoices, 0);
         SettingRow("Voices", "Spoken lines and cutscenes. They can differ from the text.");
         Combo("##voice", m_game.id, "voice_language", LanguageChoices, 0);
-        ImGui::EndTable();
+        EndSettingsTable();
     }
 
     void App::DrawGameData()
@@ -1176,25 +1206,42 @@ namespace
 
     void App::DrawSettings()
     {
+        // A centred column: settings read badly when they stretch across a wide window.
+        float available = ImGui::GetContentRegionAvail().x;
+        float width = std::min(available, 940.0f);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
+        ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+
+        // Sub-pages as a segmented control.
         constexpr std::pair<SettingsTab, const char*> Tabs[] = { { SettingsTab::Graphics, "Graphics" }, { SettingsTab::Controls, "Controls" },
             { SettingsTab::Language, "Language" }, { SettingsTab::GameData, "Game data" }, { SettingsTab::About, "About" } };
-        for (const auto& [tab, label] : Tabs)
+        ImVec2 origin = ImGui::GetCursorScreenPos();
+        float segment = 132, height = 40;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(origin, ImVec2(origin.x + segment * std::size(Tabs) + 8, origin.y + height + 8), Rgb(Field, 230), RadiusLarge);
+        draw->AddRect(origin, ImVec2(origin.x + segment * std::size(Tabs) + 8, origin.y + height + 8), Rgb(Border, 160), RadiusLarge, 1.5f);
+        for (size_t i = 0; i < std::size(Tabs); i++)
         {
-            bool active = m_tab == tab;
-            ImGui::PushStyleColor(ImGuiCol_Button, Rgb(active ? Gold : PanelRaised));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(active ? Gold : 0x2F3784));
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(active ? GoldInk : Text));
-            if (ImGui::Button(label, ImVec2(150, 40)))
+            auto [tab, label] = Tabs[i];
+            ImVec2 at(origin.x + 4 + segment * i, origin.y + 4);
+            ImGui::SetCursorScreenPos(at);
+            ImGui::PushID(int(i));
+            if (ImGui::InvisibleButton("##settingstab", ImVec2(segment, height)))
             {
                 m_tab = tab;
                 m_capturing = nullptr;
             }
-            ImGui::PopStyleColor(3);
-            ImGui::SameLine(0, 10);
+            bool hovered = ImGui::IsItemHovered();
+            ImGui::PopID();
+            bool active = m_tab == tab;
+            if (active || hovered)
+                draw->AddRectFilled(at, ImVec2(at.x + segment, at.y + height), Rgb(active ? Gold : PanelRaised), RadiusLarge - 4);
+            ImVec2 text = ImGui::CalcTextSize(label);
+            draw->AddText(ImVec2(at.x + (segment - text.x) / 2, at.y + (height - text.y) / 2), Rgb(active ? GoldInk : TextSecondary), label);
         }
-        ImGui::NewLine();
-        ImGui::Dummy(ImVec2(0, 8));
-        BeginCard("##settings", ImVec2(0, 0));
+        ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + height + 26));
+
+        BeginCard("##settings", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
         switch (m_tab)
         {
         case SettingsTab::Graphics: DrawGraphics(); break;
@@ -1204,6 +1251,7 @@ namespace
         case SettingsTab::About: DrawAbout(); break;
         }
         EndCard();
+        ImGui::EndChild();
     }
 
     void App::DrawToast()
@@ -1241,7 +1289,10 @@ namespace
             ImGui::PushFont(m_titleFont, 18);
             ImVec2 text = ImGui::CalcTextSize(label);
             ImVec2 at = ImGui::GetCursorScreenPos();
-            if (ImGui::InvisibleButton(label, ImVec2(text.x + 8, text.y + 18)))
+            ImGui::PushID(int(page));
+            bool clicked = ImGui::InvisibleButton("##pagetab", ImVec2(text.x + 8, text.y + 18));
+            ImGui::PopID();
+            if (clicked)
             {
                 m_page = page;
                 m_capturing = nullptr;
