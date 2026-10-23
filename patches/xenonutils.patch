@@ -1,0 +1,14 @@
+diff --git a/XenonUtils/xex.cpp b/XenonUtils/xex.cpp
+index 4e79042..337c945 100644
+--- a/XenonUtils/xex.cpp
++++ b/XenonUtils/xex.cpp
+@@ -180,7 +180,8 @@ Image Xex2LoadImage(const uint8_t* data, size_t dataSize)
+                 imageSize += blocks[i].dataSize + blocks[i].zeroSize;
+             }
+ 
+-            result = std::make_unique<uint8_t[]>(imageSize);
++            // The blocks can sum to less than the declared image size; the tail must stay zeroed.
++            result = std::make_unique<uint8_t[]>(std::max<size_t>(imageSize, security->imageSize));
+             auto* destData = result.get();
+ 
+             for (size_t i = 0; i < numBlocks; i++)

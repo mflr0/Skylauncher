@@ -1,0 +1,6 @@
+[submodule "thirdparty/SDL"]
+	path = thirdparty/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "thirdparty/XenonRecomp"]
+	path = thirdparty/XenonRecomp
+	url = https://github.com/hedge-dev/XenonRecomp.git
