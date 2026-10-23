@@ -1,5 +1,6 @@
 #include "launcher_ui_draw.h"
 #include "launcher_theme.h"
+#include "embedded_fonts.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -180,6 +181,15 @@ bool LauncherPainter::LoadFonts()
             m_fontDirectory = directory;
             return true;
         }
+    }
+
+    // The copies built into the executable, so the launcher also works as a lone file.
+    if (g_embeddedOutfitSize != 0 && g_embeddedBungeeSize != 0)
+    {
+        m_fontData[0].assign(g_embeddedOutfit, g_embeddedOutfit + g_embeddedOutfitSize);
+        m_fontData[1].assign(g_embeddedBungee, g_embeddedBungee + g_embeddedBungeeSize);
+        m_fontDirectory = "(built in)";
+        return true;
     }
 
     fprintf(stderr, "launcher: fonts not found (looked for Outfit-Variable.ttf and Bungee-Regular.ttf in the app's fonts folder)\n");

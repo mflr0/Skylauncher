@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 project(Skylauncher LANGUAGES C CXX)
+set(SKYLAUNCHER_VERSION "0.1.0" CACHE STRING "Version shown in the app bundle")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_SHARED_LIBS OFF)
+if(MSVC)
+    add_compile_options(/utf-8) # fmt requires it
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # no VC++ runtime to install
+endif()
 
 if(NOT EXISTS ${CMAKE_SOURCE_DIR}/thirdparty/SDL/CMakeLists.txt OR NOT EXISTS ${CMAKE_SOURCE_DIR}/thirdparty/XenonRecomp/thirdparty/fmt/CMakeLists.txt)
     message(FATAL_ERROR "Submodules missing: run `git submodule update --init --recursive`")
@@ -45,6 +50,15 @@ target_include_directories(XenonXex PUBLIC ${XENON_ROOT}/XenonUtils ${XENON_ROOT
 target_compile_definitions(XenonXex PRIVATE NOMINMAX)
 target_link_libraries(XenonXex PUBLIC fmt::fmt)
 
+# The fonts are also built into the executable, so a lone executable works (Windows .exe).
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
+    COMMAND ${CMAKE_COMMAND} -DOUTFIT=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Variable.ttf
+        -DBUNGEE=${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_fonts.cpp
+        -P ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Variable.ttf
+        ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf
+    COMMENT "Embedding the launcher fonts")
+
 # Everything but the window: disc checks, settings, title metadata. Shared by the app and the test.
 add_library(SkylauncherCore STATIC
     src/launcher.cpp
@@ -56,7 +70,8 @@ add_library(SkylauncherCore STATIC
     src/stb_impl.cpp
     src/vfs.cpp
     src/platform/platform_file.cpp
-    thirdparty/miniz/miniz.c)
+    thirdparty/miniz/miniz.c
+    ${CMAKE_BINARY_DIR}/embedded_fonts.cpp)
 target_include_directories(SkylauncherCore PUBLIC src PRIVATE thirdparty/stb thirdparty/miniz)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex)
 target_compile_definitions(SkylauncherCore PRIVATE SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
@@ -73,6 +88,15 @@ set(SKYLAUNCHER_FONTS
 
 add_executable(Skylauncher WIN32 MACOSX_BUNDLE src/main.cpp)
 target_link_libraries(Skylauncher PRIVATE SkylauncherCore)
+set_target_properties(Skylauncher PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_NAME Skylauncher
+    MACOSX_BUNDLE_GUI_IDENTIFIER io.github.mflr0.skylauncher
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${SKYLAUNCHER_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${SKYLAUNCHER_VERSION}")
+install(TARGETS Skylauncher BUNDLE DESTINATION . RUNTIME DESTINATION bin)
+if(NOT APPLE)
+    install(DIRECTORY ${CMAKE_SOURCE_DIR}/resources/fonts/ DESTINATION share/skylauncher/fonts)
+endif()
 if(APPLE)
     set_source_files_properties(${SKYLAUNCHER_FONTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/fonts)
     target_sources(Skylauncher PRIVATE ${SKYLAUNCHER_FONTS})

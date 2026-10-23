@@ -18,6 +18,17 @@ backgrounds) is read at run time from the disc image you provide, then cached on
   of the app `SSARecomp`: `~/Library/Application Support/SSARecomp/` on macOS, `%APPDATA%\SSARecomp\` on Windows,
   `~/.local/share/SSARecomp/` on Linux.
 
+## Download
+
+Every push to `main` is built by GitHub Actions and published on the
+[Releases page](https://github.com/mflr0/Skylauncher/releases):
+
+- Windows: `Skylauncher.exe`, a single file.
+- Linux: `Skylauncher-x86_64.AppImage`. Make it executable (`chmod +x`) and run it.
+- macOS: `Skylauncher-macOS.dmg` (drag the app to Applications) or `Skylauncher-macOS.zip` (the `.app` itself),
+  for Apple Silicon and Intel Macs. The app is not notarized: the first time, right-click it and choose Open, or
+  allow it in System Settings > Privacy & Security.
+
 ## Build
 
 Requirements: CMake 3.20+, Ninja (or another generator), a C++20 compiler, git.
