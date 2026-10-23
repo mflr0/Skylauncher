@@ -1,0 +1,8 @@
+/build/
+/build-*.log
+/private/
+.DS_Store
+# Anything read from a game disc stays on the player's machine.
+*.iso
+*.xex
+launcher-cache/
