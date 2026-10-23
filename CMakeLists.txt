@@ -59,21 +59,27 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
         ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf
     COMMENT "Embedding the launcher fonts")
 
+# Dear ImGui (MIT) with its SDL 3 platform and SDL_Renderer backends.
+set(IMGUI_ROOT ${CMAKE_SOURCE_DIR}/thirdparty/imgui)
+add_library(imgui STATIC ${IMGUI_ROOT}/imgui.cpp ${IMGUI_ROOT}/imgui_draw.cpp ${IMGUI_ROOT}/imgui_tables.cpp
+    ${IMGUI_ROOT}/imgui_widgets.cpp ${IMGUI_ROOT}/backends/imgui_impl_sdl3.cpp ${IMGUI_ROOT}/backends/imgui_impl_sdlrenderer3.cpp)
+target_include_directories(imgui PUBLIC ${IMGUI_ROOT} ${IMGUI_ROOT}/backends)
+target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
+
 # Everything but the window: disc checks, settings, title metadata. Shared by the app and the test.
 add_library(SkylauncherCore STATIC
     src/launcher.cpp
     src/launcher_games.cpp
     src/launcher_ui.cpp
-    src/launcher_ui_draw.cpp
     src/launcher_assets.cpp
-    src/widgets/launcher_widgets.cpp
+    src/figures/figure_catalog.cpp
     src/stb_impl.cpp
     src/vfs.cpp
     src/platform/platform_file.cpp
     thirdparty/miniz/miniz.c
     ${CMAKE_BINARY_DIR}/embedded_fonts.cpp)
 target_include_directories(SkylauncherCore PUBLIC src PRIVATE thirdparty/stb thirdparty/miniz)
-target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex)
+target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
 target_compile_definitions(SkylauncherCore PRIVATE SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
 if(APPLE)
     target_link_libraries(SkylauncherCore PUBLIC "-framework CoreGraphics")

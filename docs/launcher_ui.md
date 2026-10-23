@@ -4,18 +4,21 @@ The launcher is a Skylanders-flavoured take on the Minecraft Launcher. Keep the 
 is easy to iterate without touching the game runtime.
 
 ## Structure
-- `src/launcher_theme.h` - every colour, size, radius and font setting. Change the look here first.
-- `src/widgets/launcher_widgets.{h,cpp}` - reusable buttons, sidebar entries, panels and progress bars.
-- `src/launcher_ui.{h,cpp}` - layout, screens, input, verification flow and screenshot test.
-- `src/launcher_ui_draw.{h,cpp}` - SDL drawing primitives, font atlas, PNG loading and background.
+- `src/launcher_theme.h` - every colour, size, radius and font size, plus the ImGui style (`Apply`). Change the look here first.
+- `src/launcher_ui.{h,cpp}` - the window (Dear ImGui on SDL_Renderer): backdrop, sidebar, the Play, My Skylanders and
+  Settings pages, the launcher's widgets (`BigButton`, `PillButton`, `Toggle`, `BeginCard`), disc verification and the
+  screenshot test.
 - `src/launcher_assets.{h,cpp}` - reads frontend art from the player's disc, decodes it and caches it.
-- `resources/fonts/` - licensed fonts (Bungee, Outfit) with their OFL licences.
+- `src/figures/figure_catalog.{h,cpp}` - every toy the game knows: name, element, portrait name.
+- `resources/fonts/` - licensed fonts (Bungee, Outfit) with their OFL licences; they are also built into the executable.
+- `docs/settings.md` - the settings file the launcher writes and the game reads.
 
 ## Layout (Minecraft-like)
-1. Left sidebar - game list (SSA enabled, five greyed "coming later"), Settings at the bottom.
-2. Hero area - selected game title, icon from the XDBF, real disc art after verification, drop zone.
-3. Bottom bar - large PLAY button, ISO status and change-image action.
-4. Settings overlay - text/voice language, fullscreen, resolution scale, game data and quit.
+1. Left sidebar - the six games (Spyro's Adventure enabled, the others "Coming later").
+2. Tabs at the top - PLAY, MY SKYLANDERS, SETTINGS.
+3. Play - the game's art from the player's disc, disc status, change-disc button and the big PLAY button.
+4. My Skylanders - figures from the figures folder with their portraits; click one to start with it on the portal.
+5. Settings - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About.
 
 ## Disc art
 The launcher never ships Skylanders artwork. After an ISO is verified it:
@@ -36,11 +39,11 @@ Current role mapping:
 local only and are ignored by git; deleting the cache is always safe.
 
 ## How to change the look
-- Colours: edit the `LauncherTheme` namespace in `launcher_theme.h`.
-- Spacing/sizes: change constants such as `SidebarW`, `BottomBarH`, `BtnPlayH`, `Radius*`.
-- Fonts: add an OFL/Apache-compatible font under `resources/fonts/`, then update
-  `SSA_LAUNCHER_FONT_DIR` / the font loading in `launcher_ui_draw.cpp`.
-- Widgets: add methods to `LauncherWidgets`; keep all colours coming from the theme.
+- Colours: edit the constants in `launcher_theme.h`; ImGui's own widget colours are set in `LauncherTheme::Apply`.
+- Spacing and sizes: `SidebarW`, `Pad`, `Radius*`, `PlayButtonW/H` and the font sizes in the same file.
+- Fonts: put an OFL- or Apache-licensed font in `resources/fonts/` and load it in `App::LoadFonts`
+  (`SSA_LAUNCHER_FONT_DIR` overrides the folder while trying fonts).
+- Widgets: add them next to `BigButton` and `Toggle` in `launcher_ui.cpp`, taking every colour from the theme.
 
 ## Screenshot test
 The launcher can drive itself without opening a visible window:
@@ -53,7 +56,7 @@ SSA_LAUNCHER_TEST_DROP="/path/to/game.iso" \
 SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ./build/Skylauncher.app/Contents/MacOS/Skylauncher
 ```
-It writes `01-no-iso.png`, `02-verified.png` and `03-settings.png` at 1280x800.
+It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png` and `05-skylanders.png`.
 
 ## Notes
 - Drag & drop ISO is supported through `SDL_EVENT_DROP_FILE`.

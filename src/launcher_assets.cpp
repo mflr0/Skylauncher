@@ -188,8 +188,15 @@ namespace LauncherAssets
                 for (uint32_t bx = 0; bx < blocksX; bx++)
                 {
                     size_t offset = Tiled2D(bx, by, pitchBlocks, 4);
+                    // The console stores the block's 16-bit words big-endian (8-in-16).
+                    uint8_t swapped[16];
+                    for (int i = 0; i < 16; i += 2)
+                    {
+                        swapped[i] = data[offset + i + 1];
+                        swapped[i + 1] = data[offset + i];
+                    }
                     uint8_t block[64];
-                    DecodeBc3Block(data.data() + offset, block);
+                    DecodeBc3Block(swapped, block);
                     for (uint32_t ty = 0; ty < 4; ty++)
                     {
                         size_t dest = (size_t(by * 4 + ty) * width + bx * 4) * 4;

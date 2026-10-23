@@ -68,6 +68,20 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    // Settings the runtime already takes from its environment (the rest it reads from launcher.ini; docs/settings.md).
+    auto pass = [&](const char* variable, const char* section, const char* key) {
+        auto entry = config.find(section);
+        if (entry == config.end())
+            return;
+        auto value = entry->second.find(key);
+        if (value != entry->second.end() && !value->second.empty())
+            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), variable, value->second.c_str(), true);
+    };
+    pass("SSA_PORTAL", "portal", "mode");
+    pass("SSA_PORTAL_PLACE", "portal", "place");
+    pass("SSA_LANGUAGE", game->id, "language");
+    pass("SSA_VOICE_LANGUAGE", game->id, "voice_language");
+
     const char* arguments[] = { runtime.c_str(), chosen.c_str(), nullptr };
     SDL_Process* process = SDL_CreateProcess(arguments, false);
     if (process == nullptr)
