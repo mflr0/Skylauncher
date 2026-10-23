@@ -1267,6 +1267,9 @@ namespace
         DrawToast();
 
         ImGui::Render();
+        // ImGui works in window points: scale them to the output's pixels (Retina and other high-density displays).
+        ImGuiIO& io = ImGui::GetIO();
+        SDL_SetRenderScale(m_renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
         SDL_SetRenderDrawColor(m_renderer, 11, 15, 46, 255);
         SDL_RenderClear(m_renderer);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
