@@ -1,21 +1,26 @@
+// The launcher window (Dear ImGui on SDL_Renderer): a sidebar of games, then Play, My Skylanders and Settings pages.
+// Every choice is written to launcher.ini, which the game runtime reads (docs/settings.md lists the keys).
 #include "launcher_ui.h"
+#include "embedded_fonts.h"
+#include "figures/figure_catalog.h"
 #include "launcher_assets.h"
-#include "launcher_ui_draw.h"
 #include "launcher_theme.h"
-#include "widgets/launcher_widgets.h"
 #include "vfs.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <array>
 #include <atomic>
-#include <chrono>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
-#include <cstring>
 #include <filesystem>
 #include <fmt/format.h>
 #include <fstream>
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlrenderer3.h>
 #include <mutex>
-#include <span>
+#include <stb_image.h>
 #include <stb_image_write.h>
 #include <thread>
 #include <vector>
@@ -24,35 +29,75 @@ using namespace LauncherTheme;
 
 namespace
 {
-    double NowSeconds()
+    // ---- Settings file ------------------------------------------------------------------------------------------
+
+    std::string SettingGet(const LauncherConfig& config, std::string_view section, std::string_view key, std::string fallback = {})
     {
-        return static_cast<double>(SDL_GetTicksNS()) / 1'000'000'000.0;
+        auto s = config.find(std::string(section));
+        if (s == config.end())
+            return fallback;
+        auto k = s->second.find(std::string(key));
+        return k == s->second.end() || k->second.empty() ? fallback : k->second;
     }
 
-    bool Contains(const SDL_FRect& r, float x, float y)
+    int SettingInt(const LauncherConfig& config, std::string_view section, std::string_view key, int fallback)
     {
-        return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
+        std::string value = SettingGet(config, section, key);
+        return value.empty() ? fallback : std::atoi(value.c_str());
     }
 
-    std::string Lower(std::string_view s)
+    bool ParseBool(std::string_view value)
     {
-        std::string out(s);
-        for (char& c : out) if (c >= 'A' && c <= 'Z') c = static_cast<char>(c - 'A' + 'a');
-        return out;
+        std::string lower(value);
+        for (char& c : lower)
+            c = char(std::tolower(static_cast<unsigned char>(c)));
+        return lower == "1" || lower == "true" || lower == "yes" || lower == "on";
     }
 
-    std::string Upper(std::string_view s)
+    // Keyboard bindings: the runtime reads "[input] key_<action>=<SDL key name>".
+    struct KeyAction
     {
-        std::string out(s);
-        for (char& c : out) if (c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
-        return out;
+        const char* id;
+        const char* label;
+        SDL_Keycode fallback;
+    };
+
+    constexpr KeyAction KeyActions[] = {
+        { "a", "A (jump, confirm)", SDLK_SPACE }, { "b", "B (back)", SDLK_X }, { "x", "X (attack)", SDLK_C },
+        { "y", "Y (attack)", SDLK_V }, { "start", "Start", SDLK_RETURN }, { "back", "Back", SDLK_BACKSPACE },
+        { "lb", "Left bumper", SDLK_Q }, { "rb", "Right bumper", SDLK_E }, { "lt", "Left trigger", SDLK_1 },
+        { "rt", "Right trigger", SDLK_3 }, { "left_up", "Move up", SDLK_W }, { "left_down", "Move down", SDLK_S },
+        { "left_left", "Move left", SDLK_A }, { "left_right", "Move right", SDLK_D }, { "right_up", "Camera up", SDLK_I },
+        { "right_down", "Camera down", SDLK_K }, { "right_left", "Camera left", SDLK_J },
+        { "right_right", "Camera right", SDLK_L }, { "dpad_up", "D-pad up", SDLK_UP }, { "dpad_down", "D-pad down", SDLK_DOWN },
+        { "dpad_left", "D-pad left", SDLK_LEFT }, { "dpad_right", "D-pad right", SDLK_RIGHT },
+    };
+
+    struct Choice
+    {
+        const char* value;
+        const char* label;
+    };
+
+    constexpr Choice FpsChoices[] = { { "30", "30 (original)" }, { "60", "60" }, { "120", "120" }, { "144", "144" },
+        { "240", "240" }, { "0", "Unlimited" } };
+    constexpr Choice FilterChoices[] = { { "1", "Trilinear" }, { "2", "Anisotropic 2x" }, { "4", "Anisotropic 4x" },
+        { "8", "Anisotropic 8x" }, { "16", "Anisotropic 16x" } };
+    constexpr Choice PortalChoices[] = { { "auto", "Real portal if plugged in, else emulated" }, { "emulated", "Emulated portal" },
+        { "hid", "Wii / Wii U / PlayStation portal (HID)" }, { "usb", "Xbox 360 / Xbox One portal (USB)" } };
+    constexpr Choice LanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
+        { "it", "Italiano" }, { "nl", "Nederlands" }, { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
+
+    template<size_t N>
+    int ChoiceIndex(const Choice (&choices)[N], const std::string& value, int fallback)
+    {
+        for (size_t i = 0; i < N; i++)
+            if (value == choices[i].value)
+                return int(i);
+        return fallback;
     }
 
-    std::string FileNameOnly(const std::string& path)
-    {
-        size_t s = path.find_last_of("/\\");
-        return s == std::string::npos ? path : path.substr(s + 1);
-    }
+    // ---- Files and images --------------------------------------------------------------------------------------
 
     bool ReadWholeFile(const std::string& path, std::vector<uint8_t>& out)
     {
@@ -68,730 +113,1275 @@ namespace
         return file.good();
     }
 
-    SDL_Texture* LoadCachedAsset(LauncherAssets::Provider& provider, LauncherAssets::Role role,
-        LauncherPainter& painter)
+    std::string PreferencePath(const char* sub)
     {
-        LauncherAssets::Asset asset = provider.Get(role);
-        if (!asset.valid)
+        std::string path;
+        if (char* base = SDL_GetPrefPath("", g_launcherName))
+        {
+            path = std::string(base) + sub;
+            SDL_free(base);
+        }
+        return path;
+    }
+
+    SDL_Texture* LoadPng(SDL_Renderer* renderer, std::span<const uint8_t> png)
+    {
+        int width, height, channels;
+        stbi_uc* pixels = stbi_load_from_memory(png.data(), int(png.size()), &width, &height, &channels, 4);
+        if (pixels == nullptr)
             return nullptr;
+        SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, width, height);
+        if (texture != nullptr)
+        {
+            SDL_UpdateTexture(texture, nullptr, pixels, width * 4);
+            SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+        }
+        stbi_image_free(pixels);
+        return texture;
+    }
+
+    SDL_Texture* LoadPngFile(SDL_Renderer* renderer, const std::string& path)
+    {
         std::vector<uint8_t> png;
-        if (!ReadWholeFile(asset.path, png))
-            return nullptr;
-        return painter.LoadPng({ png.data(), png.size() });
+        return ReadWholeFile(path, png) ? LoadPng(renderer, png) : nullptr;
     }
 
-    std::string SettingGet(const LauncherConfig& cfg, std::string_view section, std::string_view key)
+    ImTextureRef Ref(SDL_Texture* texture)
     {
-        auto sit = cfg.find(std::string(section));
-        if (sit == cfg.end()) return {};
-        auto kit = sit->second.find(std::string(key));
-        if (kit == sit->second.end()) return {};
-        return kit->second;
-    }
-
-    void SettingSet(LauncherConfig& cfg, std::string_view section, std::string_view key, const std::string& value)
-    {
-        cfg[std::string(section)][std::string(key)] = value;
-    }
-
-    bool ParseBool(std::string_view v)
-    {
-        std::string l = Lower(v);
-        return l == "1" || l == "true" || l == "yes" || l == "on";
+        return ImTextureRef(ImTextureID(intptr_t(texture)));
     }
 
     std::string ChooseIsoDialog(SDL_Window* window, const GameInfo& game, const std::string& previous)
     {
         static const SDL_DialogFileFilter filters[] = { { "Xbox 360 disc image (.iso)", "iso" } };
-        struct R { std::atomic<bool> done{ false }; std::string path; bool failed = false; };
-        R r;
-        SDL_PropertiesID p = SDL_CreateProperties();
-        SDL_SetPointerProperty(p, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, const_cast<SDL_DialogFileFilter*>(filters));
-        SDL_SetNumberProperty(p, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, 1);
+        struct Result { std::atomic<bool> done{ false }; std::string path; };
+        Result result;
+        SDL_PropertiesID properties = SDL_CreateProperties();
+        SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, const_cast<SDL_DialogFileFilter*>(filters));
+        SDL_SetNumberProperty(properties, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, 1);
         std::string title = std::string("Choose your ") + game.name + " disc image";
-        SDL_SetStringProperty(p, SDL_PROP_FILE_DIALOG_TITLE_STRING, title.c_str());
-        if (window) SDL_SetPointerProperty(p, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, window);
-        if (!previous.empty()) SDL_SetStringProperty(p, SDL_PROP_FILE_DIALOG_LOCATION_STRING, previous.c_str());
-        SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE,
-            [](void* ud, const char* const* files, int) {
-                R* s = static_cast<R*>(ud);
-                if (!files || !files[0]) { s->failed = true; s->done = true; return; }
-                s->path = files[0]; s->done = true;
-            }, &r, p);
-        SDL_DestroyProperties(p);
-        while (!r.done) { SDL_PumpEvents(); SDL_Delay(10); }
-        if (r.failed) fprintf(stderr, "launcher: file dialog failed: %s\n", SDL_GetError());
-        return r.path;
+        SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, title.c_str());
+        SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, window);
+        if (!previous.empty())
+            SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_LOCATION_STRING, previous.c_str());
+        SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, [](void* userdata, const char* const* files, int) {
+            auto* r = static_cast<Result*>(userdata);
+            if (files != nullptr && files[0] != nullptr)
+                r->path = files[0];
+            r->done = true;
+        }, &result, properties);
+        SDL_DestroyProperties(properties);
+        while (!result.done)
+        {
+            SDL_PumpEvents();
+            SDL_Delay(10);
+        }
+        return result.path;
     }
+
+    // ---- Disc verification on a worker thread --------------------------------------------------------------------
 
     struct VerifyJob
     {
-        std::thread th;
+        std::thread thread;
         std::atomic<bool> done{ false };
-        std::atomic<float> progress{ 0.0f };
-        std::mutex m;
-        std::string stage = "Starting";
-        GameSourceCheck check{};
-        TitleMetadata meta{};
-        std::string path;
-        int gen = 0;
+        std::atomic<float> progress{ 0 };
+        std::mutex mutex;
+        std::string stage;
+        GameSourceCheck check;
+        TitleMetadata meta;
 
-        ~VerifyJob() { if (th.joinable()) th.join(); }
-        float P() { return progress.load(); }
-        std::string S() { std::lock_guard lk(m); return stage; }
+        ~VerifyJob() { Join(); }
+        void Join() { if (thread.joinable()) thread.join(); }
+        std::string Stage() { std::lock_guard lock(mutex); return stage; }
+
         void Start(const std::string& image, const GameInfo& game)
         {
-            if (th.joinable()) th.join();
-            ++gen;
-            int cgen = gen;
-            done = false; progress = 0.0f;
-            { std::lock_guard lk(m); stage = "Starting"; check = {}; meta = {}; }
-            path = image;
-            th = std::thread([this, cgen, image, &game]() {
-                (void)cgen;
-                auto report = [&](float f, std::string_view t) { progress.store(f); std::lock_guard lk(m); stage.assign(t); };
-                GameSourceCheck res = CheckGameSource(image, game, report);
-                if (res.status == GameSourceStatus::Ok)
+            Join();
+            done = false;
+            progress = 0;
+            { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; }
+            thread = std::thread([this, image, &game] {
+                auto report = [this](float fraction, std::string_view text) {
+                    progress = fraction;
+                    std::lock_guard lock(mutex);
+                    stage.assign(text);
+                };
+                GameSourceCheck result = CheckGameSource(image, game, report);
+                TitleMetadata metadata;
+                if (result.status == GameSourceStatus::Ok)
                 {
-                    report(0.98f, "Reading title name and icon from disc");
-                    DiscFileSystem d;
-                    if (d.Open(image.c_str()))
-                    {
-                        std::vector<uint8_t> xex = d.ReadAll("default.xex");
-                        if (!xex.empty()) meta = ReadTitleMetadata(xex);
-                    }
+                    report(0.98f, "Reading the title and icon");
+                    DiscFileSystem disc;
+                    if (disc.Open(image.c_str()))
+                        if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
+                            metadata = ReadTitleMetadata(xex);
                 }
-                { std::lock_guard lk(m); check = std::move(res); stage = "Done"; }
-                progress.store(1.0f);
-                done.store(true);
+                { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); }
+                progress = 1;
+                done = true;
             });
         }
-        void Cancel()
-        {
-            ++gen;
-            done = true; progress = 0.0f;
-            { std::lock_guard lk(m); stage = "Cancelled"; }
-        }
     };
 
-    enum class Phase { Idle, Verifying, Ready, Failed };
-    enum class Act { None, Browse, Play, Change, Settings, CloseSettings, ToggleFS, Export, Cancel, GameSel, Quit };
+    // ---- Figures (My Skylanders) ---------------------------------------------------------------------------------
 
-    struct Hotspot { SDL_FRect rect; Act act = Act::None; int idx = -1; bool enabled = true; };
-
-    struct App
+    struct FigureFile
     {
-        const GameInfo& game;
-        std::string configPath;
-        LauncherConfig& config;
-        SDL_Window* win = nullptr;
-        SDL_Renderer* ren = nullptr;
-        SDL_Gamepad* pad = nullptr;
-        SDL_Cursor* hand = nullptr;
-        SDL_Cursor* arrow = nullptr;
-        LauncherPainter painter;
-        LauncherWidgets* widgets = nullptr;
+        std::string file;   // name in the figures folder
+        const figures::ToyInfo* toy = nullptr;
+        SDL_Texture* portrait = nullptr;
+    };
 
-        Phase phase = Phase::Idle;
-        double now = 0, last = 0, delta = 0, phaseStart = 0;
-        bool running = true;
-        std::string chosen;
-        std::string srcPath;
-        uint64_t srcSize = 0;
-        GameSourceCheck check{};
-        TitleMetadata meta{};
-        SDL_Texture* iconTex = nullptr;
-        SDL_Texture* logoTex = nullptr;
-        SDL_Texture* heroTex = nullptr;
-        LauncherAssets::Provider assets;
-        long long verifyMs = 0;
+    enum class Page { Play, Skylanders, Settings };
+    enum class SettingsTab { Graphics, Controls, Language, GameData, About };
+    enum class DiscState { None, Verifying, Ready, Failed };
 
-        VerifyJob verify;
-        float dispProg = 0;
-        bool compSched = false;
-        double compAt = 0;
+    class App
+    {
+    public:
+        App(const GameInfo& game, const std::string& configPath, LauncherConfig& config) : m_game(game), m_configPath(configPath), m_config(config) {}
+        ~App() { Shutdown(); }
+        std::string Run();
 
-        bool settingsOpen = false;
-        float settingsT = 0;
-        bool dragOver = false;
-        bool fullscreen = false;
-        std::string toast; double toastUntil = 0;
-
-        std::vector<Hotspot> hs;
-        SDL_FPoint mouse{ -9999,-9999 };
-        bool mouseInside = false;
-
-        // test
-        bool testMode = false;
-        std::string shotsDir, testDrop;
-        double testStart = 0, testDropAt = 0;
-        bool tEmpty=false, tHover=false, tDrag=false, tVer=false, tReady=false, tSet=false, tDone=false;
-
-        App(const GameInfo& g, std::string cp, LauncherConfig& c): game(g), configPath(std::move(cp)), config(c) {}
+    private:
         bool Init();
         void Shutdown();
-        std::string Run();
-        void Event(const SDL_Event& e);
-        void Click(float x,float y);
-        void Update(double t, float dt);
-        void Test();
-        void StartVerify(const std::string& p);
+        bool LoadFonts();
+        void HandleEvent(const SDL_Event& event);
+        void Frame();
+        void DrawBackdrop();
+        void DrawSidebar();
+        void DrawPlay();
+        void DrawSkylanders();
+        void DrawSettings();
+        void DrawGraphics();
+        void DrawControls();
+        void DrawLanguage();
+        void DrawGameData();
+        void DrawAbout();
+        void DrawToast();
+
+        // Widgets in the launcher's style.
+        bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
+        bool PillButton(const char* label, bool primary = false, float width = 0);
+        bool Toggle(const char* id, bool* value);
+        template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback);
+        void SettingRow(const char* label, const char* hint);
+        void BeginCard(const char* id, ImVec2 size);
+        void EndCard();
+        void Title(const char* text, float size = TitleSize, unsigned color = Gold);
+
+        void StartVerify(const std::string& path);
         void FinishVerify();
         void Browse();
-        void BeginPlay();
-        void ToggleFS();
-        void Save();
-        void Toast(std::string m, double s=2.6);
-        void Cap(const std::string& n);
-        void PushDrop(const std::string& p);
-        void Add(const SDL_FRect& r, Act a, int idx=-1, bool en=true){ hs.push_back({r,a,idx,en}); }
-        bool Hover(const Hotspot& h){ return mouseInside && h.enabled && Contains(h.rect, mouse.x, mouse.y); }
-        void Draw();
-        void DrawHero();
-        void DrawBottomBar();
-        void DrawFooter();
-        void DrawSettings();
-        void DrawToast();
-        void DrawPortalDecor(float cx, float cy, float r, float t);
+        void Set(const char* section, const char* key, const std::string& value);
+        void Toast(std::string text) { m_toast = std::move(text); m_toastUntil = SDL_GetTicks() + 2500; }
+        void RefreshGamepads();
+        void LoadFigures();
+        std::vector<std::string> StartupFigures() const;
+        void SetStartupFigure(const std::string& file, bool on);
+        void Screenshot(const char* name);
+        void TestScript();
+
+        const GameInfo& m_game;
+        std::string m_configPath;
+        LauncherConfig& m_config;
+        std::string m_chosen;
+        bool m_running = true;
+
+        SDL_Window* m_window = nullptr;
+        SDL_Renderer* m_renderer = nullptr;
+        std::vector<uint8_t> m_fontData[2];
+        ImFont* m_textFont = nullptr;
+        ImFont* m_titleFont = nullptr;
+
+        Page m_page = Page::Play;
+        SettingsTab m_tab = SettingsTab::Graphics;
+        DiscState m_disc = DiscState::None;
+        std::string m_discPath;
+        uint64_t m_discSize = 0;
+        VerifyJob m_verify;
+        GameSourceCheck m_check;
+        TitleMetadata m_meta;
+        LauncherAssets::Provider m_assets;
+        SDL_Texture* m_icon = nullptr;
+        SDL_Texture* m_logo = nullptr;
+        SDL_Texture* m_hero = nullptr;
+        bool m_dragOver = false;
+
+        std::vector<SDL_JoystickID> m_gamepads;
+        const KeyAction* m_capturing = nullptr;
+        std::vector<FigureFile> m_figures;
+        bool m_figuresLoaded = false;
+
+        std::string m_toast;
+        uint64_t m_toastUntil = 0;
+        std::vector<ImVec4> m_stars; // x, y (0..1), radius, phase
+
+        // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
+        std::string m_shots, m_testDrop;
+        int m_testStep = 0;
+        uint64_t m_testAt = 0;
     };
+
+    // ---- Setup ---------------------------------------------------------------------------------------------------
+
+    bool App::LoadFonts()
+    {
+        std::vector<std::string> directories;
+        if (const char* directory = SDL_getenv("SSA_LAUNCHER_FONT_DIR"))
+            directories.emplace_back(directory);
+        if (const char* base = SDL_GetBasePath())
+        {
+            directories.emplace_back(std::string(base) + "fonts");
+            directories.emplace_back(std::string(base) + "../Resources/fonts");
+        }
+#ifdef SSA_SOURCE_FONT_DIR
+        directories.emplace_back(SSA_SOURCE_FONT_DIR);
+#endif
+        bool found = false;
+        for (const std::string& directory : directories)
+            if (ReadWholeFile(directory + "/Outfit-Variable.ttf", m_fontData[0]) && ReadWholeFile(directory + "/Bungee-Regular.ttf", m_fontData[1]))
+            {
+                found = true;
+                break;
+            }
+        if (!found)
+        {
+            m_fontData[0].assign(g_embeddedOutfit, g_embeddedOutfit + g_embeddedOutfitSize);
+            m_fontData[1].assign(g_embeddedBungee, g_embeddedBungee + g_embeddedBungeeSize);
+        }
+
+        ImGuiIO& io = ImGui::GetIO();
+        ImFontConfig config;
+        config.FontDataOwnedByAtlas = false; // the vectors outlive the atlas
+        m_textFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[0].data(), int(m_fontData[0].size()), TextSize, &config);
+        m_titleFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[1].data(), int(m_fontData[1].size()), TitleSize, &config);
+        return m_textFont != nullptr && m_titleFont != nullptr;
+    }
 
     bool App::Init()
     {
-        SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
-        const char* vd = SDL_GetCurrentVideoDriver();
-        bool off = vd && (strcmp(vd,"offscreen")==0 || strcmp(vd,"dummy")==0);
-        SDL_WindowFlags fl = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
-        SDL_PropertiesID props = SDL_CreateProperties();
-        SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Skylanders: Spyro's Adventure — Launcher");
-        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, 1280);
-        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, 800);
-        SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, static_cast<Sint64>(fl));
-        if (off) SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_EXTERNAL_GRAPHICS_CONTEXT_BOOLEAN, true);
-        win = SDL_CreateWindowWithProperties(props);
-        SDL_DestroyProperties(props);
-        if (!win) { fprintf(stderr, "launcher: window failed: %s\n", SDL_GetError()); return false; }
-        SDL_SetWindowMinimumSize(win, 1024, 640);
-        ren = off ? SDL_CreateRenderer(win, "software") : SDL_CreateRenderer(win, nullptr);
-        if (!ren) ren = SDL_CreateRenderer(win, "software");
-        if (!ren) { fprintf(stderr, "launcher: renderer failed\n"); return false; }
-        SDL_SetRenderLogicalPresentation(ren, 1280, 800, SDL_LOGICAL_PRESENTATION_LETTERBOX);
-        SDL_SetRenderVSync(ren, 1);
-        if (!painter.Init(ren)) { fprintf(stderr, "launcher: painter failed\n"); return false; }
-        widgets = new LauncherWidgets(&painter);
-        hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_POINTER);
-        arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_DEFAULT);
-        SDL_ShowCursor();
-        fullscreen = LauncherFullscreen(config);
-        if (fullscreen) SDL_SetWindowFullscreen(win, true);
-        if (const char* s = SDL_getenv("SSA_LAUNCHER_SHOTS")) { testMode = true; shotsDir = s; std::error_code ec; std::filesystem::create_directories(shotsDir,ec); }
-        if (const char* d = SDL_getenv("SSA_LAUNCHER_TEST_DROP")) testDrop = d;
-        now = last = NowSeconds(); testStart = now; testDropAt = now+1.25; phaseStart = now;
-        int ng=0; SDL_JoystickID* ids = SDL_GetGamepads(&ng);
-        if (ids){ if (ng>0) pad = SDL_OpenGamepad(ids[0]); SDL_free(ids); }
+        if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
+            return false;
+        // The offscreen driver (screenshot test) has no GPU: no graphics context for the window, software drawing.
+        const char* driver = SDL_GetCurrentVideoDriver();
+        bool offscreen = driver != nullptr && (std::string_view(driver) == "offscreen" || std::string_view(driver) == "dummy");
+        SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        if (ParseBool(SettingGet(m_config, "launcher", "fullscreen")))
+            flags |= SDL_WINDOW_FULLSCREEN;
+        SDL_PropertiesID properties = SDL_CreateProperties();
+        SDL_SetStringProperty(properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Skylauncher");
+        SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, int(WindowW));
+        SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, int(WindowH));
+        SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, Sint64(flags));
+        if (offscreen)
+            SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_EXTERNAL_GRAPHICS_CONTEXT_BOOLEAN, true);
+        m_window = SDL_CreateWindowWithProperties(properties);
+        SDL_DestroyProperties(properties);
+        if (m_window == nullptr)
+            return false;
+        SDL_SetWindowMinimumSize(m_window, int(WindowMinW), int(WindowMinH));
+        m_renderer = SDL_CreateRenderer(m_window, offscreen ? SDL_SOFTWARE_RENDERER : nullptr);
+        if (m_renderer == nullptr)
+            m_renderer = SDL_CreateRenderer(m_window, SDL_SOFTWARE_RENDERER);
+        if (m_renderer == nullptr)
+            return false;
+        SDL_SetRenderVSync(m_renderer, 1);
+
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = nullptr;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
+        Apply(ImGui::GetStyle());
+        if (!LoadFonts())
+            return false;
+        ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
+        ImGui_ImplSDLRenderer3_Init(m_renderer);
+
+        SDL_srand(7);
+        for (int i = 0; i < 140; i++)
+            m_stars.push_back(ImVec4(SDL_randf(), SDL_randf(), 0.6f + 1.4f * SDL_randf(), 6.28f * SDL_randf()));
+
+        if (const char* shots = SDL_getenv("SSA_LAUNCHER_SHOTS"))
+        {
+            m_shots = shots;
+            std::error_code error;
+            std::filesystem::create_directories(m_shots, error);
+            if (const char* drop = SDL_getenv("SSA_LAUNCHER_TEST_DROP"))
+                m_testDrop = drop;
+        }
+        RefreshGamepads();
         return true;
     }
 
     void App::Shutdown()
     {
-        verify.th.join();
-        // Textures returned by painter.LoadPng are owned by the painter and released in its Shutdown.
-        iconTex = nullptr;
-        logoTex = nullptr;
-        heroTex = nullptr;
-        delete widgets; widgets = nullptr;
-        painter.Shutdown();
-        if (pad) SDL_CloseGamepad(pad);
-        if (hand) SDL_DestroyCursor(hand);
-        if (arrow) SDL_DestroyCursor(arrow);
-        if (ren) SDL_DestroyRenderer(ren);
-        if (win) SDL_DestroyWindow(win);
+        m_verify.Join();
+        if (ImGui::GetCurrentContext() != nullptr)
+        {
+            ImGui_ImplSDLRenderer3_Shutdown();
+            ImGui_ImplSDL3_Shutdown();
+            ImGui::DestroyContext();
+        }
+        for (FigureFile& figure : m_figures)
+            if (figure.portrait != nullptr)
+                SDL_DestroyTexture(figure.portrait);
+        m_figures.clear();
+        for (SDL_Texture* texture : { m_icon, m_logo, m_hero })
+            if (texture != nullptr)
+                SDL_DestroyTexture(texture);
+        m_icon = m_logo = m_hero = nullptr;
+        if (m_renderer != nullptr)
+            SDL_DestroyRenderer(m_renderer);
+        if (m_window != nullptr)
+            SDL_DestroyWindow(m_window);
+        m_renderer = nullptr;
+        m_window = nullptr;
     }
 
     std::string App::Run()
     {
-        if (!Init()){ Shutdown(); return {}; }
-        std::string prev = SettingGet(config, game.id, "iso");
-        if (!testMode && !prev.empty()) StartVerify(prev);
-        while (running)
+        if (!Init())
         {
-            now = NowSeconds();
-            delta = static_cast<float>(std::clamp(now-last, 0.0, 0.1));
-            last = now;
-            SDL_Event e;
-            while (SDL_PollEvent(&e)) Event(e);
-            Update(now, delta);
-            Draw();
-            Test();
-            if (testMode) SDL_SetRenderVSync(ren, 0);
-            SDL_RenderPresent(ren);
-            if (!testMode) SDL_Delay(1); else SDL_Delay(4);
+            fprintf(stderr, "launcher: cannot open the window: %s\n", SDL_GetError());
+            return {};
         }
-        Shutdown();
-        return chosen;
+        if (std::string previous = SettingGet(m_config, m_game.id, "iso"); !previous.empty() && m_shots.empty())
+            StartVerify(previous);
+        while (m_running)
+        {
+            SDL_Event event;
+            while (SDL_PollEvent(&event))
+                HandleEvent(event);
+            if (m_disc == DiscState::Verifying && m_verify.done)
+                FinishVerify();
+            Frame();
+            TestScript();
+        }
+        return m_chosen;
     }
 
-    void App::Event(const SDL_Event& e)
+    // ---- Events and actions --------------------------------------------------------------------------------------
+
+    void App::HandleEvent(const SDL_Event& event)
     {
-        switch (e.type)
+        // A key binding being captured takes the next key press for itself.
+        if (m_capturing != nullptr && event.type == SDL_EVENT_KEY_DOWN)
         {
-        case SDL_EVENT_QUIT: running = false; break;
-        case SDL_EVENT_MOUSE_MOTION:
-        {
-            float x=0,y=0; if (SDL_RenderCoordinatesFromWindow(ren,e.motion.x,e.motion.y,&x,&y)){ mouse={x,y}; } else { mouse={e.motion.x,e.motion.y}; }
-            mouseInside = true; break;
+            if (event.key.key != SDLK_ESCAPE)
+                Set("input", (std::string("key_") + m_capturing->id).c_str(), SDL_GetKeyName(event.key.key));
+            m_capturing = nullptr;
+            return;
         }
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-            if (e.button.button == SDL_BUTTON_LEFT)
+        ImGui_ImplSDL3_ProcessEvent(&event);
+        switch (event.type)
+        {
+        case SDL_EVENT_QUIT:
+        case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+            m_running = false;
+            break;
+        case SDL_EVENT_DROP_BEGIN:
+        case SDL_EVENT_DROP_POSITION:
+            m_dragOver = true;
+            break;
+        case SDL_EVENT_DROP_COMPLETE:
+            m_dragOver = false;
+            break;
+        case SDL_EVENT_DROP_FILE:
+            m_dragOver = false;
+            if (event.drop.data != nullptr)
             {
-                float x=e.button.x,y=e.button.y; SDL_RenderCoordinatesFromWindow(ren,e.button.x,e.button.y,&x,&y);
-                if (settingsOpen && !Contains(SDL_FRect{ContentX, HeroY, ContentW, FooterY + FooterH - HeroY}, x,y)) { settingsOpen = false; break; }
-                Click(x,y);
+                m_page = Page::Play;
+                StartVerify(event.drop.data);
             }
             break;
-        case SDL_EVENT_KEY_DOWN:
-            if (e.key.repeat) break;
-            if (e.key.key == SDLK_ESCAPE){ if (settingsOpen) settingsOpen=false; else if (phase==Phase::Verifying){ verify.Cancel(); phase=Phase::Idle; phaseStart=now; srcPath.clear(); srcSize=0; Toast("Check cancelled."); } else running=false; break; }
-            if (e.key.key == SDLK_RETURN || e.key.key == SDLK_KP_ENTER || e.key.key == SDLK_SPACE){ if (settingsOpen) settingsOpen=false; else if (phase==Phase::Ready) BeginPlay(); else if (phase==Phase::Failed||phase==Phase::Idle) Browse(); break; }
-            if (e.key.key == SDLK_F1 || e.key.key == SDLK_COMMA){ settingsOpen = !settingsOpen; break; }
-            if (e.key.key == SDLK_F11){ ToggleFS(); break; }
-            break;
-        case SDL_EVENT_DROP_BEGIN: case SDL_EVENT_DROP_POSITION: dragOver = true; break;
-        case SDL_EVENT_DROP_COMPLETE: dragOver = false; break;
-        case SDL_EVENT_DROP_FILE: dragOver = false; if (e.drop.data && *e.drop.data) StartVerify(e.drop.data); break;
-        case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
-            if (e.gbutton.button == SDL_GAMEPAD_BUTTON_SOUTH){ if (settingsOpen) settingsOpen=false; else if (phase==Phase::Ready) BeginPlay(); else Browse(); }
-            else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_EAST){ if (settingsOpen) settingsOpen=false; else running=false; }
-            else if (e.gbutton.button == SDL_GAMEPAD_BUTTON_START){ settingsOpen = !settingsOpen; }
+        case SDL_EVENT_GAMEPAD_ADDED:
+        case SDL_EVENT_GAMEPAD_REMOVED:
+            RefreshGamepads();
             break;
         }
     }
 
-    void App::Click(float x,float y)
+    void App::Set(const char* section, const char* key, const std::string& value)
     {
-        mouse = {x,y};
-        for (auto it = hs.rbegin(); it != hs.rend(); ++it)
-        {
-            if (!Contains(it->rect,x,y)) continue;
-            if (!it->enabled && it->act == Act::Export){ Toast("Export for Xbox is coming in a later update."); return; }
-            if (settingsOpen && it->act != Act::CloseSettings && it->act != Act::ToggleFS &&
-                it->act != Act::Browse && it->act != Act::Quit) continue;
-            switch (it->act)
+        m_config[section][key] = value;
+        if (!SaveLauncherConfig(m_configPath, m_config))
+            Toast("Couldn't save the settings");
+    }
+
+    void App::StartVerify(const std::string& path)
+    {
+        m_disc = DiscState::Verifying;
+        m_discPath = path;
+        m_discSize = 0;
+        SDL_PathInfo info;
+        if (SDL_GetPathInfo(path.c_str(), &info))
+            m_discSize = info.size;
+        for (SDL_Texture** texture : { &m_icon, &m_logo, &m_hero })
+            if (*texture != nullptr)
             {
-            case Act::Browse: Browse(); return;
-            case Act::Play: if (phase==Phase::Ready) BeginPlay(); else Browse(); return;
-            case Act::Change: Browse(); return;
-            case Act::Settings: settingsOpen = true; return;
-            case Act::CloseSettings: settingsOpen = false; return;
-            case Act::Quit: running = false; return;
-            case Act::ToggleFS: ToggleFS(); return;
-            case Act::Export: Toast("Export for Xbox is coming in a later update."); return;
-            case Act::Cancel: verify.Cancel(); phase=Phase::Idle; phaseStart=now; srcPath.clear(); srcSize=0; Toast("Check cancelled."); return;
-            case Act::GameSel:
-                if (it->idx>=0)
-                {
-                    auto cat = LauncherGameCatalog();
-                    if ((size_t)it->idx < cat.size())
-                    {
-                        if (cat[it->idx].enabled) Toast("Drop your disc image to add this game.");
-                        else Toast(std::string(cat[it->idx].name) + " is coming in a later update.");
-                    }
-                }
-                return;
-            default: return;
+                SDL_DestroyTexture(*texture);
+                *texture = nullptr;
             }
-        }
-        // click on bottom drop area while idle
-        if (!settingsOpen && phase==Phase::Idle && Contains(SDL_FRect{ContentX, BarY, 608, BarH-4}, x,y)) Browse();
-        if (!settingsOpen && phase==Phase::Ready && Contains(SDL_FRect{ContentX, BarY, 608, BarH-4}, x,y)) Browse();
-    }
-
-    void App::Update(double t, float dt)
-    {
-        if (phase == Phase::Verifying)
-        {
-            float target = verify.P();
-            dispProg += (target - dispProg) * std::min(1.0f, dt * 12.0f);
-            if (target >= 1.0f) dispProg = 1.0f;
-            if (verify.done.load() && !compSched){ compSched = true; compAt = t + 0.24; }
-            if (compSched && t >= compAt) FinishVerify();
-        }
-        float tt = settingsOpen ? 1.0f : 0.0f;
-        settingsT += (tt - settingsT) * std::min(1.0f, dt * 16.0f);
-        if (settingsT < 0.001f) settingsT = 0;
-        bool handc = false;
-        for (const auto& h: hs){ if (Hover(h)){ handc=true; break; } }
-        if (hand && arrow) SDL_SetCursor(handc ? hand : arrow);
-    }
-
-    void App::StartVerify(const std::string& p)
-    {
-        verify.Cancel();
-        compSched = false; dispProg = 0;
-        phase = Phase::Verifying; phaseStart = now;
-        srcPath = p; srcSize = 0;
-        SDL_PathInfo info; if (SDL_GetPathInfo(p.c_str(), &info)) srcSize = static_cast<uint64_t>(info.size);
-        check = {}; meta = {};
-        iconTex = nullptr;
-        logoTex = nullptr;
-        heroTex = nullptr;
-        verify.Start(p, game);
+        m_verify.Start(path, m_game);
     }
 
     void App::FinishVerify()
     {
-        compSched = false;
-        check = verify.check;
-        verifyMs = static_cast<long long>((NowSeconds()-phaseStart)*1000.0);
-        if (check.status == GameSourceStatus::Ok)
+        m_verify.Join();
+        m_check = m_verify.check;
+        if (m_check.status != GameSourceStatus::Ok)
         {
-            meta = verify.meta;
-            if (!meta.iconPng.empty()) iconTex = painter.LoadPng({meta.iconPng.data(), meta.iconPng.size()});
-
-            // Pull the game's own frontend textures from the verified ISO. They are decoded to
-            // PNGs in SDL_GetPrefPath (never shipped); failure just leaves the procedural art.
-            assets.Init(srcPath, meta.titleId);
-            DiscFileSystem disc;
-            if (disc.Open(srcPath.c_str()))
-                assets.ExtractFromDisc(disc, meta);
-            logoTex = LoadCachedAsset(assets, LauncherAssets::Role::Logo, painter);
-            heroTex = LoadCachedAsset(assets, LauncherAssets::Role::HeroBackground, painter);
-
-            // Remember a verified disc immediately, even if the player closes the launcher without
-            // pressing PLAY. The next start can go straight to the game.
-            SettingSet(config, game.id, "iso", srcPath);
-            Save();
-            phase = Phase::Ready;
+            m_disc = DiscState::Failed;
+            return;
         }
-        else phase = Phase::Failed;
-        phaseStart = now;
+        m_meta = m_verify.meta;
+        if (!m_meta.iconPng.empty())
+            m_icon = LoadPng(m_renderer, m_meta.iconPng);
+        // The game's own art, decoded from the player's disc into the local cache (never shipped).
+        m_assets.Init(m_discPath, m_meta.titleId);
+        DiscFileSystem disc;
+        if (disc.Open(m_discPath.c_str()))
+            m_assets.ExtractFromDisc(disc, m_meta);
+        if (LauncherAssets::Asset logo = m_assets.Get(LauncherAssets::Role::Logo); logo.valid)
+            m_logo = LoadPngFile(m_renderer, logo.path);
+        if (LauncherAssets::Asset hero = m_assets.Get(LauncherAssets::Role::HeroBackground); hero.valid)
+            m_hero = LoadPngFile(m_renderer, hero.path);
+        Set(m_game.id, "iso", m_discPath); // remembered even if the player quits without playing
+        m_disc = DiscState::Ready;
     }
 
     void App::Browse()
     {
-        std::string prev = srcPath.empty() ? SettingGet(config,game.id,"iso") : srcPath;
-        std::string p = ChooseIsoDialog(win, game, prev);
-        if (!p.empty()) StartVerify(p);
+        std::string path = ChooseIsoDialog(m_window, m_game, m_discPath.empty() ? SettingGet(m_config, m_game.id, "iso") : m_discPath);
+        if (!path.empty())
+            StartVerify(path);
     }
 
-    void App::BeginPlay()
+    void App::RefreshGamepads()
     {
-        if (srcPath.empty()) return;
-        chosen = srcPath;
-        SettingSet(config, game.id, "iso", chosen);
-        Save();
-        running = false;
-    }
-
-    void App::ToggleFS()
-    {
-        fullscreen = !fullscreen;
-        SDL_SetWindowFullscreen(win, fullscreen);
-        SettingSet(config, "launcher", "fullscreen", fullscreen ? "1" : "0");
-        Save();
-        Toast(fullscreen ? "Fullscreen enabled" : "Windowed mode");
-    }
-
-    void App::Save()
-    {
-        if (!SaveLauncherConfig(configPath, config)) Toast("Couldn't save launcher settings");
-    }
-
-    void App::Toast(std::string m, double s){ toast = std::move(m); toastUntil = now + s; }
-
-    void App::Cap(const std::string& n)
-    {
-        if (shotsDir.empty()) return;
-        int w=0,h=0; if (!SDL_GetRenderOutputSize(ren,&w,&h)||w<=0||h<=0) return;
-        SDL_Surface* surf = SDL_RenderReadPixels(ren,nullptr);
-        if (!surf) return;
-        SDL_Surface* conv = SDL_ConvertSurface(surf, SDL_PIXELFORMAT_RGBA32); SDL_DestroySurface(surf);
-        if (!conv) return;
-        std::string path = shotsDir + "/" + n + ".png";
-        stbi_flip_vertically_on_write(0);
-        if (stbi_write_png(path.c_str(), conv->w, conv->h, 4, conv->pixels, conv->pitch)) fprintf(stderr, "launcher: shot %s\n", path.c_str());
-        SDL_DestroySurface(conv);
-    }
-
-    void App::PushDrop(const std::string& p)
-    {
-        SDL_Event ev{}; ev.type = SDL_EVENT_DROP_FILE; ev.drop.windowID = SDL_GetWindowID(win); ev.drop.data = p.c_str(); SDL_PushEvent(&ev);
-    }
-
-    void App::Test()
-    {
-        if (!testMode || tDone) return;
-        double t = now - testStart;
-        if (!tEmpty && t>0.4){ Cap("01-no-iso"); tEmpty=true; }
-        if (!tDrag && t>0.8){ dragOver=true; tDrag=true; }
-        if (tDrag && !tHover && t>1.05){ tHover=true; dragOver=false; }
-        if (!testDrop.empty() && !tVer && t>testDropAt-testStart){ PushDrop(testDrop); tVer=true; }
-        if (phase==Phase::Ready && !tSet && now-phaseStart>0.8){ Cap("02-verified"); settingsOpen=true; tSet=true; }
-        if (phase==Phase::Ready && tSet && settingsT>0.9 && now-phaseStart>1.8){ Cap("03-settings"); settingsOpen=false; tDone=true; running=false; }
-        if (phase==Phase::Failed && !tReady && now-phaseStart>0.5){ Cap("03-failed"); tReady=true; tSet=true; tDone=true; running=false; }
-    }
-
-    void App::DrawPortalDecor(float cx, float cy, float r, float t)
-    {
-        painter.Glow(SDL_FRect{cx-r*1.6f,cy-r*1.6f,r*3.2f,r*3.2f}, r*1.6f, Portal, 0.5f);
-        painter.Ring(cx,cy,r, 4, Alpha(Portal, 0.9f));
-        painter.Ring(cx,cy,r*0.72f, 2.6f, Alpha(Magic, 0.7f));
-        painter.Ring(cx,cy,r*0.48f, 2.0f, Alpha(Cyan, 0.6f));
-        const SDL_Color orbits[] = {Fire, Orange, Gold, Life, Water, Air, Magic, Undead};
-        for (int i=0;i<8;i++)
+        m_gamepads.clear();
+        int count = 0;
+        if (SDL_JoystickID* ids = SDL_GetGamepads(&count))
         {
-            float ang = t*0.28f + i*(6.283185f/8.0f);
-            float x = cx + std::cos(ang)*(r*0.84f), y = cy + std::sin(ang)*(r*0.84f);
-            painter.Circle(x,y,2.8f, Alpha(orbits[i], 0.9f));
-            painter.Circle(x,y,1.6f, Alpha(TextPrimary, 0.6f));
+            m_gamepads.assign(ids, ids + count);
+            SDL_free(ids);
         }
-        painter.Triangle(cx, cy-r*0.26f, cx-r*0.22f, cy+r*0.18f, cx+r*0.22f, cy+r*0.18f, Alpha(TextPrimary, 0.92f));
     }
 
-    void App::Draw()
+    void App::LoadFigures()
     {
-        hs.clear();
-        painter.Background(static_cast<float>(now));
-        // sidebar
-        painter.RoundRect(SDL_FRect{0,0,SidebarW,DesignH}, 0, Sidebar);
-        painter.FillRect(SDL_FRect{SidebarW-1, 0, 1, DesignH}, Alpha(Border, 0.7f));
-        // logo
-        painter.Glow(SDL_FRect{26, 20, 40, 40}, 20, Portal, 0.6f);
-        painter.Ring(46, 40, 16, 3, Alpha(Portal, 0.95f));
-        painter.Ring(46, 40, 10.5f, 2, Alpha(Magic, 0.7f));
-        for (int i=0;i<6;i++){ float ang = now*0.22f + i*1.0472f; float x=46+std::cos(ang)*12.8f,y=40+std::sin(ang)*12.8f; painter.Circle(x,y,1.8f, Alpha(Tech,0.9f)); }
-        painter.Text("SKYLANDERS", 78, 24, 20, TextPrimary, true, 0.8f);
-        painter.Text("RECOMPILED", 80, 52, 9, Alpha(Cyan,0.95f), false, 4.6f);
-        painter.Text("LAUNCHER", 82, 64, 8, TextDim, false, 3.4f);
-        painter.FillRect(SDL_FRect{18, 92, SidebarW-36, 1}, Alpha(Border,0.65f));
-
-        widgets->Label("YOUR GAMES", 26, 112, TextDim);
-        auto cat = LauncherGameCatalog();
-        for (size_t i=0;i<cat.size();i++)
+        m_figuresLoaded = true;
+        std::string folder = PreferencePath("figures");
+        std::string portraits = PreferencePath("portraits/");
+        std::error_code error;
+        for (const auto& entry : std::filesystem::directory_iterator(folder, error))
         {
-            const auto& e = cat[i];
-            SDL_FRect r{16, 142 + static_cast<float>(i)*66, SidebarW-32, 58};
-            SDL_Color ac = FromRgb(e.accent);
-            bool sel = std::string(e.id)==game.id;
-            bool hov = Hover(Hotspot{r,Act::GameSel,(int)i, e.enabled});
-            // adjust hover
-            std::string st;
-            if (!e.enabled) st = "COMING LATER";
-            else if (phase==Phase::Verifying && sel) st = "CHECKING";
-            else if (phase==Phase::Ready && sel) st = "READY";
-            else if (phase==Phase::Failed && sel) st = "DISC NOT USABLE";
-            else st = "ADD DISC";
-            widgets->SidebarItem(r, e.name, st, ac, e.enabled, sel, hov);
-            Add(r, Act::GameSel, (int)i, e.enabled);
+            std::string extension = entry.path().extension().string();
+            if (extension != ".sky" && extension != ".bin" && extension != ".dmp")
+                continue;
+            // The toy type sits unencrypted in block 1 (bytes 0x10-0x11, little endian).
+            std::ifstream file(entry.path(), std::ios::binary);
+            uint8_t header[0x12] = {};
+            if (!file.read(reinterpret_cast<char*>(header), sizeof(header)))
+                continue;
+            FigureFile figure;
+            figure.file = entry.path().filename().string();
+            figure.toy = figures::FindToy(uint16_t(header[0x10] | header[0x11] << 8));
+            if (figure.toy != nullptr)
+                if (std::string name = figures::PortraitImageName(*figure.toy); !name.empty())
+                    figure.portrait = LoadPngFile(m_renderer, portraits + name + ".png");
+            m_figures.push_back(std::move(figure));
         }
-        // settings bottom
-        SDL_FRect sr{16, DesignH-86, SidebarW-32, 48};
-        bool sh = false; for(auto&h:hs){ if(h.act==Act::Settings && Hover(h)){sh=true;break;}}
-        // draw gear
-        painter.RoundRect(sr, RadiusLg, settingsOpen ? Alpha(PanelRaised,0.9f): (sh?Alpha(PanelRaised,0.7f):Alpha(Panel,0.7f)));
-        painter.RoundRectOutline(sr, RadiusLg, 1.2f, settingsOpen?BorderBright:(sh?BorderBright:Border), Alpha(Panel,0));
-        float gx=sr.x+18, gy=sr.y+24;
-        for(int i=0;i<3;i++){ float y=gy-7+i*7; painter.FillRect(SDL_FRect{gx-7,y,gx+7-(gx-7),1.8f}, sh||settingsOpen?TextPrimary:TextSecondary); painter.Circle(gx+(i==0?-3:i==1?2:-1),y,2.2f, sh||settingsOpen?TextPrimary:TextSecondary);}
-        painter.Text("SETTINGS", sr.x+38, sr.y+16, 11, settingsOpen?TextPrimary:(sh?TextPrimary:TextSecondary), false, 1.6f);
-        painter.Text("F1", sr.x+SidebarW-52, sr.y+18, 8.5f, TextDim, false, 1.8f);
-        Add(sr, Act::Settings);
-        painter.TextCentered("MINECRAFT-STYLE · SKYLANDERS ART", SidebarW*0.5f, DesignH-28, 7.5f, TextDim, false, 2.2f);
+        std::sort(m_figures.begin(), m_figures.end(), [](const FigureFile& a, const FigureFile& b) {
+            int kindA = a.toy != nullptr ? int(a.toy->kind) : 9, kindB = b.toy != nullptr ? int(b.toy->kind) : 9;
+            return kindA != kindB ? kindA < kindB : a.file < b.file;
+        });
+    }
 
-        // content
-        if (settingsOpen && settingsT > 0.001f) DrawSettings();
+    std::vector<std::string> App::StartupFigures() const
+    {
+        std::vector<std::string> files;
+        std::string list = SettingGet(m_config, "portal", "place");
+        for (size_t begin = 0; begin < list.size();)
+        {
+            size_t end = std::min(list.find(',', begin), list.size());
+            if (end > begin)
+                files.push_back(list.substr(begin, end - begin));
+            begin = end + 1;
+        }
+        return files;
+    }
+
+    void App::SetStartupFigure(const std::string& file, bool on)
+    {
+        std::vector<std::string> files = StartupFigures();
+        files.erase(std::remove(files.begin(), files.end(), file), files.end());
+        if (on)
+            files.push_back(file);
+        std::string list;
+        for (const std::string& name : files)
+            list += (list.empty() ? "" : ",") + name;
+        Set("portal", "place", list);
+    }
+
+    // ---- Widgets -------------------------------------------------------------------------------------------------
+
+    void App::Title(const char* text, float size, unsigned color)
+    {
+        ImGui::PushFont(m_titleFont, size);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(color));
+        ImGui::TextUnformatted(text);
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+    }
+
+    bool App::BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled)
+    {
+        ImVec2 position = ImGui::GetCursorScreenPos();
+        ImGui::BeginDisabled(!enabled);
+        bool pressed = ImGui::InvisibleButton(label, size);
+        bool hovered = ImGui::IsItemHovered(), held = ImGui::IsItemActive();
+        ImGui::EndDisabled();
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        float lift = held ? 2.0f : 0.0f;
+        unsigned alpha = enabled ? 255 : 90;
+        if (hovered && enabled)
+            draw->AddRectFilled(ImVec2(position.x - 4, position.y - 4), ImVec2(position.x + size.x + 4, position.y + size.y + 4), Rgb(color, 60), Radius + 4);
+        draw->AddRectFilled(ImVec2(position.x, position.y + 6), ImVec2(position.x + size.x, position.y + size.y), Rgb(dark, alpha), Radius);
+        draw->AddRectFilled(ImVec2(position.x, position.y + lift), ImVec2(position.x + size.x, position.y + size.y - 6 + lift), Rgb(color, alpha), Radius);
+        draw->AddRectFilled(ImVec2(position.x + 8, position.y + 6 + lift), ImVec2(position.x + size.x - 8, position.y + size.y * 0.42f + lift), IM_COL32(255, 255, 255, enabled ? 40 : 15), Radius - 4);
+        ImGui::PushFont(m_titleFont, size.y * 0.42f);
+        ImVec2 text = ImGui::CalcTextSize(label, nullptr, true);
+        draw->AddText(ImVec2(position.x + (size.x - text.x) / 2, position.y + (size.y - 6 - text.y) / 2 + lift), Rgb(ink, alpha), label);
+        ImGui::PopFont();
+        return pressed && enabled;
+    }
+
+    bool App::PillButton(const char* label, bool primary, float width)
+    {
+        ImGui::PushStyleColor(ImGuiCol_Button, Rgb(primary ? Gold : PanelRaised));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? 0xFFD970 : 0x2F3784));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? GoldDark : 0x3A4290));
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(primary ? GoldInk : Text));
+        bool pressed = ImGui::Button(label, ImVec2(width, 40));
+        ImGui::PopStyleColor(4);
+        return pressed;
+    }
+
+    bool App::Toggle(const char* id, bool* value)
+    {
+        ImVec2 position = ImGui::GetCursorScreenPos();
+        ImVec2 size(54, 30);
+        bool pressed = ImGui::InvisibleButton(id, size);
+        if (pressed)
+            *value = !*value;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? Gold : Field), size.y / 2);
+        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? GoldDark : Border), size.y / 2, 2.0f);
+        float knob = *value ? position.x + size.x - size.y / 2 : position.x + size.y / 2;
+        draw->AddCircleFilled(ImVec2(knob, position.y + size.y / 2), size.y / 2 - 5, Rgb(*value ? GoldInk : TextSecondary));
+        return pressed;
+    }
+
+    void App::SettingRow(const char* label, const char* hint)
+    {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(label);
+        if (hint != nullptr)
+        {
+            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+            ImGui::TextWrapped("%s", hint);
+            ImGui::PopStyleColor();
+            ImGui::PopFont();
+        }
+        ImGui::TableSetColumnIndex(1);
+    }
+
+    template<size_t N>
+    bool App::Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback)
+    {
+        int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
+        bool changed = false;
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::BeginCombo(label, choices[index].label))
+        {
+            for (size_t i = 0; i < N; i++)
+                if (ImGui::Selectable(choices[i].label, int(i) == index))
+                {
+                    Set(section, key, choices[i].value);
+                    changed = true;
+                }
+            ImGui::EndCombo();
+        }
+        return changed;
+    }
+
+    void App::BeginCard(const char* id, ImVec2 size)
+    {
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Panel, 235));
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusLarge);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
+        ImGui::BeginChild(id, size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+    }
+
+    void App::EndCard()
+    {
+        ImGui::EndChild();
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
+    }
+
+    // ---- Screens -------------------------------------------------------------------------------------------------
+
+    void App::DrawBackdrop()
+    {
+        ImDrawList* draw = ImGui::GetBackgroundDrawList();
+        ImVec2 size = ImGui::GetIO().DisplaySize;
+        draw->AddRectFilledMultiColor(ImVec2(0, 0), size, Rgb(SkyTop), Rgb(SkyTop), Rgb(SkyBottom), Rgb(SkyBottom));
+        // The portal's glow, low on the right, and twinkling stars.
+        ImVec2 portal(size.x * 0.78f, size.y * 1.02f);
+        for (int ring = 6; ring > 0; ring--)
+            draw->AddCircleFilled(portal, size.y * 0.09f * ring, Rgb(PortalGlow, 10), 64);
+        float time = float(SDL_GetTicks()) / 1000.0f;
+        for (const ImVec4& star : m_stars)
+        {
+            float twinkle = 0.45f + 0.55f * (0.5f + 0.5f * std::sin(time * 1.3f + star.w));
+            draw->AddCircleFilled(ImVec2(star.x * size.x, star.y * size.y * 0.85f), star.z, IM_COL32(255, 255, 255, int(150 * twinkle)), 8);
+        }
+    }
+
+    void App::DrawSidebar()
+    {
+        ImVec2 size = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(SidebarW, size.y));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, Rgb(Sidebar, 240));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18, Pad));
+        ImGui::Begin("##sidebar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+
+        Title("SKYLAUNCHER", TitleSize + 2);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextUnformatted("Native PC ports");
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 18));
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::PushFont(nullptr, SmallSize);
+        ImGui::TextUnformatted("YOUR GAMES");
+        ImGui::PopFont();
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 4));
+
+        // The games: only those with a runtime can be selected.
+        for (const LauncherGameEntry& entry : LauncherGameCatalog())
+        {
+            ImGui::PushID(entry.id);
+            ImVec2 position = ImGui::GetCursorScreenPos();
+            float width = ImGui::GetContentRegionAvail().x;
+            bool selected = entry.enabled && std::string_view(entry.id) == m_game.id;
+            ImGui::BeginDisabled(!entry.enabled);
+            if (ImGui::InvisibleButton("game", ImVec2(width, 58)) && entry.enabled)
+                m_page = Page::Play;
+            bool hovered = ImGui::IsItemHovered();
+            ImGui::EndDisabled();
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            if (selected || hovered)
+                draw->AddRectFilled(position, ImVec2(position.x + width, position.y + 58), Rgb(selected ? PanelRaised : Panel), Radius);
+            if (selected)
+                draw->AddRect(position, ImVec2(position.x + width, position.y + 58), Rgb(Gold, 200), Radius, 2.0f);
+            unsigned accent = entry.accent;
+            ImVec2 badge(position.x + 29, position.y + 29);
+            draw->AddCircleFilled(badge, 19, Rgb(accent, entry.enabled ? 255 : 90));
+            ImGui::PushFont(m_titleFont, 18);
+            char letter[2] = { entry.name[0], 0 };
+            ImVec2 letterSize = ImGui::CalcTextSize(letter);
+            draw->AddText(ImVec2(badge.x - letterSize.x / 2, badge.y - letterSize.y / 2), Rgb(0x0B0F2E), letter);
+            ImGui::PopFont();
+            draw->AddText(ImVec2(position.x + 58, position.y + 9), Rgb(entry.enabled ? Text : TextDim), entry.name);
+            ImGui::PushFont(nullptr, SmallSize);
+            const char* status = !entry.enabled ? "Coming later" : m_disc == DiscState::Ready ? "Ready to play" : "Needs your disc";
+            draw->AddText(ImVec2(position.x + 58, position.y + 32), Rgb(entry.enabled ? (m_disc == DiscState::Ready ? Ok : Gold) : TextDim), status);
+            ImGui::PopFont();
+            ImGui::Dummy(ImVec2(0, 4));
+            ImGui::PopID();
+        }
+
+        ImGui::End();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+    }
+
+    void App::DrawPlay()
+    {
+        ImVec2 available = ImGui::GetContentRegionAvail();
+        float heroH = available.y - 150;
+
+        // Hero: the game's art from the player's disc, else the drawn sky.
+        ImVec2 position = ImGui::GetCursorScreenPos();
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImVec2 end(position.x + available.x, position.y + heroH);
+        draw->AddRectFilled(position, end, Rgb(Panel, 200), RadiusLarge);
+        if (m_hero != nullptr)
+            draw->AddImageRounded(Ref(m_hero), position, end, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 120), RadiusLarge);
+        draw->AddRectFilledMultiColor(ImVec2(position.x, position.y + heroH * 0.55f), end, IM_COL32(11, 15, 46, 0), IM_COL32(11, 15, 46, 0),
+            IM_COL32(11, 15, 46, 230), IM_COL32(11, 15, 46, 230));
+        draw->AddRect(position, end, Rgb(m_dragOver ? Gold : Border, m_dragOver ? 255 : 160), RadiusLarge, m_dragOver ? 4.0f : 1.5f);
+
+        if (m_logo != nullptr)
+        {
+            float w, h;
+            SDL_GetTextureSize(m_logo, &w, &h);
+            float scale = std::min(available.x * 0.62f / w, heroH * 0.55f / h);
+            ImVec2 logoSize(w * scale, h * scale);
+            ImVec2 logoAt(position.x + (available.x - logoSize.x) / 2, position.y + heroH * 0.08f);
+            draw->AddImage(Ref(m_logo), logoAt, ImVec2(logoAt.x + logoSize.x, logoAt.y + logoSize.y));
+        }
         else
         {
-            DrawHero();
-            DrawBottomBar();
+            ImGui::PushFont(m_titleFont, HeroSize);
+            const char* name = m_game.name;
+            ImVec2 text = ImGui::CalcTextSize(name, nullptr, false, available.x - 80);
+            ImGui::SetCursorScreenPos(ImVec2(position.x + 40, position.y + heroH * 0.22f));
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Gold));
+            ImGui::PushTextWrapPos(position.x + available.x - 40);
+            ImGui::TextUnformatted(name);
+            ImGui::PopTextWrapPos();
+            ImGui::PopStyleColor();
+            ImGui::PopFont();
+            (void)text;
         }
-        DrawFooter();
-        DrawToast();
+
+        // Disc status, bottom left of the hero.
+        ImGui::SetCursorScreenPos(ImVec2(position.x + 32, end.y - 118));
+        ImGui::BeginGroup();
+        if (m_icon != nullptr)
+        {
+            ImGui::Image(Ref(m_icon), ImVec2(64, 64));
+            ImGui::SameLine(0, 16);
+        }
+        ImGui::BeginGroup();
+        Title(m_meta.name.empty() ? m_game.name : m_meta.name.c_str(), TitleSize, Text);
+        switch (m_disc)
+        {
+        case DiscState::None:
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop your disc image (.iso) here, or choose it below.");
+            break;
+        case DiscState::Verifying:
+            ImGui::TextColored(ImColor(Rgb(Gold)), "%s...", m_verify.Stage().c_str());
+            ImGui::ProgressBar(m_verify.progress, ImVec2(360, 8), "");
+            break;
+        case DiscState::Ready:
+            ImGui::TextColored(ImColor(Rgb(Ok)), "Disc verified: %s", LauncherFormatSize(m_discSize).c_str());
+            break;
+        case DiscState::Failed:
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
+            ImGui::PushTextWrapPos(end.x - 40);
+            ImGui::TextWrapped("%s", m_check.message.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::PopStyleColor();
+            break;
+        }
+        ImGui::EndGroup();
+        ImGui::EndGroup();
+
+        // Bottom bar: the disc and the PLAY button.
+        ImGui::SetCursorScreenPos(ImVec2(position.x, end.y + 24));
+        ImGui::BeginGroup();
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextUnformatted("DISC IMAGE");
+        ImGui::PopStyleColor();
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+        ImGui::TextUnformatted(m_discPath.empty() ? "None yet" : LauncherMiddleEllipsis(m_discPath, 70).c_str());
+        ImGui::PopStyleColor();
+        if (PillButton(m_discPath.empty() ? "Choose disc image..." : "Change disc...", false, 220))
+            Browse();
+        ImGui::EndGroup();
+
+        ImGui::SetCursorScreenPos(ImVec2(position.x + available.x - PlayButtonW, end.y + 30));
+        bool ready = m_disc == DiscState::Ready;
+        if (BigButton("PLAY", ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, ready))
+        {
+            m_chosen = m_discPath;
+            Set(m_game.id, "iso", m_chosen);
+            m_running = false;
+        }
     }
 
-    void App::DrawHero()
+    void App::DrawSkylanders()
     {
-        SDL_FRect hero{ContentX, HeroY, ContentW, HeroH};
-        widgets->Panel(hero, RadiusXl, dragOver && phase==Phase::Idle, dragOver?Cyan:Portal);
-        // The player's own disc supplies this art; until an ISO is verified the panel stays procedural.
-        if (heroTex != nullptr)
-            painter.DrawTexture(heroTex, SDL_FRect{hero.x + hero.w - 470, hero.y - 24, 494, 494}, Alpha(Portal, 0.24f));
-        if (logoTex != nullptr)
+        if (!m_figuresLoaded)
+            LoadFigures();
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+        ImGui::TextWrapped("Choose who starts on the portal. Levels, gold and nicknames are edited in the game's Toy Box (F6 or Tab while playing); F7 puts the next figure on the portal.");
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 8));
+        if (PillButton("Open the figures folder", false, 260))
         {
-            SDL_FRect art{ContentRight - 290, HeroY + 270, 280, 140};
-            painter.Glow(art, RadiusXl, Gold, 0.30f);
-            painter.DrawTexture(logoTex, art, Alpha(TextPrimary, 0.95f));
-            painter.TextRight("ART FROM YOUR DISC", art.x + art.w, art.y + art.h + 4, 10.0f, TextSecondary, false, 0.6f);
+            std::string folder = PreferencePath("figures");
+            SDL_CreateDirectory(folder.c_str());
+            SDL_OpenURL(("file://" + folder).c_str());
         }
-        if (dragOver && phase==Phase::Idle) painter.DashedRoundRect(SDL_FRect{hero.x+10,hero.y+10,hero.w-20,hero.h-20}, RadiusXl-4, 1.6f, Alpha(Cyan,0.9f), 16, 10);
-        // decor
-        DrawPortalDecor(hero.x + hero.w - 132, hero.y + 44, 82, static_cast<float>(now));
-        // icon
-        SDL_FRect it{hero.x+44, hero.y+70, 168, 168};
-        painter.Glow(it, RadiusXl, Cyan, phase==Phase::Ready?0.8f:0.5f);
-        painter.RoundRectGradient(it, RadiusXl, Alpha(Night,0.98f), Alpha(Twilight,0.98f));
-        painter.RoundRectOutline(it, RadiusXl, 1.6f, Alpha(phase==Phase::Ready?Life:Portal, phase==Phase::Ready?0.9f:0.7f), Alpha(Panel,0));
-        if (iconTex && phase==Phase::Ready) painter.DrawTexture(iconTex, SDL_FRect{it.x+22,it.y+22,it.w-44,it.h-44}, TextPrimary);
+        ImGui::SameLine();
+        if (PillButton("Refresh", false, 120))
+        {
+            for (FigureFile& figure : m_figures)
+                if (figure.portrait != nullptr)
+                    SDL_DestroyTexture(figure.portrait);
+            m_figures.clear();
+            LoadFigures();
+        }
+        ImGui::Dummy(ImVec2(0, 10));
+
+        if (m_figures.empty())
+        {
+            BeginCard("##nofigures", ImVec2(0, 150));
+            Title("No figures yet", TitleSize, Text);
+            ImGui::TextWrapped("Start the game once: it creates a figure for every Skylander in the figures folder. You can also copy dumps of your own figures (.sky, .bin, .dmp) there.");
+            EndCard();
+            return;
+        }
+
+        std::vector<std::string> startup = StartupFigures();
+        ImGui::BeginChild("##figuregrid", ImVec2(0, 0), ImGuiChildFlags_None);
+        float cell = 150, width = ImGui::GetContentRegionAvail().x;
+        int columns = std::max(1, int((width + 12) / (cell + 12)));
+        for (size_t i = 0; i < m_figures.size(); i++)
+        {
+            FigureFile& figure = m_figures[i];
+            if (i % columns != 0)
+                ImGui::SameLine(0, 12);
+            ImGui::PushID(int(i));
+            bool onPortal = std::find(startup.begin(), startup.end(), figure.file) != startup.end();
+            ImVec2 position = ImGui::GetCursorScreenPos();
+            if (ImGui::InvisibleButton("figure", ImVec2(cell, cell + 34)))
+            {
+                SetStartupFigure(figure.file, !onPortal);
+                Toast(onPortal ? "Taken off the portal" : "Will start on the portal");
+            }
+            bool hovered = ImGui::IsItemHovered();
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            ImVec2 end(position.x + cell, position.y + cell + 34);
+            draw->AddRectFilled(position, end, Rgb(onPortal ? PanelRaised : Panel, 235), Radius);
+            draw->AddRect(position, end, Rgb(onPortal ? Gold : hovered ? BorderBright : Border), Radius, onPortal ? 3.0f : 1.5f);
+            ImU32 color = figure.toy != nullptr ? figures::ElementColor(figure.toy->element) : Rgb(Border);
+            ImVec2 center(position.x + cell / 2, position.y + cell / 2 - 4);
+            draw->AddCircleFilled(center, cell * 0.36f, color, 48);
+            if (figure.portrait != nullptr)
+                draw->AddImageRounded(Ref(figure.portrait), ImVec2(center.x - cell * 0.34f, center.y - cell * 0.34f),
+                    ImVec2(center.x + cell * 0.34f, center.y + cell * 0.34f), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, cell * 0.34f);
+            std::string name = figure.toy != nullptr ? figure.toy->name : figure.file;
+            ImVec2 text = ImGui::CalcTextSize(name.c_str());
+            draw->AddText(ImVec2(position.x + std::max(6.0f, (cell - text.x) / 2), end.y - 30), Rgb(Text), name.c_str());
+            if (onPortal)
+            {
+                draw->AddRectFilled(ImVec2(position.x + 8, position.y + 8), ImVec2(position.x + 70, position.y + 30), Rgb(Gold), 11);
+                ImGui::PushFont(nullptr, SmallSize);
+                draw->AddText(ImVec2(position.x + 16, position.y + 10), Rgb(GoldInk), "PORTAL");
+                ImGui::PopFont();
+            }
+            ImGui::PopID();
+        }
+        ImGui::EndChild();
+    }
+
+    void App::DrawGraphics()
+    {
+        if (!ImGui::BeginTable("##graphics", 2, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX))
+            return;
+        ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch, 0.55f);
+        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch, 0.45f);
+
+        SettingRow("Fullscreen", "Play in fullscreen instead of a window.");
+        bool fullscreen = ParseBool(SettingGet(m_config, "video", "fullscreen"));
+        if (Toggle("##fullscreen", &fullscreen))
+            Set("video", "fullscreen", fullscreen ? "1" : "0");
+
+        SettingRow("Resolution scale", "Renders the 3D at a multiple of the console's resolution: sharper, heavier on the GPU.");
+        int scale = std::clamp(SettingInt(m_config, "video", "resolution_scale", 1), 1, 10);
+        ImGui::SetNextItemWidth(-1);
+        if (ImGui::SliderInt("##scale", &scale, 1, 10, "x%d"))
+            Set("video", "resolution_scale", std::to_string(scale));
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::Text("%d x %d for the 3D scene", 1120 * scale, 704 * scale);
+        ImGui::PopStyleColor();
+
+        SettingRow("Frame rate limit", "The game was made for 30 FPS; higher limits are experimental.");
+        Combo("##fps", "video", "fps_limit", FpsChoices, 0);
+
+        SettingRow("VSync", "Waits for the screen's refresh: no tearing, a little more latency.");
+        bool vsync = ParseBool(SettingGet(m_config, "video", "vsync", "1"));
+        if (Toggle("##vsync", &vsync))
+            Set("video", "vsync", vsync ? "1" : "0");
+
+        SettingRow("Texture filtering", "Anisotropic filtering keeps ground textures sharp at an angle.");
+        Combo("##filter", "video", "anisotropy", FilterChoices, 0);
+        ImGui::EndTable();
+    }
+
+    void App::DrawControls()
+    {
+        // The device the game listens to.
+        std::string device = SettingGet(m_config, "input", "device", "auto");
+        std::string guid = SettingGet(m_config, "input", "gamepad");
+        std::vector<std::pair<std::string, std::string>> options = { { "auto", "Automatic (first gamepad, else keyboard)" }, { "keyboard", "Keyboard" } };
+        for (SDL_JoystickID id : m_gamepads)
+        {
+            char text[64];
+            SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), text, sizeof(text));
+            const char* name = SDL_GetGamepadNameForID(id);
+            options.emplace_back(std::string("gamepad:") + text, name != nullptr ? name : "Gamepad");
+        }
+        std::string current = device == "gamepad" ? "gamepad:" + guid : device;
+        std::string currentLabel = "Automatic (first gamepad, else keyboard)";
+        for (const auto& [value, label] : options)
+            if (value == current)
+                currentLabel = label;
+        if (device == "gamepad" && currentLabel.starts_with("Automatic"))
+            currentLabel = "Saved gamepad (not connected)";
+
+        Title("Controller", TitleSize, Text);
+        ImGui::SetNextItemWidth(520);
+        if (ImGui::BeginCombo("##device", currentLabel.c_str()))
+        {
+            for (const auto& [value, label] : options)
+                if (ImGui::Selectable(label.c_str(), value == current))
+                {
+                    if (value.starts_with("gamepad:"))
+                    {
+                        Set("input", "device", "gamepad");
+                        Set("input", "gamepad", value.substr(8));
+                    }
+                    else
+                        Set("input", "device", value);
+                }
+            ImGui::EndCombo();
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::Text("%d gamepad(s) connected. Xbox, PlayStation, Switch and most other controllers work.", int(m_gamepads.size()));
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 12));
+
+        Title("Portal of Power", TitleSize, Text);
+        ImGui::SetNextItemWidth(520);
+        Combo("##portal", "portal", "mode", PortalChoices, 0);
+        ImGui::Dummy(ImVec2(0, 12));
+
+        // Keyboard bindings, two columns of actions.
+        Title("Keyboard", TitleSize, Text);
+        ImGui::SameLine(0, 24);
+        if (PillButton("Reset to defaults", false, 200))
+        {
+            for (const KeyAction& action : KeyActions)
+                m_config["input"].erase(std::string("key_") + action.id);
+            Set("input", "device", SettingGet(m_config, "input", "device", "auto"));
+            Toast("Keyboard bindings reset");
+        }
+        if (m_capturing != nullptr)
+            ImGui::TextColored(ImColor(Rgb(Gold)), "Press a key for \"%s\" (Escape cancels)", m_capturing->label);
         else
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "Click a key to change it.");
+        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingStretchProp))
         {
-            painter.Ring(it.x+84, it.y+84, 52, 4, Alpha(Portal,0.9f));
-            painter.Ring(it.x+84, it.y+84, 34, 3, Alpha(Magic,0.7f));
-            painter.Triangle(it.x+84, it.y+60, it.x+66, it.y+98, it.x+102, it.y+98, Alpha(TextPrimary,0.95f));
+            for (size_t i = 0; i < std::size(KeyActions); i++)
+            {
+                const KeyAction& action = KeyActions[i];
+                if (i % 2 == 0)
+                    ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted(action.label);
+                ImGui::TableNextColumn();
+                std::string key = SettingGet(m_config, "input", std::string("key_") + action.id, SDL_GetKeyName(action.fallback));
+                bool duplicate = false;
+                for (const KeyAction& other : KeyActions)
+                    if (&other != &action && SettingGet(m_config, "input", std::string("key_") + other.id, SDL_GetKeyName(other.fallback)) == key)
+                        duplicate = true;
+                ImGui::PushID(action.id);
+                ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Gold : Field));
+                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? GoldInk : duplicate ? Danger : Text));
+                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(160, 34)))
+                    m_capturing = &action;
+                ImGui::PopStyleColor(2);
+                if (duplicate && ImGui::IsItemHovered())
+                    ImGui::SetTooltip("This key is used by another action");
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
         }
-        // text
-        widgets->Label("SELECTED GAME", ContentX+244, HeroY+70, TextDim);
-        std::string title = Upper(game.name);
-        float ts = 36; while(ts>26 && painter.Measure(title,ts,true,0.7f)>680) ts -= 2;
-        painter.Text(title, ContentX+246, HeroY+88, ts, TextPrimary, true, 0.7f);
-        widgets->Label(phase==Phase::Ready?"DISC VERIFIED · READY TO PLAY":"DROP YOUR ISO TO VERIFY · RUNS FROM YOUR OWN DISC", ContentX+248, HeroY+142, TextSecondary);
-        // chips
-        float cx=ContentX+248, cy=HeroY+178;
-        auto chip = [&](const std::string& t, SDL_Color c, bool f){ float w=painter.Measure(t,9,0,1.8f)+24; widgets->Chip(SDL_FRect{cx,cy,w,22}, t, c, f); cx += w+10; };
-        chip(game.releases.empty()?"USA/EUROPE":Upper(game.releases[0].label), Gold, false);
-        if (phase==Phase::Ready) chip("VERIFIED", Life, true);
-        else if (phase==Phase::Verifying) chip("CHECKING", Orange, false);
-        else if (phase==Phase::Failed) chip("NOT USABLE", Red, false);
-        else chip("NO DISC", TextDim, false);
-        if (srcSize>0) chip(LauncherFormatSize(srcSize), TextDim, false);
-        // description
-        painter.Text("Magical cartoon adventure · Skylanders style · built from your own disc. No bundled artwork.", ContentX+248, HeroY+220, 12, TextSecondary);
-        painter.Text("Design ready for Giants, Swap Force, Trap Team, SuperChargers, Imaginators.", ContentX+248, HeroY+248, 11, TextDim);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextUnformatted("F6/Tab opens the Toy Box, F7 places the next figure, F8 removes them all.");
+        ImGui::PopStyleColor();
     }
 
-    void App::DrawBottomBar()
+    void App::DrawLanguage()
     {
-        SDL_FRect bar{ContentX, BarY, ContentW, BarH};
-        widgets->Panel(bar, RadiusXl);
-        // drop/play area
-        SDL_FRect drop{ContentX+16, BarY+18, 616, BarH-36};
-        bool dh = Hover(Hotspot{drop, phase==Phase::Ready?Act::Browse:Act::Browse, -1, true});
-        if (dragOver && phase==Phase::Idle) painter.Glow(drop, RadiusLg, Cyan, 0.9f);
-        painter.RoundRect(drop, RadiusLg, Alpha(PanelRaised, dh?0.95f:0.78f));
-        painter.RoundRectOutline(drop, RadiusLg, 1.4f, (dragOver&&phase==Phase::Idle)?Cyan:(dh?BorderBright:Border), Alpha(Panel,0));
-        if (dragOver && phase==Phase::Idle) painter.DashedRoundRect(SDL_FRect{drop.x+8,drop.y+8,drop.w-16,drop.h-16}, RadiusLg-4, 1.2f, Alpha(Cyan,0.9f), 14, 8);
-        // disc
-        painter.Circle(drop.x+38, drop.y+34, 16, Alpha(Night,0.9f));
-        painter.Ring(drop.x+38, drop.y+34, 15, 2, Alpha(phase==Phase::Ready?Life:(phase==Phase::Verifying?Orange:(phase==Phase::Failed?Red:Cyan)), 0.9f));
-        if (phase==Phase::Ready) { float d=7; painter.FillRect(SDL_FRect{drop.x+38-2,drop.y+34-d/2,4,d}, Life); painter.FillRect(SDL_FRect{drop.x+38-d/2,drop.y+34-2,d,4}, Life); }
-        else if (phase==Phase::Verifying) { float a=now*4; float x1=drop.x+38+std::cos(a)*9,y1=drop.y+34+std::sin(a)*9,x2=drop.x+38+std::cos(a+2.09)*9,y2=drop.y+34+std::sin(a+2.09)*9,x3=drop.x+38+std::cos(a+4.18)*9,y3=drop.y+34+std::sin(a+4.18)*9; painter.Circle(x1,y1,2,Orange); painter.Circle(x2,y2,2,Orange); painter.Circle(x3,y3,2,Orange); }
-        else if (phase==Phase::Failed) { float k=6; painter.FillRect(SDL_FRect{drop.x+38-k,drop.y+34-k,2*k,2*k}, Red); /* rough X via circles */ for(int i=0;i<2;i++){ float ang=i*1.5708f; painter.Circle(drop.x+38+std::cos(ang)*8,drop.y+34+std::sin(ang)*8,1.6f,Red);} }
-        else { painter.Ring(drop.x+38, drop.y+34, 9, 1.6f, Alpha(Cyan,0.8f)); painter.Circle(drop.x+38, drop.y+34, 3, Alpha(Gold,0.9f)); }
-        if (phase==Phase::Idle)
-        { painter.Text("DROP YOUR ISO HERE", drop.x+72, drop.y+18, 16, TextPrimary, true, 0.6f); painter.Text(dh?"CLICK TO BROWSE · DRAG & DROP ANYWHERE":"DRAG & DROP · OR CLICK BROWSE", drop.x+74, drop.y+44, 11, TextSecondary); }
-        else if (phase==Phase::Verifying)
-        { painter.Text("VERIFYING DISC", drop.x+72, drop.y+14, 14, TextPrimary, true, 0.5f); std::string st=verify.S(); painter.Text(painter.Ellipsize(st, 320, 11), drop.x+74, drop.y+36, 11, Cyan); SDL_FRect pb{drop.x+74, drop.y+54, 520, 8}; widgets->ProgressBar(pb, dispProg, Cyan, Magic); painter.TextRight(fmt::format("{}%",(int)(dispProg*100)), pb.x+pb.w, drop.y+52, 9, TextSecondary); }
-        else if (phase==Phase::Ready)
-        { std::string nm = srcPath.empty()?"verified.iso":FileNameOnly(srcPath); painter.Text(painter.Ellipsize(nm, 420, 14), drop.x+72, drop.y+18, 14, TextPrimary, true, 0.4f); painter.Text(fmt::format("Verified · {} · Saved to launcher.ini", LauncherFormatSize(srcSize)), drop.x+74, drop.y+42, 11, Life); }
-        else if (phase==Phase::Failed)
-        { painter.Text("DISC CHECK FAILED", drop.x+72, drop.y+18, 14, TextPrimary, true, 0.4f); std::string m = check.message.empty()?"Try another image":check.message; painter.Text(painter.Ellipsize(m, 440, 10), drop.x+74, drop.y+42, 10, TextSecondary); }
-        Add(drop, Act::Browse);
-        if (phase==Phase::Failed){ SDL_FRect cb{drop.x+drop.w-130, drop.y+18, 112, 34}; widgets->Button(cb, "TRY AGAIN", ButtonStyle::Accent, true, Hover(Hotspot{cb,Act::Browse,-1,true}), 10.5f); Add(cb,Act::Browse); }
-        // play
-        SDL_FRect pb{ContentRight-264, BarY+16, 248, PlayButtonH};
-        bool pen = phase==Phase::Ready;
-        widgets->Button(pb, pen?"PLAY":"ADD DISC", ButtonStyle::Primary, pen, Hover(Hotspot{pb,Act::Play,-1,pen}), 18.0f);
-        if (!pen) painter.TextCentered("Click to choose an ISO", pb.x+pb.w*0.5f, pb.y+pb.h+6, 9, TextDim);
-        else painter.TextCentered("Enter / click to launch", pb.x+pb.w*0.5f, pb.y+pb.h+6, 9, Alpha(Life,0.9f));
-        Add(pb, Act::Play, -1, true);
+        if (!ImGui::BeginTable("##language", 2, ImGuiTableFlags_SizingStretchProp))
+            return;
+        ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch, 0.55f);
+        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch, 0.45f);
+        SettingRow("Text", "Menus, subtitles and on-screen text.");
+        Combo("##text", m_game.id, "language", LanguageChoices, 0);
+        SettingRow("Voices", "Spoken lines and cutscenes. They can differ from the text.");
+        Combo("##voice", m_game.id, "voice_language", LanguageChoices, 0);
+        ImGui::EndTable();
     }
 
-    void App::DrawFooter()
+    void App::DrawGameData()
     {
-        painter.FillRect(SDL_FRect{ContentX, FooterY, ContentW, 1}, Alpha(Border,0.7f));
-        painter.FillRect(SDL_FRect{ContentX, FooterY, 140, 1}, Alpha(Portal,0.9f));
-        widgets->Label("SKYLANDERS RECOMPILED · PORTAL LAUNCHER", ContentX, FooterY+14, TextDim);
-        std::string iso = SettingGet(config,game.id,"iso");
-        if (!iso.empty()) painter.Text("ISO: " + LauncherMiddleEllipsis(iso, 68), ContentX, FooterY+34, 10, TextDim);
-        painter.TextRight("F1  SETTINGS", ContentRight, FooterY+14, 9, TextDim);
-        painter.TextRight("HOLD SHIFT / --LAUNCHER TO OPEN AGAIN", ContentRight, FooterY+34, 8.5f, TextDim);
-        // export
-        SDL_FRect ex{ContentRight-210, FooterY+16, 194, 38};
-        painter.RoundRect(ex, RadiusLg, Alpha(Panel,0.6f));
-        painter.RoundRectOutline(ex, RadiusLg, 1.1f, Border, Alpha(Panel,0));
-        painter.TextCentered("EXPORT FOR XBOX", ex.x+ex.w*0.5f-16, ex.y+12, 9, TextDim);
-        SDL_FRect bd{ex.x+ex.w-52, ex.y+10, 42, 18}; painter.RoundRect(bd, RadiusSm, Alpha(Gold,0.12f)); painter.RoundRectOutline(bd,RadiusSm,1,Alpha(Gold,0.4f),Alpha(Panel,0)); painter.TextCentered("SOON",bd.x+21,bd.y+5,7.5f,Alpha(Gold,0.9f));
-        Add(ex, Act::Export, -1, false);
+        Title("Disc image", TitleSize, Text);
+        ImGui::TextWrapped("%s", m_discPath.empty() ? "None chosen yet." : m_discPath.c_str());
+        if (m_disc == DiscState::Ready)
+            ImGui::TextColored(ImColor(Rgb(Ok)), "Verified, %s", LauncherFormatSize(m_discSize).c_str());
+        if (PillButton("Change disc...", true, 200))
+            Browse();
+        ImGui::Dummy(ImVec2(0, 16));
+        Title("Folders", TitleSize, Text);
+        auto folder = [&](const char* label, const char* sub) {
+            std::string path = PreferencePath(sub);
+            if (PillButton(label, false, 260))
+            {
+                SDL_CreateDirectory(path.c_str());
+                SDL_OpenURL(("file://" + path).c_str());
+            }
+        };
+        folder("Saves and settings", "");
+        ImGui::SameLine();
+        folder("Figures", "figures");
+        ImGui::Dummy(ImVec2(0, 16));
+        Title("Game runtime", TitleSize, Text);
+        ImGui::TextWrapped("Skylauncher starts the game runtime (%s) next to it, or the one set as runtime= in the [launcher] section of %s.",
+            m_game.runtime, m_configPath.c_str());
+    }
+
+    void App::DrawAbout()
+    {
+        Title("Skylauncher", HeadlineSize);
+        ImGui::TextWrapped("A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown from the game is read from your own disc and kept on this computer.");
+        ImGui::Dummy(ImVec2(0, 8));
+        ImGui::TextWrapped("Made with SDL 3, Dear ImGui, stb, XenonRecomp's XEX readers, the Outfit and Bungee fonts (SIL OFL). Licences: THIRD_PARTY_NOTICES.md. Skylauncher is MIT licensed.");
+        ImGui::Dummy(ImVec2(0, 8));
+        if (PillButton("Project page", false, 200))
+            SDL_OpenURL("https://github.com/mflr0/Skylauncher");
+        ImGui::Dummy(ImVec2(0, 8));
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextWrapped("Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision.");
+        ImGui::PopStyleColor();
     }
 
     void App::DrawSettings()
     {
-        SDL_FRect area{ContentX, HeroY, ContentW, FooterY + FooterH - HeroY};
-        // header
-        widgets->Label("SETTINGS", ContentX, HeroY+6, TextDim);
-        painter.Text("Tweak language, display and game data. Looks like Minecraft Launcher, styled for Skylanders.", ContentX, HeroY+28, 12, TextSecondary);
-        SDL_FRect back{ContentRight-96, HeroY, 80, 34};
-        widgets->Button(back, "BACK", ButtonStyle::Secondary, true, Hover(Hotspot{back,Act::CloseSettings,-1,true}), 10.5f);
-        Add(back, Act::CloseSettings);
-        // cards left
-        SDL_FRect c1{ContentX, HeroY+64, 460, 210};
-        widgets->Panel(c1);
-        painter.Text("LANGUAGE", c1.x+18, c1.y+14, 11, TextPrimary, true, 0.8f);
-        painter.Text("From launcher.ini · keys language / voice_language", c1.x+20, c1.y+38, 10, TextDim);
-        // language row
-        SDL_FRect lr{c1.x+16, c1.y+64, c1.w-32, 44};
-        painter.RoundRect(lr, RadiusLg, Alpha(PanelRaised,0.7f));
-        painter.RoundRectOutline(lr,RadiusLg,1,Border,Alpha(Panel,0));
-        painter.Text("Text Language", lr.x+16, lr.y+14, 11, TextSecondary);
-        painter.TextRight(LauncherLanguageLabel(config,game), lr.x+lr.w-18, lr.y+16, 11, TextPrimary);
-        SDL_FRect vr{c1.x+16, c1.y+116, c1.w-32, 44};
-        painter.RoundRect(vr, RadiusLg, Alpha(PanelRaised,0.7f));
-        painter.RoundRectOutline(vr,RadiusLg,1,Border,Alpha(Panel,0));
-        painter.Text("Voice Language", vr.x+16, vr.y+14, 11, TextSecondary);
-        painter.TextRight(LauncherVoiceLabel(config,game), vr.x+vr.w-18, vr.y+16, 11, TextPrimary);
-        painter.Text("Cycle with the arrows in a future update · values saved to launcher.ini", c1.x+18, c1.y+178, 9.5f, TextDim);
-
-        SDL_FRect c2{ContentX, HeroY+290, 460, 174};
-        widgets->Panel(c2);
-        painter.Text("DISPLAY", c2.x+18, c2.y+14, 11, TextPrimary, true, 0.8f);
-        painter.Text("Windowing and rendering", c2.x+20, c2.y+38, 10, TextDim);
-        SDL_FRect fr{c2.x+16, c2.y+64, c2.w-32, 44};
-        painter.RoundRect(fr, RadiusLg, Alpha(PanelRaised,0.7f));
-        painter.RoundRectOutline(fr,RadiusLg,1,Border,Alpha(Panel,0));
-        painter.Text("Fullscreen", fr.x+16, fr.y+14, 11, TextSecondary);
-        SDL_FRect tg{fr.x+fr.w-72, fr.y+10, 56, 24}; widgets->Toggle(tg, fullscreen, true, Hover(Hotspot{tg,Act::ToggleFS,-1,true})); Add(tg,Act::ToggleFS);
-        SDL_FRect rr{c2.x+16, c2.y+114, c2.w-32, 44};
-        painter.RoundRect(rr, RadiusLg, Alpha(Panel,0.6f));
-        painter.RoundRectOutline(rr,RadiusLg,1,Border,Alpha(Panel,0));
-        painter.Text("Resolution Scale", rr.x+16, rr.y+14, 11, TextDim);
-        painter.TextRight("100%", rr.x+rr.w-70, rr.y+16, 11, TextDim);
-        SDL_FRect sb{rr.x+rr.w-56, rr.y+12, 42, 20}; painter.RoundRect(sb,RadiusSm,Alpha(Gold,0.12f)); painter.RoundRectOutline(sb,RadiusSm,1,Alpha(Gold,0.4f),Alpha(Panel,0)); painter.TextCentered("SOON",sb.x+21,sb.y+5,7.5f,Alpha(Gold,0.9f));
-
-        // right
-        SDL_FRect c3{ContentX+476, HeroY+64, ContentW-476, 242};
-        widgets->Panel(c3);
-        painter.Text("GAME DATA", c3.x+18, c3.y+14, 11, TextPrimary, true, 0.8f);
-        painter.Text("Your ISO stays local · saved in launcher.ini", c3.x+20, c3.y+38, 10, TextDim);
-        painter.Text("Current ISO", c3.x+20, c3.y+74, 10, TextDim);
-        std::string iso = SettingGet(config,game.id,"iso");
-        painter.Text(painter.Ellipsize(iso.empty()?"(none selected)":iso, c3.w-40, 11), c3.x+20, c3.y+94, 11, iso.empty()?TextDim:TextSecondary);
-        painter.Text(fmt::format("Status: {}", phase==Phase::Ready?"Verified and ready":(phase==Phase::Verifying?"Verifying":(phase==Phase::Failed?"Failed check":"Not checked"))), c3.x+20, c3.y+122, 11, phase==Phase::Ready?Life:(phase==Phase::Failed?Red:TextDim));
-        SDL_FRect ch{c3.x+18, c3.y+150, 190, ButtonH}; widgets->Button(ch, "CHANGE IMAGE", ButtonStyle::Accent, true, Hover(Hotspot{ch,Act::Browse,-1,true}), 11); Add(ch,Act::Browse);
-        SDL_FRect qp{c3.x+222, c3.y+150, 190, ButtonH}; widgets->Button(qp, "QUIT", ButtonStyle::Secondary, true, Hover(Hotspot{qp,Act::Quit,-1,true}), 11); Add(qp, Act::Quit);
-
-        SDL_FRect c4{ContentX+476, HeroY+322, ContentW-476, 142};
-        widgets->Panel(c4);
-        painter.Text("EXPORT FOR XBOX", c4.x+18, c4.y+14, 11, TextPrimary, true, 0.8f);
-        painter.Text("Produce an installable .msix with your own local build pipeline (disabled).", c4.x+20, c4.y+38, 10, TextDim);
-        SDL_FRect ex2{c4.x+18, c4.y+72, 210, ButtonH}; widgets->Button(ex2, "EXPORT FOR XBOX", ButtonStyle::Secondary, false, false, 11); Add(ex2,Act::Export,-1,false);
-
-        painter.Text("Settings file: " + LauncherMiddleEllipsis(configPath, 92), ContentX, HeroY+486, 9.5f, TextDim);
-        painter.Text("All colours, sizes and fonts are in host/launcher_theme.h · widgets in host/widgets/", ContentX, HeroY+506, 9.5f, TextDim);
+        constexpr std::pair<SettingsTab, const char*> Tabs[] = { { SettingsTab::Graphics, "Graphics" }, { SettingsTab::Controls, "Controls" },
+            { SettingsTab::Language, "Language" }, { SettingsTab::GameData, "Game data" }, { SettingsTab::About, "About" } };
+        for (const auto& [tab, label] : Tabs)
+        {
+            bool active = m_tab == tab;
+            ImGui::PushStyleColor(ImGuiCol_Button, Rgb(active ? Gold : PanelRaised));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(active ? Gold : 0x2F3784));
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(active ? GoldInk : Text));
+            if (ImGui::Button(label, ImVec2(150, 40)))
+            {
+                m_tab = tab;
+                m_capturing = nullptr;
+            }
+            ImGui::PopStyleColor(3);
+            ImGui::SameLine(0, 10);
+        }
+        ImGui::NewLine();
+        ImGui::Dummy(ImVec2(0, 8));
+        BeginCard("##settings", ImVec2(0, 0));
+        switch (m_tab)
+        {
+        case SettingsTab::Graphics: DrawGraphics(); break;
+        case SettingsTab::Controls: DrawControls(); break;
+        case SettingsTab::Language: DrawLanguage(); break;
+        case SettingsTab::GameData: DrawGameData(); break;
+        case SettingsTab::About: DrawAbout(); break;
+        }
+        EndCard();
     }
 
     void App::DrawToast()
     {
-        if (toast.empty() || now >= toastUntil) return;
-        float a = std::clamp(static_cast<float>((toastUntil-now)/0.4), 0.0f, 1.0f);
-        float w = painter.Measure(toast,12)+56;
-        SDL_FRect r{DesignW*0.5f - w*0.5f, 12, w, 38};
-        painter.RoundRect(r, RadiusLg, Alpha(SDL_Color{20,28,58,255}, 0.98f*a));
-        painter.RoundRectOutline(r,RadiusLg,1,Alpha(Cyan,0.4f*a),Alpha(Panel,0));
-        painter.Circle(r.x+20,r.y+19,3.5f,Alpha(Life,a));
-        painter.Text(toast, r.x+34, r.y+11, 12, Alpha(TextPrimary,a));
+        if (m_toast.empty() || SDL_GetTicks() > m_toastUntil)
+            return;
+        ImVec2 size = ImGui::GetIO().DisplaySize;
+        ImVec2 text = ImGui::CalcTextSize(m_toast.c_str());
+        ImVec2 position(size.x - text.x - 64, size.y - 72);
+        ImDrawList* draw = ImGui::GetForegroundDrawList();
+        draw->AddRectFilled(position, ImVec2(size.x - 24, size.y - 28), Rgb(PanelRaised, 245), Radius);
+        draw->AddRect(position, ImVec2(size.x - 24, size.y - 28), Rgb(Gold, 200), Radius, 2.0f);
+        draw->AddText(ImVec2(position.x + 20, position.y + 12), Rgb(Text), m_toast.c_str());
     }
+
+    void App::Frame()
+    {
+        ImGui_ImplSDLRenderer3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+        DrawBackdrop();
+        DrawSidebar();
+
+        ImVec2 size = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowPos(ImVec2(SidebarW, 0));
+        ImGui::SetNextWindowSize(ImVec2(size.x - SidebarW, size.y));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad + 8, Pad + 4));
+        ImGui::Begin("##page", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
+        // Pages as tabs across the top, like the Minecraft Launcher.
+        constexpr std::pair<Page, const char*> Pages[] = { { Page::Play, "PLAY" }, { Page::Skylanders, "MY SKYLANDERS" }, { Page::Settings, "SETTINGS" } };
+        for (const auto& [page, label] : Pages)
+        {
+            bool active = m_page == page;
+            ImGui::PushFont(m_titleFont, 18);
+            ImVec2 text = ImGui::CalcTextSize(label);
+            ImVec2 at = ImGui::GetCursorScreenPos();
+            if (ImGui::InvisibleButton(label, ImVec2(text.x + 8, text.y + 18)))
+            {
+                m_page = page;
+                m_capturing = nullptr;
+            }
+            bool hovered = ImGui::IsItemHovered();
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            draw->AddText(ImVec2(at.x + 4, at.y + 4), Rgb(active ? Gold : hovered ? Text : TextSecondary), label);
+            if (active)
+                draw->AddRectFilled(ImVec2(at.x, at.y + text.y + 12), ImVec2(at.x + text.x + 8, at.y + text.y + 16), Rgb(Gold), 2);
+            ImGui::PopFont();
+            ImGui::SameLine(0, 34);
+        }
+        ImGui::NewLine();
+        ImGui::Dummy(ImVec2(0, 6));
+        switch (m_page)
+        {
+        case Page::Play: DrawPlay(); break;
+        case Page::Skylanders: DrawSkylanders(); break;
+        case Page::Settings: DrawSettings(); break;
+        }
+        ImGui::End();
+        ImGui::PopStyleVar();
+        DrawToast();
+
+        ImGui::Render();
+        SDL_SetRenderDrawColor(m_renderer, 11, 15, 46, 255);
+        SDL_RenderClear(m_renderer);
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+        if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
+        {
+            static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-skylanders" };
+            Screenshot(Names[std::min(m_testStep, 4)]);
+            m_testAt = 0;
+            m_testStep++;
+        }
+        SDL_RenderPresent(m_renderer);
+    }
+
+    void App::Screenshot(const char* name)
+    {
+        SDL_Surface* surface = SDL_RenderReadPixels(m_renderer, nullptr);
+        if (surface == nullptr)
+            return;
+        if (SDL_Surface* rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32))
+        {
+            std::string path = m_shots + "/" + name + ".png";
+            if (stbi_write_png(path.c_str(), rgba->w, rgba->h, 4, rgba->pixels, rgba->pitch))
+                fprintf(stderr, "launcher: shot %s\n", path.c_str());
+            SDL_DestroySurface(rgba);
+        }
+        SDL_DestroySurface(surface);
+    }
+
+    // Screens of the screenshot test, each captured once it has settled.
+    void App::TestScript()
+    {
+        if (m_shots.empty() || m_testAt != 0)
+            return;
+        uint64_t now = SDL_GetTicks();
+        switch (m_testStep)
+        {
+        case 0:
+            m_testAt = now + 600;
+            break;
+        case 1:
+            if (m_disc == DiscState::None && !m_testDrop.empty())
+                StartVerify(m_testDrop);
+            if (m_disc == DiscState::Ready || m_disc == DiscState::Failed || m_testDrop.empty())
+                m_testAt = now + 400;
+            break;
+        case 2:
+            m_page = Page::Settings;
+            m_tab = SettingsTab::Graphics;
+            m_testAt = now + 400;
+            break;
+        case 3:
+            m_tab = SettingsTab::Controls;
+            m_testAt = now + 400;
+            break;
+        case 4:
+            m_page = Page::Skylanders;
+            m_testAt = now + 600;
+            break;
+        default:
+            m_running = false;
+            break;
+        }
+    }
+}
+
+void LauncherTheme::Apply(ImGuiStyle& style)
+{
+    style.WindowRounding = 0;
+    style.ChildRounding = RadiusLarge;
+    style.FrameRounding = RadiusSmall;
+    style.PopupRounding = RadiusSmall;
+    style.GrabRounding = RadiusSmall;
+    style.TabRounding = RadiusSmall;
+    style.ScrollbarRounding = RadiusSmall;
+    style.FramePadding = ImVec2(14, 9);
+    style.ItemSpacing = ImVec2(12, 12);
+    style.CellPadding = ImVec2(10, 12);
+    style.GrabMinSize = 22;
+    style.WindowBorderSize = 0;
+    style.ChildBorderSize = 1.5f;
+    style.FrameBorderSize = 1;
+    style.FontSizeBase = TextSize;
+    ImVec4* colors = style.Colors;
+    auto color = [](unsigned rgb, float alpha = 1.0f) {
+        return ImVec4(((rgb >> 16) & 0xFF) / 255.0f, ((rgb >> 8) & 0xFF) / 255.0f, (rgb & 0xFF) / 255.0f, alpha);
+    };
+    colors[ImGuiCol_Text] = color(Text);
+    colors[ImGuiCol_TextDisabled] = color(TextDim);
+    colors[ImGuiCol_WindowBg] = color(SkyTop, 0);
+    colors[ImGuiCol_ChildBg] = color(Panel, 0);
+    colors[ImGuiCol_PopupBg] = color(Panel, 0.98f);
+    colors[ImGuiCol_Border] = color(Border);
+    colors[ImGuiCol_FrameBg] = color(Field);
+    colors[ImGuiCol_FrameBgHovered] = color(0x1A1F5C);
+    colors[ImGuiCol_FrameBgActive] = color(0x232A78);
+    colors[ImGuiCol_Button] = color(PanelRaised);
+    colors[ImGuiCol_ButtonHovered] = color(0x2F3784);
+    colors[ImGuiCol_ButtonActive] = color(0x3A4290);
+    colors[ImGuiCol_Header] = color(PanelRaised);
+    colors[ImGuiCol_HeaderHovered] = color(0x2F3784);
+    colors[ImGuiCol_HeaderActive] = color(Gold, 0.35f);
+    colors[ImGuiCol_SliderGrab] = color(Gold);
+    colors[ImGuiCol_SliderGrabActive] = color(0xFFD970);
+    colors[ImGuiCol_CheckMark] = color(Gold);
+    colors[ImGuiCol_PlotHistogram] = color(Gold);
+    colors[ImGuiCol_ScrollbarBg] = color(SkyTop, 0);
+    colors[ImGuiCol_ScrollbarGrab] = color(Border);
+    colors[ImGuiCol_NavCursor] = color(Gold);
+    colors[ImGuiCol_TableRowBg] = color(Panel, 0);
+    colors[ImGuiCol_TableBorderLight] = color(Border, 0.5f);
 }
 
 std::span<const LauncherGameEntry> LauncherGameCatalog()
 {
-    static const LauncherGameEntry cat[] = {
+    static const LauncherGameEntry catalog[] = {
         { "ssa", "Spyro's Adventure", "Spyro's Adventure", 0x4AE3FF, true },
         { "giants", "Giants", "Giants", 0xFFC65C, false },
         { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, false },
@@ -799,59 +1389,72 @@ std::span<const LauncherGameEntry> LauncherGameCatalog()
         { "superchargers", "SuperChargers", "SuperChargers", 0xFF8A5C, false },
         { "imaginators", "Imaginators", "Imaginators", 0xB49BFF, false },
     };
-    return cat;
+    return catalog;
 }
 
 std::string LauncherLanguageLabel(const LauncherConfig& config, const GameInfo& game)
 {
-    std::string v = SettingGet(config,"launcher","language");
-    if (v.empty()) v = SettingGet(config,game.id,"language");
-    if (v.empty()) v = SettingGet(config,"","language");
-    if (v.empty()) return "English";
-    return v;
+    std::string code = SettingGet(config, game.id, "language", "en");
+    for (const Choice& choice : LanguageChoices)
+        if (code == choice.value)
+            return choice.label;
+    return code;
 }
 
 std::string LauncherVoiceLabel(const LauncherConfig& config, const GameInfo& game)
 {
-    std::string v = SettingGet(config,"launcher","voice_language");
-    if (v.empty()) v = SettingGet(config,game.id,"voice_language");
-    if (v.empty()) v = SettingGet(config,"","voice_language");
-    if (v.empty()) return "Same as text";
-    return v;
+    std::string code = SettingGet(config, game.id, "voice_language", "en");
+    for (const Choice& choice : LanguageChoices)
+        if (code == choice.value)
+            return choice.label;
+    return code;
 }
 
 bool LauncherFullscreen(const LauncherConfig& config)
 {
-    std::string v = SettingGet(config,"launcher","fullscreen");
-    if (v.empty()) v = SettingGet(config,"","fullscreen");
-    return ParseBool(v);
+    return ParseBool(SettingGet(config, "launcher", "fullscreen", SettingGet(config, "", "fullscreen")));
 }
 
 std::string LauncherFormatSize(uint64_t bytes)
 {
-    constexpr double KB=1024, MB=KB*1024, GB=MB*1024;
-    if (bytes>= (uint64_t)GB) return fmt::format("{:.1f} GB", double(bytes)/GB);
-    if (bytes>= (uint64_t)MB) return fmt::format("{:.0f} MB", double(bytes)/MB);
-    if (bytes>= (uint64_t)KB) return fmt::format("{:.0f} KB", double(bytes)/KB);
+    constexpr double KB = 1024, MB = KB * 1024, GB = MB * 1024;
+    if (bytes >= uint64_t(GB))
+        return fmt::format("{:.1f} GB", double(bytes) / GB);
+    if (bytes >= uint64_t(MB))
+        return fmt::format("{:.0f} MB", double(bytes) / MB);
+    if (bytes >= uint64_t(KB))
+        return fmt::format("{:.0f} KB", double(bytes) / KB);
     return fmt::format("{} bytes", bytes);
 }
 
 std::string LauncherMiddleEllipsis(std::string_view text, size_t max)
 {
-    if (text.size() <= max) return std::string(text);
-    if (max <= 3) return std::string(text.substr(0,max));
-    std::vector<size_t> b{0};
-    size_t p=0; while(p<text.size()){ unsigned char f=(unsigned char)text[p]; size_t len=f<0x80?1:(f>>5)==0x6?2:(f>>4)==0xE?3:4; p=std::min(text.size(),p+len); b.push_back(p); }
-    if (b.size()-1 <= max) return std::string(text);
-    size_t k=max-3, head=(k+1)/2, tail=k/2;
-    std::string r(text.substr(0,b[head])); r+="..."; r+=text.substr(b[b.size()-1-tail]); return r;
+    // Counts UTF-8 characters, not bytes.
+    std::vector<size_t> starts{ 0 };
+    for (size_t at = 0; at < text.size();)
+    {
+        unsigned char lead = static_cast<unsigned char>(text[at]);
+        at = std::min(text.size(), at + (lead < 0x80 ? 1 : (lead >> 5) == 0x6 ? 2 : (lead >> 4) == 0xE ? 3 : 4));
+        starts.push_back(at);
+    }
+    size_t characters = starts.size() - 1;
+    if (characters <= max)
+        return std::string(text);
+    if (max <= 3)
+        return std::string(text.substr(0, starts[max]));
+    size_t keep = max - 3, head = (keep + 1) / 2, tail = keep / 2;
+    return std::string(text.substr(0, starts[head])) + "..." + std::string(text.substr(starts[characters - tail]));
 }
 
-std::string LauncherDisplayName(std::string_view x, const GameInfo& game){ return x.empty()?std::string(game.name):std::string(x); }
+std::string LauncherDisplayName(std::string_view xdbfName, const GameInfo& game)
+{
+    return xdbfName.empty() ? std::string(game.name) : std::string(xdbfName);
+}
 
 std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const std::string& previous)
 {
+    if (!previous.empty())
+        config[game.id]["iso"] = previous;
     App app(game, configPath, config);
-    if (!previous.empty()) SettingSet(config, game.id, "iso", previous);
     return app.Run();
 }

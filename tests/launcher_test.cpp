@@ -233,16 +233,17 @@ int main(int argc, char** argv)
     EXPECT(enabledEntries == g_games.size());
 
     LauncherConfig helperConfig;
+    // The game reads "[ssa] language" / "voice_language" (codes); the labels name them, unknown codes stay as they are.
     EXPECT(LauncherLanguageLabel(helperConfig, game) == "English");
-    helperConfig[""]["language"] = "sv";
-    EXPECT(LauncherLanguageLabel(helperConfig, game) == "sv");
-    helperConfig["ssa"]["language"] = "French";
-    EXPECT(LauncherLanguageLabel(helperConfig, game) == "French");
-    helperConfig["launcher"]["language"] = "fr-FR";
-    EXPECT(LauncherLanguageLabel(helperConfig, game) == "fr-FR");
-    helperConfig["launcher"]["language"].clear();
+    EXPECT(LauncherVoiceLabel(helperConfig, game) == "English");
+    helperConfig["ssa"]["language"] = "fr";
+    EXPECT(LauncherLanguageLabel(helperConfig, game) == "Français");
+    helperConfig["ssa"]["voice_language"] = "sv";
+    EXPECT(LauncherVoiceLabel(helperConfig, game) == "Svenska");
+    helperConfig["ssa"]["language"] = "pt-BR";
+    EXPECT(LauncherLanguageLabel(helperConfig, game) == "pt-BR");
     helperConfig["ssa"]["language"].clear();
-    helperConfig[""]["language"].clear();
+    helperConfig["ssa"]["voice_language"].clear();
 
     EXPECT(!LauncherFullscreen(helperConfig));
     helperConfig["launcher"]["fullscreen"] = "YES";

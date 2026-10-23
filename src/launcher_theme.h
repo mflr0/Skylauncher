@@ -1,139 +1,55 @@
 #pragma once
 
-#include <SDL3/SDL.h>
-#include <algorithm>
-#include <cstdint>
+// The launcher's look in one place: colours, sizes and fonts. Change these first; the screens only use names from here.
+// Art direction: a Skylanders-like night sky (deep blue to purple), gold accents, the eight element colours, chunky
+// rounded buttons. There is no publisher artwork: the backdrop is drawn, game art comes from the player's own disc.
+#include <imgui.h>
 
-// Central theme for the Skylanders launcher: every colour, size and font lives here so the
-// look can be changed without touching the screens. The art direction is magical/cartoon
-// (deep blue and purple night sky, gold/orange accents, eight elemental colours, a glowing
-// Portal of Power ring). There is no publisher artwork anywhere: the background is drawn
-// procedurally and the game icon comes from the player's own disc image at runtime.
 namespace LauncherTheme
 {
-    // ---- Palette -----------------------------------------------------------------------
-    inline constexpr SDL_Color Ink{ 7, 10, 24, 255 };             // window backdrop / shadows
-    inline constexpr SDL_Color Night{ 12, 17, 44, 255 };          // deep blue night
-    inline constexpr SDL_Color Twilight{ 27, 15, 58, 255 };       // purple horizon
-    inline constexpr SDL_Color Panel{ 17, 23, 52, 246 };          // cards
-    inline constexpr SDL_Color PanelRaised{ 28, 37, 74, 255 };    // hovered cards, chips
-    inline constexpr SDL_Color Sidebar{ 10, 14, 36, 250 };        // left rail
-    inline constexpr SDL_Color Border{ 58, 72, 122, 255 };
-    inline constexpr SDL_Color BorderBright{ 112, 152, 255, 255 };
-
-    inline constexpr SDL_Color TextPrimary{ 242, 246, 255, 255 };
-    inline constexpr SDL_Color TextSecondary{ 178, 190, 226, 255 };
-    inline constexpr SDL_Color TextDim{ 126, 140, 184, 255 };
-
-    // Skylanders elemental accents (used by the game list and the portal decoration).
-    inline constexpr SDL_Color Fire{ 255, 122, 74, 255 };
-    inline constexpr SDL_Color Water{ 82, 170, 255, 255 };
-    inline constexpr SDL_Color Air{ 156, 226, 255, 255 };
-    inline constexpr SDL_Color Earth{ 166, 208, 112, 255 };
-    inline constexpr SDL_Color Life{ 128, 236, 142, 255 };
-    inline constexpr SDL_Color Undead{ 184, 146, 255, 255 };
-    inline constexpr SDL_Color Magic{ 224, 150, 255, 255 };
-    inline constexpr SDL_Color Tech{ 255, 214, 96, 255 };
-
-    // Interface accents.
-    inline constexpr SDL_Color Gold{ 255, 198, 92, 255 };
-    inline constexpr SDL_Color Portal{ 196, 132, 255, 255 };       // Portal of Power violet
-    inline constexpr SDL_Color Orange{ 255, 154, 64, 255 };
-    inline constexpr SDL_Color Cyan{ 90, 228, 255, 255 };
-    inline constexpr SDL_Color Green{ 108, 238, 178, 255 };
-    inline constexpr SDL_Color PlayGreen{ 105, 214, 116, 255 };       // Minecraft-like play button
-    inline constexpr SDL_Color PlayGreenHover{ 132, 240, 144, 255 };
-    inline constexpr SDL_Color Red{ 255, 112, 124, 255 };
-
-    // Short aliases used by the screen code and the widget layer.
-    inline constexpr SDL_Color White = TextPrimary;
-    inline constexpr SDL_Color Muted = TextSecondary;
-    inline constexpr SDL_Color Dim = TextDim;
-    inline constexpr SDL_Color Card = Panel;
-    inline constexpr SDL_Color CardRaised = PanelRaised;
-    inline constexpr SDL_Color Line = Border;
-    inline constexpr SDL_Color GreenPlay = PlayGreen;
-    inline constexpr SDL_Color GreenPlayHover = PlayGreenHover;
-    inline constexpr SDL_Color Magenta{ 255, 85, 168, 255 };
-
-    // ---- Layout (1280 x 800 design space) ----------------------------------------------
-    inline constexpr float DesignW = 1280.0f;
-    inline constexpr float DesignH = 800.0f;
-    inline constexpr float DesignWidth = DesignW;
-    inline constexpr float DesignHeight = DesignH;
-
-    inline constexpr float SidebarW = 248.0f;
-    inline constexpr float ContentX = 284.0f;
-    inline constexpr float ContentW = 952.0f;        // 284 .. 1236
-    inline constexpr float ContentRight = ContentX + ContentW;
-
-    inline constexpr float HeroY = 64.0f;
-    inline constexpr float HeroH = 416.0f;
-    inline constexpr float BarY = 496.0f;
-    inline constexpr float BarH = 104.0f;
-    inline constexpr float FooterY = 616.0f;
-    inline constexpr float FooterH = 80.0f;
-
-    inline constexpr float Gap = 16.0f;
-    inline constexpr float Pad = 24.0f;
-
-    // ---- Shape and type ----------------------------------------------------------------
-    inline constexpr float RadiusSm = 8.0f;
-    inline constexpr float RadiusMd = 12.0f;
-    inline constexpr float RadiusLg = 16.0f;
-    inline constexpr float RadiusXl = 22.0f;
-    inline constexpr float RadiusPill = 999.0f;
-
-    inline constexpr float ButtonH = 46.0f;
-    inline constexpr float PlayButtonH = 68.0f;
-
-    inline constexpr const char* FontBody = "Outfit";     // SIL Open Font License 1.1
-    inline constexpr const char* FontDisplay = "Bungee";   // SIL Open Font License 1.1
-
-    inline SDL_Color Alpha(SDL_Color color, float alpha)
+    constexpr ImU32 Rgb(unsigned rgb, unsigned alpha = 255)
     {
-        alpha = std::clamp(alpha, 0.0f, 1.0f);
-        color.a = static_cast<uint8_t>(alpha * 255.0f);
-        return color;
+        return IM_COL32((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF, alpha);
     }
 
-    inline SDL_Color Mix(SDL_Color a, SDL_Color b, float t)
-    {
-        t = std::clamp(t, 0.0f, 1.0f);
-        return SDL_Color{
-            static_cast<uint8_t>(a.r + (b.r - a.r) * t),
-            static_cast<uint8_t>(a.g + (b.g - a.g) * t),
-            static_cast<uint8_t>(a.b + (b.b - a.b) * t),
-            static_cast<uint8_t>(a.a + (b.a - a.a) * t),
-        };
-    }
+    // Backdrop gradient, top to bottom, and the glow behind the portal ring.
+    inline constexpr unsigned SkyTop = 0x0B0F2E;
+    inline constexpr unsigned SkyBottom = 0x2A1A5E;
+    inline constexpr unsigned PortalGlow = 0x5B3FD0;
 
-    inline SDL_Color FromRgb(uint32_t rgb)
-    {
-        return SDL_Color{ static_cast<uint8_t>(rgb >> 16), static_cast<uint8_t>(rgb >> 8),
-            static_cast<uint8_t>(rgb), 255 };
-    }
+    inline constexpr unsigned Sidebar = 0x0A0D2A;
+    inline constexpr unsigned Panel = 0x161B4D;
+    inline constexpr unsigned PanelRaised = 0x222866;
+    inline constexpr unsigned Field = 0x0E1240;
+    inline constexpr unsigned Border = 0x3A3F8C;
+    inline constexpr unsigned BorderBright = 0x6F78E8;
 
-    inline SDL_Color ThemeAlpha(SDL_Color color, float alpha) { return Alpha(color, alpha); }
-    inline SDL_Color ThemeMix(SDL_Color a, SDL_Color b, float t) { return Mix(a, b, t); }
+    inline constexpr unsigned Text = 0xF4F1FF;
+    inline constexpr unsigned TextSecondary = 0xC9C5F0;
+    inline constexpr unsigned TextDim = 0x9C97D6;
 
-    // Common text sizes, so screens do not repeat magic numbers.
-    namespace Type
-    {
-        inline constexpr float DisplayLarge = 30.0f;
-        inline constexpr float DisplayMedium = 24.0f;
-        inline constexpr float Heading = 22.0f;
-        inline constexpr float BodyLarge = 15.0f;
-        inline constexpr float Body = 12.0f;
-        inline constexpr float BodySmall = 11.0f;
-        inline constexpr float Label = 10.0f;
-        inline constexpr float Caption = 9.0f;
-    }
+    inline constexpr unsigned Gold = 0xFFC233;      // titles, selection, sliders
+    inline constexpr unsigned GoldDark = 0xD98A00;  // bevel under gold buttons
+    inline constexpr unsigned GoldInk = 0x3A1C00;   // text on gold
+    inline constexpr unsigned Play = 0x3FCB5A;      // the PLAY button
+    inline constexpr unsigned PlayDark = 0x1F8F3A;
+    inline constexpr unsigned PlayInk = 0x06240F;
+    inline constexpr unsigned Danger = 0xF85149;
+    inline constexpr unsigned Ok = 0x48D17A;
 
-    inline constexpr SDL_Color BackgroundTop{ 6, 9, 23, 255 };
-    inline constexpr SDL_Color BackgroundMiddle{ 15, 12, 37, 255 };
-    inline constexpr SDL_Color BackgroundBottom{ 27, 10, 42, 255 };
+    // Element colours: air, earth, fire, water, magic, tech, life, undead.
+    inline constexpr unsigned Elements[8] = { 0x3E9FD8, 0x9A6233, 0xE0531F, 0x1F74D1, 0x8E44C9, 0xD08A00, 0x3E9B3F, 0x5E5A86 };
+
+    // Sizes in points (the window scales them to the display's pixel density).
+    inline constexpr float WindowW = 1280, WindowH = 800, WindowMinW = 1024, WindowMinH = 680;
+    inline constexpr float SidebarW = 270;
+    inline constexpr float Pad = 24;
+    inline constexpr float Radius = 14, RadiusSmall = 10, RadiusLarge = 22;
+    inline constexpr float PlayButtonW = 300, PlayButtonH = 72;
+
+    // Fonts: Outfit for text, Bungee for titles and buttons (both SIL OFL 1.1, resources/fonts).
+    inline constexpr float TextSize = 17, SmallSize = 14, TitleSize = 22, HeadlineSize = 34, HeroSize = 48;
+
+    // ImGui widget colours and shapes for the whole window.
+    void Apply(ImGuiStyle& style);
 }
-
-// Screens use the short names directly (White, Cyan, Type::Body, ...).
-using namespace LauncherTheme;

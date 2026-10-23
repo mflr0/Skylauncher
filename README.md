@@ -13,7 +13,10 @@ backgrounds) is read at run time from the disc image you provide, then cached on
 - Drag and drop of an `.iso`, or a Browse button. The image is checked: Xbox 360 file system, `default.xex`
   present and readable, and a release the runtime supports (SHA-256 of `default.xex`).
 - Once the disc is verified, the game's own name, icon and logo are shown.
-- Settings: text and voice language, fullscreen, display scale, game data. "Export for Xbox" is a placeholder.
+- Settings: graphics (fullscreen, resolution scale x1 to x10, frame rate limit, VSync, texture filtering), controls
+  (which gamepad or the keyboard, every key remappable, Portal of Power type), text and voice language, game data.
+- My Skylanders: your figures with their portraits from the game; pick the ones that start on the portal.
+- The game runtime reads the same settings file; `docs/settings.md` lists every key and which ones it applies yet.
 - The choice is saved in `launcher.ini`, shared with the game runtime. Its location is the SDL preferences folder
   of the app `SSARecomp`: `~/Library/Application Support/SSARecomp/` on macOS, `%APPDATA%\SSARecomp\` on Windows,
   `~/.local/share/SSARecomp/` on Linux.
@@ -55,7 +58,8 @@ If none is found, the launcher tells you where to set the path.
 
 ## Changing the look
 
-All colours, sizes and fonts are in `src/launcher_theme.h`, and the reusable widgets are in `src/widgets/`.
+The interface is drawn with Dear ImGui. All colours, sizes and fonts are in `src/launcher_theme.h`; the screens and the
+launcher's own widgets (big buttons, toggles, cards) are in `src/launcher_ui.cpp`.
 `docs/launcher_ui.md` explains the structure, how disc art is extracted and mapped to roles, and how to run the
 screenshot test, which renders every screen to PNG files without opening a window.
 
