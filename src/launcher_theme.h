@@ -1,8 +1,8 @@
 #pragma once
 
 // The launcher's look in one place: colours, sizes and fonts. Change these first; the screens only use names from here.
-// Art direction: a Skylanders-like night sky (deep blue to purple), gold accents, the eight element colours, chunky
-// rounded buttons. There is no publisher artwork: the backdrop is drawn, game art comes from the player's own disc.
+// Art direction: the game's sky behind (a drawn night sky before a disc is verified), neutral dark greys for the surfaces,
+// one blue accent, an orange bar for the sidebar's selection, the eight element colours, chunky rounded buttons. There is no publisher artwork: the backdrop is drawn, game art comes from the player's own disc.
 #include <imgui.h>
 
 namespace LauncherTheme
@@ -16,24 +16,43 @@ namespace LauncherTheme
     inline constexpr unsigned SkyTop = 0x0B0F2E;
     inline constexpr unsigned SkyBottom = 0x2A1A5E;
     inline constexpr unsigned PortalGlow = 0x5B3FD0;
+    inline constexpr unsigned BackdropShade = 70; // alpha of the night tint laid over the game's sky backdrop
 
-    inline constexpr unsigned Sidebar = 0x0A0D2A;
-    inline constexpr unsigned Panel = 0x161B4D;
-    inline constexpr unsigned PanelRaised = 0x222866;
-    inline constexpr unsigned Field = 0x0E1240;
-    inline constexpr unsigned Border = 0x3A3F8C;
-    inline constexpr unsigned BorderBright = 0x6F78E8;
+    // The sidebar: a cool dark grey (a touch of blue), light ink. The bottom band and its buttons are shades of the same grey.
+    inline constexpr unsigned Sidebar = 0x26262C; // Sidebar background color
+    inline constexpr unsigned SidebarHover = 0x47474F;    // a game row under the mouse
+    inline constexpr unsigned SidebarSelected = 0x55555E; // the selected row, with an orange bar on its left
+    inline constexpr unsigned SidebarInk = 0xF2F2F2;   // light text on the dark sidebar
+    inline constexpr unsigned SidebarInkDim = 0xFFFFFF;
+    inline constexpr unsigned Ready = 0x2EEA8F;     // green dot: the disc is verified
+    // The band under the game art, one step lighter than the sidebar; its buttons sit a step darker than the band, lighten
+    // under the mouse and darken when pressed. Every shade keeps the sidebar's hue (blue a little above red and green).
+    inline constexpr unsigned BottomBar = 0x3A3A44;
+    inline constexpr unsigned BottomBarRaised = 0x2C2C34, BottomBarRaisedHover = 0x34343E, BottomBarRaisedActive = 0x26262C;
+    inline constexpr unsigned BottomBarBorder = 0x50505E;
+    inline constexpr unsigned BottomBarInk = 0xF2F2F2;
+    inline constexpr unsigned BadgeInk = 0x15171C;     // initials on the coloured game badges
+    // Surfaces (settings cards, fields, buttons, menus): the sidebar's neutral greys, each with its hover and pressed shade.
+    inline constexpr unsigned Panel = 0x26262C;
+    inline constexpr unsigned PanelRaised = 0x3A3A42, PanelRaisedHover = 0x47474F, PanelRaisedActive = 0x55555E;
+    inline constexpr unsigned Field = 0x1C1C21, FieldHover = 0x2A2A31, FieldActive = 0x34343C;
+    inline constexpr unsigned Border = 0x4A4A55;
+    inline constexpr unsigned BorderBright = 0x7A7A88;
 
-    inline constexpr unsigned Text = 0xF4F1FF;
-    inline constexpr unsigned TextSecondary = 0xC9C5F0;
-    inline constexpr unsigned TextDim = 0x9C97D6;
+    inline constexpr unsigned Text = 0xF4F4F6;
+    inline constexpr unsigned TextSecondary = 0xD0D0D8;
+    inline constexpr unsigned TextDim = 0x9C9CA8;
 
-    inline constexpr unsigned Gold = 0xFFC233;      // titles, selection, sliders
-    inline constexpr unsigned GoldDark = 0xD98A00;  // bevel under gold buttons
-    inline constexpr unsigned GoldInk = 0x3A1C00;   // text on gold
-    inline constexpr unsigned Play = 0x3FCB5A;      // the PLAY button
-    inline constexpr unsigned PlayDark = 0x1F8F3A;
-    inline constexpr unsigned PlayInk = 0x06240F;
+    // One accent everywhere, the blue of the main button (close to the Skylanders logo's sky blue): selections,
+    // toggles, sliders, focus. The only other accent is the orange bar marking the selected row of the sidebar.
+    inline constexpr unsigned Accent = 0x6BBAFF;
+    inline constexpr unsigned AccentHover = 0x8ECBFF;
+    inline constexpr unsigned AccentDark = 0x2F86E0; // bevel under accent buttons, lines marking a selection
+    inline constexpr unsigned AccentInk = 0x0A1B33;  // text on the accent
+    inline constexpr unsigned Play = Accent;         // the main button (CHOOSE ISO / PLAY)
+    inline constexpr unsigned PlayDark = AccentDark;
+    inline constexpr unsigned PlayInk = AccentInk;
+    inline constexpr unsigned SidebarBar = 0xF08A12; // orange, the sidebar's selected row only
     inline constexpr unsigned Danger = 0xF85149;
     inline constexpr unsigned Ok = 0x48D17A;
 
@@ -41,14 +60,24 @@ namespace LauncherTheme
     inline constexpr unsigned Elements[8] = { 0x3E9FD8, 0x9A6233, 0xE0531F, 0x1F74D1, 0x8E44C9, 0xD08A00, 0x3E9B3F, 0x5E5A86 };
 
     // Sizes in points (the window scales them to the display's pixel density).
-    inline constexpr float WindowW = 1280, WindowH = 800, WindowMinW = 1024, WindowMinH = 680;
+    inline constexpr float WindowW = 1080, WindowH = 720, WindowMinW = 1024, WindowMinH = 680;
     inline constexpr float SidebarW = 270;
     inline constexpr float Pad = 24;
     inline constexpr float Radius = 14, RadiusSmall = 10, RadiusLarge = 22;
     inline constexpr float PlayButtonW = 300, PlayButtonH = 72;
+    inline constexpr float BottomBarH = 150; // the band with the main button, under the game art
+    inline constexpr float GameRowH = 58, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
+    inline constexpr float TabUnderlineH = 3, TabGap = 34; // settings tabs: the line under the selected one, the space between them
+    inline constexpr float LanguageMenuW = 140; // the launcher's language menu, top right
+    inline constexpr float ControllerW = 190, ControllerGap = 40; // the controller picker, and its space before the main button
+    inline constexpr float GameBadgeR = 17;     // the game's icon (or initial) in a sidebar row
+    inline constexpr float GearButton = 30;  // the settings icon at the bottom of the sidebar
 
     // Fonts: Outfit for text, Bungee for titles and buttons (both SIL OFL 1.1, resources/fonts).
     inline constexpr float TextSize = 17, SmallSize = 14, TitleSize = 22, HeadlineSize = 34, HeroSize = 48;
+    inline constexpr float SidebarTextSize = 20, SidebarSmallSize = 16; // game names and their status in the sidebar
+    inline constexpr float BoldOffset = 0.8f; // Outfit is one light weight: bold text is drawn twice, this far apart
+    inline constexpr int BolderPasses = 2;     // extra copies for text that must read heavier (the chosen controller)
 
     // ImGui widget colours and shapes for the whole window.
     void Apply(ImGuiStyle& style);

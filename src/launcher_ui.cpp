@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <fmt/format.h>
 #include <fstream>
@@ -234,8 +235,9 @@ namespace
         SDL_Texture* portrait = nullptr;
     };
 
-    enum class Page { Play, Skylanders, Settings };
-    enum class SettingsTab { Graphics, Controls, Language, GameData, About };
+    // Home is the menu (the SKYLAUNCHER title opens it), Play is the game art and the main button, the gear opens Settings.
+    enum class Page { Home, Play, Settings };
+    enum class SettingsTab { Graphics, Controls, Language, Skylanders, GameData, About };
     enum class DiscState { None, Verifying, Ready, Failed };
 
     class App
@@ -253,6 +255,7 @@ namespace
         void Frame();
         void DrawBackdrop();
         void DrawSidebar();
+        void DrawHome();
         void DrawPlay();
         void DrawSkylanders();
         void DrawSettings();
@@ -262,10 +265,13 @@ namespace
         void DrawGameData();
         void DrawAbout();
         void DrawToast();
+        void DrawLanguageMenu();
 
         // Widgets in the launcher's style.
         bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
-        bool PillButton(const char* label, bool primary = false, float width = 0);
+        bool PillButton(const char* label, bool primary = false, float width = 0, bool bold = false, unsigned fill = PanelRaised,
+            unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive);
+        void BoldText(const char* text, unsigned color);
         bool Toggle(const char* id, bool* value);
         template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
@@ -273,7 +279,7 @@ namespace
         void EndSettingsTable();
         void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
         void EndCard();
-        void Title(const char* text, float size = TitleSize, unsigned color = Gold);
+        void Title(const char* text, float size = TitleSize, unsigned color = Accent);
 
         void StartVerify(const std::string& path);
         void FinishVerify();
@@ -281,6 +287,10 @@ namespace
         void Set(const char* section, const char* key, const std::string& value);
         void Toast(std::string text) { m_toast = std::move(text); m_toastUntil = SDL_GetTicks() + 2500; }
         void RefreshGamepads();
+        std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
+        std::string CurrentDevice() const;
+        std::string DeviceLabel() const;
+        void SetDevice(const std::string& value);
         void LoadFigures();
         std::vector<std::string> StartupFigures() const;
         void SetStartupFigure(const std::string& file, bool on);
@@ -299,7 +309,7 @@ namespace
         ImFont* m_textFont = nullptr;
         ImFont* m_titleFont = nullptr;
 
-        Page m_page = Page::Play;
+        Page m_page = Page::Home; // the launcher opens on its menu; the player picks a game in the sidebar
         SettingsTab m_tab = SettingsTab::Graphics;
         DiscState m_disc = DiscState::None;
         std::string m_discPath;
@@ -310,13 +320,15 @@ namespace
         LauncherAssets::Provider m_assets;
         SDL_Texture* m_icon = nullptr;
         SDL_Texture* m_logo = nullptr;
-        SDL_Texture* m_hero = nullptr;
+        SDL_Texture* m_background = nullptr; // the window's backdrop, from the player's disc once verified
         bool m_dragOver = false;
 
         std::vector<SDL_JoystickID> m_gamepads;
         const KeyAction* m_capturing = nullptr;
         std::vector<FigureFile> m_figures;
         bool m_figuresLoaded = false;
+
+        int m_uiLanguage = 0; // index in LanguageChoices; the launcher isn't translated yet, so nothing reads it
 
         std::string m_toast;
         uint64_t m_toastUntil = 0;
@@ -433,10 +445,10 @@ namespace
             if (figure.portrait != nullptr)
                 SDL_DestroyTexture(figure.portrait);
         m_figures.clear();
-        for (SDL_Texture* texture : { m_icon, m_logo, m_hero })
+        for (SDL_Texture* texture : { m_icon, m_logo, m_background })
             if (texture != nullptr)
                 SDL_DestroyTexture(texture);
-        m_icon = m_logo = m_hero = nullptr;
+        m_icon = m_logo = m_background = nullptr;
         if (m_renderer != nullptr)
             SDL_DestroyRenderer(m_renderer);
         if (m_window != nullptr)
@@ -523,7 +535,7 @@ namespace
         SDL_PathInfo info;
         if (SDL_GetPathInfo(path.c_str(), &info))
             m_discSize = info.size;
-        for (SDL_Texture** texture : { &m_icon, &m_logo, &m_hero })
+        for (SDL_Texture** texture : { &m_icon, &m_logo, &m_background })
             if (*texture != nullptr)
             {
                 SDL_DestroyTexture(*texture);
@@ -551,8 +563,8 @@ namespace
             m_assets.ExtractFromDisc(disc, m_meta);
         if (LauncherAssets::Asset logo = m_assets.Get(LauncherAssets::Role::Logo); logo.valid)
             m_logo = LoadPngFile(m_renderer, logo.path);
-        if (LauncherAssets::Asset hero = m_assets.Get(LauncherAssets::Role::HeroBackground); hero.valid)
-            m_hero = LoadPngFile(m_renderer, hero.path);
+        if (LauncherAssets::Asset background = m_assets.Get(LauncherAssets::Role::HeroBackground); background.valid)
+            m_background = LoadPngFile(m_renderer, background.path);
         Set(m_game.id, "iso", m_discPath); // remembered even if the player quits without playing
         m_disc = DiscState::Ready;
     }
@@ -573,6 +585,46 @@ namespace
             m_gamepads.assign(ids, ids + count);
             SDL_free(ids);
         }
+    }
+
+    // The device the game listens to: "auto", "keyboard" or "gamepad:<SDL GUID>" ([input] device= and gamepad=).
+    std::vector<std::pair<std::string, std::string>> App::DeviceOptions() const
+    {
+        std::vector<std::pair<std::string, std::string>> options = { { "auto", "Automatic (first gamepad, else keyboard)" }, { "keyboard", "Keyboard" } };
+        for (SDL_JoystickID id : m_gamepads)
+        {
+            char text[64];
+            SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), text, sizeof(text));
+            const char* name = SDL_GetGamepadNameForID(id);
+            options.emplace_back(std::string("gamepad:") + text, name != nullptr ? name : "Gamepad");
+        }
+        return options;
+    }
+
+    std::string App::CurrentDevice() const
+    {
+        std::string device = SettingGet(m_config, "input", "device", "auto");
+        return device == "gamepad" ? "gamepad:" + SettingGet(m_config, "input", "gamepad") : device;
+    }
+
+    std::string App::DeviceLabel() const
+    {
+        std::string current = CurrentDevice();
+        for (const auto& [value, label] : DeviceOptions())
+            if (value == current)
+                return label;
+        return current.starts_with("gamepad:") ? "Saved gamepad (not connected)" : "Automatic (first gamepad, else keyboard)";
+    }
+
+    void App::SetDevice(const std::string& value)
+    {
+        if (value.starts_with("gamepad:"))
+        {
+            Set("input", "device", "gamepad");
+            Set("input", "gamepad", value.substr(8));
+        }
+        else
+            Set("input", "device", value);
     }
 
     void App::LoadFigures()
@@ -633,6 +685,51 @@ namespace
 
     // ---- Widgets -------------------------------------------------------------------------------------------------
 
+    // A cog of `radius` around `center`, with a hole the colour of what is behind it.
+    void DrawGear(ImDrawList* draw, ImVec2 center, float radius, ImU32 ink, ImU32 hole)
+    {
+        constexpr int Teeth = 8;
+        float half = radius * 0.2f, inner = radius * 0.7f;
+        for (int i = 0; i < Teeth; i++)
+        {
+            float angle = float(i) * 6.2831853f / Teeth, c = std::cos(angle), s = std::sin(angle);
+            auto at = [&](float along, float across) { return ImVec2(center.x + c * along - s * across, center.y + s * along + c * across); };
+            draw->AddQuadFilled(at(inner, -half), at(radius, -half), at(radius, half), at(inner, half), ink);
+        }
+        draw->AddCircleFilled(center, radius * 0.78f, ink, 32);
+        draw->AddCircleFilled(center, radius * 0.32f, hole, 24);
+    }
+
+    // A gamepad seen from above: body, two grips, a d-pad and two face buttons cut out in `hole`.
+    void DrawGamepad(ImDrawList* draw, ImVec2 center, float width, ImU32 ink, ImU32 hole)
+    {
+        float w = width / 2, h = width * 0.3f;
+        draw->AddRectFilled(ImVec2(center.x - w, center.y - h), ImVec2(center.x + w, center.y + h * 0.6f), ink, h);
+        draw->AddCircleFilled(ImVec2(center.x - w * 0.62f, center.y + h * 0.45f), h * 0.62f, ink, 20);
+        draw->AddCircleFilled(ImVec2(center.x + w * 0.62f, center.y + h * 0.45f), h * 0.62f, ink, 20);
+        ImVec2 pad(center.x - w * 0.5f, center.y - h * 0.15f);
+        float arm = h * 0.42f, thick = h * 0.14f;
+        draw->AddRectFilled(ImVec2(pad.x - arm, pad.y - thick), ImVec2(pad.x + arm, pad.y + thick), hole);
+        draw->AddRectFilled(ImVec2(pad.x - thick, pad.y - arm), ImVec2(pad.x + thick, pad.y + arm), hole);
+        draw->AddCircleFilled(ImVec2(center.x + w * 0.38f, center.y - h * 0.05f), h * 0.17f, hole, 12);
+        draw->AddCircleFilled(ImVec2(center.x + w * 0.62f, center.y - h * 0.35f), h * 0.17f, hole, 12);
+    }
+
+    // Bold for Outfit, which is loaded as a single weight: the text twice, BoldOffset apart.
+    // `passes` extra copies, each BoldOffset further right: 1 is bold, more is heavier.
+    void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes = 1)
+    {
+        for (int i = 0; i <= passes; i++)
+            draw->AddText(ImVec2(at.x + BoldOffset * i, at.y), color, text);
+    }
+
+    void App::BoldText(const char* text, unsigned color)
+    {
+        ImVec2 size = ImGui::CalcTextSize(text);
+        AddBoldText(ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos(), Rgb(color), text);
+        ImGui::Dummy(ImVec2(size.x + BoldOffset, size.y));
+    }
+
     void App::Title(const char* text, float size, unsigned color)
     {
         ImGui::PushFont(m_titleFont, size);
@@ -658,19 +755,26 @@ namespace
         draw->AddRectFilled(ImVec2(position.x, position.y + lift), ImVec2(position.x + size.x, position.y + size.y - 6 + lift), Rgb(color, alpha), Radius);
         draw->AddRectFilled(ImVec2(position.x + 8, position.y + 6 + lift), ImVec2(position.x + size.x - 8, position.y + size.y * 0.42f + lift), IM_COL32(255, 255, 255, enabled ? 40 : 15), Radius - 4);
         ImGui::PushFont(m_titleFont, size.y * 0.42f);
-        ImVec2 text = ImGui::CalcTextSize(label, nullptr, true);
-        draw->AddText(ImVec2(position.x + (size.x - text.x) / 2, position.y + (size.y - 6 - text.y) / 2 + lift), Rgb(ink, alpha), label);
+        const char* labelEnd = std::strstr(label, "##"); // "##id" alone draws no text
+        ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
+        draw->AddText(ImVec2(position.x + (size.x - text.x) / 2, position.y + (size.y - 6 - text.y) / 2 + lift), Rgb(ink, alpha), label, labelEnd);
         ImGui::PopFont();
         return pressed && enabled;
     }
 
-    bool App::PillButton(const char* label, bool primary, float width)
+    bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive)
     {
-        ImGui::PushStyleColor(ImGuiCol_Button, Rgb(primary ? Gold : PanelRaised));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? 0xFFD970 : 0x2F3784));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? GoldDark : 0x3A4290));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(primary ? GoldInk : Text));
+        ImGui::PushStyleColor(ImGuiCol_Button, Rgb(primary ? Accent : fill));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? AccentHover : fillHover));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? AccentDark : fillActive));
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(primary ? AccentInk : Text));
         bool pressed = ImGui::Button(label, ImVec2(width, 40));
+        if (bold)
+        {
+            ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax(), text = ImGui::CalcTextSize(label);
+            ImGui::GetWindowDrawList()->AddText(ImVec2((min.x + max.x - text.x) / 2 + BoldOffset, (min.y + max.y - text.y) / 2),
+                ImGui::GetColorU32(ImGuiCol_Text), label);
+        }
         ImGui::PopStyleColor(4);
         return pressed;
     }
@@ -683,10 +787,10 @@ namespace
         if (pressed)
             *value = !*value;
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? Gold : Field), size.y / 2);
-        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? GoldDark : Border), size.y / 2, 2.0f);
+        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? Accent : Field), size.y / 2);
+        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? AccentDark : Border), size.y / 2, 2.0f);
         float knob = *value ? position.x + size.x - size.y / 2 : position.x + size.y / 2;
-        draw->AddCircleFilled(ImVec2(knob, position.y + size.y / 2), size.y / 2 - 5, Rgb(*value ? GoldInk : TextSecondary));
+        draw->AddCircleFilled(ImVec2(knob, position.y + size.y / 2), size.y / 2 - 5, Rgb(*value ? AccentInk : TextSecondary));
         return pressed;
     }
 
@@ -774,6 +878,16 @@ namespace
         ImDrawList* draw = ImGui::GetBackgroundDrawList();
         ImVec2 size = ImGui::GetIO().DisplaySize;
         draw->AddRectFilledMultiColor(ImVec2(0, 0), size, Rgb(SkyTop), Rgb(SkyTop), Rgb(SkyBottom), Rgb(SkyBottom));
+        // Once a disc is verified: the game's painted Skylands sky, cropped to fill, instead of the drawn stars.
+        if (m_background != nullptr)
+        {
+            float w, h;
+            SDL_GetTextureSize(m_background, &w, &h);
+            float scale = std::max(size.x / w, size.y / h), u = size.x / (w * scale), v = size.y / (h * scale);
+            draw->AddImage(Ref(m_background), ImVec2(0, 0), size, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2));
+            draw->AddRectFilled(ImVec2(0, 0), size, Rgb(SkyTop, BackdropShade)); // keeps white text readable on the bright sky
+            return;
+        }
         // The portal's glow, low on the right, and twinkling stars.
         ImVec2 portal(size.x * 0.78f, size.y * 1.02f);
         for (int ring = 6; ring > 0; ring--)
@@ -788,125 +902,192 @@ namespace
 
     void App::DrawSidebar()
     {
+        // A fixed column (SidebarW wide, never resized or scrolled): the games, then the settings gear at the bottom.
         ImVec2 size = ImGui::GetIO().DisplaySize;
         ImGui::SetNextWindowPos(ImVec2(0, 0));
         ImGui::SetNextWindowSize(ImVec2(SidebarW, size.y));
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, Rgb(Sidebar, 240));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, Rgb(Sidebar));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18, Pad));
-        ImGui::Begin("##sidebar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings);
+        ImGui::Begin("##sidebar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoScrollWithMouse);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        float rowW = SidebarW;
 
-        Title("SKYLAUNCHER", TitleSize + 2);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted("Native PC ports");
-        ImGui::PopStyleColor();
-        ImGui::Dummy(ImVec2(0, 18));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::TextUnformatted("YOUR GAMES");
+        // A row across the whole sidebar, like the Minecraft Launcher: lighter when hovered, a bar on the left when selected.
+        auto row = [&](const char* id, float height, bool selected, bool enabled, ImVec2& at) {
+            at = ImVec2(0, ImGui::GetCursorScreenPos().y);
+            ImGui::SetCursorScreenPos(at);
+            ImGui::BeginDisabled(!enabled);
+            bool pressed = ImGui::InvisibleButton(id, ImVec2(rowW, height)) && enabled;
+            bool hovered = ImGui::IsItemHovered();
+            ImGui::EndDisabled();
+            if (selected || hovered)
+                draw->AddRectFilled(at, ImVec2(rowW, at.y + height), Rgb(selected ? SidebarSelected : SidebarHover));
+            if (selected)
+                draw->AddRectFilled(at, ImVec2(SidebarBarW, at.y + height), Rgb(SidebarBar));
+            return pressed;
+        };
+
+        Title("SKYLAUNCHER", TitleSize + 4, SidebarInk);
+        if (ImGui::IsItemHovered())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+        if (ImGui::IsItemClicked())
+        {
+            m_page = Page::Home;
+            m_capturing = nullptr;
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(SidebarInkDim));
+        ImGui::PushFont(nullptr, SidebarTextSize);
+        BoldText("Native PC ports", SidebarInkDim);
         ImGui::PopFont();
         ImGui::PopStyleColor();
-        ImGui::Dummy(ImVec2(0, 4));
+        ImGui::Dummy(ImVec2(0, 14));
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(SidebarInkDim));
+        ImGui::PushFont(nullptr, SidebarSmallSize);
+        BoldText("YOUR GAMES", SidebarInkDim);
+        ImGui::PopFont();
+        ImGui::PopStyleColor();
 
         // The games: only those with a runtime can be selected.
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12, 0));
         for (const LauncherGameEntry& entry : LauncherGameCatalog())
         {
             ImGui::PushID(entry.id);
-            ImVec2 position = ImGui::GetCursorScreenPos();
-            float width = ImGui::GetContentRegionAvail().x;
-            bool selected = entry.enabled && std::string_view(entry.id) == m_game.id;
-            ImGui::BeginDisabled(!entry.enabled);
-            if (ImGui::InvisibleButton("game", ImVec2(width, 58)) && entry.enabled)
+            ImVec2 position;
+            // Selected only once the player has picked it: Play is that game's page.
+            bool selected = m_page == Page::Play && std::string_view(entry.id) == m_game.id;
+            if (row("game", GameRowH, selected, entry.enabled, position))
                 m_page = Page::Play;
-            bool hovered = ImGui::IsItemHovered();
-            ImGui::EndDisabled();
-            ImDrawList* draw = ImGui::GetWindowDrawList();
-            if (selected || hovered)
-                draw->AddRectFilled(position, ImVec2(position.x + width, position.y + 58), Rgb(selected ? PanelRaised : Panel), Radius);
-            if (selected)
-                draw->AddRect(position, ImVec2(position.x + width, position.y + 58), Rgb(Gold, 200), Radius, 2.0f);
-            unsigned accent = entry.accent;
-            ImVec2 badge(position.x + 29, position.y + 29);
-            draw->AddCircleFilled(badge, 19, Rgb(accent, entry.enabled ? 255 : 90));
-            ImGui::PushFont(m_titleFont, 18);
-            char letter[2] = { entry.name[0], 0 };
-            ImVec2 letterSize = ImGui::CalcTextSize(letter);
-            draw->AddText(ImVec2(badge.x - letterSize.x / 2, badge.y - letterSize.y / 2), Rgb(0x0B0F2E), letter);
+            // The game's icon from the player's disc once it is verified, else its initial on its colour.
+            ImVec2 badge(position.x + 34, position.y + GameRowH / 2);
+            if (m_icon != nullptr && std::string_view(entry.id) == m_game.id)
+                draw->AddImageRounded(Ref(m_icon), ImVec2(badge.x - GameBadgeR, badge.y - GameBadgeR), ImVec2(badge.x + GameBadgeR, badge.y + GameBadgeR),
+                    ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, GameBadgeR);
+            else
+            {
+                draw->AddCircleFilled(badge, GameBadgeR, Rgb(entry.accent, entry.enabled ? 255 : 90));
+                ImGui::PushFont(m_titleFont, GameBadgeR);
+                char letter[2] = { entry.name[0], 0 };
+                ImVec2 letterSize = ImGui::CalcTextSize(letter);
+                draw->AddText(ImVec2(badge.x - letterSize.x / 2, badge.y - letterSize.y / 2), Rgb(BadgeInk), letter);
+                ImGui::PopFont();
+            }
+            ImGui::PushFont(nullptr, SidebarTextSize);
+            AddBoldText(draw, ImVec2(position.x + 62, position.y + 6), Rgb(entry.enabled ? SidebarInk : SidebarInkDim), entry.name);
             ImGui::PopFont();
-            draw->AddText(ImVec2(position.x + 58, position.y + 9), Rgb(entry.enabled ? Text : TextDim), entry.name);
-            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::PushFont(nullptr, SidebarSmallSize);
             const char* status = !entry.enabled ? "Coming later" : m_disc == DiscState::Ready ? "Ready to play" : "Needs your disc";
-            draw->AddText(ImVec2(position.x + 58, position.y + 32), Rgb(entry.enabled ? (m_disc == DiscState::Ready ? Ok : Gold) : TextDim), status);
+            float statusX = position.x + 62;
+            if (entry.enabled)
+            {
+                draw->AddCircleFilled(ImVec2(statusX + 4, position.y + 40), 4, Rgb(m_disc == DiscState::Ready ? Ready : Accent));
+                statusX += 14;
+            }
+            draw->AddText(ImVec2(statusX, position.y + 30), Rgb(SidebarInkDim), status);
             ImGui::PopFont();
-            ImGui::Dummy(ImVec2(0, 4));
             ImGui::PopID();
         }
+
+        // Settings: the gear at the bottom of the sidebar, selected while its page is shown.
+        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - Pad - GameRowH);
+        ImVec2 at;
+        bool open = m_page == Page::Settings;
+        if (row("##settings", GameRowH, open, true, at))
+        {
+            m_page = open ? Page::Play : Page::Settings;
+            m_capturing = nullptr;
+        }
+        ImGui::PopStyleVar();
+        ImVec2 center(at.x + 34, at.y + GameRowH / 2);
+        draw->AddCircleFilled(center, GearButton / 2, Rgb(SidebarInk), 32);
+        DrawGear(draw, center, GearButton * 0.32f, Rgb(Sidebar), Rgb(SidebarInk));
+        ImGui::PushFont(m_titleFont, 19);
+        ImVec2 label = ImGui::CalcTextSize("SETTINGS");
+        draw->AddText(ImVec2(at.x + 62, center.y - label.y / 2), Rgb(SidebarInk), "SETTINGS");
+        ImGui::PopFont();
 
         ImGui::End();
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
     }
 
+    // The launcher's menu, opened by the SKYLAUNCHER title. Empty for now.
+    void App::DrawHome()
+    {
+    }
+
     void App::DrawPlay()
     {
-        ImVec2 available = ImGui::GetContentRegionAvail();
-        float heroH = available.y - 150;
-
-        // Hero: the game's art from the player's disc, else the drawn sky.
+        // Edge to edge: the game's logo on top, a band with the main button below it.
         ImVec2 position = ImGui::GetCursorScreenPos();
+        ImVec2 available = ImGui::GetContentRegionAvail();
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        ImVec2 end(position.x + available.x, position.y + heroH);
-        draw->AddRectFilled(position, end, Rgb(Panel, 200), RadiusLarge);
-        if (m_hero != nullptr)
-            draw->AddImageRounded(Ref(m_hero), position, end, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 120), RadiusLarge);
+        ImVec2 end(position.x + available.x, position.y + available.y - BottomBarH);
+        float heroH = end.y - position.y;
+
+        // Hero: the game's logo from the player's disc (drawn below) over the drawn sky; the disc's background art isn't used.
         draw->AddRectFilledMultiColor(ImVec2(position.x, position.y + heroH * 0.55f), end, IM_COL32(11, 15, 46, 0), IM_COL32(11, 15, 46, 0),
             IM_COL32(11, 15, 46, 230), IM_COL32(11, 15, 46, 230));
-        draw->AddRect(position, end, Rgb(m_dragOver ? Gold : Border, m_dragOver ? 255 : 160), RadiusLarge, m_dragOver ? 4.0f : 1.5f);
+        if (m_dragOver)
+            draw->AddRect(ImVec2(position.x + 6, position.y + 6), ImVec2(end.x - 6, end.y - 6), Rgb(AccentDark), RadiusLarge, 4.0f);
 
+        // The logo (else the game's name), as large as fits and centred between the language menu and the disc status.
+        float areaTop = position.y + Pad * 3, areaBottom = end.y - 120, areaH = areaBottom - areaTop;
         if (m_logo != nullptr)
         {
             float w, h;
             SDL_GetTextureSize(m_logo, &w, &h);
-            float scale = std::min(available.x * 0.62f / w, heroH * 0.55f / h);
+            float scale = std::min(available.x * 0.85f / w, areaH / h);
             ImVec2 logoSize(w * scale, h * scale);
-            ImVec2 logoAt(position.x + (available.x - logoSize.x) / 2, position.y + heroH * 0.08f);
+            ImVec2 logoAt(position.x + (available.x - logoSize.x) / 2, areaTop + (areaH - logoSize.y) / 2);
             draw->AddImage(Ref(m_logo), logoAt, ImVec2(logoAt.x + logoSize.x, logoAt.y + logoSize.y));
         }
         else
         {
             ImGui::PushFont(m_titleFont, HeroSize);
-            const char* name = m_game.name;
-            ImVec2 text = ImGui::CalcTextSize(name, nullptr, false, available.x - 80);
-            ImGui::SetCursorScreenPos(ImVec2(position.x + 40, position.y + heroH * 0.22f));
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Gold));
-            ImGui::PushTextWrapPos(position.x + available.x - 40);
-            ImGui::TextUnformatted(name);
+            float wrap = available.x - 96;
+            ImVec2 text = ImGui::CalcTextSize(m_game.name, nullptr, false, wrap);
+            ImVec2 at(position.x + (available.x - text.x) / 2, areaTop + (areaH - text.y) / 2);
+            ImGui::SetCursorScreenPos(at);
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Text));
+            ImGui::PushTextWrapPos(at.x + wrap);
+            ImGui::TextUnformatted(m_game.name);
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
             ImGui::PopFont();
-            (void)text;
         }
 
-        // Disc status, bottom left of the hero.
-        ImGui::SetCursorScreenPos(ImVec2(position.x + 32, end.y - 118));
+        // The disc, bottom left of the hero: the game's icon (rounded), the image's file name, its status under it.
+        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 120));
         ImGui::BeginGroup();
         if (m_icon != nullptr)
         {
-            ImGui::Image(Ref(m_icon), ImVec2(64, 64));
+            ImVec2 at = ImGui::GetCursorScreenPos();
+            ImGui::Dummy(ImVec2(64, 64));
+            draw->AddImageRounded(Ref(m_icon), at, ImVec2(at.x + 64, at.y + 64), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, Radius);
             ImGui::SameLine(0, 16);
         }
         ImGui::BeginGroup();
-        Title(m_meta.name.empty() ? m_game.name : m_meta.name.c_str(), TitleSize, Text);
+        // The file name on top, then "DISC IMAGE:" and the status on the line below.
+        std::string file = m_discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_discPath).filename().string(), 40);
+        ImGui::PushFont(nullptr, TitleSize);
+        BoldText(file.c_str(), Text);
+        ImGui::PopFont();
+        if (!m_discPath.empty() && ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", m_discPath.c_str());
+        BoldText("DISC IMAGE:", TextDim);
+        ImGui::SameLine(0, 6);
         switch (m_disc)
         {
         case DiscState::None:
             ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop your disc image (.iso) here, or choose it below.");
             break;
         case DiscState::Verifying:
-            ImGui::TextColored(ImColor(Rgb(Gold)), "%s...", m_verify.Stage().c_str());
+            ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_verify.Stage().c_str());
             ImGui::ProgressBar(m_verify.progress, ImVec2(360, 8), "");
             break;
         case DiscState::Ready:
-            ImGui::TextColored(ImColor(Rgb(Ok)), "Disc verified: %s", LauncherFormatSize(m_discSize).c_str());
+            ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_discSize).c_str());
             break;
         case DiscState::Failed:
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
@@ -919,26 +1100,88 @@ namespace
         ImGui::EndGroup();
         ImGui::EndGroup();
 
-        // Bottom bar: the disc and the PLAY button.
-        ImGui::SetCursorScreenPos(ImVec2(position.x, end.y + 24));
-        ImGui::BeginGroup();
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted("DISC IMAGE");
-        ImGui::PopStyleColor();
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextUnformatted(m_discPath.empty() ? "None yet" : LauncherMiddleEllipsis(m_discPath, 70).c_str());
-        ImGui::PopStyleColor();
-        if (PillButton(m_discPath.empty() ? "Choose disc image..." : "Change disc...", false, 220))
-            Browse();
-        ImGui::EndGroup();
+        // Bottom band: the controller and the main button in the middle, "Change disc..." on the right.
+        ImVec2 bar(position.x, end.y), barEnd(end.x, position.y + available.y);
+        draw->AddRectFilled(bar, barEnd, Rgb(BottomBar));
+        float middle = bar.y + BottomBarH / 2;
 
-        ImGui::SetCursorScreenPos(ImVec2(position.x + available.x - PlayButtonW, end.y + 30));
-        bool ready = m_disc == DiscState::Ready;
-        if (BigButton("PLAY", ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, ready))
+        bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying;
+        const char* label = ready ? "PLAY" : verifying ? "CHECKING..." : "Upload Iso";
+        float mainX = bar.x + (available.x - PlayButtonW) / 2, buttonY = middle - PlayButtonH / 2 + 3;
+        ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY));
+        if (BigButton(label, ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, !verifying))
         {
-            m_chosen = m_discPath;
-            Set(m_game.id, "iso", m_chosen);
-            m_running = false;
+            if (ready)
+            {
+                m_chosen = m_discPath;
+                Set(m_game.id, "iso", m_chosen);
+                m_running = false;
+            }
+            else
+                Browse();
+        }
+
+        // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
+        ImVec2 controllerAt(mainX - ControllerGap - ControllerW, buttonY), controllerSize(ControllerW, PlayButtonH - 6);
+        ImGui::SetCursorScreenPos(controllerAt);
+        if (ImGui::InvisibleButton("##controller", controllerSize))
+        {
+            RefreshGamepads();
+            ImGui::OpenPopup("##controllers");
+        }
+        bool pickerHovered = ImGui::IsItemHovered(), pickerOpen = ImGui::IsPopupOpen("##controllers");
+        ImVec2 controllerEnd(controllerAt.x + controllerSize.x, controllerAt.y + controllerSize.y);
+        draw->AddRectFilled(controllerAt, controllerEnd, Rgb(pickerHovered || pickerOpen ? BottomBarRaisedHover : BottomBarRaised), Radius);
+        // Same surface as "Change disc...": the band's button grey, a thin border, the accent while its menu is open.
+        draw->AddRect(controllerAt, controllerEnd, Rgb(pickerOpen ? Accent : BottomBarBorder), Radius, 0, pickerOpen ? 2.0f : 1.0f);
+        float controllerMid = controllerAt.y + controllerSize.y / 2;
+        DrawGamepad(draw, ImVec2(controllerAt.x + 34, controllerMid), 38, Rgb(BottomBarInk), Rgb(pickerHovered || pickerOpen ? BottomBarRaisedHover : BottomBarRaised));
+        std::string device = CurrentDevice();
+        std::string deviceName = device == "auto" ? "Automatic" : device == "keyboard" ? "Keyboard" : LauncherMiddleEllipsis(DeviceLabel(), 13);
+        ImGui::PushFont(nullptr, SmallSize);
+        AddBoldText(draw, ImVec2(controllerAt.x + 64, controllerMid - 20), Rgb(BottomBarInk), "CONTROLLER");
+        ImGui::PopFont();
+        AddBoldText(draw, ImVec2(controllerAt.x + 64, controllerMid - 1), Rgb(BottomBarInk), deviceName.c_str(), BolderPasses);
+        ImVec2 chevron(controllerEnd.x - 20, controllerMid);
+        draw->AddTriangleFilled(ImVec2(chevron.x - 6, chevron.y + 3), ImVec2(chevron.x + 6, chevron.y + 3), ImVec2(chevron.x, chevron.y - 4), Rgb(SidebarInk));
+        if (pickerHovered && !pickerOpen)
+            ImGui::SetTooltip("Controller: %s", DeviceLabel().c_str());
+
+        ImGui::SetNextWindowPos(ImVec2(controllerAt.x, controllerAt.y - 8), ImGuiCond_Always, ImVec2(0, 1));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(ControllerW, 0), ImVec2(FLT_MAX, FLT_MAX));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(BottomBarRaised, 250));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 10));
+        if (ImGui::BeginPopup("##controllers"))
+        {
+            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "  PLAY WITH");
+            ImGui::PopFont();
+            for (const auto& [value, name] : DeviceOptions())
+            {
+                bool current = value == device;
+                ImVec2 at = ImGui::GetCursorScreenPos();
+                if (ImGui::Selectable(("      " + name).c_str(), current, 0, ImVec2(0, 30)))
+                    SetDevice(value);
+                ImDrawList* popup = ImGui::GetWindowDrawList();
+                ImVec2 dot(at.x + 14, at.y + 15);
+                popup->AddCircle(dot, 6, Rgb(current ? Accent : TextDim), 16, 2.0f);
+                if (current)
+                    popup->AddCircleFilled(dot, 3, Rgb(Accent), 12);
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleVar();
+        ImGui::PopStyleColor();
+
+        // "Change disc...", right-aligned and centred in the band once a disc is verified; styled like the controller picker.
+        if (ready)
+        {
+            constexpr float ChangeDiscW = 170;
+            ImGui::SetCursorScreenPos(ImVec2(barEnd.x - Pad - 8 - ChangeDiscW, middle - 20));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
+            if (PillButton("Change disc...", false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+                Browse();
+            ImGui::PopStyleVar();
         }
     }
 
@@ -997,7 +1240,7 @@ namespace
             ImDrawList* draw = ImGui::GetWindowDrawList();
             ImVec2 end(position.x + cell, position.y + cell + 34);
             draw->AddRectFilled(position, end, Rgb(onPortal ? PanelRaised : Panel, 235), Radius);
-            draw->AddRect(position, end, Rgb(onPortal ? Gold : hovered ? BorderBright : Border), Radius, onPortal ? 3.0f : 1.5f);
+            draw->AddRect(position, end, Rgb(onPortal ? Accent : hovered ? BorderBright : Border), Radius, onPortal ? 3.0f : 1.5f);
             ImU32 color = figure.toy != nullptr ? figures::ElementColor(figure.toy->element) : Rgb(Border);
             ImVec2 center(position.x + cell / 2, position.y + cell / 2 - 4);
             draw->AddCircleFilled(center, cell * 0.36f, color, 48);
@@ -1009,9 +1252,9 @@ namespace
             draw->AddText(ImVec2(position.x + std::max(6.0f, (cell - text.x) / 2), end.y - 30), Rgb(Text), name.c_str());
             if (onPortal)
             {
-                draw->AddRectFilled(ImVec2(position.x + 8, position.y + 8), ImVec2(position.x + 70, position.y + 30), Rgb(Gold), 11);
+                draw->AddRectFilled(ImVec2(position.x + 8, position.y + 8), ImVec2(position.x + 70, position.y + 30), Rgb(Accent), 11);
                 ImGui::PushFont(nullptr, SmallSize);
-                draw->AddText(ImVec2(position.x + 16, position.y + 10), Rgb(GoldInk), "PORTAL");
+                draw->AddText(ImVec2(position.x + 16, position.y + 10), Rgb(AccentInk), "PORTAL");
                 ImGui::PopFont();
             }
             ImGui::PopID();
@@ -1053,40 +1296,14 @@ namespace
 
     void App::DrawControls()
     {
-        // The device the game listens to.
-        std::string device = SettingGet(m_config, "input", "device", "auto");
-        std::string guid = SettingGet(m_config, "input", "gamepad");
-        std::vector<std::pair<std::string, std::string>> options = { { "auto", "Automatic (first gamepad, else keyboard)" }, { "keyboard", "Keyboard" } };
-        for (SDL_JoystickID id : m_gamepads)
-        {
-            char text[64];
-            SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), text, sizeof(text));
-            const char* name = SDL_GetGamepadNameForID(id);
-            options.emplace_back(std::string("gamepad:") + text, name != nullptr ? name : "Gamepad");
-        }
-        std::string current = device == "gamepad" ? "gamepad:" + guid : device;
-        std::string currentLabel = "Automatic (first gamepad, else keyboard)";
-        for (const auto& [value, label] : options)
-            if (value == current)
-                currentLabel = label;
-        if (device == "gamepad" && currentLabel.starts_with("Automatic"))
-            currentLabel = "Saved gamepad (not connected)";
-
+        std::string current = CurrentDevice();
         Title("Controller", TitleSize, Text);
         ImGui::SetNextItemWidth(440);
-        if (ImGui::BeginCombo("##device", currentLabel.c_str()))
+        if (ImGui::BeginCombo("##device", DeviceLabel().c_str()))
         {
-            for (const auto& [value, label] : options)
+            for (const auto& [value, label] : DeviceOptions())
                 if (ImGui::Selectable(label.c_str(), value == current))
-                {
-                    if (value.starts_with("gamepad:"))
-                    {
-                        Set("input", "device", "gamepad");
-                        Set("input", "gamepad", value.substr(8));
-                    }
-                    else
-                        Set("input", "device", value);
-                }
+                    SetDevice(value);
             ImGui::EndCombo();
         }
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
@@ -1109,7 +1326,7 @@ namespace
             Toast("Keyboard bindings reset");
         }
         if (m_capturing != nullptr)
-            ImGui::TextColored(ImColor(Rgb(Gold)), "Press a key for \"%s\" (Escape cancels)", m_capturing->label);
+            ImGui::TextColored(ImColor(Rgb(Accent)), "Press a key for \"%s\" (Escape cancels)", m_capturing->label);
         else
             ImGui::TextColored(ImColor(Rgb(TextDim)), "Click a key to change it.");
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
@@ -1134,8 +1351,8 @@ namespace
                     if (&other != &action && SettingGet(m_config, "input", std::string("key_") + other.id, SDL_GetKeyName(other.fallback)) == key)
                         duplicate = true;
                 ImGui::PushID(action.id);
-                ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Gold : Field));
-                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? GoldInk : duplicate ? Danger : Text));
+                ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Accent : Field));
+                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? AccentInk : duplicate ? Danger : Text));
                 if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(140, 32)))
                     m_capturing = &action;
                 ImGui::PopStyleColor(2);
@@ -1212,46 +1429,82 @@ namespace
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
         ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
 
-        // Sub-pages as a segmented control.
         constexpr std::pair<SettingsTab, const char*> Tabs[] = { { SettingsTab::Graphics, "Graphics" }, { SettingsTab::Controls, "Controls" },
-            { SettingsTab::Language, "Language" }, { SettingsTab::GameData, "Game data" }, { SettingsTab::About, "About" } };
-        ImVec2 origin = ImGui::GetCursorScreenPos();
-        float segment = 132, height = 40;
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(origin, ImVec2(origin.x + segment * std::size(Tabs) + 8, origin.y + height + 8), Rgb(Field, 230), RadiusLarge);
-        draw->AddRect(origin, ImVec2(origin.x + segment * std::size(Tabs) + 8, origin.y + height + 8), Rgb(Border, 160), RadiusLarge, 1.5f);
-        for (size_t i = 0; i < std::size(Tabs); i++)
+            { SettingsTab::Language, "Language" }, { SettingsTab::Skylanders, "My Skylanders" }, { SettingsTab::GameData, "Game data" },
+            { SettingsTab::About, "About" } };
+        Title("SETTINGS", HeadlineSize, Text);
+        ImGui::Dummy(ImVec2(0, 4));
+        // The tabs: words on one line, an accent line under the selected one (like the sidebar's bar).
+        ImGui::PushFont(nullptr, SidebarTextSize);
+        for (const auto& [tab, label] : Tabs)
         {
-            auto [tab, label] = Tabs[i];
-            ImVec2 at(origin.x + 4 + segment * i, origin.y + 4);
-            ImGui::SetCursorScreenPos(at);
-            ImGui::PushID(int(i));
-            if (ImGui::InvisibleButton("##settingstab", ImVec2(segment, height)))
+            bool active = m_tab == tab;
+            ImVec2 at = ImGui::GetCursorScreenPos(), text = ImGui::CalcTextSize(label);
+            ImVec2 size(text.x + BoldOffset, text.y + 10 + TabUnderlineH);
+            if (ImGui::InvisibleButton(label, size))
             {
                 m_tab = tab;
                 m_capturing = nullptr;
             }
             bool hovered = ImGui::IsItemHovered();
-            ImGui::PopID();
-            bool active = m_tab == tab;
-            if (active || hovered)
-                draw->AddRectFilled(at, ImVec2(at.x + segment, at.y + height), Rgb(active ? Gold : PanelRaised), RadiusLarge - 4);
-            ImVec2 text = ImGui::CalcTextSize(label);
-            draw->AddText(ImVec2(at.x + (segment - text.x) / 2, at.y + (height - text.y) / 2), Rgb(active ? GoldInk : TextSecondary), label);
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            unsigned color = active || hovered ? Text : TextDim;
+            if (active)
+            {
+                AddBoldText(draw, at, Rgb(color), label);
+                draw->AddRectFilled(ImVec2(at.x, at.y + size.y - TabUnderlineH), ImVec2(at.x + size.x, at.y + size.y), Rgb(AccentDark));
+            }
+            else
+                draw->AddText(at, Rgb(color), label);
+            ImGui::SameLine(0, TabGap);
         }
-        ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + height + 26));
-
-        BeginCard("##settings", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
+        ImGui::PopFont();
+        ImGui::NewLine();
+        ImGui::Dummy(ImVec2(0, 4));
+        // Cards fit their content; My Skylanders' figure grid scrolls in the rest of the page instead.
+        BeginCard("##settings", ImVec2(0, 0), m_tab == SettingsTab::Skylanders ? ImGuiChildFlags_None : ImGuiChildFlags_AutoResizeY);
         switch (m_tab)
         {
         case SettingsTab::Graphics: DrawGraphics(); break;
         case SettingsTab::Controls: DrawControls(); break;
         case SettingsTab::Language: DrawLanguage(); break;
+        case SettingsTab::Skylanders: DrawSkylanders(); break;
         case SettingsTab::GameData: DrawGameData(); break;
         case SettingsTab::About: DrawAbout(); break;
         }
         EndCard();
         ImGui::EndChild();
+    }
+
+    // The launcher's own language, top right of every page but Settings. A placeholder: it is neither saved nor applied yet.
+    void App::DrawLanguageMenu()
+    {
+        ImVec2 at(ImGui::GetIO().DisplaySize.x - Pad - LanguageMenuW, Pad);
+        ImVec2 padding(12, 6);
+        const char* current = LanguageChoices[m_uiLanguage].label;
+        ImGui::PushFont(nullptr, TextSize + 1);
+        // The frame has no fill, so the bold copy of the current language can go under it.
+        ImGui::GetWindowDrawList()->AddText(ImVec2(at.x + padding.x + BoldOffset, at.y + padding.y), IM_COL32_WHITE, current);
+        ImGui::SetCursorScreenPos(at);
+        ImGui::SetNextItemWidth(LanguageMenuW);
+        // See-through: white outline and text, no fill.
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
+        ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32_WHITE);
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_WHITE);
+        for (ImGuiCol fill : { ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_Button, ImGuiCol_ButtonHovered })
+            ImGui::PushStyleColor(fill, IM_COL32(255, 255, 255, fill == ImGuiCol_FrameBgHovered || fill == ImGuiCol_ButtonHovered ? 30 : 0));
+        bool open = ImGui::BeginCombo("##uilanguage", current);
+        ImGui::PopStyleColor(6);
+        ImGui::PopStyleVar(2);
+        if (open)
+        {
+            for (int i = 0; i < int(std::size(LanguageChoices)); i++)
+                if (ImGui::Selectable(LanguageChoices[i].label, i == m_uiLanguage))
+                    m_uiLanguage = i;
+            ImGui::EndCombo();
+        }
+        ImGui::PopFont();
     }
 
     void App::DrawToast()
@@ -1263,7 +1516,7 @@ namespace
         ImVec2 position(size.x - text.x - 64, size.y - 72);
         ImDrawList* draw = ImGui::GetForegroundDrawList();
         draw->AddRectFilled(position, ImVec2(size.x - 24, size.y - 28), Rgb(PanelRaised, 245), Radius);
-        draw->AddRect(position, ImVec2(size.x - 24, size.y - 28), Rgb(Gold, 200), Radius, 2.0f);
+        draw->AddRect(position, ImVec2(size.x - 24, size.y - 28), Rgb(Accent, 200), Radius, 2.0f);
         draw->AddText(ImVec2(position.x + 20, position.y + 12), Rgb(Text), m_toast.c_str());
     }
 
@@ -1278,41 +1531,18 @@ namespace
         ImVec2 size = ImGui::GetIO().DisplaySize;
         ImGui::SetNextWindowPos(ImVec2(SidebarW, 0));
         ImGui::SetNextWindowSize(ImVec2(size.x - SidebarW, size.y));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad + 8, Pad + 4));
+        // Play fills the page to its edges; Settings sits inside the usual margins.
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, m_page == Page::Play ? ImVec2(0, 0) : ImVec2(Pad + 8, Pad + 4));
         ImGui::Begin("##page", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground |
             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
-        // Pages as tabs across the top, like the Minecraft Launcher.
-        constexpr std::pair<Page, const char*> Pages[] = { { Page::Play, "PLAY" }, { Page::Skylanders, "MY SKYLANDERS" }, { Page::Settings, "SETTINGS" } };
-        for (const auto& [page, label] : Pages)
-        {
-            bool active = m_page == page;
-            ImGui::PushFont(m_titleFont, 18);
-            ImVec2 text = ImGui::CalcTextSize(label);
-            ImVec2 at = ImGui::GetCursorScreenPos();
-            ImGui::PushID(int(page));
-            bool clicked = ImGui::InvisibleButton("##pagetab", ImVec2(text.x + 8, text.y + 18));
-            ImGui::PopID();
-            if (clicked)
-            {
-                m_page = page;
-                m_capturing = nullptr;
-            }
-            bool hovered = ImGui::IsItemHovered();
-            ImDrawList* draw = ImGui::GetWindowDrawList();
-            draw->AddText(ImVec2(at.x + 4, at.y + 4), Rgb(active ? Gold : hovered ? Text : TextSecondary), label);
-            if (active)
-                draw->AddRectFilled(ImVec2(at.x, at.y + text.y + 12), ImVec2(at.x + text.x + 8, at.y + text.y + 16), Rgb(Gold), 2);
-            ImGui::PopFont();
-            ImGui::SameLine(0, 34);
-        }
-        ImGui::NewLine();
-        ImGui::Dummy(ImVec2(0, 6));
         switch (m_page)
         {
+        case Page::Home: DrawHome(); break;
         case Page::Play: DrawPlay(); break;
-        case Page::Skylanders: DrawSkylanders(); break;
         case Page::Settings: DrawSettings(); break;
         }
+        if (m_page != Page::Settings) // Settings has its own Language tab
+            DrawLanguageMenu();
         ImGui::End();
         ImGui::PopStyleVar();
         DrawToast();
@@ -1326,8 +1556,8 @@ namespace
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
         if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
         {
-            static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-skylanders" };
-            Screenshot(Names[std::min(m_testStep, 4)]);
+            static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-skylanders", "06-home" };
+            Screenshot(Names[std::min(m_testStep, 5)]);
             m_testAt = 0;
             m_testStep++;
         }
@@ -1358,6 +1588,7 @@ namespace
         switch (m_testStep)
         {
         case 0:
+            m_page = Page::Play;
             m_testAt = now + 600;
             break;
         case 1:
@@ -1376,8 +1607,12 @@ namespace
             m_testAt = now + 400;
             break;
         case 4:
-            m_page = Page::Skylanders;
+            m_tab = SettingsTab::Skylanders;
             m_testAt = now + 600;
+            break;
+        case 5:
+            m_page = Page::Home;
+            m_testAt = now + 400;
             break;
         default:
             m_running = false;
@@ -1414,21 +1649,21 @@ void LauncherTheme::Apply(ImGuiStyle& style)
     colors[ImGuiCol_PopupBg] = color(Panel, 0.98f);
     colors[ImGuiCol_Border] = color(Border);
     colors[ImGuiCol_FrameBg] = color(Field);
-    colors[ImGuiCol_FrameBgHovered] = color(0x1A1F5C);
-    colors[ImGuiCol_FrameBgActive] = color(0x232A78);
+    colors[ImGuiCol_FrameBgHovered] = color(FieldHover);
+    colors[ImGuiCol_FrameBgActive] = color(FieldActive);
     colors[ImGuiCol_Button] = color(PanelRaised);
-    colors[ImGuiCol_ButtonHovered] = color(0x2F3784);
-    colors[ImGuiCol_ButtonActive] = color(0x3A4290);
+    colors[ImGuiCol_ButtonHovered] = color(PanelRaisedHover);
+    colors[ImGuiCol_ButtonActive] = color(PanelRaisedActive);
     colors[ImGuiCol_Header] = color(PanelRaised);
-    colors[ImGuiCol_HeaderHovered] = color(0x2F3784);
-    colors[ImGuiCol_HeaderActive] = color(Gold, 0.35f);
-    colors[ImGuiCol_SliderGrab] = color(Gold);
-    colors[ImGuiCol_SliderGrabActive] = color(0xFFD970);
-    colors[ImGuiCol_CheckMark] = color(Gold);
-    colors[ImGuiCol_PlotHistogram] = color(Gold);
+    colors[ImGuiCol_HeaderHovered] = color(PanelRaisedHover);
+    colors[ImGuiCol_HeaderActive] = color(Accent, 0.35f);
+    colors[ImGuiCol_SliderGrab] = color(Accent);
+    colors[ImGuiCol_SliderGrabActive] = color(AccentHover);
+    colors[ImGuiCol_CheckMark] = color(Accent);
+    colors[ImGuiCol_PlotHistogram] = color(Accent);
     colors[ImGuiCol_ScrollbarBg] = color(SkyTop, 0);
     colors[ImGuiCol_ScrollbarGrab] = color(Border);
-    colors[ImGuiCol_NavCursor] = color(Gold);
+    colors[ImGuiCol_NavCursor] = color(Accent);
     colors[ImGuiCol_TableRowBg] = color(Panel, 0);
     colors[ImGuiCol_TableBorderLight] = color(Border, 0.5f);
 }
@@ -1436,7 +1671,7 @@ void LauncherTheme::Apply(ImGuiStyle& style)
 std::span<const LauncherGameEntry> LauncherGameCatalog()
 {
     static const LauncherGameEntry catalog[] = {
-        { "ssa", "Spyro's Adventure", "Spyro's Adventure", 0x4AE3FF, true },
+        { "ssa", "Spyro's Adventure", "Spyro's Adventure", 0x6BBAFF, true },
         { "giants", "Giants", "Giants", 0xFFC65C, false },
         { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, false },
         { "trapteam", "Trap Team", "Trap Team", 0x6DF0B4, false },

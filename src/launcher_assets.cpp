@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <fstream>
+#include <map>
 #include <span>
 #include <stb_image_write.h>
 // Use the miniz implementation already vendored with the renderer instead of adding a separate zlib
@@ -21,6 +22,7 @@ namespace LauncherAssets
         struct RoleSource
         {
             Role role;
+            const char* container; // STRM file on the disc ("ui/eng/..." also tries "ui/enu/...")
             const char* fileName;
             uint32_t width;
             uint32_t height;
@@ -29,8 +31,9 @@ namespace LauncherAssets
         // Frontend art that ships on the player's own disc. Dimensions are the texture sizes stored
         // with these APKF entries (the payload is exactly width * height bytes of BC3).
         constexpr RoleSource Sources[] = {
-            { Role::Logo, "skylanderslogo.dds", 1024, 512 },
-            { Role::HeroBackground, "godraysdark.dds", 512, 512 },
+            { Role::Logo, "ui/eng/startmenu.str", "skylanderslogo.dds", 1024, 512 },
+            // The game's painted Skylands sky (its fullscreen backdrop), behind the whole launcher.
+            { Role::HeroBackground, "uiimage.str", "fullscreen_000", 512, 512 },
         };
 
         std::string RoleKey(Role role)
@@ -219,7 +222,7 @@ namespace LauncherAssets
             return found == end ? nullptr : found;
         }
 
-        bool DecodeTextureFromStartMenu(std::span<const uint8_t> startMenu, const RoleSource& source,
+        bool DecodeTextureFromPackage(std::span<const uint8_t> startMenu, const RoleSource& source,
             std::vector<uint8_t>& rgba, std::string* assetPathOut)
         {
             for (size_t position = 0; position + 0x100 <= startMenu.size();)
@@ -272,8 +275,8 @@ namespace LauncherAssets
         if (!DecompressStrm(strmFile, startMenu))
             return false;
         std::string name(fileName);
-        RoleSource source{ Role::Logo, name.c_str(), width, height };
-        return DecodeTextureFromStartMenu(startMenu, source, rgba, nullptr);
+        RoleSource source{ Role::Logo, "", name.c_str(), width, height };
+        return DecodeTextureFromPackage(startMenu, source, rgba, nullptr);
     }
 
     void Provider::Init(const std::string& iso, uint32_t tid)
@@ -338,17 +341,27 @@ namespace LauncherAssets
             }
         }
 
-        // The start menu STRM holds the frontend texture package. Decompress it, then find the
+        // Each STRM container holds a texture package. Decompress the ones the roles need, then find the
         // requested APKF entries by their original asset path and decode the BC3 payload.
-        std::vector<uint8_t> startMenu;
-        std::string startMenuPath;
-        for (const char* path : { "ui/eng/startmenu.str", "ui/enu/startmenu.str" })
+        std::map<std::string, std::vector<uint8_t>> containers; // by container name; empty when unreadable
+        std::map<std::string, std::string> containerPaths;      // where each was found on the disc
+        for (const RoleSource& source : Sources)
         {
-            std::vector<uint8_t> strm = disc.ReadAll(path);
-            if (!strm.empty() && DecompressStrm(strm, startMenu))
+            if (containers.contains(source.container))
+                continue;
+            std::vector<uint8_t>& unpacked = containers[source.container];
+            std::string path = source.container;
+            std::vector<std::string> candidates = { path };
+            if (path.starts_with("ui/eng/"))
+                candidates.push_back("ui/enu/" + path.substr(7));
+            for (const std::string& candidate : candidates)
             {
-                startMenuPath = path;
-                break;
+                std::vector<uint8_t> strm = disc.ReadAll(candidate);
+                if (!strm.empty() && DecompressStrm(strm, unpacked))
+                {
+                    containerPaths[source.container] = candidate;
+                    break;
+                }
             }
         }
 
@@ -362,18 +375,19 @@ namespace LauncherAssets
             out << fmt::format("id={:08X}\n", titleId);
             out << "name=" << meta.name << "\n\n";
             out << "[sources]\n";
-            out << "startmenu=" << (startMenuPath.empty() ? "not found" : startMenuPath) << " (STRM container, zlib at +0x14)\n";
+            for (const auto& [name, unpacked] : containers)
+                out << name << "=" << (unpacked.empty() ? "not found" : containerPaths[name]) << " (STRM container, zlib at +0x14)\n";
             out << "title_icon=default.xex XDBF image resource\n";
             out << "\n[roles]\n";
         }
 
-        if (!startMenu.empty())
         {
             for (const RoleSource& source : Sources)
             {
+                const std::vector<uint8_t>& unpacked = containers[source.container];
                 std::vector<uint8_t> rgba;
                 std::string assetPath;
-                if (!DecodeTextureFromStartMenu(startMenu, source, rgba, &assetPath))
+                if (unpacked.empty() || !DecodeTextureFromPackage(unpacked, source, rgba, &assetPath))
                     continue;
                 std::string cachePath = CachePathFor(RoleKey(source.role));
                 if (cachePath.empty() || !WritePng(cachePath, source.width, source.height, rgba))
