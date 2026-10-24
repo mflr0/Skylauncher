@@ -137,13 +137,62 @@ namespace collection
             return json.IsObject() ? json : Json::Object();
         }
 
+        // Loads the index for a write. A missing file is a new, empty index; a file that exists but cannot be read or
+        // parsed is bad: it is never replaced by a near-empty index. It is kept as collection.json.bad-<time> (once per
+        // bad state) and writes are refused, each attempt re-reading the file, until it loads again.
+        bool LoadIndexForWrite(const std::string& path, Json& index)
+        {
+            static std::string keptAs;
+            std::string text, error;
+            bool bad = false;
+            if (!Exists(path))
+                index = Json::Object();
+            else if (!LoadBytes(path, text))
+            {
+                error = "cannot read the file";
+                bad = true;
+            }
+            else if (!Json::Parse(text, index, error) || !index.IsObject())
+            {
+                if (error.empty())
+                    error = "not a JSON object";
+                bad = true;
+            }
+            if (!bad)
+            {
+                keptAs.clear();
+                return true;
+            }
+            if (keptAs.empty() && !text.empty())
+            {
+                time_t now = time(nullptr);
+                struct tm utc;
+#ifdef _WIN32
+                gmtime_s(&utc, &now);
+#else
+                gmtime_r(&now, &utc);
+#endif
+                char stamp[32];
+                strftime(stamp, sizeof(stamp), "%Y%m%d-%H%M%S", &utc);
+                std::string copy = path + ".bad-" + stamp;
+                if (SDL_SaveFile(copy.c_str(), text.data(), text.size()))
+                    keptAs = copy;
+                fprintf(stderr, "[collection] %s: %s; kept as %s\n", path.c_str(), error.c_str(), copy.c_str());
+            }
+            fprintf(stderr, "[collection] %s: %s; index writes refused until it loads again\n", path.c_str(),
+                error.c_str());
+            return false;
+        }
+
         // collection.json: read, changed and written back at once, so the launcher and a game can both use it.
         template <typename Change>
         bool UpdateIndex(Change change)
         {
             SDL_CreateDirectory(Folder().c_str());
             std::string path = PathOf(IndexName);
-            Json index = LoadJson(path);
+            Json index;
+            if (!LoadIndexForWrite(path, index))
+                return false;
             if (!index.Has("format"))
                 index.Set("format", 1);
             change(index);

@@ -1,5 +1,6 @@
 #include "figure_tag.h"
 #include "figure_crypto.h"
+#include <algorithm>
 #include <cstring>
 
 namespace figures
@@ -211,8 +212,26 @@ namespace figures
         return AreaState::Valid;
     }
 
-    void WriteStats(FigureData& tag, const FigureStats& stats)
+    // A date the title could have written: zero (never) or a real calendar field set.
+    static Date ClampDate(Date date)
     {
+        date.minute = std::min<uint8_t>(date.minute, 59);
+        date.hour = std::min<uint8_t>(date.hour, 23);
+        date.day = std::min<uint8_t>(date.day, 31);
+        date.month = std::min<uint8_t>(date.month, 12);
+        return date;
+    }
+
+    void WriteStats(FigureData& tag, const FigureStats& unchecked)
+    {
+        // Whatever the caller passes, the figure never gets more than the game allows (level 10's experience, gold).
+        FigureStats stats = unchecked;
+        stats.experience = std::min(stats.experience, LevelExperience[MaxLevel - 1]);
+        stats.gold = std::min(stats.gold, MaxGold);
+        stats.nickname.resize(std::min<size_t>(stats.nickname.size(), 16));
+        stats.lastPlaced = ClampDate(stats.lastPlaced);
+        stats.lastReset = ClampDate(stats.lastReset);
+
         // Start from the area the title would read, so that bytes this editor does not know about are kept.
         FigureData plain = Decrypt(tag);
         int newest = NewestArea(plain);
