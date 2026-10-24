@@ -7,12 +7,13 @@
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "launcher/theme/launcher_theme.h"
-#include "shared/figures/figure_collection.h"
+#include "launcher/ui/collection_page.h"
 #include <SDL3/SDL.h>
 #include <atomic>
 #include <filesystem>
 #include <imgui.h>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -107,27 +108,6 @@ namespace launcher_ui
         void Start(const std::string& image, const GameInfo& game);
     };
 
-    // ---- The collection -------------------------------------------------------------------------------------------
-
-    // One figure file of the collection, read once and refreshed after every change.
-    struct CollectionFigure
-    {
-        std::string file;                     // name in the figures folder
-        figures::FigureHeader header;
-        figures::FigureStats stats;
-        const figures::ToyInfo* toy = nullptr; // null for a toy this launcher doesn't know
-        bool locked = false;                  // a running game has it on its portal
-        bool favourite = false;
-        bool onPortal = false;                // starts on the portal ([portal] place)
-    };
-
-    // A figure's picture: the disc's portrait, or a generated icon (the page writes the initials over those).
-    struct FigureIconTexture
-    {
-        SDL_Texture* texture = nullptr;
-        bool generated = false;
-    };
-
     // Home is the menu (the SKYLAUNCHER title opens it), Play is the game art and the main button, Collection is the
     // figures (its sidebar row), the gear opens Settings.
     enum class Page { Home, Play, Collection, Settings };
@@ -161,25 +141,8 @@ namespace launcher_ui
         void DrawToast();
         void DrawLanguageMenu();
 
-        // The collection (collection_page.cpp).
-        void DrawCollection();
-        void DrawCollectionFilters();
-        void DrawPortalBar();
-        bool DrawFigureCard(const CollectionFigure& figure, float size);
-        void DrawFigureSheet();
-        void DrawNewFigure();
-        void DrawFigureIcon(ImDrawList* draw, const figures::ToyInfo* toy, ImVec2 at, float size, bool large);
-        const FigureIconTexture& FigureIcon(const figures::ToyInfo* toy, bool large);
-        void ClearFigureIcons();
-        std::filesystem::path FiguresFolder() const;
-        void LoadCollection();
-        void RefreshFigure(const std::string& file);
-        void RefreshLocks();
-        void ImportFigures();
-        void ImportFigureFile(const std::string& path);
-        void SetFavourite(const std::string& file, bool on);
-        std::vector<std::string> Favourites() const;
-        CollectionFigure* FindFigure(const std::string& file);
+        // The collection (collection_page.h): its page draws with the widgets below.
+        friend class CollectionPage;
 
         // Widgets in the launcher's style.
         bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
@@ -217,8 +180,6 @@ namespace launcher_ui
         std::string CurrentDevice() const;
         std::string DeviceLabel() const;
         void SetDevice(const std::string& value);
-        std::vector<std::string> StartupFigures() const;
-        void SetStartupFigure(const std::string& file, bool on);
         void Screenshot(const char* name);
         void TestScript();
         void TestInstallScript(uint64_t now);
@@ -265,22 +226,8 @@ namespace launcher_ui
         std::vector<SDL_JoystickID> m_gamepads;
         const KeyAction* m_capturing = nullptr;
 
-        // Collection state.
-        std::vector<CollectionFigure> m_collection;
-        bool m_collectionLoaded = false;
-        std::map<std::string, FigureIconTexture> m_figureIcons; // by image name (and size)
-        char m_search[64] = {};
-        int m_categoryFilter = -1;   // figures::Category, -1: all
-        int m_gameFilter = -1;       // figures::Game, -1: any
-        bool m_favouritesOnly = false;
-        std::string m_sheetFile;     // the figure whose sheet is open
-        char m_renameBuffer[64] = {};
-        std::string m_confirm;       // the sheet action waiting for confirmation ("reset", "delete", "restore:<backup>")
-        bool m_newFigureOpen = false;
-        int m_newCategory = int(figures::Category::Skylander);
-        uint16_t m_newBase = 0xFFFF; // the toy picked in the creator, then its variants
-        uint16_t m_newVariant = 0xFFFF; // the variant picked (a toy type); starts as the plain toy
-        uint64_t m_locksCheckedAt = 0;
+        // The collection page and its state.
+        std::unique_ptr<CollectionPage> m_collection = std::make_unique<CollectionPage>(*this);
 
         int m_uiLanguage = 0; // index in LanguageChoices; the launcher isn't translated yet, so nothing reads it
 
@@ -291,6 +238,7 @@ namespace launcher_ui
         // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
         std::string m_shots, m_testDrop;
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
+        bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };

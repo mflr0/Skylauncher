@@ -4,7 +4,7 @@
 #include "launcher/launcher.h"
 #include "assets/launcher_assets.h"
 #include "launcher/ui/launcher_ui.h"
-#include "shared/figures/figure_collection.h"
+#include "launcher/ui/collection_model.h"
 #include "shared/figures/figure_icons.h"
 #include "shared/vfs.h"
 #include <algorithm>
@@ -14,7 +14,6 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
-#include <aes.hpp>
 #include <fmt/format.h>
 #include <SDL3/SDL.h>
 #if defined(_WIN32)
@@ -117,63 +116,6 @@ namespace
         return ResolveGameSource(int(argv.size()), argv.data(), *FindGame("ssa"), false);
     }
 
-    // Figure engine, independent of the disc: crypto building blocks, a new figure, then progress written the way the
-    // game writes it (re-implemented here from the layout, so a slip in either copy shows up).
-    std::string Hex(std::span<const uint8_t> bytes)
-    {
-        std::string out;
-        for (uint8_t b : bytes)
-            out += fmt::format("{:02x}", b);
-        return out;
-    }
-
-    void SealAreaForTest(figures::FigureData& data, int areaBlock, uint32_t experience, uint16_t gold, uint8_t sequence)
-    {
-        // Plain area blocks (area-relative 0..9), checksums as documented in figure_file.h.
-        uint8_t blocks[10][16] = {};
-        blocks[0][0] = uint8_t(experience); blocks[0][1] = uint8_t(experience >> 8); blocks[0][2] = uint8_t(experience >> 16);
-        blocks[0][3] = uint8_t(gold); blocks[0][4] = uint8_t(gold >> 8);
-        blocks[0][9] = sequence;
-        blocks[1][0] = 0x05; // two upgrades
-        const char16_t name[] = u"Gilly";
-        for (int i = 0; name[i] != 0; i++)
-            blocks[2][i * 2] = uint8_t(name[i]);
-        auto crc = [](std::vector<uint8_t> bytes) { return figures::Crc16(bytes); };
-        std::vector<uint8_t> extra(0x110, 0);
-        for (int i = 0; i < 4; i++)
-            memcpy(&extra[i * 16], blocks[std::array{ 5, 6, 8, 9 }[i]], 16);
-        uint16_t c3 = crc(extra);
-        std::vector<uint8_t> type2;
-        for (int k : { 1, 2, 4 })
-            type2.insert(type2.end(), blocks[k], blocks[k] + 16);
-        uint16_t c2 = crc(type2);
-        blocks[0][0x0A] = uint8_t(c3); blocks[0][0x0B] = uint8_t(c3 >> 8);
-        blocks[0][0x0C] = uint8_t(c2); blocks[0][0x0D] = uint8_t(c2 >> 8);
-        std::vector<uint8_t> head(blocks[0], blocks[0] + 16);
-        head[0x0E] = 0x05; head[0x0F] = 0x00;
-        uint16_t c1 = crc(head);
-        blocks[0][0x0E] = uint8_t(c1); blocks[0][0x0F] = uint8_t(c1 >> 8);
-        // Encrypt like the game: AES-128-ECB, key = MD5(blocks 0-1, block number, copyright line).
-        static const char Copyright[] = " Copyright (C) 2010 Activision. All Rights Reserved. ";
-        for (int k = 0; k < 10; k++)
-        {
-            int block = areaBlock + k;
-            if (block % 4 == 3)
-                continue;
-            uint8_t* out = &data[block * 16];
-            memcpy(out, blocks[k], 16);
-            if (std::all_of(out, out + 16, [](uint8_t b) { return b == 0; }))
-                continue;
-            std::vector<uint8_t> material(data.begin(), data.begin() + 32);
-            material.push_back(uint8_t(block));
-            material.insert(material.end(), Copyright, Copyright + sizeof(Copyright) - 1);
-            std::array<uint8_t, 16> key = figures::Md5(material);
-            AES_ctx context;
-            AES_init_ctx(&context, key.data());
-            AES_ECB_encrypt(&context, out);
-        }
-    }
-
     // SSABuild's events, then the fake kit (tests/fake_ssabuild.c) run through the launcher's installer: a failure, then a success.
     void InstallChecks(const std::filesystem::path& scratch, const std::string& iso)
     {
@@ -238,68 +180,155 @@ namespace
         EXPECT(!FindInstallKit({ { "launcher", { { "kit", (scratch / "nowhere").string() } } } }));
     }
 
-    void FigureChecks(const std::filesystem::path& scratch)
+    // The collection: SSARecomp's library (src/shared/collection) and the launcher's model over it, in a scratch folder
+    // (SSA_COLLECTION, SSA_SAVE_DIR, SSA_MIGRATE_FROM): never the player's own.
+    void CollectionChecks(const std::filesystem::path& scratch)
     {
-        auto bytes = [](std::string_view text) { return std::span(reinterpret_cast<const uint8_t*>(text.data()), text.size()); };
-        EXPECT(Hex(figures::Md5(bytes(""))) == "d41d8cd98f00b204e9800998ecf8427e");
-        EXPECT(Hex(figures::Md5(bytes("abc"))) == "900150983cd24fb0d6963f7d28e17f72");
-        EXPECT(Hex(figures::Md5(bytes("12345678901234567890123456789012345678901234567890123456789012345678901234567890"))) ==
-            "57edf4a22be3c955ac49da2e2107b67a");
-        EXPECT(figures::Crc16(bytes("123456789")) == 0x29B1);
-        EXPECT(figures::LevelFromExperience(0) == 1 && figures::LevelFromExperience(1000) == 2 && figures::LevelFromExperience(40000) == 10);
+        namespace fs = std::filesystem;
+        fs::path folder = scratch / "collection", legacy = scratch / "legacy", save = scratch / "save";
+        fs::create_directories(legacy);
+        fs::create_directories(save);
+        SDL_setenv_unsafe("SSA_COLLECTION", folder.string().c_str(), 1);
+        SDL_setenv_unsafe("SSA_SAVE_DIR", save.string().c_str(), 1);
+        SDL_setenv_unsafe("SSA_MIGRATE_FROM", legacy.string().c_str(), 1);
+        SDL_setenv_unsafe("SSA_LAUNCHER_INI", "", 1);
+        auto dump = [&](const fs::path& at, uint16_t type) {
+            FigureData data = figures::CreateFigure(type, 0);
+            WriteFile(at, std::vector<uint8_t>(data.begin(), data.end()));
+            return at;
+        };
+#ifdef _WIN32
+        long long otherPid = 0; // no parent process to borrow: the lock checks are skipped
+#else
+        long long otherPid = getppid(); // a live process that is not this one
+#endif
+        auto bytesOf = [](const fs::path& path) {
+            std::ifstream in(path, std::ios::binary);
+            return std::vector<char>(std::istreambuf_iterator<char>(in), {});
+        };
 
-        const figures::ToyInfo& gill = *figures::FindToy(14);
-        figures::FigureData data = figures::CreateFigure(gill.toyType, gill.variantId);
-        figures::FigureHeader header = figures::ReadHeader(data);
-        EXPECT(header.checksumValid && header.toyType == 14 && header.variantId == 0);
-        EXPECT(data[4] == (data[0] ^ data[1] ^ data[2] ^ data[3]));
-        EXPECT(Hex(std::span(&data[0x30], 6)) == "4b0b20107ccb"); // sector 0 key A
-        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Blank);
-        EXPECT(!figures::SetNickname(data, "Nope")); // a blank toy has no progress to rename
+        EXPECT(fs::path(collection::Folder()) == folder);
+        const collection::Catalogue& catalogue = collection::Catalogue::Get();
+        EXPECT(catalogue.Games().size() == 6 && catalogue.Accepts("ssa", 14) && catalogue.FindGame("ssa")->seats.size() == 4);
 
-        SealAreaForTest(data, 0x08, 2500, 1234, 7);
-        figures::FigureStats stats = figures::ReadStats(data);
-        EXPECT(stats.state == figures::FigureStats::State::Valid && stats.area == 0);
-        EXPECT(stats.experience == 2500 && stats.level == 3 && stats.gold == 1234 && stats.nickname == "Gilly" && stats.upgrades == 5);
-        EXPECT(figures::SetNickname(data, "Gill Gr\xC3\xBCnt"));
-        stats = figures::ReadStats(data);
-        EXPECT(stats.state == figures::FigureStats::State::Valid && stats.area == 1 && stats.sequence == 8);
-        EXPECT(stats.nickname == "Gill Gr\xC3\xBCnt" && stats.experience == 2500 && stats.gold == 1234);
-        EXPECT(!figures::SetNickname(data, "A name far too long"));
-        data[0x08 * 16 + 5] ^= 0xFF; // damage the older copy: the current one still reads
-        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Valid);
-        data[0x24 * 16 + 5] ^= 0xFF; // and now both
-        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Unreadable);
-        figures::ResetProgress(data);
-        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Blank && figures::ReadHeader(data).toyType == 14);
+        // Migration: copied, never moved; a second pass copies nothing.
+        dump(legacy / "014 Gill Grunt.sky", 14);
+        dump(legacy / "016 Spyro.sky", 16);
+        dump(legacy / "200 Anvil Rain.sky", 200);
+        std::vector<char> before = bytesOf(legacy / "014 Gill Grunt.sky");
+        collection::Migration migration = collection::Migrate(collection::LegacyFolder());
+        EXPECT(migration.copied == 3 && migration.failed == 0);
+        EXPECT(fs::exists(legacy / "014 Gill Grunt.sky") && bytesOf(legacy / "014 Gill Grunt.sky") == before);
+        EXPECT(bytesOf(folder / "014 Gill Grunt.sky") == before);
+        EXPECT(collection::Migrate(collection::LegacyFolder()).copied == 0);
 
-        // The folder: create, import, back up, restore, delete, locks.
-        std::filesystem::path folder = scratch / "figures";
-        std::string made = figures::NewFigure(folder, gill);
-        EXPECT(made == "014 Gill Grunt.sky");
-        EXPECT(figures::NewFigure(folder, gill) == "014 Gill Grunt (2).sky");
-        std::filesystem::path outside = scratch / "dump.bin";
-        EXPECT(figures::SaveFigure(outside, figures::CreateFigure(416, 0)));
-        figures::ImportResult imported = figures::ImportFigure(folder, outside);
-        EXPECT(imported.file == "dump.bin" && imported.error.empty());
+        // A figure: stats, level, the nickname, backups, restore.
+        std::string gill = collection::PathOf("014 Gill Grunt.sky");
+        collection::Figure figure;
+        EXPECT(collection::Read(gill, figure) && figure.toy != nullptr && figure.toy->name == "Gill Grunt" && figure.state == figures::AreaState::Blank);
+        EXPECT(collection::UntouchedStarter(figure));
+        figure.stats.experience = 2500;
+        figure.stats.gold = 1234;
+        figures::SetNicknameUtf8(figure.stats, "Gilou");
+        std::string error;
+        EXPECT(collection::WriteStats(gill, figure.stats, &error));
+        EXPECT(collection::Read(gill, figure) && figure.state == figures::AreaState::Valid && figure.level == 3 && figure.stats.gold == 1234 &&
+            figures::NicknameUtf8(figure.stats) == "Gilou");
+        EXPECT(!collection::Backups(gill).empty());
+        std::string backup = collection::Backup(gill);
+        EXPECT(!backup.empty() && collection::Backups(gill).size() >= 2);
+        figure.stats.gold = 9;
+        EXPECT(collection::WriteStats(gill, figure.stats));
+        EXPECT(collection::Restore(gill, backup) && collection::Read(gill, figure) && figure.stats.gold == 1234);
+        EXPECT(collection::ResetToNew(gill) && collection::Read(gill, figure) && figure.state == figures::AreaState::Blank);
+
+        // The folder's other jobs: label, favourite, duplicate, trash, import.
+        EXPECT(collection::SetLabel(gill, "Gilou's") && collection::SetFavourite(gill, true));
+        EXPECT(collection::Read(gill, figure) && figure.label == "Gilou's" && figure.favourite && figure.DisplayName() == "Gilou's");
+        std::string copy = collection::Duplicate(gill);
+        EXPECT(!copy.empty() && fs::exists(copy));
+        EXPECT(collection::Delete(copy) && !fs::exists(copy) && collection::Trash().size() == 1);
+        EXPECT(!collection::Undelete(collection::Trash().front().id).empty() && collection::Trash().empty());
+        fs::path outside = dump(scratch / "dump.bin", 416);
+        collection::ImportReport imported = collection::Import({ outside.string() });
+        EXPECT(imported.added == 1 && imported.duplicates == 0);
+        EXPECT(collection::Import({ outside.string() }).duplicates == 1);
         WriteFile(scratch / "junk.sky", std::vector<uint8_t>(100, 1));
-        EXPECT(figures::ImportFigure(folder, scratch / "junk.sky").file.empty());
-        EXPECT(!figures::BackupFigure(folder, made).empty());
-        EXPECT(figures::ListBackups(folder, made).size() == 1);
-        EXPECT(figures::RestoreBackup(folder, made, figures::ListBackups(folder, made).front()));
-        EXPECT(figures::DeleteFigure(folder, made) && !std::filesystem::exists(folder / made));
-        EXPECT(!figures::IsLocked(folder, "dump.bin"));
-        std::ofstream(folder / "dump.bin.lock") << 0;
-        EXPECT(!figures::IsLocked(folder, "dump.bin")); // no such process
-        std::ofstream(folder / "dump.bin.lock") << getpid();
-        EXPECT(figures::IsLocked(folder, "dump.bin"));
+        EXPECT(collection::Import({ (scratch / "junk.sky").string() }).invalid == 1);
 
-        // Generated icons: opaque in the middle, transparent in the corners.
-        std::vector<uint8_t> icon = figures::GenerateIcon(*figures::FindToy(404), 64);
-        EXPECT(icon.size() == 64 * 64 * 4 && icon[(32 * 64 + 32) * 4 + 3] == 255 && icon[3] == 0);
-        for (const figures::ToyInfo& toy : figures::Catalog())
-            EXPECT(figures::PlayableIn(toy, figures::Game::SpyrosAdventure) == (toy.game == figures::Game::SpyrosAdventure));
-        printf("Figure engine: crypto, header, progress copies, folder and icons checked\n");
+        // Locks: the game's JSON. Another live process holds the figure: nothing writes it. A dead one does not.
+        std::string spyro = collection::PathOf("016 Spyro.sky");
+        collection::Figure spyroFigure;
+        EXPECT(collection::Read(spyro, spyroFigure));
+        spyroFigure.stats.experience = 500;
+        EXPECT(collection::SetFavourite(spyro, true)); // metadata is not the dump
+        if (otherPid > 0)
+        {
+            std::ofstream(spyro + ".lock") << fmt::format("{{ \"game\": \"ssa\", \"pid\": {}, \"since\": \"2026-10-24T10:15:00Z\" }}", otherPid);
+            EXPECT(collection::GetLock(spyro).Busy() && collection::GetLock(spyro).game == "ssa");
+            EXPECT(!collection::WriteStats(spyro, spyroFigure.stats, &error) && !error.empty());
+            EXPECT(!collection::Delete(spyro));
+        }
+        std::ofstream(spyro + ".lock") << fmt::format("{{ \"game\": \"ssa\", \"pid\": {} }}", 99999999);
+        EXPECT(collection::GetLock(spyro).stale && !collection::GetLock(spyro).Busy());
+        EXPECT(collection::WriteStats(spyro, spyroFigure.stats));
+        collection::BreakLock(spyro);
+
+        // Seats: the session file the game reads (portal.txt), a figure to a seat it fits.
+        const collection::Game& ssa = *catalogue.FindGame("ssa");
+        std::string anvil = collection::PathOf("200 Anvil Rain.sky");
+        std::string session = launcher_ui::SessionFile(ssa);
+        EXPECT(session == (save / "portal.txt").string());
+        EXPECT(launcher_ui::WriteSeats(session, { gill, "", anvil, "" }));
+        std::vector<std::string> seats = launcher_ui::ReadSeats(ssa, session);
+        EXPECT(seats.size() == 4 && seats[0] == gill && seats[1].empty() && seats[2] == anvil && seats[3].empty());
+        // The game numbers slots by hardware, not seats: a figure goes to the first seat that takes it.
+        { std::ofstream(session) << "5 " << spyro << "\n7 " << anvil << "\n"; }
+        seats = launcher_ui::ReadSeats(ssa, session);
+        EXPECT(seats[0] == spyro && seats[2] == anvil);
+        EXPECT(launcher_ui::ShortGameName("ssa") == "Spyro's Adventure");
+
+        launcher_ui::CollectionModel model;
+        model.Load();
+        EXPECT(model.figures.size() == 5 && model.SeatOf(spyro) == 0 && model.OnPortal().size() == 2);
+        EXPECT(model.CanEditSeats() && model.SetSeat(1, gill) && model.SeatOf(gill) == 1);
+        EXPECT(launcher_ui::ReadSeats(ssa, session)[1] == gill);
+        EXPECT(model.SetSeat(1, "") && model.seats[1].empty());
+        EXPECT(model.Poll(1000000, 0) == false); // nothing changed since Load (SetSeat's own write is not a change)
+        // While a game holds a figure: the seats are read-only. When its dump changes the model reloads.
+        if (otherPid > 0)
+        {
+            std::ofstream(spyro + ".lock") << fmt::format("{{ \"game\": \"ssa\", \"pid\": {} }}", otherPid);
+            SDL_Delay(30);
+            EXPECT(model.Poll(2000000, 0) && model.RunningGame() == "ssa" && !model.CanEditSeats());
+            collection::BreakLock(spyro);
+            SDL_Delay(30);
+            EXPECT(model.Poll(3000000, 0) && model.CanEditSeats());
+        }
+        collection::Figure again;
+        collection::Read(gill, again);
+        again.stats.experience = 40000;
+        collection::WriteStats(gill, again.stats);
+        SDL_Delay(30);
+        EXPECT(model.Poll(4000000, 0) && model.Find(gill)->level == 10);
+
+        // The launcher's own earlier state moves over: favourites and "starts on the portal", by name.
+        fs::remove(session);
+        std::vector<std::string> moved = launcher_ui::MoveLauncherSettings(ssa, legacy.string(), { "016 Spyro.sky" }, { "200 Anvil Rain.sky", "014 Gill Grunt.sky", "new:5" });
+        EXPECT(moved.size() == 4 && moved[0] == gill && moved[2] == anvil);
+        collection::Read(spyro, again);
+        EXPECT(again.favourite);
+
+        // Unknown toys can be named (collection's catalogue.json), icons exist for every category.
+        EXPECT(launcher_ui::NameUnknownToy(3502, "Mystery", collection::Category::Core, "ssa"));
+        EXPECT(fs::exists(folder / "catalogue.json"));
+        for (const collection::Toy& toy : catalogue.Toys())
+        {
+            std::vector<uint8_t> icon = figures::GenerateIcon(&toy, collection::VariantKind::Legendary, 32);
+            EXPECT(icon.size() == 32 * 32 * 4 && icon[(16 * 32 + 16) * 4 + 3] > 0);
+        }
+        EXPECT(figures::GenerateIcon(nullptr, collection::VariantKind::Base, 32).size() == 32 * 32 * 4);
+        printf("Collection: library, migration, locks, seats, live refresh and icons checked\n");
     }
 }
 
@@ -321,7 +350,7 @@ int main(int argc, char** argv)
         return (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
     };
 
-    FigureChecks(scratch);
+    CollectionChecks(scratch);
     InstallChecks(scratch, iso.string());
 
     // FIPS 180-4 examples, covering one- and two-block padding.

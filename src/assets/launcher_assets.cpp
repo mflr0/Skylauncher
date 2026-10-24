@@ -1,5 +1,5 @@
 #include "assets/launcher_assets.h"
-#include "shared/figures/figure_catalog.h"
+#include "shared/figures/figure_icons.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -422,7 +422,7 @@ namespace LauncherAssets
         struct Wanted { std::string name; uint32_t size; };
         std::vector<Wanted> wanted;
         for (const figures::ToyInfo& toy : figures::Catalog())
-            for (Wanted item : { Wanted{ figures::PortraitImageName(toy), 128 }, Wanted{ figures::PortraitLargeImageName(toy), 512 } })
+            for (Wanted item : { Wanted{ toy.portrait != nullptr ? figures::PortraitImageName(toy) : std::string(), 128 }, Wanted{ figures::PortraitLargeImageName(toy), 512 } })
                 if (!item.name.empty() && !std::filesystem::exists(folder + item.name + ".png", error) &&
                     std::none_of(wanted.begin(), wanted.end(), [&](const Wanted& w) { return w.name == item.name; }))
                     wanted.push_back(item);

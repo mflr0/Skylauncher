@@ -1,9 +1,13 @@
 #include "shared/figures/figure_icons.h"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 
 namespace figures
 {
+    using collection::Category;
+    using collection::VariantKind;
+
     namespace
     {
         struct Rgba
@@ -52,25 +56,54 @@ namespace figures
             case Category::TrapMaster: return Polygon(x, y, 6, 0.47f);
             case Category::Mini: return Circle(x, y, 0.34f);
             case Category::Trap:
+            case Category::Villain:
             case Category::CreationCrystal: return Diamond(x, y, 0.46f);
             case Category::Vehicle: return Box(x, y, 0.46f, 0.30f, 0.12f);
-            case Category::MagicItem: return Box(x, y, 0.38f, 0.38f, 0.10f);
-            case Category::AdventurePack: return Polygon(x, y, 6, 0.46f);
+            case Category::MagicItem:
+            case Category::Trophy: return Box(x, y, 0.38f, 0.38f, 0.10f);
+            case Category::Adventure: return Polygon(x, y, 6, 0.46f);
+            case Category::Sensei: return Polygon(x, y, 5, 0.47f);
             default: return Circle(x, y, 0.44f);
             }
         }
     }
 
-    std::vector<uint8_t> GenerateIcon(const ToyInfo& toy, int size, const IconStyle& style)
+    uint32_t VariantBadgeColor(VariantKind kind, const IconStyle& style)
+    {
+        switch (kind)
+        {
+        case VariantKind::Base: return 0;
+        case VariantKind::Legendary: return style.legendary;
+        case VariantKind::Dark: return style.darkEdition;
+        case VariantKind::Crystal: return style.crystal;
+        case VariantKind::Glow: return style.glow;
+        case VariantKind::Metallic: return style.metallic;
+        case VariantKind::LightCore: return style.lightCore;
+        default:
+        {
+            uint32_t rgb = collection::VariantKindRgb(kind);
+            return 0xFF000000 | (rgb & 0xFF) << 16 | (rgb & 0xFF00) | rgb >> 16;
+        }
+        }
+    }
+
+    std::vector<uint8_t> GenerateIcon(const collection::Toy* toy, VariantKind kind, int size, const IconStyle& style)
     {
         constexpr int Samples = 4;
         std::vector<uint8_t> rgba(size_t(size) * size * 4, 0);
-        Rgba base = Unpack(toy.element == Element::None ? style.neutral : ElementColor(toy.element));
+        collection::Element element = toy != nullptr ? toy->element : collection::Element::None;
+        Category category = toy != nullptr ? toy->category : Category::Core;
+        // The element colours are Spyro's Adventure's (figures::ElementColor); Light and Dark are the style's.
+        uint32_t fill = element == collection::Element::Light ? style.light : element == collection::Element::Dark ? style.dark
+            : element >= collection::Element::None ? style.neutral : ElementColor(Element(element));
+        if (kind == VariantKind::Base && toy != nullptr)
+            kind = toy->edition; // Legendary Bash, Dark Spyro: the toy type itself is the edition
+        Rgba base = Unpack(fill);
         Rgba top = Scale(base, 1.15f), bottom = Scale(base, 1.0f - style.shade);
         Rgba outline = Unpack(style.outline);
-        Rgba badge = Unpack(style.variantColors[size_t(toy.variant)]);
-        bool hasBadge = toy.variant != Variant::Normal;
-        float fillAlpha = toy.variant == Variant::Crystal ? 0.65f : 1.0f;
+        Rgba badge = Unpack(VariantBadgeColor(kind, style));
+        bool hasBadge = kind != VariantKind::Base;
+        float fillAlpha = kind == VariantKind::Crystal ? 0.65f : 1.0f;
         const float badgeX = 0.30f, badgeY = 0.30f, badgeR = 0.13f;
 
         for (int py = 0; py < size; py++)
@@ -82,13 +115,13 @@ namespace figures
                     {
                         float x = (px + (sx + 0.5f) / Samples) / size - 0.5f, y = (py + (sy + 0.5f) / Samples) / size - 0.5f;
                         Rgba color{};
-                        float shape = Shape(toy.category, x, y);
+                        float shape = Shape(category, x, y);
                         if (shape < 0)
                         {
                             float t = std::clamp(y + 0.5f, 0.0f, 1.0f);
                             color = { top.r + (bottom.r - top.r) * t, top.g + (bottom.g - top.g) * t, top.b + (bottom.b - top.b) * t, fillAlpha };
-                            // Swap Force: the two halves in two tones.
-                            if (toy.category == Category::SwapForce && x + y > 0)
+                            // Swap Force: a swapper's half is lit, the other half shaded.
+                            if ((category == Category::SwapTop && y > 0) || (category == Category::SwapBottom && y < 0))
                                 color = Scale(color, 0.8f);
                             if (shape > -style.outlineWidth)
                                 color = outline;
@@ -115,5 +148,12 @@ namespace figures
                 out[3] = uint8_t(std::lround(a / (Samples * Samples) * 255));
             }
         return rgba;
+    }
+
+    std::string PortraitLargeImageName(const ToyInfo& toy)
+    {
+        std::string name = toy.portrait != nullptr ? std::string(toy.portrait) + "_vs" : std::string();
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return char(tolower(c)); });
+        return name;
     }
 }

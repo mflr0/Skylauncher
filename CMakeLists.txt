@@ -66,6 +66,13 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
         ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf
     COMMENT "Embedding the launcher fonts")
 
+# SSARecomp's collection library (src/shared/collection, tools/sync_collection.sh) builds its toy catalogue in.
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_catalogue.cpp
+    COMMAND ${CMAKE_COMMAND} -DNAME=g_embeddedCatalogue -DINPUT=${CMAKE_SOURCE_DIR}/resources/collection/catalogue.json
+        -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_catalogue.cpp -P ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake ${CMAKE_SOURCE_DIR}/resources/collection/catalogue.json
+    COMMENT "Embedding the toy catalogue")
+
 # Dear ImGui (MIT) with its SDL 3 platform and SDL_Renderer backends.
 set(IMGUI_ROOT ${CMAKE_SOURCE_DIR}/lib/imgui)
 add_library(imgui STATIC ${IMGUI_ROOT}/imgui.cpp ${IMGUI_ROOT}/imgui_draw.cpp ${IMGUI_ROOT}/imgui_tables.cpp
@@ -80,19 +87,28 @@ add_library(SkylauncherCore STATIC
     src/launcher/game_install.cpp
     src/launcher/ui/launcher_ui.cpp
     src/launcher/ui/collection_page.cpp
+    src/launcher/ui/collection_figure.cpp
+    src/launcher/ui/collection_add.cpp
+    src/launcher/ui/collection_manage.cpp
+    src/launcher/ui/collection_model.cpp
     src/assets/launcher_assets.cpp
     src/shared/figures/figure_catalog.cpp
-    src/shared/figures/figure_collection.cpp
-    src/shared/figures/figure_file.cpp
+    src/shared/figures/figure_crypto.cpp
+    src/shared/figures/figure_data.cpp
+    src/shared/figures/figure_tag.cpp
     src/shared/figures/figure_icons.cpp
+    src/shared/collection/catalogue.cpp
+    src/shared/collection/collection.cpp
+    src/shared/collection/icons.cpp
+    src/shared/collection/json.cpp
     src/shared/stb_impl.cpp
     src/shared/vfs.cpp
     src/shared/platform/platform_file.cpp
     src/shared/platform/platform_process.cpp
     lib/miniz/miniz.c
-    ${CMAKE_BINARY_DIR}/embedded_fonts.cpp)
-# Figure files are AES encrypted: tiny-AES-c comes with XenonUtils (built into XenonXex).
-target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz ${XENON_ROOT}/thirdparty/tiny-AES-c)
+    ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
+    ${CMAKE_BINARY_DIR}/embedded_catalogue.cpp)
+target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
 target_compile_definitions(SkylauncherCore PRIVATE SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
 if(APPLE)
@@ -135,7 +151,6 @@ endif()
 # Checks against the player's own disc image: SkylauncherTest <game disc .iso> <scratch dir> [<damaged copy>...]
 add_executable(SkylauncherTest EXCLUDE_FROM_ALL tests/launcher_test.cpp)
 target_link_libraries(SkylauncherTest PRIVATE SkylauncherCore)
-target_include_directories(SkylauncherTest PRIVATE ${XENON_ROOT}/thirdparty/tiny-AES-c)
 # A stand-in for the kit's SSABuild, in <build>/fake-kit: the install screens and SkylauncherTest run against it.
 add_executable(FakeSSABuild EXCLUDE_FROM_ALL tests/fake_ssabuild.c)
 set_target_properties(FakeSSABuild PROPERTIES OUTPUT_NAME SSABuild RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fake-kit)
