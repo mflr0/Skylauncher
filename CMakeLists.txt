@@ -96,12 +96,14 @@ add_library(SkylauncherCore STATIC
 target_sources(SkylauncherCore PRIVATE
     src/launcher/install_checklist.cpp
     src/launcher/game_run.cpp
+    src/launcher/updater.cpp
+    src/shared/mini_json.cpp
     src/launcher/ui/install_page.cpp
     src/launcher/ui/support_page.cpp)
 # Figure files are AES encrypted: tiny-AES-c comes with XenonUtils (built into XenonXex).
 target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz ${XENON_ROOT}/thirdparty/tiny-AES-c)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
-target_compile_definitions(SkylauncherCore PRIVATE SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
+target_compile_definitions(SkylauncherCore PRIVATE SKYLAUNCHER_VERSION_STRING="${SKYLAUNCHER_VERSION}" SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
 if(APPLE)
     target_link_libraries(SkylauncherCore PUBLIC "-framework CoreGraphics")
 endif()
@@ -153,3 +155,4 @@ target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE
 
 # The launcher shell's checks (tests/shell_test.cpp), run by SkylauncherTest.
 target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp)
+target_include_directories(SkylauncherTest PRIVATE lib/miniz)
