@@ -31,7 +31,8 @@ jobs:
         shell: pwsh
         run: |
           $extra = @()
-          if ("${{ env.VERSION }}") { $extra += "-DSKYLAUNCHER_VERSION=$("${{ env.VERSION }}".TrimStart('v'))" }
+          $version = $env:VERSION.TrimStart('v')
+          if ($version) { $extra += "-DSKYLAUNCHER_VERSION=$version" }
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl @extra
           cmake --build build --target Skylauncher
           New-Item -ItemType Directory -Force dist | Out-Null
