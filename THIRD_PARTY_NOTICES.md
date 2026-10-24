@@ -5,7 +5,7 @@ The GNU binutils disassembler that XenonUtils normally includes is neither built
 
 ## SDL 3
 
-Licence: zlib. Source: `thirdparty/SDL` (git submodule).
+Licence: zlib. Source: `lib/SDL` (git submodule).
 
 ```
 Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
@@ -29,7 +29,7 @@ freely, subject to the following restrictions:
 
 ## Dear ImGui
 
-Licence: MIT. Source: `thirdparty/imgui` (git submodule).
+Licence: MIT. Source: `lib/imgui` (git submodule).
 
 ```
 The MIT License (MIT)
@@ -57,7 +57,7 @@ SOFTWARE.
 
 ## XenonRecomp (XenonUtils: XEX and XDBF readers only)
 
-Licence: MIT. Source: `thirdparty/XenonRecomp` (git submodule).
+Licence: MIT. Source: `lib/XenonRecomp` (git submodule).
 
 ```
 MIT License
@@ -85,7 +85,7 @@ SOFTWARE.
 
 ## {fmt}
 
-Licence: MIT with an optional exception for binary distribution. Source: `thirdparty/XenonRecomp/thirdparty/fmt` (nested submodule).
+Licence: MIT with an optional exception for binary distribution. Source: `lib/XenonRecomp/thirdparty/fmt` (nested submodule).
 
 ```
 Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors
@@ -119,11 +119,11 @@ without including the above copyright and permission notices.
 
 ## libmspack (LZX decompressor, lzxd.c)
 
-Licence: GNU LGPL 2.1. Source: `thirdparty/XenonRecomp/thirdparty/libmspack` (nested submodule). The full licence text is in `libmspack/COPYING.LIB` there. Skylauncher links it statically; since the complete source of Skylauncher is published, you can rebuild it against a modified libmspack.
+Licence: GNU LGPL 2.1. Source: `lib/XenonRecomp/thirdparty/libmspack` (nested submodule). The full licence text is in `libmspack/COPYING.LIB` there. Skylauncher links it statically; since the complete source of Skylauncher is published, you can rebuild it against a modified libmspack.
 
 ## tiny-AES-c
 
-Licence: The Unlicense (public domain). Source: `thirdparty/XenonRecomp/thirdparty/tiny-AES-c` (nested submodule).
+Licence: The Unlicense (public domain). Source: `lib/XenonRecomp/thirdparty/tiny-AES-c` (nested submodule).
 
 ```
 This is free and unencumbered software released into the public domain.
@@ -154,7 +154,7 @@ For more information, please refer to <http://unlicense.org/>
 
 ## TinySHA1
 
-Licence: ISC-style permission notice. Source: `thirdparty/XenonRecomp/thirdparty/TinySHA1`.
+Licence: ISC-style permission notice. Source: `lib/XenonRecomp/thirdparty/TinySHA1`.
 
 ```
 TinySHA1 - a header only implementation of the SHA1 algorithm in C++. Based
@@ -182,7 +182,7 @@ Modified for use by Xenia
 
 ## SIMDe (headers)
 
-Licence: MIT. Source: `thirdparty/XenonRecomp/thirdparty/simde` (nested submodule).
+Licence: MIT. Source: `lib/XenonRecomp/thirdparty/simde` (nested submodule).
 
 ```
 Copyright (c) 2017 Evan Nemerson <evan@nemerson.com>
@@ -209,7 +209,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## stb (stb_image, stb_image_write)
 
-Licence: MIT or public domain, at your choice. Source: `thirdparty/stb` (vendored).
+Licence: MIT or public domain, at your choice. Source: `lib/stb` (vendored).
 
 ```
 This software is available under 2 licenses -- choose whichever you prefer.
@@ -253,7 +253,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## miniz 1.15
 
-Licence: The Unlicense (public domain). Source: `thirdparty/miniz` (vendored).
+Licence: The Unlicense (public domain). Source: `lib/miniz` (vendored).
 
 ```
 This is free and unencumbered software released into the public domain.

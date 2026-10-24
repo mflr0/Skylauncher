@@ -1,11 +1,13 @@
-// The launcher window (Dear ImGui on SDL_Renderer): a sidebar of games, then Play, My Skylanders and Settings pages.
+// The launcher window (Dear ImGui on SDL_Renderer): a sidebar of games, then the Home, Play and Settings pages and the
+// launcher's widgets. The collection's pages are in collection_page.cpp; the class is declared in launcher_app.h.
 // Every choice is written to launcher.ini, which the game runtime reads (docs/settings.md lists the keys).
-#include "launcher_ui.h"
-#include "embedded_fonts.h"
-#include "figures/figure_catalog.h"
-#include "launcher_assets.h"
-#include "launcher_theme.h"
-#include "vfs.h"
+#include "launcher/ui/launcher_ui.h"
+#include "launcher/ui/launcher_app.h"
+#include "shared/embedded_fonts.h"
+#include "shared/figures/figure_catalog.h"
+#include "assets/launcher_assets.h"
+#include "launcher/theme/launcher_theme.h"
+#include "shared/vfs.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
@@ -26,13 +28,11 @@
 #include <thread>
 #include <vector>
 
-using namespace LauncherTheme;
-
-namespace
+namespace launcher_ui
 {
     // ---- Settings file ------------------------------------------------------------------------------------------
 
-    std::string SettingGet(const LauncherConfig& config, std::string_view section, std::string_view key, std::string fallback = {})
+    std::string SettingGet(const LauncherConfig& config, std::string_view section, std::string_view key, std::string fallback)
     {
         auto s = config.find(std::string(section));
         if (s == config.end())
@@ -53,49 +53,6 @@ namespace
         for (char& c : lower)
             c = char(std::tolower(static_cast<unsigned char>(c)));
         return lower == "1" || lower == "true" || lower == "yes" || lower == "on";
-    }
-
-    // Keyboard bindings: the runtime reads "[input] key_<action>=<SDL key name>".
-    struct KeyAction
-    {
-        const char* id;
-        const char* label;
-        SDL_Keycode fallback;
-    };
-
-    constexpr KeyAction KeyActions[] = {
-        { "a", "A (jump, confirm)", SDLK_SPACE }, { "b", "B (back)", SDLK_X }, { "x", "X (attack)", SDLK_C },
-        { "y", "Y (attack)", SDLK_V }, { "start", "Start", SDLK_RETURN }, { "back", "Back", SDLK_BACKSPACE },
-        { "lb", "Left bumper", SDLK_Q }, { "rb", "Right bumper", SDLK_E }, { "lt", "Left trigger", SDLK_1 },
-        { "rt", "Right trigger", SDLK_3 }, { "left_up", "Move up", SDLK_W }, { "left_down", "Move down", SDLK_S },
-        { "left_left", "Move left", SDLK_A }, { "left_right", "Move right", SDLK_D }, { "right_up", "Camera up", SDLK_I },
-        { "right_down", "Camera down", SDLK_K }, { "right_left", "Camera left", SDLK_J },
-        { "right_right", "Camera right", SDLK_L }, { "dpad_up", "D-pad up", SDLK_UP }, { "dpad_down", "D-pad down", SDLK_DOWN },
-        { "dpad_left", "D-pad left", SDLK_LEFT }, { "dpad_right", "D-pad right", SDLK_RIGHT },
-    };
-
-    struct Choice
-    {
-        const char* value;
-        const char* label;
-    };
-
-    constexpr Choice FpsChoices[] = { { "30", "30 (original)" }, { "60", "60" }, { "120", "120" }, { "144", "144" },
-        { "240", "240" }, { "0", "Unlimited" } };
-    constexpr Choice FilterChoices[] = { { "1", "Trilinear" }, { "2", "Anisotropic 2x" }, { "4", "Anisotropic 4x" },
-        { "8", "Anisotropic 8x" }, { "16", "Anisotropic 16x" } };
-    constexpr Choice PortalChoices[] = { { "auto", "Real portal if plugged in, else emulated" }, { "emulated", "Emulated portal" },
-        { "hid", "Wii / Wii U / PlayStation portal (HID)" }, { "usb", "Xbox 360 / Xbox One portal (USB)" } };
-    constexpr Choice LanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
-        { "it", "Italiano" }, { "nl", "Nederlands" }, { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
-
-    template<size_t N>
-    int ChoiceIndex(const Choice (&choices)[N], const std::string& value, int fallback)
-    {
-        for (size_t i = 0; i < N; i++)
-            if (value == choices[i].value)
-                return int(i);
-        return fallback;
     }
 
     // ---- Files and images --------------------------------------------------------------------------------------
@@ -148,6 +105,18 @@ namespace
         return ReadWholeFile(path, png) ? LoadPng(renderer, png) : nullptr;
     }
 
+    SDL_Texture* LoadRgba(SDL_Renderer* renderer, const std::vector<uint8_t>& rgba, int width, int height)
+    {
+        SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, width, height);
+        if (texture != nullptr)
+        {
+            SDL_UpdateTexture(texture, nullptr, rgba.data(), width * 4);
+            SDL_SetTextureBlendMode(texture, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR);
+        }
+        return texture;
+    }
+
     ImTextureRef Ref(SDL_Texture* texture)
     {
         return ImTextureRef(ImTextureID(intptr_t(texture)));
@@ -181,164 +150,84 @@ namespace
         return result.path;
     }
 
+    // The GitHub mark (Primer Octicons "mark-github", MIT), flattened to an outline on a 16x16 grid.
+    const ImVec2 GitHubMark[] = {
+        { 8.00f, 0.00f }, { 4.89f, 0.63f }, { 2.34f, 2.34f }, { 0.63f, 4.89f }, { 0.00f, 8.00f }, { 0.41f, 10.53f }, { 1.54f, 12.73f },
+        { 3.27f, 14.45f }, { 5.47f, 15.59f }, { 5.72f, 15.59f }, { 5.89f, 15.51f }, { 5.99f, 15.37f }, { 6.02f, 15.21f }, { 6.02f,
+        14.99f }, { 6.01f, 14.64f }, { 6.01f, 14.21f }, { 6.01f, 13.72f }, { 4.76f, 13.79f }, { 3.97f, 13.56f }, { 3.53f, 13.17f }, {
+        3.32f, 12.78f }, { 3.20f, 12.53f }, { 3.00f, 12.20f }, { 2.76f, 11.87f }, { 2.50f, 11.65f }, { 2.29f, 11.51f }, { 2.14f, 11.33f
+        }, { 2.17f, 11.19f }, { 2.49f, 11.12f }, { 2.93f, 11.21f }, { 3.29f, 11.44f }, { 3.55f, 11.71f }, { 3.72f, 11.94f }, { 4.32f,
+        12.58f }, { 4.98f, 12.80f }, { 5.59f, 12.76f }, { 6.05f, 12.60f }, { 6.13f, 12.24f }, { 6.25f, 11.95f }, { 6.39f, 11.71f }, {
+        6.56f, 11.53f }, { 5.24f, 11.26f }, { 4.07f, 10.63f }, { 3.24f, 9.46f }, { 2.92f, 7.58f }, { 2.98f, 6.96f }, { 3.14f, 6.39f }, {
+        3.40f, 5.88f }, { 3.74f, 5.43f }, { 3.66f, 5.17f }, { 3.58f, 4.71f }, { 3.61f, 4.08f }, { 3.82f, 3.31f }, { 3.95f, 3.29f }, {
+        4.35f, 3.33f }, { 5.03f, 3.57f }, { 6.02f, 4.13f }, { 6.51f, 4.01f }, { 7.01f, 3.93f }, { 7.51f, 3.88f }, { 8.02f, 3.86f }, {
+        8.53f, 3.88f }, { 9.03f, 3.93f }, { 9.53f, 4.01f }, { 10.02f, 4.13f }, { 11.01f, 3.56f }, { 11.69f, 3.33f }, { 12.09f, 3.29f },
+        { 12.22f, 3.31f }, { 12.43f, 4.08f }, { 12.46f, 4.71f }, { 12.38f, 5.17f }, { 12.30f, 5.43f }, { 12.64f, 5.88f }, { 12.90f,
+        6.38f }, { 13.06f, 6.95f }, { 13.12f, 7.58f }, { 12.80f, 9.46f }, { 11.96f, 10.63f }, { 10.79f, 11.26f }, { 9.47f, 11.53f }, {
+        9.68f, 11.76f }, { 9.85f, 12.08f }, { 9.97f, 12.50f }, { 10.01f, 13.01f }, { 10.01f, 13.77f }, { 10.00f, 14.41f }, { 10.00f,
+        14.90f }, { 10.00f, 15.21f }, { 10.03f, 15.37f }, { 10.12f, 15.51f }, { 10.30f, 15.59f }, { 10.55f, 15.59f }, { 11.32f, 15.28f
+        }, { 12.06f, 14.89f }, { 12.75f, 14.44f }, { 13.39f, 13.91f }, { 13.98f, 13.32f }, { 14.50f, 12.67f }, { 14.94f, 11.97f }, {
+        15.32f, 11.23f }, { 15.37f, 4.89f }, { 13.66f, 2.34f }, { 11.11f, 0.63f }
+    };
+
+    // The mark as a white texture whose alpha is its coverage, rasterised once (even-odd, 4x4 samples per pixel):
+    // ImGui's concave fill can't triangulate this outline.
+    SDL_Texture* CreateGitHubMarkTexture(SDL_Renderer* renderer, int size)
+    {
+        constexpr int Samples = 4;
+        constexpr size_t Count = std::size(GitHubMark);
+        std::vector<uint8_t> rgba(size_t(size) * size * 4, 255);
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                int covered = 0;
+                for (int sy = 0; sy < Samples; sy++)
+                    for (int sx = 0; sx < Samples; sx++)
+                    {
+                        float px = (x + (sx + 0.5f) / Samples) * 16 / size, py = (y + (sy + 0.5f) / Samples) * 16 / size;
+                        bool inside = false;
+                        for (size_t i = 0, j = Count - 1; i < Count; j = i++)
+                        {
+                            const ImVec2 &a = GitHubMark[i], &b = GitHubMark[j];
+                            if ((a.y > py) != (b.y > py) && px < (b.x - a.x) * (py - a.y) / (b.y - a.y) + a.x)
+                                inside = !inside;
+                        }
+                        covered += inside;
+                    }
+                rgba[(size_t(y) * size + x) * 4 + 3] = uint8_t(covered * 255 / (Samples * Samples));
+            }
+        return LoadRgba(renderer, rgba, size, size);
+    }
+
     // ---- Disc verification on a worker thread --------------------------------------------------------------------
 
-    struct VerifyJob
+    void VerifyJob::Start(const std::string& image, const GameInfo& game)
     {
-        std::thread thread;
-        std::atomic<bool> done{ false };
-        std::atomic<float> progress{ 0 };
-        std::mutex mutex;
-        std::string stage;
-        GameSourceCheck check;
-        TitleMetadata meta;
-
-        ~VerifyJob() { Join(); }
-        void Join() { if (thread.joinable()) thread.join(); }
-        std::string Stage() { std::lock_guard lock(mutex); return stage; }
-
-        void Start(const std::string& image, const GameInfo& game)
-        {
-            Join();
-            done = false;
-            progress = 0;
-            { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; }
-            thread = std::thread([this, image, &game] {
-                auto report = [this](float fraction, std::string_view text) {
-                    progress = fraction;
-                    std::lock_guard lock(mutex);
-                    stage.assign(text);
-                };
-                GameSourceCheck result = CheckGameSource(image, game, report);
-                TitleMetadata metadata;
-                if (result.status == GameSourceStatus::Ok)
-                {
-                    report(0.98f, "Reading the title and icon");
-                    DiscFileSystem disc;
-                    if (disc.Open(image.c_str()))
-                        if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
-                            metadata = ReadTitleMetadata(xex);
-                }
-                { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); }
-                progress = 1;
-                done = true;
-            });
-        }
-    };
-
-    // ---- Figures (My Skylanders) ---------------------------------------------------------------------------------
-
-    struct FigureFile
-    {
-        std::string file;   // name in the figures folder
-        const figures::ToyInfo* toy = nullptr;
-        SDL_Texture* portrait = nullptr;
-    };
-
-    // Home is the menu (the SKYLAUNCHER title opens it), Play is the game art and the main button, the gear opens Settings.
-    enum class Page { Home, Play, Settings };
-    enum class SettingsTab { Graphics, Controls, Language, Skylanders, GameData, About };
-    enum class DiscState { None, Verifying, Ready, Failed };
-
-    class App
-    {
-    public:
-        App(const GameInfo& game, const std::string& configPath, LauncherConfig& config) : m_game(game), m_configPath(configPath), m_config(config) {}
-        ~App() { Shutdown(); }
-        std::string Run();
-
-    private:
-        bool Init();
-        void Shutdown();
-        bool LoadFonts();
-        void HandleEvent(const SDL_Event& event);
-        void Frame();
-        void DrawBackdrop();
-        void DrawSidebar();
-        void DrawHome();
-        void DrawPlay();
-        void DrawSkylanders();
-        void DrawSettings();
-        void DrawGraphics();
-        void DrawControls();
-        void DrawLanguage();
-        void DrawGameData();
-        void DrawAbout();
-        void DrawToast();
-        void DrawLanguageMenu();
-
-        // Widgets in the launcher's style.
-        bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
-        bool PillButton(const char* label, bool primary = false, float width = 0, bool bold = false, unsigned fill = PanelRaised,
-            unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive);
-        void BoldText(const char* text, unsigned color);
-        bool Toggle(const char* id, bool* value);
-        template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width = -1);
-        void SettingRow(const char* label, const char* hint);
-        bool BeginSettingsTable(const char* id);
-        void EndSettingsTable();
-        void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
-        void EndCard();
-        void Title(const char* text, float size = TitleSize, unsigned color = Accent);
-
-        void StartVerify(const std::string& path);
-        void FinishVerify();
-        void Browse();
-        void Set(const char* section, const char* key, const std::string& value);
-        void Toast(std::string text) { m_toast = std::move(text); m_toastUntil = SDL_GetTicks() + 2500; }
-        void RefreshGamepads();
-        std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
-        std::string CurrentDevice() const;
-        std::string DeviceLabel() const;
-        void SetDevice(const std::string& value);
-        void LoadFigures();
-        std::vector<std::string> StartupFigures() const;
-        void SetStartupFigure(const std::string& file, bool on);
-        void Screenshot(const char* name);
-        void TestScript();
-
-        const GameInfo& m_game;
-        std::string m_configPath;
-        LauncherConfig& m_config;
-        std::string m_chosen;
-        bool m_running = true;
-
-        SDL_Window* m_window = nullptr;
-        SDL_Renderer* m_renderer = nullptr;
-        std::vector<uint8_t> m_fontData[2];
-        ImFont* m_textFont = nullptr;
-        ImFont* m_titleFont = nullptr;
-
-        Page m_page = Page::Home; // the launcher opens on its menu; the player picks a game in the sidebar
-        SettingsTab m_tab = SettingsTab::Graphics;
-        DiscState m_disc = DiscState::None;
-        std::string m_discPath;
-        uint64_t m_discSize = 0;
-        VerifyJob m_verify;
-        GameSourceCheck m_check;
-        TitleMetadata m_meta;
-        LauncherAssets::Provider m_assets;
-        SDL_Texture* m_icon = nullptr;
-        SDL_Texture* m_logo = nullptr;
-        SDL_Texture* m_background = nullptr; // the window's backdrop, from the player's disc once verified
-        bool m_dragOver = false;
-
-        std::vector<SDL_JoystickID> m_gamepads;
-        const KeyAction* m_capturing = nullptr;
-        std::vector<FigureFile> m_figures;
-        bool m_figuresLoaded = false;
-
-        int m_uiLanguage = 0; // index in LanguageChoices; the launcher isn't translated yet, so nothing reads it
-
-        std::string m_toast;
-        uint64_t m_toastUntil = 0;
-        std::vector<ImVec4> m_stars; // x, y (0..1), radius, phase
-
-        // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
-        std::string m_shots, m_testDrop;
-        int m_testStep = 0;
-        uint64_t m_testAt = 0;
-    };
+        Join();
+        done = false;
+        progress = 0;
+        { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; }
+        thread = std::thread([this, image, &game] {
+            auto report = [this](float fraction, std::string_view text) {
+                progress = fraction;
+                std::lock_guard lock(mutex);
+                stage.assign(text);
+            };
+            GameSourceCheck result = CheckGameSource(image, game, report);
+            TitleMetadata metadata;
+            if (result.status == GameSourceStatus::Ok)
+            {
+                report(0.98f, "Reading the title and icon");
+                DiscFileSystem disc;
+                if (disc.Open(image.c_str()))
+                    if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
+                        metadata = ReadTitleMetadata(xex);
+            }
+            { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); }
+            progress = 1;
+            done = true;
+        });
+    }
 
     // ---- Setup ---------------------------------------------------------------------------------------------------
 
@@ -429,6 +318,7 @@ namespace
                 m_testDrop = drop;
         }
         RefreshGamepads();
+        m_github = CreateGitHubMarkTexture(m_renderer, 128);
         return true;
     }
 
@@ -441,14 +331,11 @@ namespace
             ImGui_ImplSDL3_Shutdown();
             ImGui::DestroyContext();
         }
-        for (FigureFile& figure : m_figures)
-            if (figure.portrait != nullptr)
-                SDL_DestroyTexture(figure.portrait);
-        m_figures.clear();
-        for (SDL_Texture* texture : { m_icon, m_logo, m_background })
+        ClearFigureIcons();
+        for (SDL_Texture* texture : { m_icon, m_logo, m_background, m_github })
             if (texture != nullptr)
                 SDL_DestroyTexture(texture);
-        m_icon = m_logo = m_background = nullptr;
+        m_icon = m_logo = m_background = m_github = nullptr;
         if (m_renderer != nullptr)
             SDL_DestroyRenderer(m_renderer);
         if (m_window != nullptr)
@@ -507,7 +394,12 @@ namespace
             break;
         case SDL_EVENT_DROP_FILE:
             m_dragOver = false;
-            if (event.drop.data != nullptr)
+            if (event.drop.data != nullptr && figures::IsFigureFileName(std::filesystem::path(event.drop.data).filename()))
+            {
+                m_page = Page::Collection; // a figure dump joins the collection
+                ImportFigureFile(event.drop.data);
+            }
+            else if (event.drop.data != nullptr)
             {
                 m_page = Page::Play;
                 StartVerify(event.drop.data);
@@ -560,7 +452,11 @@ namespace
         m_assets.Init(m_discPath, m_meta.titleId);
         DiscFileSystem disc;
         if (disc.Open(m_discPath.c_str()))
+        {
             m_assets.ExtractFromDisc(disc, m_meta);
+            m_assets.ExtractFigurePortraits(disc);
+        }
+        ClearFigureIcons(); // the collection's pictures now come from the disc
         if (LauncherAssets::Asset logo = m_assets.Get(LauncherAssets::Role::Logo); logo.valid)
             m_logo = LoadPngFile(m_renderer, logo.path);
         if (LauncherAssets::Asset background = m_assets.Get(LauncherAssets::Role::HeroBackground); background.valid)
@@ -627,36 +523,6 @@ namespace
             Set("input", "device", value);
     }
 
-    void App::LoadFigures()
-    {
-        m_figuresLoaded = true;
-        std::string folder = PreferencePath("figures");
-        std::string portraits = PreferencePath("portraits/");
-        std::error_code error;
-        for (const auto& entry : std::filesystem::directory_iterator(folder, error))
-        {
-            std::string extension = entry.path().extension().string();
-            if (extension != ".sky" && extension != ".bin" && extension != ".dmp")
-                continue;
-            // The toy type sits unencrypted in block 1 (bytes 0x10-0x11, little endian).
-            std::ifstream file(entry.path(), std::ios::binary);
-            uint8_t header[0x12] = {};
-            if (!file.read(reinterpret_cast<char*>(header), sizeof(header)))
-                continue;
-            FigureFile figure;
-            figure.file = entry.path().filename().string();
-            figure.toy = figures::FindToy(uint16_t(header[0x10] | header[0x11] << 8));
-            if (figure.toy != nullptr)
-                if (std::string name = figures::PortraitImageName(*figure.toy); !name.empty())
-                    figure.portrait = LoadPngFile(m_renderer, portraits + name + ".png");
-            m_figures.push_back(std::move(figure));
-        }
-        std::sort(m_figures.begin(), m_figures.end(), [](const FigureFile& a, const FigureFile& b) {
-            int kindA = a.toy != nullptr ? int(a.toy->kind) : 9, kindB = b.toy != nullptr ? int(b.toy->kind) : 9;
-            return kindA != kindB ? kindA < kindB : a.file < b.file;
-        });
-    }
-
     std::vector<std::string> App::StartupFigures() const
     {
         std::vector<std::string> files;
@@ -716,8 +582,7 @@ namespace
     }
 
     // Bold for Outfit, which is loaded as a single weight: the text twice, BoldOffset apart.
-    // `passes` extra copies, each BoldOffset further right: 1 is bold, more is heavier.
-    void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes = 1)
+    void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes)
     {
         for (int i = 0; i <= passes; i++)
             draw->AddText(ImVec2(at.x + BoldOffset * i, at.y), color, text);
@@ -877,6 +742,12 @@ namespace
     {
         ImDrawList* draw = ImGui::GetBackgroundDrawList();
         ImVec2 size = ImGui::GetIO().DisplaySize;
+        // The game's art belongs to the game's page; the launcher's own pages get a plain colour.
+        if (m_page != Page::Play)
+        {
+            draw->AddRectFilledMultiColor(ImVec2(0, 0), size, Rgb(PageTop), Rgb(PageTop), Rgb(PageBottom), Rgb(PageBottom));
+            return;
+        }
         draw->AddRectFilledMultiColor(ImVec2(0, 0), size, Rgb(SkyTop), Rgb(SkyTop), Rgb(SkyBottom), Rgb(SkyBottom));
         // Once a disc is verified: the game's painted Skylands sky, cropped to fill, instead of the drawn stars.
         if (m_background != nullptr)
@@ -988,9 +859,29 @@ namespace
             ImGui::PopID();
         }
 
-        // Settings: the gear at the bottom of the sidebar, selected while its page is shown.
-        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - Pad - GameRowH);
+        // The collection, then Settings (the gear), at the bottom of the sidebar; selected while their page is shown.
+        ImGui::SetCursorPosY(ImGui::GetWindowHeight() - Pad - 2 * GameRowH);
         ImVec2 at;
+        bool collection = m_page == Page::Collection;
+        if (row("##collection", GameRowH, collection, true, at))
+        {
+            m_page = collection ? Page::Play : Page::Collection;
+            m_capturing = nullptr;
+        }
+        {
+            // Three figure cards fanned out.
+            ImVec2 center(at.x + 34, at.y + GameRowH / 2);
+            for (int i = -1; i <= 1; i++)
+            {
+                ImVec2 card(center.x + i * 7.0f, center.y + (i == 0 ? -3.0f : 0.0f));
+                draw->AddRectFilled(ImVec2(card.x - 7, card.y - 10), ImVec2(card.x + 7, card.y + 10), Rgb(i == 0 ? SidebarInk : SidebarInkDim, i == 0 ? 255 : 170), 3);
+                draw->AddRect(ImVec2(card.x - 7, card.y - 10), ImVec2(card.x + 7, card.y + 10), Rgb(Sidebar), 3, 0, 1.5f);
+            }
+            ImGui::PushFont(m_titleFont, 19);
+            ImVec2 label = ImGui::CalcTextSize("COLLECTION");
+            draw->AddText(ImVec2(at.x + 62, center.y - label.y / 2), Rgb(SidebarInk), "COLLECTION");
+            ImGui::PopFont();
+        }
         bool open = m_page == Page::Settings;
         if (row("##settings", GameRowH, open, true, at))
         {
@@ -1011,9 +902,32 @@ namespace
         ImGui::PopStyleColor();
     }
 
-    // The launcher's menu, opened by the SKYLAUNCHER title. Empty for now.
+    // The launcher's menu, opened by the SKYLAUNCHER title: empty for now, with the project's links bottom right.
     void App::DrawHome()
     {
+        constexpr const char* Project = "https://github.com/mflr0/Skylauncher";
+        constexpr float Icon = 40, ReportW = 190;
+        ImVec2 size = ImGui::GetIO().DisplaySize;
+        ImVec2 iconAt(size.x - Pad - Icon, size.y - Pad - Icon);
+
+        ImGui::SetCursorScreenPos(ImVec2(iconAt.x - 14 - ReportW, iconAt.y));
+        if (PillButton("Report a bug", false, ReportW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+            SDL_OpenURL((std::string(Project) + "/issues/new").c_str());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Opens a new issue on GitHub");
+
+        ImGui::SetCursorScreenPos(iconAt);
+        if (ImGui::InvisibleButton("##github", ImVec2(Icon, Icon)))
+            SDL_OpenURL(Project);
+        bool hovered = ImGui::IsItemHovered();
+        if (hovered)
+        {
+            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::SetTooltip("Skylauncher on GitHub");
+        }
+        if (m_github != nullptr)
+            ImGui::GetWindowDrawList()->AddImage(Ref(m_github), iconAt, ImVec2(iconAt.x + Icon, iconAt.y + Icon), ImVec2(0, 0), ImVec2(1, 1),
+                Rgb(hovered ? Accent : Text));
     }
 
     void App::DrawPlay()
@@ -1185,83 +1099,6 @@ namespace
         }
     }
 
-    void App::DrawSkylanders()
-    {
-        if (!m_figuresLoaded)
-            LoadFigures();
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("Choose who starts on the portal. Levels, gold and nicknames are edited in the game's Toy Box (F6 or Tab while playing); F7 puts the next figure on the portal.");
-        ImGui::PopStyleColor();
-        ImGui::Dummy(ImVec2(0, 8));
-        if (PillButton("Open the figures folder", false, 260))
-        {
-            std::string folder = PreferencePath("figures");
-            SDL_CreateDirectory(folder.c_str());
-            SDL_OpenURL(("file://" + folder).c_str());
-        }
-        ImGui::SameLine();
-        if (PillButton("Refresh", false, 120))
-        {
-            for (FigureFile& figure : m_figures)
-                if (figure.portrait != nullptr)
-                    SDL_DestroyTexture(figure.portrait);
-            m_figures.clear();
-            LoadFigures();
-        }
-        ImGui::Dummy(ImVec2(0, 10));
-
-        if (m_figures.empty())
-        {
-            BeginCard("##nofigures", ImVec2(0, 150));
-            Title("No figures yet", TitleSize, Text);
-            ImGui::TextWrapped("Start the game once: it creates a figure for every Skylander in the figures folder. You can also copy dumps of your own figures (.sky, .bin, .dmp) there.");
-            EndCard();
-            return;
-        }
-
-        std::vector<std::string> startup = StartupFigures();
-        ImGui::BeginChild("##figuregrid", ImVec2(0, 0), ImGuiChildFlags_None);
-        float cell = 150, width = ImGui::GetContentRegionAvail().x;
-        int columns = std::max(1, int((width + 12) / (cell + 12)));
-        for (size_t i = 0; i < m_figures.size(); i++)
-        {
-            FigureFile& figure = m_figures[i];
-            if (i % columns != 0)
-                ImGui::SameLine(0, 12);
-            ImGui::PushID(int(i));
-            bool onPortal = std::find(startup.begin(), startup.end(), figure.file) != startup.end();
-            ImVec2 position = ImGui::GetCursorScreenPos();
-            if (ImGui::InvisibleButton("figure", ImVec2(cell, cell + 34)))
-            {
-                SetStartupFigure(figure.file, !onPortal);
-                Toast(onPortal ? "Taken off the portal" : "Will start on the portal");
-            }
-            bool hovered = ImGui::IsItemHovered();
-            ImDrawList* draw = ImGui::GetWindowDrawList();
-            ImVec2 end(position.x + cell, position.y + cell + 34);
-            draw->AddRectFilled(position, end, Rgb(onPortal ? PanelRaised : Panel, 235), Radius);
-            draw->AddRect(position, end, Rgb(onPortal ? Accent : hovered ? BorderBright : Border), Radius, onPortal ? 3.0f : 1.5f);
-            ImU32 color = figure.toy != nullptr ? figures::ElementColor(figure.toy->element) : Rgb(Border);
-            ImVec2 center(position.x + cell / 2, position.y + cell / 2 - 4);
-            draw->AddCircleFilled(center, cell * 0.36f, color, 48);
-            if (figure.portrait != nullptr)
-                draw->AddImageRounded(Ref(figure.portrait), ImVec2(center.x - cell * 0.34f, center.y - cell * 0.34f),
-                    ImVec2(center.x + cell * 0.34f, center.y + cell * 0.34f), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, cell * 0.34f);
-            std::string name = figure.toy != nullptr ? figure.toy->name : figure.file;
-            ImVec2 text = ImGui::CalcTextSize(name.c_str());
-            draw->AddText(ImVec2(position.x + std::max(6.0f, (cell - text.x) / 2), end.y - 30), Rgb(Text), name.c_str());
-            if (onPortal)
-            {
-                draw->AddRectFilled(ImVec2(position.x + 8, position.y + 8), ImVec2(position.x + 70, position.y + 30), Rgb(Accent), 11);
-                ImGui::PushFont(nullptr, SmallSize);
-                draw->AddText(ImVec2(position.x + 16, position.y + 10), Rgb(AccentInk), "PORTAL");
-                ImGui::PopFont();
-            }
-            ImGui::PopID();
-        }
-        ImGui::EndChild();
-    }
-
     void App::DrawGraphics()
     {
         if (!BeginSettingsTable("##graphics"))
@@ -1430,7 +1267,7 @@ namespace
         ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
 
         constexpr std::pair<SettingsTab, const char*> Tabs[] = { { SettingsTab::Graphics, "Graphics" }, { SettingsTab::Controls, "Controls" },
-            { SettingsTab::Language, "Language" }, { SettingsTab::Skylanders, "My Skylanders" }, { SettingsTab::GameData, "Game data" },
+            { SettingsTab::Language, "Language" }, { SettingsTab::GameData, "Game data" },
             { SettingsTab::About, "About" } };
         Title("SETTINGS", HeadlineSize, Text);
         ImGui::Dummy(ImVec2(0, 4));
@@ -1461,14 +1298,12 @@ namespace
         ImGui::PopFont();
         ImGui::NewLine();
         ImGui::Dummy(ImVec2(0, 4));
-        // Cards fit their content; My Skylanders' figure grid scrolls in the rest of the page instead.
-        BeginCard("##settings", ImVec2(0, 0), m_tab == SettingsTab::Skylanders ? ImGuiChildFlags_None : ImGuiChildFlags_AutoResizeY);
+        BeginCard("##settings", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
         switch (m_tab)
         {
         case SettingsTab::Graphics: DrawGraphics(); break;
         case SettingsTab::Controls: DrawControls(); break;
         case SettingsTab::Language: DrawLanguage(); break;
-        case SettingsTab::Skylanders: DrawSkylanders(); break;
         case SettingsTab::GameData: DrawGameData(); break;
         case SettingsTab::About: DrawAbout(); break;
         }
@@ -1539,9 +1374,10 @@ namespace
         {
         case Page::Home: DrawHome(); break;
         case Page::Play: DrawPlay(); break;
+        case Page::Collection: DrawCollection(); break;
         case Page::Settings: DrawSettings(); break;
         }
-        if (m_page != Page::Settings) // Settings has its own Language tab
+        if (m_page == Page::Home || m_page == Page::Play) // Settings has its own Language tab, the collection its buttons there
             DrawLanguageMenu();
         ImGui::End();
         ImGui::PopStyleVar();
@@ -1556,8 +1392,9 @@ namespace
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
         if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
         {
-            static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-skylanders", "06-home" };
-            Screenshot(Names[std::min(m_testStep, 5)]);
+            static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-collection", "06-home",
+                "07-figure-sheet", "08-new-figure" };
+            Screenshot(Names[std::min<int>(m_testStep, int(std::size(Names)) - 1)]);
             m_testAt = 0;
             m_testStep++;
         }
@@ -1607,12 +1444,35 @@ namespace
             m_testAt = now + 400;
             break;
         case 4:
-            m_tab = SettingsTab::Skylanders;
+            // A few figures to show, in the test's own settings folder: a character, a legendary, a sidekick, an item
+            // and an adventure pack; one starts on the portal.
+            if (std::error_code error; !std::filesystem::exists(FiguresFolder(), error))
+            {
+                for (uint16_t toyType : { 14, 416, 28, 505, 200, 300 })
+                    figures::NewFigure(FiguresFolder(), *figures::FindToy(toyType));
+                SetStartupFigure("014 Gill Grunt.sky", true);
+                SetFavourite("416 Legendary Spyro.sky", true);
+            }
+            m_collectionLoaded = false;
+            m_page = Page::Collection;
             m_testAt = now + 600;
             break;
         case 5:
             m_page = Page::Home;
             m_testAt = now + 400;
+            break;
+        case 6:
+            m_page = Page::Collection;
+            m_sheetFile = "416 Legendary Spyro.sky";
+            m_testAt = now + 600;
+            break;
+        case 7:
+            m_sheetFile.clear();
+            m_newFigureOpen = true;
+            m_newCategory = int(figures::Category::Skylander);
+            m_newBase = 16;
+            m_newVariant = 416;
+            m_testAt = now + 600;
             break;
         default:
             m_running = false;
@@ -1620,6 +1480,9 @@ namespace
         }
     }
 }
+
+using namespace launcher_ui;
+using namespace LauncherTheme;
 
 void LauncherTheme::Apply(ImGuiStyle& style)
 {
@@ -1676,6 +1539,7 @@ std::span<const LauncherGameEntry> LauncherGameCatalog()
         { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, false },
         { "trapteam", "Trap Team", "Trap Team", 0x6DF0B4, false },
         { "superchargers", "SuperChargers", "SuperChargers", 0xFF8A5C, false },
+        { "racing", "SuperChargers Racing", "SuperChargers Racing", 0xE85D75, false },
         { "imaginators", "Imaginators", "Imaginators", 0xB49BFF, false },
     };
     return catalog;

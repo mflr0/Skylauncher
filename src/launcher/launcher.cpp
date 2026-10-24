@@ -1,6 +1,6 @@
-#include "launcher.h"
-#include "launcher_ui.h"
-#include "vfs.h"
+#include "launcher/launcher.h"
+#include "launcher/ui/launcher_ui.h"
+#include "shared/vfs.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <atomic>

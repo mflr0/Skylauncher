@@ -1,6 +1,6 @@
 #pragma once
 
-#include "launcher.h"
+#include "launcher/launcher.h"
 #include <cstdint>
 #include <span>
 #include <string>
@@ -17,7 +17,7 @@ struct LauncherGameEntry
     bool enabled;
 };
 
-// The six console Skylanders games, in release order. Enabled entries match g_games.
+// The console Skylanders games in release order, SuperChargers Racing included. Enabled entries match g_games.
 std::span<const LauncherGameEntry> LauncherGameCatalog();
 
 // Shows the launcher window until the player starts a verified disc image, quits, or the screenshot

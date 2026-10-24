@@ -1,6 +1,6 @@
 // Skylauncher: shows the launcher, then starts the game runtime with the disc image the player chose.
-#include "launcher.h"
-#include "launcher_ui.h"
+#include "launcher/launcher.h"
+#include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <filesystem>

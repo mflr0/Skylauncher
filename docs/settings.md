@@ -23,10 +23,23 @@ The launcher and the game runtime share one settings file, `launcher.ini`, in th
 | `input` | `key_<action>` | SDL key name (`Space`, `Return`, `A`...) | Keyboard binding | pending |
 | `portal` | `mode` | `auto`, `emulated`, `hid`, `usb` | Portal of Power backend | yes (`SSA_PORTAL`) |
 | `portal` | `place` | figure file names, comma separated | Figures put on the emulated portal at start | yes (`SSA_PORTAL_PLACE`) |
+| `collection` | `favourites` | figure file names, comma separated | The collection's favourites | launcher only |
 
 Keyboard actions: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`, `left_left`,
 `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (camera), `dpad_up`, `dpad_down`,
 `dpad_left`, `dpad_right`. Defaults: Space, X, C, V, Return, Backspace, Q, E, 1, 3, W, S, A, D, I, K, J, L and the arrow keys.
+
+## Figures
+
+The collection and the game share the `figures` folder next to `launcher.ini`. A figure is a 1 KB tag dump (`.sky`,
+`.bin` or `.dmp`); `src/shared/figures/figure_file.h` describes the layout the launcher reads and writes.
+
+- Before every change (rename, reset, restore, delete) the launcher copies the figure to
+  `figures/backups/<figure name>/<date>.sky`.
+- While a figure is on the game's portal, the runtime should keep a lock next to it: `figures/<file>.lock`, holding the
+  runtime's process id as text, removed when the figure leaves the portal or the game exits. The collection shows such a
+  figure as "in use" and changes nothing in it. A lock whose process isn't running is ignored, so a crash never leaves a
+  figure stuck. The runtime doesn't write these locks yet.
 
 When it starts the game, the launcher also passes `portal` and the languages through the environment variables in
 brackets above, which the runtime already reads.

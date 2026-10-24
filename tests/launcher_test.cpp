@@ -1,15 +1,25 @@
 // Checks the launcher's disc verification and settings file without showing any UI.
 // usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]
-#include "launcher.h"
-#include "launcher_assets.h"
-#include "launcher_ui.h"
-#include "vfs.h"
+#include "launcher/launcher.h"
+#include "assets/launcher_assets.h"
+#include "launcher/ui/launcher_ui.h"
+#include "shared/figures/figure_collection.h"
+#include "shared/figures/figure_icons.h"
+#include "shared/vfs.h"
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <aes.hpp>
+#include <fmt/format.h>
+#if defined(_WIN32)
+#include <process.h>
+#define getpid _getpid
+#else
+#include <unistd.h>
+#endif
 
 namespace
 {
@@ -103,6 +113,127 @@ namespace
             argv.push_back(argument.data());
         return ResolveGameSource(int(argv.size()), argv.data(), *FindGame("ssa"), false);
     }
+
+    // Figure engine, independent of the disc: crypto building blocks, a new figure, then progress written the way the
+    // game writes it (re-implemented here from the layout, so a slip in either copy shows up).
+    std::string Hex(std::span<const uint8_t> bytes)
+    {
+        std::string out;
+        for (uint8_t b : bytes)
+            out += fmt::format("{:02x}", b);
+        return out;
+    }
+
+    void SealAreaForTest(figures::FigureData& data, int areaBlock, uint32_t experience, uint16_t gold, uint8_t sequence)
+    {
+        // Plain area blocks (area-relative 0..9), checksums as documented in figure_file.h.
+        uint8_t blocks[10][16] = {};
+        blocks[0][0] = uint8_t(experience); blocks[0][1] = uint8_t(experience >> 8); blocks[0][2] = uint8_t(experience >> 16);
+        blocks[0][3] = uint8_t(gold); blocks[0][4] = uint8_t(gold >> 8);
+        blocks[0][9] = sequence;
+        blocks[1][0] = 0x05; // two upgrades
+        const char16_t name[] = u"Gilly";
+        for (int i = 0; name[i] != 0; i++)
+            blocks[2][i * 2] = uint8_t(name[i]);
+        auto crc = [](std::vector<uint8_t> bytes) { return figures::Crc16(bytes); };
+        std::vector<uint8_t> extra(0x110, 0);
+        for (int i = 0; i < 4; i++)
+            memcpy(&extra[i * 16], blocks[std::array{ 5, 6, 8, 9 }[i]], 16);
+        uint16_t c3 = crc(extra);
+        std::vector<uint8_t> type2;
+        for (int k : { 1, 2, 4 })
+            type2.insert(type2.end(), blocks[k], blocks[k] + 16);
+        uint16_t c2 = crc(type2);
+        blocks[0][0x0A] = uint8_t(c3); blocks[0][0x0B] = uint8_t(c3 >> 8);
+        blocks[0][0x0C] = uint8_t(c2); blocks[0][0x0D] = uint8_t(c2 >> 8);
+        std::vector<uint8_t> head(blocks[0], blocks[0] + 16);
+        head[0x0E] = 0x05; head[0x0F] = 0x00;
+        uint16_t c1 = crc(head);
+        blocks[0][0x0E] = uint8_t(c1); blocks[0][0x0F] = uint8_t(c1 >> 8);
+        // Encrypt like the game: AES-128-ECB, key = MD5(blocks 0-1, block number, copyright line).
+        static const char Copyright[] = " Copyright (C) 2010 Activision. All Rights Reserved. ";
+        for (int k = 0; k < 10; k++)
+        {
+            int block = areaBlock + k;
+            if (block % 4 == 3)
+                continue;
+            uint8_t* out = &data[block * 16];
+            memcpy(out, blocks[k], 16);
+            if (std::all_of(out, out + 16, [](uint8_t b) { return b == 0; }))
+                continue;
+            std::vector<uint8_t> material(data.begin(), data.begin() + 32);
+            material.push_back(uint8_t(block));
+            material.insert(material.end(), Copyright, Copyright + sizeof(Copyright) - 1);
+            std::array<uint8_t, 16> key = figures::Md5(material);
+            AES_ctx context;
+            AES_init_ctx(&context, key.data());
+            AES_ECB_encrypt(&context, out);
+        }
+    }
+
+    void FigureChecks(const std::filesystem::path& scratch)
+    {
+        auto bytes = [](std::string_view text) { return std::span(reinterpret_cast<const uint8_t*>(text.data()), text.size()); };
+        EXPECT(Hex(figures::Md5(bytes(""))) == "d41d8cd98f00b204e9800998ecf8427e");
+        EXPECT(Hex(figures::Md5(bytes("abc"))) == "900150983cd24fb0d6963f7d28e17f72");
+        EXPECT(Hex(figures::Md5(bytes("12345678901234567890123456789012345678901234567890123456789012345678901234567890"))) ==
+            "57edf4a22be3c955ac49da2e2107b67a");
+        EXPECT(figures::Crc16(bytes("123456789")) == 0x29B1);
+        EXPECT(figures::LevelFromExperience(0) == 1 && figures::LevelFromExperience(1000) == 2 && figures::LevelFromExperience(40000) == 10);
+
+        const figures::ToyInfo& gill = *figures::FindToy(14);
+        figures::FigureData data = figures::CreateFigure(gill.toyType, gill.variantId);
+        figures::FigureHeader header = figures::ReadHeader(data);
+        EXPECT(header.checksumValid && header.toyType == 14 && header.variantId == 0);
+        EXPECT(data[4] == (data[0] ^ data[1] ^ data[2] ^ data[3]));
+        EXPECT(Hex(std::span(&data[0x30], 6)) == "4b0b20107ccb"); // sector 0 key A
+        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Blank);
+        EXPECT(!figures::SetNickname(data, "Nope")); // a blank toy has no progress to rename
+
+        SealAreaForTest(data, 0x08, 2500, 1234, 7);
+        figures::FigureStats stats = figures::ReadStats(data);
+        EXPECT(stats.state == figures::FigureStats::State::Valid && stats.area == 0);
+        EXPECT(stats.experience == 2500 && stats.level == 3 && stats.gold == 1234 && stats.nickname == "Gilly" && stats.upgrades == 5);
+        EXPECT(figures::SetNickname(data, "Gill Gr\xC3\xBCnt"));
+        stats = figures::ReadStats(data);
+        EXPECT(stats.state == figures::FigureStats::State::Valid && stats.area == 1 && stats.sequence == 8);
+        EXPECT(stats.nickname == "Gill Gr\xC3\xBCnt" && stats.experience == 2500 && stats.gold == 1234);
+        EXPECT(!figures::SetNickname(data, "A name far too long"));
+        data[0x08 * 16 + 5] ^= 0xFF; // damage the older copy: the current one still reads
+        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Valid);
+        data[0x24 * 16 + 5] ^= 0xFF; // and now both
+        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Unreadable);
+        figures::ResetProgress(data);
+        EXPECT(figures::ReadStats(data).state == figures::FigureStats::State::Blank && figures::ReadHeader(data).toyType == 14);
+
+        // The folder: create, import, back up, restore, delete, locks.
+        std::filesystem::path folder = scratch / "figures";
+        std::string made = figures::NewFigure(folder, gill);
+        EXPECT(made == "014 Gill Grunt.sky");
+        EXPECT(figures::NewFigure(folder, gill) == "014 Gill Grunt (2).sky");
+        std::filesystem::path outside = scratch / "dump.bin";
+        EXPECT(figures::SaveFigure(outside, figures::CreateFigure(416, 0)));
+        figures::ImportResult imported = figures::ImportFigure(folder, outside);
+        EXPECT(imported.file == "dump.bin" && imported.error.empty());
+        WriteFile(scratch / "junk.sky", std::vector<uint8_t>(100, 1));
+        EXPECT(figures::ImportFigure(folder, scratch / "junk.sky").file.empty());
+        EXPECT(!figures::BackupFigure(folder, made).empty());
+        EXPECT(figures::ListBackups(folder, made).size() == 1);
+        EXPECT(figures::RestoreBackup(folder, made, figures::ListBackups(folder, made).front()));
+        EXPECT(figures::DeleteFigure(folder, made) && !std::filesystem::exists(folder / made));
+        EXPECT(!figures::IsLocked(folder, "dump.bin"));
+        std::ofstream(folder / "dump.bin.lock") << 0;
+        EXPECT(!figures::IsLocked(folder, "dump.bin")); // no such process
+        std::ofstream(folder / "dump.bin.lock") << getpid();
+        EXPECT(figures::IsLocked(folder, "dump.bin"));
+
+        // Generated icons: opaque in the middle, transparent in the corners.
+        std::vector<uint8_t> icon = figures::GenerateIcon(*figures::FindToy(404), 64);
+        EXPECT(icon.size() == 64 * 64 * 4 && icon[(32 * 64 + 32) * 4 + 3] == 255 && icon[3] == 0);
+        for (const figures::ToyInfo& toy : figures::Catalog())
+            EXPECT(figures::PlayableIn(toy, figures::Game::SpyrosAdventure) == (toy.game == figures::Game::SpyrosAdventure));
+        printf("Figure engine: crypto, header, progress copies, folder and icons checked\n");
+    }
 }
 
 int main(int argc, char** argv)
@@ -122,6 +253,8 @@ int main(int argc, char** argv)
     {
         return (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
     };
+
+    FigureChecks(scratch);
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };
@@ -218,7 +351,7 @@ int main(int argc, char** argv)
 
     printf("Launcher catalog and display helpers:\n");
     auto catalog = LauncherGameCatalog();
-    EXPECT(catalog.size() == 6);
+    EXPECT(catalog.size() == 7); // the six console games and SuperChargers Racing
     EXPECT(std::string(catalog.front().id) == "ssa");
     EXPECT(catalog.front().enabled);
     EXPECT(std::string(catalog.front().name) == "Spyro's Adventure");

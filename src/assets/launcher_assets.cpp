@@ -1,4 +1,5 @@
-#include "launcher_assets.h"
+#include "assets/launcher_assets.h"
+#include "shared/figures/figure_catalog.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -399,6 +400,46 @@ namespace LauncherAssets
         }
         if (out.good())
             out << "title_icon=default.xex XDBF image resource -> title_icon.png\n";
+    }
+
+    std::string Provider::FigurePortraitPath(const std::string& imageName) const
+    {
+        if (!enabled || cacheDir.empty() || imageName.empty())
+            return {};
+        std::string path = cacheDir + fmt::format("{:08X}", titleId) + "/figures/" + imageName + ".png";
+        std::error_code error;
+        return std::filesystem::exists(path, error) ? path : std::string();
+    }
+
+    void Provider::ExtractFigurePortraits(DiscFileSystem& disc)
+    {
+        if (!enabled)
+            return;
+        std::string folder = cacheDir + fmt::format("{:08X}", titleId) + "/figures/";
+        std::error_code error;
+        std::filesystem::create_directories(folder, error);
+
+        struct Wanted { std::string name; uint32_t size; };
+        std::vector<Wanted> wanted;
+        for (const figures::ToyInfo& toy : figures::Catalog())
+            for (Wanted item : { Wanted{ figures::PortraitImageName(toy), 128 }, Wanted{ figures::PortraitLargeImageName(toy), 512 } })
+                if (!item.name.empty() && !std::filesystem::exists(folder + item.name + ".png", error) &&
+                    std::none_of(wanted.begin(), wanted.end(), [&](const Wanted& w) { return w.name == item.name; }))
+                    wanted.push_back(item);
+        if (wanted.empty())
+            return;
+
+        std::vector<uint8_t> package;
+        std::vector<uint8_t> strm = disc.ReadAll("uigameimage.str");
+        if (strm.empty() || !DecompressStrm(strm, package))
+            return;
+        for (const Wanted& item : wanted)
+        {
+            RoleSource source{ Role::CharacterPortrait, "", item.name.c_str(), item.size, item.size };
+            std::vector<uint8_t> rgba;
+            if (DecodeTextureFromPackage(package, source, rgba, nullptr))
+                WritePng(folder + item.name + ".png", item.size, item.size, rgba);
+        }
     }
 
     Asset Provider::Get(Role role)

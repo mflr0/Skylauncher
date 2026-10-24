@@ -9,6 +9,6 @@ function(embed_array name path)
     file(APPEND "${OUTPUT}" "extern const unsigned char ${name}[] = {\n${bytes}\n};\nextern const size_t ${name}Size = ${size};\n")
 endfunction()
 
-file(WRITE "${OUTPUT}" "// Generated from resources/fonts by cmake/embed_fonts.cmake. Do not edit.\n#include \"embedded_fonts.h\"\n")
+file(WRITE "${OUTPUT}" "// Generated from resources/fonts by cmake/embed_fonts.cmake. Do not edit.\n#include \"shared/embedded_fonts.h\"\n")
 embed_array(g_embeddedOutfit "${OUTFIT}")
 embed_array(g_embeddedBungee "${BUNGEE}")

@@ -17,6 +17,8 @@ namespace LauncherTheme
     inline constexpr unsigned SkyBottom = 0x2A1A5E;
     inline constexpr unsigned PortalGlow = 0x5B3FD0;
     inline constexpr unsigned BackdropShade = 70; // alpha of the night tint laid over the game's sky backdrop
+    // Every page but the game's (Home, Collection, Settings): a plain gradient in the sidebar's grey, top to bottom.
+    inline constexpr unsigned PageTop = 0x32323C, PageBottom = 0x1E1E24;
 
     // The sidebar: a cool dark grey (a touch of blue), light ink. The bottom band and its buttons are shades of the same grey.
     inline constexpr unsigned Sidebar = 0x26262C; // Sidebar background color
@@ -66,7 +68,7 @@ namespace LauncherTheme
     inline constexpr float Radius = 14, RadiusSmall = 10, RadiusLarge = 22;
     inline constexpr float PlayButtonW = 300, PlayButtonH = 72;
     inline constexpr float BottomBarH = 150; // the band with the main button, under the game art
-    inline constexpr float GameRowH = 58, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
+    inline constexpr float GameRowH = 54, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
     inline constexpr float TabUnderlineH = 3, TabGap = 34; // settings tabs: the line under the selected one, the space between them
     inline constexpr float LanguageMenuW = 140; // the launcher's language menu, top right
     inline constexpr float ControllerW = 190, ControllerGap = 40; // the controller picker, and its space before the main button
