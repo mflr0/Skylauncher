@@ -43,7 +43,7 @@ namespace LauncherTheme
 
     inline constexpr unsigned Text = 0xF4F4F6;
     inline constexpr unsigned TextSecondary = 0xD0D0D8;
-    inline constexpr unsigned TextDim = 0x9C9CA8;
+    inline constexpr unsigned TextDim = 0xB8B8C4; // was 0x9C9CA8: 4.1:1 on the raised greys, now 4.5:1 or more (docs/launcher_ui.md, Legibility)
 
     // One accent everywhere, the blue of the main button (close to the Skylanders logo's sky blue): selections,
     // toggles, sliders, focus. The only other accent is the orange bar marking the selected row of the sidebar.
@@ -55,7 +55,7 @@ namespace LauncherTheme
     inline constexpr unsigned PlayDark = AccentDark;
     inline constexpr unsigned PlayInk = AccentInk;
     inline constexpr unsigned SidebarBar = 0xF08A12; // orange, the sidebar's selected row only
-    inline constexpr unsigned Danger = 0xF85149;
+    inline constexpr unsigned Danger = 0xFF817A; // was 0xF85149: 3.4:1 on the raised greys
     inline constexpr unsigned Ok = 0x48D17A;
 
     // Element colours: air, earth, fire, water, magic, tech, life, undead.
@@ -79,8 +79,9 @@ namespace LauncherTheme
     // Fonts: Outfit for text, Bungee for titles and buttons (both SIL OFL 1.1, resources/fonts).
     inline constexpr float TextSize = 17, SmallSize = 14, TitleSize = 22, HeadlineSize = 34, HeroSize = 48;
     inline constexpr float SidebarTextSize = 20, SidebarSmallSize = 16; // game names and their status in the sidebar
-    inline constexpr float BoldOffset = 0.8f; // Outfit is one light weight: bold text is drawn twice, this far apart
-    inline constexpr int BolderPasses = 2;     // extra copies for text that must read heavier (the chosen controller)
+    inline constexpr float CaptionSize = 12;  // the smallest text there is, at 1x
+    inline constexpr float BoldOffset = 0.6f; // extra copies of SemiBold text, this far apart, for what must read heavier (the chosen controller)
+    inline constexpr int BolderPasses = 2;
 
     // ImGui widget colours and shapes for the whole window.
     void Apply(ImGuiStyle& style);

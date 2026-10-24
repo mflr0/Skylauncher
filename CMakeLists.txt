@@ -59,10 +59,11 @@ target_link_libraries(XenonXex PUBLIC fmt::fmt)
 
 # The fonts are also built into the executable, so a lone executable works (Windows .exe).
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
-    COMMAND ${CMAKE_COMMAND} -DOUTFIT=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Variable.ttf
+    COMMAND ${CMAKE_COMMAND} -DOUTFIT=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf -DOUTFIT_BOLD=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf
         -DBUNGEE=${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_fonts.cpp
         -P ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake
-    DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Variable.ttf
+    DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf
+        ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf
         ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf
     COMMENT "Embedding the launcher fonts")
 
@@ -105,7 +106,8 @@ endif()
 
 # Fonts are data, not game content: Outfit and Bungee (SIL Open Font License, licence files next to them).
 set(SKYLAUNCHER_FONTS
-    ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Variable.ttf
+    ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf
+    ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf
     ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf
     ${CMAKE_SOURCE_DIR}/resources/fonts/OFL-Outfit.txt
     ${CMAKE_SOURCE_DIR}/resources/fonts/OFL-Bungee.txt)

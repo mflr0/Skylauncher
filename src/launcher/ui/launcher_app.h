@@ -237,10 +237,11 @@ namespace launcher_ui
         SDL_Window* m_window = nullptr;
         float m_uiScale = 1.0f; // launcher points per window unit (UpdateUiScale)
         SDL_Renderer* m_renderer = nullptr;
-        std::vector<uint8_t> m_fontData[2];
+        std::vector<uint8_t> m_fontData[3];
         ImFont* m_textFont = nullptr;
         ImFont* m_titleFont = nullptr;
         ImFont* m_monoFont = nullptr;
+        ImFont* m_boldFont = nullptr; // Outfit SemiBold
 
         Page m_page = Page::Home; // the launcher opens on its menu; the player picks a game in the sidebar
         SettingsTab m_tab = SettingsTab::Graphics;

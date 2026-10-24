@@ -30,6 +30,8 @@
 
 namespace launcher_ui
 {
+    ImFont* g_boldFont = nullptr; // Outfit SemiBold, for AddBoldText (set by App::LoadFonts)
+
     // ---- Settings file ------------------------------------------------------------------------------------------
 
     std::string SettingGet(const LauncherConfig& config, std::string_view section, std::string_view key, std::string fallback)
@@ -246,7 +248,8 @@ namespace launcher_ui
 #endif
         bool found = false;
         for (const std::string& directory : directories)
-            if (ReadWholeFile(directory + "/Outfit-Variable.ttf", m_fontData[0]) && ReadWholeFile(directory + "/Bungee-Regular.ttf", m_fontData[1]))
+            if (ReadWholeFile(directory + "/Outfit-Regular.ttf", m_fontData[0]) && ReadWholeFile(directory + "/Bungee-Regular.ttf", m_fontData[1]) &&
+            ReadWholeFile(directory + "/Outfit-SemiBold.ttf", m_fontData[2]))
             {
                 found = true;
                 break;
@@ -255,15 +258,20 @@ namespace launcher_ui
         {
             m_fontData[0].assign(g_embeddedOutfit, g_embeddedOutfit + g_embeddedOutfitSize);
             m_fontData[1].assign(g_embeddedBungee, g_embeddedBungee + g_embeddedBungeeSize);
+            m_fontData[2].assign(g_embeddedOutfitBold, g_embeddedOutfitBold + g_embeddedOutfitBoldSize);
         }
 
         ImGuiIO& io = ImGui::GetIO();
         ImFontConfig config;
         config.FontDataOwnedByAtlas = false; // the vectors outlive the atlas
+        // Glyphs are rasterized at the screen's density (DisplayFramebufferScale), so no extra oversampling: crisper stems.
+        config.OversampleH = config.OversampleV = 1;
+        config.PixelSnapH = true;
         m_textFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[0].data(), int(m_fontData[0].size()), TextSize, &config);
+        g_boldFont = m_boldFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[2].data(), int(m_fontData[2].size()), TextSize, &config);
         m_titleFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[1].data(), int(m_fontData[1].size()), TitleSize, &config);
         m_monoFont = io.Fonts->AddFontDefaultVector(); // logs: Dear ImGui's own monospace font
-        return m_textFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr;
+        return m_textFont != nullptr && m_boldFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr;
     }
 
     bool App::Init()
@@ -648,18 +656,22 @@ namespace launcher_ui
         draw->AddCircleFilled(ImVec2(center.x + w * 0.62f, center.y - h * 0.35f), h * 0.17f, hole, 12);
     }
 
-    // Bold for Outfit, which is loaded as a single weight: the text twice, BoldOffset apart.
+    // Bold is Outfit SemiBold at the current size; `passes` extra copies BoldOffset apart make it heavier still.
     void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes)
     {
-        for (int i = 0; i <= passes; i++)
+        ImGui::PushFont(g_boldFont, ImGui::GetFontSize());
+        for (int i = 0; i < passes; i++)
             draw->AddText(ImVec2(at.x + BoldOffset * i, at.y), color, text);
+        ImGui::PopFont();
     }
 
     void App::BoldText(const char* text, unsigned color)
     {
+        ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
         ImVec2 size = ImGui::CalcTextSize(text);
+        ImGui::PopFont();
         AddBoldText(ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos(), Rgb(color), text);
-        ImGui::Dummy(ImVec2(size.x + BoldOffset, size.y));
+        ImGui::Dummy(size);
     }
 
     void App::Title(const char* text, float size, unsigned color)
@@ -700,13 +712,11 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? AccentHover : fillHover));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? AccentDark : fillActive));
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(primary ? AccentInk : Text));
+        if (bold)
+            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
         bool pressed = ImGui::Button(label, ImVec2(width, 40));
         if (bold)
-        {
-            ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax(), text = ImGui::CalcTextSize(label);
-            ImGui::GetWindowDrawList()->AddText(ImVec2((min.x + max.x - text.x) / 2 + BoldOffset, (min.y + max.y - text.y) / 2),
-                ImGui::GetColorU32(ImGuiCol_Text), label);
-        }
+            ImGui::PopFont();
         ImGui::PopStyleColor(4);
         return pressed;
     }
