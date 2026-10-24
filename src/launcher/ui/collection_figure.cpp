@@ -101,6 +101,7 @@ namespace launcher_ui
 
     namespace
     {
+        constexpr uint32_t MaxExperience = 33000; // the title's ceiling for a figure
         std::string BackupLabel(const std::string& backup)
         {
             std::string stem = fs::path(backup).stem().string(); // 2026-10-24T101500Z
@@ -398,18 +399,20 @@ namespace launcher_ui
         ImGui::SetNextItemWidth(380);
         int level = figures::LevelForExperience(m_edit.experience);
         label("Level");
-        if (ImGui::SliderInt("##level", &level, 1, figures::MaxLevel))
-            m_edit.experience = figures::LevelExperience[level - 1];
+        if (ImGui::SliderInt("##level", &level, 1, figures::MaxLevel, "%d", ImGuiSliderFlags_AlwaysClamp))
+            m_edit.experience = figures::LevelExperience[std::clamp(level, 1, figures::MaxLevel) - 1];
         int experience = int(m_edit.experience);
         label("Experience");
         ImGui::SetNextItemWidth(380);
         if (ImGui::InputInt("##xp", &experience, 100, 1000))
-            m_edit.experience = uint32_t(std::clamp(experience, 0, 0xFFFFFF));
-        int gold = m_edit.gold;
+            m_edit.experience = uint32_t(std::clamp(experience, 0, int(MaxExperience)));
         label("Gold");
         ImGui::SetNextItemWidth(380);
-        if (ImGui::InputInt("##gold", &gold, 100, 1000))
-            m_edit.gold = uint16_t(std::clamp(gold, 0, int(figures::MaxGold)));
+        char gold[8];
+        snprintf(gold, sizeof gold, "%u", unsigned(m_edit.gold));
+        auto digitsOnly = [](ImGuiInputTextCallbackData* data) { return data->EventChar >= '0' && data->EventChar <= '9' ? 0 : 1; };
+        if (ImGui::InputText("##gold", gold, sizeof gold, ImGuiInputTextFlags_CallbackCharFilter, digitsOnly))
+            m_edit.gold = uint16_t(std::min(strtol(gold, nullptr, 10), long(figures::MaxGold)));
         int hero = m_edit.heroPoints;
         label("Hero points");
         ImGui::SetNextItemWidth(380);
