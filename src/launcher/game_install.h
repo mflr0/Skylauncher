@@ -20,7 +20,7 @@ struct InstallKit
 {
     std::filesystem::path folder;
     std::filesystem::path ssabuild; // the kit's SSABuild executable
-    std::string version;            // the kit's VERSION file, else a fingerprint of SSABuild
+    std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
 };
 
 // The kit: SKYLAUNCHER_KIT, else "[launcher] kit=", else a folder next to the launcher (or its macOS app bundle) named

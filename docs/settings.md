@@ -10,6 +10,9 @@ The launcher and the game runtime share one settings file, `launcher.ini`, in th
 | --- | --- | --- | --- | --- |
 | `launcher` | `fullscreen` | `0`, `1` | The launcher window itself | n/a |
 | `launcher` | `runtime` | path | The game runtime to start, if not next to the launcher | n/a |
+| `launcher` | `kit` | folder | The player kit that installs the game, if not next to the launcher (`docs/install.md`) | n/a |
+| `install.<sha256>` | `runtime` | path | The game the launcher built for the disc whose `default.xex` has this SHA-256 | n/a |
+| `install.<sha256>` | `kit` | text | The kit version it was built with; another kit offers "Update the game" | n/a |
 | `ssa` | `iso` | path | The verified disc image | yes |
 | `ssa` | `language` | `en` `fr` `de` `es` `it` `nl` `sv` `no` `da` `fi` | Text language | yes |
 | `ssa` | `voice_language` | same codes | Voice language | yes |

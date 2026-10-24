@@ -7,6 +7,7 @@ is easy to iterate without touching the game runtime.
 - `src/launcher/theme/launcher_theme.h` - every colour, size, radius and font size, plus the ImGui style (`Apply`). Change the look here first.
 - `src/main.cpp` - picks the game and disc, shows the launcher, starts the runtime.
 - `src/launcher/` - the launcher: `launcher.{h,cpp}` (disc checks, settings file), `launcher_games.cpp` (the game table),
+  `game_install.{h,cpp}` (installing the game with the kit's SSABuild, `docs/install.md`),
   `ui/`, `theme/`.
 - `src/assets/` - the art read from the player's disc (`launcher_assets`).
 - `src/launcher/ui/launcher_app.h` - the window's class (`App`) and helpers shared by the page files.
@@ -92,6 +93,8 @@ SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ```
 It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
 `07-figure-sheet.png` and `08-new-figure.png` (it creates a few figures in its own settings folder first).
+With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
+(`docs/install.md`).
 
 ## Notes
 - Drag & drop ISO is supported through `SDL_EVENT_DROP_FILE`.

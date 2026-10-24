@@ -52,10 +52,13 @@ Tested on macOS (Apple Silicon). Windows and Linux builds are expected to work b
 The launcher starts the game runtime, which is a separate program. It looks for it in this order:
 
 1. the `SKYLAUNCHER_RUNTIME` environment variable;
-2. `runtime=` in the `[launcher]` section of `launcher.ini`;
-3. `SSARecomp` (`SSARecomp.exe` on Windows, or `SSARecomp.app` on macOS) next to the launcher.
+2. the game it installed for your disc (below);
+3. `runtime=` in the `[launcher]` section of `launcher.ini`;
+4. `SSARecomp` (`SSARecomp.exe` on Windows, or `SSARecomp.app` on macOS) next to the launcher.
 
-If none is found, the launcher tells you where to set the path.
+If none of these exists, the launcher can **install** the game: put the SSARecomp player kit (the `ssa-kit` folder)
+next to the launcher, drop your disc, and press INSTALL. The kit recompiles and builds the game from your disc on your
+computer (about 15 minutes the first time; internet is needed once for the compiler). See `docs/install.md`.
 
 ## Changing the look
 
