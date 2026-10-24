@@ -9,10 +9,9 @@ on your computer.
 ## What you need
 
 - Your own copy of *Skylanders: Spyro's Adventure* for Xbox 360, as a disc image (`.iso`).
-- The SSARecomp player kit (`ssa-kit`), next to the launcher. **It is not published yet.**
 - Windows 10 or 11 (64-bit), or a Mac with Apple Silicon. Linux builds of the launcher exist, but the game can't be
   installed on Linux yet.
-- An internet connection the first time, to download the compiler.
+- An internet connection the first time: INSTALL downloads the game tools (about 30 to 40 MB) and the compiler.
 
 ## Get started
 

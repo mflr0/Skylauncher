@@ -30,12 +30,26 @@ HTTPS is `curl` (`curl.exe` ships with Windows 10 and 11, as SSABuild already re
 
 ## The game kit
 
-`[update] kit_repo=owner/name` (empty by default: the game's repository isn't public yet) enables the same check for the
-player kit, whose release must carry `ssa-kit-windows-x64.zip`, `ssa-kit-macos-arm64.zip` (or `-x64`) or
-`ssa-kit-linux-x64.zip`, and `SHA256SUMS`. The installed kit's release is `[update] kit_tag` (written after an update), else
-`version=` in its `kit.txt`. A newer tag shows "A new version of the game is available" with **Update the game**: the zip is
-verified, unpacked next to the old kit and swapped in, and (a disc being verified) the install runs again; SSABuild is
-incremental. `[update] repo=` changes where the launcher itself is looked up.
+The kit is an asset of the launcher's own release: `ssa-kit-windows-x64.zip` and `ssa-kit-macos-arm64.zip` (there is no Linux
+kit yet), listed in the release's `SHA256SUMS`. `[update] kit_repo=owner/name` says where (default `mflr0/Skylauncher`).
+
+- **First install**: with no kit, INSTALL starts with "Downloading the game tools" (docs/install.md): the release tagged
+  `v<launcher version>`, else the latest one; the zip is checked against that release's `SHA256SUMS` (a mismatch or a missing line
+  refuses it), then unpacked into `kit/<release tag>/` in the data folder.
+- **Updates**: the installed kit's release is `[update] kit_tag` (written after a download or an update), else `version=` in its
+  `kit.txt`. A newer tag shows "A new version of the game is available" with **Update the game**: the zip is verified, unpacked
+  into `kit/<tag>/` (or over the kit next to the launcher, if that is the one in use) and, a disc being verified, the install
+  runs again; SSABuild is incremental. `[update] repo=` changes where the launcher itself is looked up.
+
+## Releasing
+
+1. Bump `SKYLAUNCHER_VERSION` in `CMakeLists.txt` and commit.
+2. Tag the commit `vX.Y.Z` and push the tag.
+3. Wait for the CI: it publishes the release with the launcher assets and `SHA256SUMS`.
+4. `tools/release_kit.sh vX.Y.Z ssa-kit-windows-x64.zip ssa-kit-macos-arm64.zip` (needs `gh`): uploads the kit zips to that
+   release, downloads its `SHA256SUMS`, replaces or appends the kit lines and uploads it again with `--clobber`.
+
+A kit-only update is a new release the same way (a new tag, the launcher unchanged in behaviour).
 
 ## What the CI must publish
 
@@ -48,5 +62,5 @@ then tag the commit. Branch builds publish nothing.
 
 `SkylauncherTest` builds fake releases in a scratch folder (`latest.json`, assets, `SHA256SUMS`, served as `file://` through
 `SKYLAUNCHER_UPDATE_URL`): version compare, the JSON, a good download, a damaged one, no `SHA256SUMS`, the swap and its
-rollback, zip path escapes, the kit install and the manager. `SSA_LAUNCHER_TEST_UPDATE=1` with `SKYLAUNCHER_UPDATE_URL` on a
+rollback, zip path escapes, the kit install, the kit download (a fake release with a kit zip: good, bad hash, missing line, fallback to the latest) and the manager. `SSA_LAUNCHER_TEST_UPDATE=1` with `SKYLAUNCHER_UPDATE_URL` on a
 fake `latest.json` takes the banner, What's new, About and failure screenshots.

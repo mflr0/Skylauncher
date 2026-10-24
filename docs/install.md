@@ -10,7 +10,10 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
 2. No game built for that disc, and no runtime set up by hand (below): **INSTALL** replaces PLAY, with one line
    saying the game is built from the disc, about 15 minutes and 6 GB, and internet is needed once for the compiler
    (`InstallMinutes`, `InstallGigabytes` in `game_install.h`).
-3. INSTALL runs `SSABuild --iso <iso> --out <game folder> --kit <kit>`. The progress card replaces the logo
+3. With no kit (below), INSTALL first downloads it: the checklist starts with **Downloading the game tools** (a bar in MB,
+   retry with **Retry**; a failure says "The game tools couldn't be downloaded"). On Linux there is no kit: "The game can't be
+   installed on Linux yet." See `docs/updates.md` for the release it comes from.
+   Then INSTALL runs `SSABuild --iso <iso> --out <game folder> --kit <kit>`. The progress card replaces the logo
    (`ui/install_page.cpp`, its model is `install_checklist.{h,cpp}`):
    - a fixed **checklist** of eight steps: Preparing the compiler, Reading the disc, Translating the game code, Translating
      the shaders, Compiling the game, Linking the game, Adding the movie shaders, Finishing (the second shaders / compile /
@@ -40,13 +43,15 @@ SSABuild's output is also written to `install.log` in the game folder. `SKYLAUNC
 
 | What | Where |
 | --- | --- |
-| The kit | `SKYLAUNCHER_KIT`, else `[launcher] kit=` in `launcher.ini`, else next to the launcher (next to `Skylauncher.app` on macOS): `ssa-kit/`, `kit/`, or a folder whose name starts with `ssa-kit` (an unzipped `ssa-kit-windows-x64`). It must hold `SSABuild` (`SSABuild.exe`). |
+| The kit | `SKYLAUNCHER_KIT`, else `[launcher] kit=` in `launcher.ini`, else next to the launcher (next to `Skylauncher.app` on macOS): `ssa-kit/`, `kit/`, or a folder whose name starts with `ssa-kit` (an unzipped `ssa-kit-windows-x64`), else the newest `kit/<release tag>/` Skylauncher downloaded into its data folder. It must hold `SSABuild` (`SSABuild.exe`). |
 | The kit's version | `build=` (else `version=`) in the kit's `kit.txt`, else SSABuild's size and date |
 | The built game | `%LOCALAPPDATA%\Skylauncher\games\<sha256>` on Windows, `~/Library/Application Support/Skylauncher/games/<sha256>` on macOS, `~/.local/share/Skylauncher/games/<sha256>` on Linux. Never next to the ISO. |
 | What was built | `[install.<sha256>]` in `launcher.ini`: `runtime=` (the `@done` path), `kit=` (the kit version it was built with) |
 
 Which runtime PLAY starts: `SKYLAUNCHER_RUNTIME`, else the game built for this disc, else `[launcher] runtime=`, else
 `SSARecomp` next to the launcher. A runtime set up by hand (the last two) also hides INSTALL.
+
+`SKYLAUNCHER_DATA` replaces the data folder (the games and the downloaded kits), for tests.
 
 ## Code
 
