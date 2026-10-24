@@ -1,11 +1,13 @@
 // Checks the launcher's disc verification and settings file without showing any UI.
 // usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]
+#include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "assets/launcher_assets.h"
 #include "launcher/ui/launcher_ui.h"
 #include "shared/figures/figure_collection.h"
 #include "shared/figures/figure_icons.h"
 #include "shared/vfs.h"
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -14,6 +16,7 @@
 #include <random>
 #include <aes.hpp>
 #include <fmt/format.h>
+#include <SDL3/SDL.h>
 #if defined(_WIN32)
 #include <process.h>
 #define getpid _getpid
@@ -171,6 +174,70 @@ namespace
         }
     }
 
+    // SSABuild's events, then the fake kit (tests/fake_ssabuild.c) run through the launcher's installer: a failure, then a success.
+    void InstallChecks(const std::filesystem::path& scratch, const std::string& iso)
+    {
+        printf("Install:\n");
+        InstallProgress progress;
+        progress.Apply("@step disc Reading the disc", 100);
+        progress.Apply("@progress 3 10", 150);
+        progress.Apply("@log reading default.xex", 160);
+        progress.Apply("@step compile Compiling the game", 200);
+        progress.Apply("warning: not an event", 210);
+        progress.Apply("@error compile failed\r", 300);
+        EXPECT(progress.steps.size() == 2 && progress.steps[0].id == "disc" && progress.steps[0].title == "Reading the disc");
+        EXPECT(progress.steps[0].startedAt == 100 && progress.steps[0].endedAt == 200 && progress.steps[1].endedAt == 0);
+        EXPECT(progress.done == 0 && progress.total == 0); // reset by the new step
+        EXPECT(progress.error == "compile failed");
+        EXPECT(progress.log.size() == 5);
+        progress.Apply("@progress 7 9", 310);
+        progress.Apply("@done /games/x/SSARecomp.exe", 400);
+        EXPECT(progress.done == 7 && progress.total == 9 && progress.runtime == "/games/x/SSARecomp.exe" && progress.steps[1].endedAt == 400);
+
+        LauncherConfig config;
+        RecordInstalledGame(config, "abc", (scratch / "missing").string(), "1");
+        EXPECT(FindInstalledGame(config, "abc").runtime.empty()); // the built game is gone
+        EXPECT(FindInstalledGame(config, "abc").kitVersion == "1");
+        EXPECT(GameInstallFolder("abc").filename() == "abc" && GameInstallFolder("abc").parent_path().filename() == "games");
+
+        config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
+        std::optional<InstallKit> kit = FindInstallKit(config);
+        EXPECT(kit && kit->version == "fake-1");
+        auto run = [&](const char* fail) {
+            if (fail != nullptr)
+                SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL", fail, true);
+            else
+                SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
+            GameInstaller installer;
+            installer.Start(kit, iso, scratch / "game");
+            while (installer.Running())
+                SDL_Delay(20);
+            return installer.Snapshot(1000);
+        };
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0", true);
+        InstallProgress failed = run("shaders");
+        EXPECT(failed.state == InstallProgress::State::Failed && failed.error.find("didn't compile") != std::string::npos);
+        EXPECT(failed.steps.size() == 4 && failed.runtime.empty());
+        InstallProgress done = run(nullptr);
+        EXPECT(done.state == InstallProgress::State::Done && done.steps.size() == 6);
+        EXPECT(std::filesystem::path(done.runtime).filename().string().starts_with("SSARecomp"));
+        EXPECT(std::filesystem::exists(scratch / "game" / "install.log"));
+        printf("  fake kit: failure at step %zu, then built %s\n", failed.steps.size(), done.runtime.c_str());
+
+        // Cancel stops the fake SSABuild, slowed down so it is still running.
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.2", true);
+        GameInstaller installer;
+        installer.Start(kit, iso, scratch / "game");
+        SDL_Delay(500);
+        installer.Cancel();
+        auto start = std::chrono::steady_clock::now();
+        while (installer.Running())
+            SDL_Delay(20);
+        EXPECT(installer.Snapshot().state == InstallProgress::State::Cancelled);
+        EXPECT(std::chrono::steady_clock::now() - start < std::chrono::seconds(5));
+        EXPECT(!FindInstallKit({ { "launcher", { { "kit", (scratch / "nowhere").string() } } } }));
+    }
+
     void FigureChecks(const std::filesystem::path& scratch)
     {
         auto bytes = [](std::string_view text) { return std::span(reinterpret_cast<const uint8_t*>(text.data()), text.size()); };
@@ -255,6 +322,7 @@ int main(int argc, char** argv)
     };
 
     FigureChecks(scratch);
+    InstallChecks(scratch, iso.string());
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };
@@ -269,6 +337,7 @@ int main(int argc, char** argv)
     printf("Player's disc image:\n");
     auto start = Clock::now();
     EXPECT(Check(iso) == GameSourceStatus::Ok);
+    EXPECT(CheckGameSource(iso.string(), game).xexSha256 == game.releases[0].defaultXexSha256);
     printf("  verified in %lld ms\n", milliseconds(start));
 
     DiscFileSystem disc;

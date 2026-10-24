@@ -239,7 +239,7 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
         if (sha256 == release.defaultXexSha256)
         {
             report(1.0f, "Verified");
-            return { Ok, {} };
+            return { Ok, {}, sha256 };
         }
     }
     for (const GameRelease& release : game.releases)

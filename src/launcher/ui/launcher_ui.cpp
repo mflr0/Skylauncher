@@ -316,6 +316,7 @@ namespace launcher_ui
             std::filesystem::create_directories(m_shots, error);
             if (const char* drop = SDL_getenv("SSA_LAUNCHER_TEST_DROP"))
                 m_testDrop = drop;
+            m_testInstall = SDL_getenv("SSA_LAUNCHER_TEST_INSTALL") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -360,6 +361,7 @@ namespace launcher_ui
                 HandleEvent(event);
             if (m_disc == DiscState::Verifying && m_verify.done)
                 FinishVerify();
+            PollInstall();
             Frame();
             TestScript();
         }
@@ -399,6 +401,8 @@ namespace launcher_ui
                 m_page = Page::Collection; // a figure dump joins the collection
                 ImportFigureFile(event.drop.data);
             }
+            else if (event.drop.data != nullptr && m_installer.Running())
+                Toast("Wait for the installation to finish");
             else if (event.drop.data != nullptr)
             {
                 m_page = Page::Play;
@@ -463,6 +467,190 @@ namespace launcher_ui
             m_background = LoadPngFile(m_renderer, background.path);
         Set(m_game.id, "iso", m_discPath); // remembered even if the player quits without playing
         m_disc = DiscState::Ready;
+        RefreshInstall();
+    }
+
+    // ---- Installing the game -------------------------------------------------------------------------------------
+
+    void App::RefreshInstall()
+    {
+        m_kit = FindInstallKit(m_config);
+        m_installed = FindInstalledGame(m_config, m_check.xexSha256);
+        m_ownRuntime = FindRuntime(m_game, m_config);
+    }
+
+    bool App::NeedsInstall() const
+    {
+        return m_disc == DiscState::Ready && m_installed.runtime.empty() && m_ownRuntime.empty();
+    }
+
+    bool App::UpdateAvailable() const
+    {
+        return m_disc == DiscState::Ready && !m_installed.runtime.empty() && m_kit && m_kit->version != m_installed.kitVersion;
+    }
+
+    void App::StartInstall()
+    {
+        RefreshInstall();
+        m_installSha = m_check.xexSha256;
+        m_installKitVersion = m_kit ? m_kit->version : std::string();
+        m_installView = true;
+        m_installLog = false;
+        m_page = Page::Play;
+        m_installer.Start(m_kit, m_discPath, GameInstallFolder(m_installSha));
+    }
+
+    void App::PollInstall()
+    {
+        if (!m_installView || m_installer.Running())
+            return;
+        InstallProgress progress = m_installer.Snapshot();
+        if (progress.state == InstallProgress::State::Done)
+        {
+            RecordInstalledGame(m_config, m_installSha, progress.runtime, m_installKitVersion);
+            if (!SaveLauncherConfig(m_configPath, m_config))
+                Toast("Couldn't save the settings");
+            else
+                Toast("The game is installed: press PLAY");
+            m_installView = false;
+            RefreshInstall();
+        }
+        else if (progress.state == InstallProgress::State::Cancelled)
+        {
+            m_installView = false;
+            Toast("Installation cancelled");
+        }
+    }
+
+    // The progress card: SSABuild's steps, the current one's progress and time, its log, and Cancel (Copy log and Retry
+    // once it failed).
+    void App::DrawInstall(ImVec2 at, ImVec2 size)
+    {
+        InstallProgress progress = m_installer.Snapshot(m_installLog ? 400 : 0);
+        bool failed = progress.state == InstallProgress::State::Failed;
+        bool running = progress.state == InstallProgress::State::Running;
+        uint64_t now = SDL_GetTicks();
+        auto duration = [](uint64_t ms) { return fmt::format("{}:{:02}", ms / 60000, ms / 1000 % 60); };
+
+        ImGui::SetCursorScreenPos(at);
+        BeginCard("##install", size);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        float width = ImGui::GetContentRegionAvail().x;
+        Title(failed ? "Installation stopped" : "Installing the game", TitleSize, failed ? Danger : Text);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+        ImGui::TextWrapped("The game is built on your PC from your disc, about %d minutes. If it stops, running it again carries on "
+            "where it left off.", InstallMinutes);
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 6));
+
+        // The steps: done ones ticked with their time, the current one with its running time. With the details open, only
+        // the current one.
+        size_t first = m_installLog && !progress.steps.empty() ? progress.steps.size() - 1 : 0;
+        if (progress.steps.empty())
+            ImGui::TextColored(ImColor(Rgb(TextDim)), running ? "Starting the installer..." : "");
+        for (size_t i = first; i < progress.steps.size(); i++)
+        {
+            const InstallProgress::Step& step = progress.steps[i];
+            bool current = step.endedAt == 0 || (i + 1 == progress.steps.size() && !running && failed);
+            ImVec2 row = ImGui::GetCursorScreenPos();
+            float lineH = ImGui::GetTextLineHeight();
+            ImVec2 dot(row.x + 9, row.y + lineH / 2 + 1);
+            if (current && failed)
+            {
+                draw->AddCircleFilled(dot, 8, Rgb(Danger), 20);
+                draw->AddLine(ImVec2(dot.x - 3, dot.y - 3), ImVec2(dot.x + 3, dot.y + 3), Rgb(Panel), 2.0f);
+                draw->AddLine(ImVec2(dot.x - 3, dot.y + 3), ImVec2(dot.x + 3, dot.y - 3), Rgb(Panel), 2.0f);
+            }
+            else if (current)
+            {
+                draw->AddCircle(dot, 8, Rgb(Border), 24, 2.5f);
+                float angle = float(now % 1000) / 1000.0f * 6.2832f;
+                draw->PathArcTo(dot, 8, angle, angle + 2.0f, 12);
+                draw->PathStroke(Rgb(Accent), 0, 2.5f);
+            }
+            else
+            {
+                draw->AddCircleFilled(dot, 8, Rgb(Ok), 20);
+                draw->AddPolyline(std::array{ ImVec2(dot.x - 4, dot.y), ImVec2(dot.x - 1, dot.y + 3), ImVec2(dot.x + 4, dot.y - 3) }.data(),
+                    3, Rgb(Panel), 0, 2.0f);
+            }
+            ImGui::SetCursorScreenPos(ImVec2(row.x + 28, row.y));
+            if (current)
+                BoldText(step.title.c_str(), Text);
+            else
+                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", step.title.c_str());
+            std::string time = duration((step.endedAt != 0 ? step.endedAt : now) - step.startedAt);
+            float timeW = ImGui::CalcTextSize(time.c_str()).x;
+            draw->AddText(ImVec2(row.x + width - timeW, row.y), Rgb(current ? Text : TextDim), time.c_str());
+            ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + lineH + 8));
+        }
+
+        if (running && progress.total > 0)
+        {
+            ImGui::Dummy(ImVec2(0, 2));
+            std::string count = fmt::format("{} / {}", progress.done, progress.total);
+            float countW = ImGui::CalcTextSize(count.c_str()).x;
+            ImGui::ProgressBar(float(double(progress.done) / double(progress.total)), ImVec2(width - countW - 12, 10), "");
+            ImGui::SameLine(0, 12);
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", count.c_str());
+        }
+        if (failed)
+        {
+            ImGui::Dummy(ImVec2(0, 4));
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
+            ImGui::TextWrapped("%s", progress.error.c_str());
+            ImGui::PopStyleColor();
+        }
+
+        // The log, in the space left above the buttons.
+        constexpr float ButtonsH = 52;
+        if (m_installLog)
+        {
+            ImGui::Dummy(ImVec2(0, 4));
+            float logH = std::max(60.0f, ImGui::GetContentRegionAvail().y - ButtonsH);
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusSmall);
+            ImGui::BeginChild("##installlog", ImVec2(0, logH), ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
+            bool atBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4;
+            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+            for (const std::string& line : progress.log)
+                ImGui::TextUnformatted(line.c_str());
+            ImGui::PopStyleColor();
+            ImGui::PopFont();
+            if (atBottom)
+                ImGui::SetScrollHereY(1.0f);
+            ImGui::EndChild();
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
+        }
+
+        // Buttons along the card's bottom edge.
+        ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - Pad - 40));
+        if (PillButton(m_installLog ? "Hide details" : "Show details", false, 150))
+            m_installLog = !m_installLog;
+        if (failed)
+        {
+            ImGui::SameLine();
+            if (PillButton("Copy log", false, 130))
+            {
+                SDL_SetClipboardText(m_installer.FullLog().c_str());
+                Toast("Log copied");
+            }
+            ImGui::SameLine(Pad + width - 130 * 2 - ImGui::GetStyle().ItemSpacing.x);
+            if (PillButton("Close", false, 130))
+                m_installView = false;
+            ImGui::SameLine();
+            if (PillButton("Retry", true, 130, true))
+                StartInstall();
+        }
+        else if (running)
+        {
+            ImGui::SameLine(Pad + width - 130);
+            if (PillButton("Cancel", false, 130))
+                m_installer.Cancel();
+        }
+        EndCard();
     }
 
     void App::Browse()
@@ -947,7 +1135,12 @@ namespace launcher_ui
 
         // The logo (else the game's name), as large as fits and centred between the language menu and the disc status.
         float areaTop = position.y + Pad * 3, areaBottom = end.y - 120, areaH = areaBottom - areaTop;
-        if (m_logo != nullptr)
+        if (m_installView)
+        {
+            float cardW = std::min(available.x - 80, 680.0f);
+            DrawInstall(ImVec2(position.x + (available.x - cardW) / 2, areaTop), ImVec2(cardW, end.y - Pad - areaTop));
+        }
+        else if (m_logo != nullptr)
         {
             float w, h;
             SDL_GetTextureSize(m_logo, &w, &h);
@@ -974,44 +1167,64 @@ namespace launcher_ui
         // The disc, bottom left of the hero: the game's icon (rounded), the image's file name, its status under it.
         ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 120));
         ImGui::BeginGroup();
-        if (m_icon != nullptr)
+        if (!m_installView) // the progress card takes the whole hero
         {
-            ImVec2 at = ImGui::GetCursorScreenPos();
-            ImGui::Dummy(ImVec2(64, 64));
-            draw->AddImageRounded(Ref(m_icon), at, ImVec2(at.x + 64, at.y + 64), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, Radius);
-            ImGui::SameLine(0, 16);
-        }
-        ImGui::BeginGroup();
-        // The file name on top, then "DISC IMAGE:" and the status on the line below.
-        std::string file = m_discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_discPath).filename().string(), 40);
-        ImGui::PushFont(nullptr, TitleSize);
-        BoldText(file.c_str(), Text);
-        ImGui::PopFont();
-        if (!m_discPath.empty() && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", m_discPath.c_str());
-        BoldText("DISC IMAGE:", TextDim);
-        ImGui::SameLine(0, 6);
-        switch (m_disc)
-        {
-        case DiscState::None:
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop your disc image (.iso) here, or choose it below.");
-            break;
-        case DiscState::Verifying:
-            ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_verify.Stage().c_str());
-            ImGui::ProgressBar(m_verify.progress, ImVec2(360, 8), "");
-            break;
-        case DiscState::Ready:
-            ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_discSize).c_str());
-            break;
-        case DiscState::Failed:
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-            ImGui::PushTextWrapPos(end.x - 40);
-            ImGui::TextWrapped("%s", m_check.message.c_str());
-            ImGui::PopTextWrapPos();
-            ImGui::PopStyleColor();
-            break;
+            if (m_icon != nullptr)
+            {
+                ImVec2 at = ImGui::GetCursorScreenPos();
+                ImGui::Dummy(ImVec2(64, 64));
+                draw->AddImageRounded(Ref(m_icon), at, ImVec2(at.x + 64, at.y + 64), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, Radius);
+                ImGui::SameLine(0, 16);
+            }
+            ImGui::BeginGroup();
+            // The file name on top, then "DISC IMAGE:" and the status on the line below.
+            std::string file = m_discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_discPath).filename().string(), 40);
+            ImGui::PushFont(nullptr, TitleSize);
+            BoldText(file.c_str(), Text);
+            ImGui::PopFont();
+            if (!m_discPath.empty() && ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", m_discPath.c_str());
+            BoldText("DISC IMAGE:", TextDim);
+            ImGui::SameLine(0, 6);
+            switch (m_disc)
+            {
+            case DiscState::None:
+                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop your disc image (.iso) here, or choose it below.");
+                break;
+            case DiscState::Verifying:
+                ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_verify.Stage().c_str());
+                ImGui::ProgressBar(m_verify.progress, ImVec2(360, 8), "");
+                break;
+            case DiscState::Ready:
+                ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_discSize).c_str());
+                if (NeedsInstall())
+                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Install builds the game on your PC from your disc: about %d minutes "
+                        "and %d GB, internet needed once for the compiler.", InstallMinutes, InstallGigabytes);
+                else if (UpdateAvailable())
+                {
+                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "A new version of the game is ready to build.");
+                    ImGui::SameLine(0, 10);
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 2));
+                    ImGui::PushStyleColor(ImGuiCol_Button, Rgb(Accent));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(AccentHover));
+                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(AccentDark));
+                    ImGui::PushStyleColor(ImGuiCol_Text, Rgb(AccentInk));
+                    if (ImGui::Button("Update the game"))
+                        StartInstall();
+                    ImGui::PopStyleColor(4);
+                    ImGui::PopStyleVar();
+                }
+                break;
+            case DiscState::Failed:
+                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
+                ImGui::PushTextWrapPos(end.x - 40);
+                ImGui::TextWrapped("%s", m_check.message.c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::PopStyleColor();
+                break;
         }
         ImGui::EndGroup();
+        }
         ImGui::EndGroup();
 
         // Bottom band: the controller and the main button in the middle, "Change disc..." on the right.
@@ -1019,15 +1232,19 @@ namespace launcher_ui
         draw->AddRectFilled(bar, barEnd, Rgb(BottomBar));
         float middle = bar.y + BottomBarH / 2;
 
-        bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying;
-        const char* label = ready ? "PLAY" : verifying ? "CHECKING..." : "Upload Iso";
+        bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying, installing = m_installer.Running();
+        bool install = ready && NeedsInstall();
+        const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : "Upload Iso";
         float mainX = bar.x + (available.x - PlayButtonW) / 2, buttonY = middle - PlayButtonH / 2 + 3;
         ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY));
-        if (BigButton(label, ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, !verifying))
+        if (BigButton(label, ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, !verifying && !installing))
         {
-            if (ready)
+            if (install)
+                StartInstall();
+            else if (ready)
             {
                 m_chosen = m_discPath;
+                m_chosenRuntime = m_installed.runtime;
                 Set(m_game.id, "iso", m_chosen);
                 m_running = false;
             }
@@ -1088,7 +1305,7 @@ namespace launcher_ui
         ImGui::PopStyleColor();
 
         // "Change disc...", right-aligned and centred in the band once a disc is verified; styled like the controller picker.
-        if (ready)
+        if (ready && !installing)
         {
             constexpr float ChangeDiscW = 170;
             ImGui::SetCursorScreenPos(ImVec2(barEnd.x - Pad - 8 - ChangeDiscW, middle - 20));
@@ -1239,8 +1456,21 @@ namespace launcher_ui
         folder("Figures", "figures");
         ImGui::Dummy(ImVec2(0, 16));
         Title("Game runtime", TitleSize, Text);
-        ImGui::TextWrapped("Skylauncher starts the game runtime (%s) next to it, or the one set as runtime= in the [launcher] section of %s.",
-            m_game.runtime, m_configPath.c_str());
+        if (!m_installed.runtime.empty())
+        {
+            ImGui::TextWrapped("Built on this computer for this disc: %s", m_installed.runtime.c_str());
+            if (PillButton("Reinstall the game", false, 260) && !m_installer.Running())
+                StartInstall();
+            ImGui::SameLine();
+            if (PillButton("Open the game folder", false, 260))
+            {
+                std::u8string folder = GameInstallFolder(m_check.xexSha256).u8string();
+                SDL_OpenURL(("file://" + std::string(folder.begin(), folder.end())).c_str());
+            }
+            ImGui::Dummy(ImVec2(0, 8));
+        }
+        ImGui::TextWrapped("Skylauncher starts the game it built for the disc, else the game runtime (%s) next to it, or the one set as "
+            "runtime= in the [launcher] section of %s.", m_game.runtime, m_configPath.c_str());
     }
 
     void App::DrawAbout()
@@ -1394,7 +1624,12 @@ namespace launcher_ui
         {
             static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-collection", "06-home",
                 "07-figure-sheet", "08-new-figure" };
-            Screenshot(Names[std::min<int>(m_testStep, int(std::size(Names)) - 1)]);
+            static const char* const InstallNames[] = { "10-install", "11-installing", "12-install-details", "13-install-failed",
+                "14-installed", "15-game-data" };
+            if (m_testInstall)
+                Screenshot(InstallNames[std::min<int>(m_testStep, int(std::size(InstallNames)) - 1)]);
+            else
+                Screenshot(Names[std::min<int>(m_testStep, int(std::size(Names)) - 1)]);
             m_testAt = 0;
             m_testStep++;
         }
@@ -1422,6 +1657,11 @@ namespace launcher_ui
         if (m_shots.empty() || m_testAt != 0)
             return;
         uint64_t now = SDL_GetTicks();
+        if (m_testInstall)
+        {
+            TestInstallScript(now);
+            return;
+        }
         switch (m_testStep)
         {
         case 0:
@@ -1473,6 +1713,59 @@ namespace launcher_ui
             m_newBase = 16;
             m_newVariant = 416;
             m_testAt = now + 600;
+            break;
+        default:
+            m_running = false;
+            break;
+        }
+    }
+
+    // The install screens (SSA_LAUNCHER_TEST_INSTALL, with SKYLAUNCHER_KIT set to <build>/fake-kit): the Install button, the
+    // progress card with and without its log, a failure, then a retry that succeeds.
+    void App::TestInstallScript(uint64_t now)
+    {
+        InstallProgress progress = m_installer.Snapshot();
+        switch (m_testStep)
+        {
+        case 0:
+            m_page = Page::Play;
+            if (m_disc == DiscState::None && !m_testDrop.empty())
+                StartVerify(m_testDrop);
+            if (m_disc == DiscState::Ready || m_disc == DiscState::Failed || m_testDrop.empty())
+                m_testAt = now + 400;
+            break;
+        case 1:
+            if (!m_installView)
+            {
+                SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL", "compile", true);
+                StartInstall();
+                break;
+            }
+            if (progress.steps.size() >= 3 || progress.state != InstallProgress::State::Running)
+                m_testAt = now + 300;
+            break;
+        case 2:
+            m_installLog = true;
+            m_testAt = now + 300;
+            break;
+        case 3:
+            if (progress.state != InstallProgress::State::Running)
+                m_testAt = now + 300;
+            break;
+        case 4:
+            if (progress.state == InstallProgress::State::Failed)
+            {
+                SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
+                m_installLog = false;
+                StartInstall();
+            }
+            else if (!m_installView)
+                m_testAt = now + 400;
+            break;
+        case 5:
+            m_page = Page::Settings;
+            m_tab = SettingsTab::GameData;
+            m_testAt = now + 400;
             break;
         default:
             m_running = false;
@@ -1604,10 +1897,14 @@ std::string LauncherDisplayName(std::string_view xdbfName, const GameInfo& game)
     return xdbfName.empty() ? std::string(game.name) : std::string(xdbfName);
 }
 
-std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const std::string& previous)
+std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const std::string& previous,
+    std::string* installed)
 {
     if (!previous.empty())
         config[game.id]["iso"] = previous;
     App app(game, configPath, config);
-    return app.Run();
+    std::string chosen = app.Run();
+    if (installed != nullptr)
+        *installed = app.ChosenRuntime();
+    return chosen;
 }
