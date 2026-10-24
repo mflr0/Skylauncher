@@ -217,7 +217,7 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(ImVec2(right, origin.y));
         ImGui::BeginGroup();
         m_app.Title(Name(f).c_str(), HeadlineSize - 6, Text);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s%s", f.variantInfo.name.c_str(), f.favourite ? "  ★ favourite" : "");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s%s", f.variantInfo.name.c_str(), f.favourite ? "  ·  favourite" : "");
         if (f.lock.Busy())
         {
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
