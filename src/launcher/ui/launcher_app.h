@@ -206,6 +206,7 @@ namespace launcher_ui
         void PollInstall();
         void DrawInstall(ImVec2 at, ImVec2 size);
 
+        void UpdateUiScale(bool resize);
         void StartVerify(const std::string& path);
         void FinishVerify();
         void Browse();
@@ -230,6 +231,7 @@ namespace launcher_ui
         bool m_running = true;
 
         SDL_Window* m_window = nullptr;
+        float m_uiScale = 1.0f; // launcher points per window unit (UpdateUiScale)
         SDL_Renderer* m_renderer = nullptr;
         std::vector<uint8_t> m_fontData[2];
         ImFont* m_textFont = nullptr;

@@ -73,6 +73,14 @@ Current role mapping:
 `manifest.ini` in the cache records the title ID and where each role came from. The cached files are
 local only and are ignored by git; deleting the cache is always safe.
 
+## Size on high-DPI screens
+Every size is in launcher points. `App::UpdateUiScale` picks how many window units a point is: `[launcher] ui_scale`, else
+the display's scale beyond its pixel density (Windows at 200 %: 2; a Retina Mac: 2 / 2 = 1, its window units are
+already points), capped so the smallest layout fits the display's usable area. ImGui gets the window size divided by
+the scale and a framebuffer scale multiplied by it, so it draws and rasterizes the fonts at the screen's real density.
+It follows `SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED`; Ctrl (Cmd) + / - / 0 zoom and reset, saved in `ui_scale`.
+The Windows executable declares per-monitor v2 DPI awareness in its manifest (`resources/windows/`).
+
 ## How to change the look
 - Colours: edit the constants in `launcher_theme.h`; ImGui's own widget colours are set in `LauncherTheme::Apply`.
 - Spacing and sizes: `SidebarW`, `Pad`, `Radius*`, `PlayButtonW/H` and the font sizes in the same file.

@@ -1,0 +1,2 @@
+// The application manifest (RT_MANIFEST 24, id 1: the process's own), for llvm-mingw's windres.
+1 24 "skylauncher.manifest"

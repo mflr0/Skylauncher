@@ -63,6 +63,7 @@ namespace LauncherTheme
 
     // Sizes in points (the window scales them to the display's pixel density).
     inline constexpr float WindowW = 1080, WindowH = 720, WindowMinW = 1024, WindowMinH = 680;
+    inline constexpr float MinUiScale = 0.75f, MaxUiScale = 3.0f; // [launcher] ui_scale and the Ctrl +/- zoom
     inline constexpr float SidebarW = 270;
     inline constexpr float Pad = 24;
     inline constexpr float Radius = 14, RadiusSmall = 10, RadiusLarge = 22;

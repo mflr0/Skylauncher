@@ -272,7 +272,7 @@ namespace launcher_ui
         // The offscreen driver (screenshot test) has no GPU: no graphics context for the window, software drawing.
         const char* driver = SDL_GetCurrentVideoDriver();
         bool offscreen = driver != nullptr && (std::string_view(driver) == "offscreen" || std::string_view(driver) == "dummy");
-        SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+        SDL_WindowFlags flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_HIDDEN;
         if (ParseBool(SettingGet(m_config, "launcher", "fullscreen")))
             flags |= SDL_WINDOW_FULLSCREEN;
         SDL_PropertiesID properties = SDL_CreateProperties();
@@ -286,7 +286,9 @@ namespace launcher_ui
         SDL_DestroyProperties(properties);
         if (m_window == nullptr)
             return false;
-        SDL_SetWindowMinimumSize(m_window, int(WindowMinW), int(WindowMinH));
+        // Sized once the window knows its display's scale, then shown.
+        UpdateUiScale(true);
+        SDL_ShowWindow(m_window);
         m_renderer = SDL_CreateRenderer(m_window, offscreen ? SDL_SOFTWARE_RENDERER : nullptr);
         if (m_renderer == nullptr)
             m_renderer = SDL_CreateRenderer(m_window, SDL_SOFTWARE_RENDERER);
@@ -380,9 +382,33 @@ namespace launcher_ui
             m_capturing = nullptr;
             return;
         }
-        ImGui_ImplSDL3_ProcessEvent(&event);
+        if (event.type == SDL_EVENT_KEY_DOWN && (event.key.mod & (SDL_KMOD_CTRL | SDL_KMOD_GUI)) != 0 &&
+            (event.key.key == SDLK_EQUALS || event.key.key == SDLK_PLUS || event.key.key == SDLK_KP_PLUS ||
+             event.key.key == SDLK_MINUS || event.key.key == SDLK_KP_MINUS || event.key.key == SDLK_0 || event.key.key == SDLK_KP_0))
+        {
+            // Ctrl (Cmd) + and - zoom the launcher, 0 goes back to the display's scale; remembered as [launcher] ui_scale.
+            bool reset = event.key.key == SDLK_0 || event.key.key == SDLK_KP_0;
+            bool bigger = event.key.key == SDLK_EQUALS || event.key.key == SDLK_PLUS || event.key.key == SDLK_KP_PLUS;
+            float scale = std::clamp(std::round((m_uiScale + (bigger ? 0.25f : -0.25f)) * 4) / 4, MinUiScale, MaxUiScale);
+            Set("launcher", "ui_scale", reset ? "auto" : fmt::format("{:g}", scale));
+            UpdateUiScale(false);
+            Toast(reset ? "Zoom: automatic" : fmt::format("Zoom: {:g}%", m_uiScale * 100));
+            return;
+        }
+        // ImGui works in the launcher's points: the window's coordinates divided by the UI scale.
+        SDL_Event scaled = event;
+        if (event.type == SDL_EVENT_MOUSE_MOTION)
+        {
+            scaled.motion.x /= m_uiScale;
+            scaled.motion.y /= m_uiScale;
+        }
+        ImGui_ImplSDL3_ProcessEvent(&scaled);
         switch (event.type)
         {
+        case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+            UpdateUiScale(false);
+            break;
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             m_running = false;
@@ -413,6 +439,41 @@ namespace launcher_ui
         case SDL_EVENT_GAMEPAD_REMOVED:
             RefreshGamepads();
             break;
+        }
+    }
+
+    // The UI scale: [launcher] ui_scale when it is a number, else the display's scale beyond its pixel density (Windows'
+    // 150 %, 200 %...; 1 on a Mac, whose window units are already points). `resize` sizes the window for it, within the
+    // display's usable area.
+    void App::UpdateUiScale(bool resize)
+    {
+        float scale = std::strtof(SettingGet(m_config, "launcher", "ui_scale", "auto").c_str(), nullptr);
+        if (scale <= 0)
+        {
+            float density = SDL_GetWindowPixelDensity(m_window), display = SDL_GetWindowDisplayScale(m_window);
+            scale = density > 0 && display > 0 ? display / density : 1.0f;
+        }
+        // Never so large that the launcher's smallest layout leaves the display's usable area (40: the title bar).
+        SDL_Rect usable{};
+        bool bounded = SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(m_window), &usable) && usable.w > 0 && usable.h > 40;
+        if (bounded)
+            scale = std::min({ scale, usable.w / WindowMinW, (usable.h - 40) / WindowMinH });
+        m_uiScale = std::clamp(scale, MinUiScale, MaxUiScale);
+        fprintf(stderr, "launcher: ui scale %.2f (display scale %.2f, pixel density %.2f, usable %dx%d)\n", m_uiScale,
+            SDL_GetWindowDisplayScale(m_window), SDL_GetWindowPixelDensity(m_window), usable.w, usable.h);
+
+        SDL_SetWindowMinimumSize(m_window, int(WindowMinW * m_uiScale), int(WindowMinH * m_uiScale));
+        if (resize && !(SDL_GetWindowFlags(m_window) & SDL_WINDOW_FULLSCREEN))
+        {
+            int w = int(WindowW * m_uiScale), h = int(WindowH * m_uiScale);
+            if (bounded)
+            {
+                w = std::min(w, usable.w);
+                h = std::min(h, usable.h - 40);
+            }
+            SDL_SetWindowSize(m_window, w, h);
+            SDL_DisplayID display = SDL_GetDisplayForWindow(m_window);
+            SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED_DISPLAY(display), SDL_WINDOWPOS_CENTERED_DISPLAY(display));
         }
     }
 
@@ -1589,6 +1650,12 @@ namespace launcher_ui
     {
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
+        // The launcher's points are m_uiScale window units: a smaller page, drawn (and its fonts rasterized) denser.
+        ImGuiIO& frameIo = ImGui::GetIO();
+        frameIo.DisplaySize = ImVec2(frameIo.DisplaySize.x / m_uiScale, frameIo.DisplaySize.y / m_uiScale);
+        frameIo.DisplayFramebufferScale = ImVec2(frameIo.DisplayFramebufferScale.x * m_uiScale, frameIo.DisplayFramebufferScale.y * m_uiScale);
+        if (SDL_GetMouseFocus() == nullptr) // the backend's outside-the-window position is in unscaled window units
+            frameIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
         ImGui::NewFrame();
         DrawBackdrop();
         DrawSidebar();

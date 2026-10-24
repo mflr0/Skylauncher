@@ -108,6 +108,13 @@ set(SKYLAUNCHER_FONTS
 
 add_executable(Skylauncher WIN32 MACOSX_BUNDLE src/main.cpp)
 target_link_libraries(Skylauncher PRIVATE SkylauncherCore)
+# Windows: the manifest declares per-monitor v2 DPI awareness. MSVC's linker merges a .manifest source; mingw links it
+# as a resource.
+if(MINGW)
+    target_sources(Skylauncher PRIVATE resources/windows/skylauncher.rc)
+elseif(WIN32)
+    target_sources(Skylauncher PRIVATE resources/windows/skylauncher.manifest)
+endif()
 set_target_properties(Skylauncher PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME Skylauncher
     MACOSX_BUNDLE_GUI_IDENTIFIER io.github.mflr0.skylauncher

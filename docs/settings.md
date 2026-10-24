@@ -9,6 +9,7 @@ The launcher and the game runtime share one settings file, `launcher.ini`, in th
 | Section | Key | Values | Meaning | Runtime |
 | --- | --- | --- | --- | --- |
 | `launcher` | `fullscreen` | `0`, `1` | The launcher window itself | n/a |
+| `launcher` | `ui_scale` | `auto`, `0.75` to `3` | The launcher's size: `auto` follows the display's scale (Windows 150 %, 200 %...); Ctrl + / Ctrl - / Ctrl 0 change it | n/a |
 | `launcher` | `runtime` | path | The game runtime to start, if not next to the launcher | n/a |
 | `launcher` | `kit` | folder | The player kit that installs the game, if not next to the launcher (`docs/install.md`) | n/a |
 | `install.<sha256>` | `runtime` | path | The game the launcher built for the disc whose `default.xex` has this SHA-256 | n/a |
