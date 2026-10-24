@@ -1,12 +1,15 @@
 cmake_minimum_required(VERSION 3.20)
 project(Skylauncher LANGUAGES C CXX)
-set(SKYLAUNCHER_VERSION "0.1.0" CACHE STRING "Version shown in the app bundle")
+set(SKYLAUNCHER_VERSION "0.2.0" CACHE STRING "Version shown in the app bundle")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_SHARED_LIBS OFF)
 if(MINGW)
     add_compile_definitions(_WIN32_WINNT=0x0A00) # Windows 10 APIs (CreateFile2), as MSVC's SDK headers default to
+endif()
+if(WIN32)
+    add_compile_definitions(NOMINMAX) # windows.h's min/max macros break std::min and std::max
 endif()
 if(MSVC)
     add_compile_options(/utf-8) # fmt requires it

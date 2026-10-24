@@ -490,8 +490,8 @@ bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
         }
         fs::create_directories(out.parent_path(), fsError);
         unsigned mode = (stat.m_external_attr >> 16) & 07777;
-        bool unix = (stat.m_version_made_by >> 8) == 3;
-        if (unix && (stat.m_external_attr >> 16 & 0170000) == 0120000) // a symbolic link: its target is the content
+        bool fromUnix = (stat.m_version_made_by >> 8) == 3; // `unix` is a predefined macro on Linux
+        if (fromUnix && (stat.m_external_attr >> 16 & 0170000) == 0120000) // a symbolic link: its target is the content
         {
             std::string target(size_t(stat.m_uncomp_size), '\0');
             if (mz_zip_reader_extract_to_mem(&archive, i, target.data(), target.size(), 0))
@@ -507,7 +507,7 @@ bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
             ok = false;
             break;
         }
-        if (unix && mode != 0)
+        if (fromUnix && mode != 0)
             fs::permissions(out, fs::perms(mode), fs::perm_options::replace, fsError);
     }
     mz_zip_reader_end(&archive);
