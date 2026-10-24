@@ -328,7 +328,7 @@ void GameInstaller::Read()
     int exitCode = 0;
     bool exited = false;
     auto apply = [&](std::string_view line) {
-        logFile << line << '\n';
+        logFile << line << std::endl; // kept if the launcher dies
         std::lock_guard lock(m_mutex);
         m_progress.Apply(line, SDL_GetTicks());
     };
