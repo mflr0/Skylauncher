@@ -15,8 +15,9 @@ backgrounds) is read at run time from the disc image you provide, then cached on
 - Once the disc is verified, the game's own name, icon and logo are shown.
 - Settings: graphics (fullscreen, resolution scale x1 to x10, frame rate limit, VSync, texture filtering), controls
   (which gamepad or the keyboard, every key remappable, Portal of Power type), text and voice language, game data.
-- Collection: your figures with their portraits from the game, filters and search, each figure's stats, rename, backups,
-  reset, new figures, import of your own dumps, and which figures start on the portal.
+- Collection: the same figures as the game's Toy Box (one shared folder): the seats of the next session, your figures
+  in sections with their portraits from the game, each figure's stats, edit, rename, backups, trash, a catalogue of the
+  six games to add figures from, import and export. `docs/collection_ui.md`.
 - The game runtime reads the same settings file; `docs/settings.md` lists every key and which ones it applies yet.
 - The choice is saved in `launcher.ini`, shared with the game runtime. Its location is the SDL preferences folder
   of the app `SSARecomp`: `~/Library/Application Support/SSARecomp/` on macOS, `%APPDATA%\SSARecomp\` on Windows,

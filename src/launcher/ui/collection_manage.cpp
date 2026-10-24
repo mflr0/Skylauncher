@@ -408,7 +408,7 @@ namespace launcher_ui
 #ifndef _WIN32
             // A game holds the figures of the seats: a lock of a live process other than this one.
             for (const std::string& seat : m_model.seats)
-                if (!seat.empty() && getenv("SSA_COLLECTION") != nullptr)
+                if (!seat.empty() && getenv("SSA_COLLECTION") != nullptr && getenv("SSA_LAUNCHER_TEST_FAKE_LOCKS") != nullptr)
                 {
                     std::ofstream lock(seat + ".lock");
                     lock << fmt::format("{{ \"game\": \"ssa\", \"pid\": {}, \"since\": \"2026-10-24T10:15:00Z\" }}\n", (long long)getppid());

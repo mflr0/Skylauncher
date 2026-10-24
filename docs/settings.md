@@ -27,7 +27,8 @@ The launcher and the game runtime share one settings file, `launcher.ini`, in th
 | `input` | `key_<action>` | SDL key name (`Space`, `Return`, `A`...) | Keyboard binding | pending |
 | `portal` | `mode` | `auto`, `emulated`, `hid`, `usb` | Portal of Power backend | yes (`SSA_PORTAL`) |
 | `portal` | `place` | figure file names, comma separated | Figures put on the emulated portal at start | yes (`SSA_PORTAL_PLACE`) |
-| `collection` | `favourites` | figure file names, comma separated | The collection's favourites | launcher only |
+| `collection` | `favourites` | figure file names, comma separated | Old favourites; moved once into the shared collection's `collection.json` | read once (see `collection_ui.md`) |
+| `collection` | `moved` | `1` | Set once the old favourites and `[portal] place` were moved | launcher only |
 
 Keyboard actions: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`, `left_left`,
 `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (camera), `dpad_up`, `dpad_down`,
@@ -35,15 +36,17 @@ Keyboard actions: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `
 
 ## Figures
 
-The collection and the game share the `figures` folder next to `launcher.ini`. A figure is a 1 KB tag dump (`.sky`,
-`.bin` or `.dmp`); `src/shared/figures/figure_file.h` describes the layout the launcher reads and writes.
+The launcher and the game share one collection folder (`collection::Folder()`: `Skylanders/Collection` in the user's data
+folder, or `SSA_COLLECTION`), with `collection.json` (labels, favourites, views, trash), `<dump>.lock` (JSON written by
+the game while a figure is on its portal), `backups/` and `trash/`. `docs/collection_ui.md` describes the page; the
+format is SSARecomp's `docs/collection.md`. The old `figures` folder next to `launcher.ini` is copied in once, never
+changed.
 
-- Before every change (rename, reset, restore, delete) the launcher copies the figure to
-  `figures/backups/<figure name>/<date>.sky`.
-- While a figure is on the game's portal, the runtime should keep a lock next to it: `figures/<file>.lock`, holding the
-  runtime's process id as text, removed when the figure leaves the portal or the game exits. The collection shows such a
-  figure as "in use" and changes nothing in it. A lock whose process isn't running is ignored, so a crash never leaves a
-  figure stuck. The runtime doesn't write these locks yet.
+- The seats of the next session are `portal.txt` in the game's save folder (`SSA_SAVE_DIR`, else its preference
+  folder): the launcher writes it, the game reads it at start. `[portal] place` is no longer written (it would override
+  the session file through `SSA_PORTAL_PLACE`); `[portal] mode` still goes through `SSA_PORTAL`.
+- Before every change the library backs the figure up (newest 10 kept); a figure whose lock belongs to another live
+  process is never written.
 
 When it starts the game, the launcher also passes `portal` and the languages through the environment variables in
 brackets above, which the runtime already reads.

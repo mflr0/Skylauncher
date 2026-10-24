@@ -1,6 +1,6 @@
 # Figures: Skylauncher's engine and SSARecomp's collection library
 
-For a later decision; nothing was changed. Skylauncher's figure engine (`src/shared/figures/`, used by the Collection
+Decided: option A, done (`docs/collection_ui.md`). What follows is the comparison as it stood before. Skylauncher's figure engine (`src/shared/figures/`, used by the Collection
 page) and SSARecomp's collection library (`docs/collection.md` and `docs/collection_api.md` in that repo; code in
 `SSARecomp/host/figures/` and `SSARecomp/host/collection/`, with `tools/sync_skylauncher.sh` to copy it here) do the
 same jobs.
