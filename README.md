@@ -1,89 +1,104 @@
 # Skylauncher
 
-A launcher for the native PC port of *Skylanders: Spyro's Adventure* (the SSARecomp runtime). Drop your own disc
-image on the window, it gets checked, and the PLAY button starts the game with it. The layout follows the Minecraft
-Launcher; the style is Skylanders-inspired.
+A launcher for the native PC port of *Skylanders: Spyro's Adventure*. You give it your own disc image, it builds the
+game on your computer, and you play.
 
-Skylauncher contains no game code and no game art. Everything that comes from the game (title, icon, logo,
-backgrounds) is read at run time from the disc image you provide, then cached on your machine only.
+Skylauncher contains no game code and no game art. Everything shown from the game is read from your own disc and stays
+on your computer.
 
-## What it does
+## What you need
 
-- A sidebar with the console Skylanders games (and SuperChargers Racing). Spyro's Adventure is the only one enabled for now.
-- Drag and drop of an `.iso`, or a Browse button. The image is checked: Xbox 360 file system, `default.xex`
-  present and readable, and a release the runtime supports (SHA-256 of `default.xex`).
-- Once the disc is verified, the game's own name, icon and logo are shown.
-- Settings: graphics (fullscreen, resolution scale Auto or x1 to x10, frame rate limit, VSync, texture filtering), controls
-  (which gamepad or the keyboard, every key remappable, button glyphs, Portal of Power type), text and voice language, game data.
-- Collection: the same figures as the game's Toy Box (one shared folder): the seats of the next session, your figures
-  in sections with their portraits from the game, each figure's stats, edit, rename, backups, trash, a catalogue of the
-  six games to add figures from, import and export. `docs/collection_ui.md`.
-- Installing the game shows a checklist of the steps, an overall bar, the time left and what is happening now; it carries on
-  after a restart (`docs/install.md`).
-- Settings > Game data: Copy game log, Open logs folder; Controls: Test the portal. If the game stops with an error, a dialog
-  offers Copy log and Report (`docs/support.md`).
-- Updates from the GitHub releases, checked against a SHA-256, from a banner or Settings > About (`docs/updates.md`).
-- The game runtime reads the same settings file; `docs/settings.md` lists every key and which ones it applies yet.
-- The choice is saved in `launcher.ini`, shared with the game runtime. Its location is the SDL preferences folder
-  of the app `SSARecomp`: `~/Library/Application Support/SSARecomp/` on macOS, `%APPDATA%\SSARecomp\` on Windows,
+- Your own copy of *Skylanders: Spyro's Adventure* for Xbox 360, as a disc image (`.iso`).
+- The SSARecomp player kit (`ssa-kit`), next to the launcher. **It is not published yet.**
+- Windows 10 or 11 (64-bit), or a Mac with Apple Silicon. Linux builds of the launcher exist, but the game can't be
+  installed on Linux yet.
+- An internet connection the first time, to download the compiler.
+
+## Get started
+
+1. Download Skylauncher from the [Releases page](https://github.com/mflr0/Skylauncher/releases):
+   - **Windows:** `Skylauncher.exe`. If SmartScreen warns you, choose More info, then Run anyway.
+   - **Mac:** `Skylauncher-macOS.dmg`. The app is not notarized: the first time, right-click it and choose Open.
+   - **Linux:** `Skylauncher-x86_64.AppImage`, after `chmod +x`.
+2. Drop your `.iso` on the window, or click the button to choose it. The disc is checked.
+3. Click **INSTALL**. The game is built from your disc. It takes 5 to 15 minutes and happens once.
+4. Click **PLAY**.
+
+## Controls
+
+Any gamepad works: Xbox, PlayStation, Switch and others. You can also play on the keyboard, and change every key in
+Settings > Controls.
+
+| Action | Gamepad | Keyboard |
+|---|---|---|
+| Move | Left stick | W A S D |
+| Camera | Right stick | I J K L |
+| A | A | Space |
+| B | B | X |
+| X | X | C |
+| Y | Y | V |
+| Pause | Start | Enter |
+| Back | Back / View | Backspace (Escape also goes back in menus) |
+| LB / RB | LB / RB | Q / E |
+| LT / RT | LT / RT | 1 / 3 |
+| D-pad | D-pad | Arrow keys |
+
+On-screen buttons can show Xbox 360, Xbox One / Series, PlayStation, Nintendo or keyboard glyphs (Settings > Controls).
+
+### Figures and the Toy Box
+
+You don't need a real Portal of Power. The game has a virtual portal, and your figures live in the **Toy Box**.
+
+| | Gamepad | Keyboard / mouse |
+|---|---|---|
+| Open the Toy Box | View + Y | F6, or tap Tab |
+| Quick swap wheel | Hold View | Hold Tab |
+| Choose / back | A / B | Enter / Escape |
+| Options of a figure | X | Right click |
+| View menu (sort, group) | Y | F3 |
+| Previous / next section | LB / RB | Page Up / Page Down |
+| Take a figure off a seat | X, then Take off | Delete |
+
+The **Collection** page of the launcher shows the same figures: their stats, backups, the trash, and the seats for the
+next game. You can also create figures from the catalogue there.
+
+To use a real portal (Wii, PlayStation, Xbox 360 or Xbox One), plug it in and choose it in Settings > Controls >
+Portal of Power. Then click **Test the portal**.
+
+## Settings
+
+- **Resolution scale:** Auto picks x1 on integrated graphics and x2 on dedicated cards. If the game is slow, use x1.
+- **Frame rate:** 30 is the original. 60 is experimental.
+- The launcher and the game share one settings file, `launcher.ini`.
+
+## If something goes wrong
+
+- Settings > Game data > **Copy game log** copies the log so you can send it to us. **Open logs folder** shows the
+  files.
+- The logs are in `%APPDATA%\SSARecomp\` on Windows, `~/Library/Application Support/SSARecomp/` on Mac, and
   `~/.local/share/SSARecomp/` on Linux.
+- If the game stops with an error, a window offers Copy log and Report.
+- Updates are offered at start, at most once a day. Every download is checked against the release's SHA-256.
 
-## Download
+## Build from source
 
-Every push to `main` is built by GitHub Actions and published on the
-[Releases page](https://github.com/mflr0/Skylauncher/releases):
-
-- Windows: `Skylauncher.exe`, a single file.
-- Linux: `Skylauncher-x86_64.AppImage`. Make it executable (`chmod +x`) and run it.
-- macOS: `Skylauncher-macOS.dmg` (drag the app to Applications) or `Skylauncher-macOS.zip` (the `.app` itself),
-  for Apple Silicon and Intel Macs. The app is not notarized: the first time, right-click it and choose Open, or
-  allow it in System Settings > Privacy & Security.
-
-## Build
-
-Requirements: CMake 3.20+, Ninja (or another generator), a C++20 compiler, git.
+You need CMake 3.20 or later, Ninja, a C++20 compiler (Clang) and git.
 
 ```sh
 git clone --recursive https://github.com/mflr0/Skylauncher.git
 cd Skylauncher
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 ninja -C build Skylauncher
 ```
 
-If you cloned without `--recursive`, run `git submodule update --init --recursive` first.
-Tested on macOS (Apple Silicon). Windows and Linux builds are expected to work but have not been tested yet.
+The developer docs are in `docs/`: `launcher_ui.md` covers the screens and theme, `install.md` the install,
+`collection_ui.md` the figures, `updates.md` the updater and releases, and `support.md` the logs.
 
-## Run
+## Credits and licence
 
-The launcher starts the game runtime, which is a separate program. It looks for it in this order:
+The launcher's look, colours, fonts, background and layout are dorydev's design.
 
-1. the `SKYLAUNCHER_RUNTIME` environment variable;
-2. the game it installed for your disc (below);
-3. `runtime=` in the `[launcher]` section of `launcher.ini`;
-4. `SSARecomp` (`SSARecomp.exe` on Windows, or `SSARecomp.app` on macOS) next to the launcher.
+MIT licence, see `LICENSE`. The third-party components are listed in `THIRD_PARTY_NOTICES.md`.
 
-If none of these exists, the launcher can **install** the game: put the SSARecomp player kit (the `ssa-kit` folder)
-next to the launcher, drop your disc, and press INSTALL. The kit recompiles and builds the game from your disc on your
-computer (about 15 minutes the first time; internet is needed once for the compiler). See `docs/install.md`.
-
-## Changing the look
-
-The interface is drawn with Dear ImGui. All colours, sizes and fonts are in `src/launcher/theme/launcher_theme.h`; the screens and the
-launcher's own widgets (big buttons, toggles, cards) are in `src/launcher/ui/launcher_ui.cpp`.
-`docs/launcher_ui.md` explains the structure, how disc art is extracted and mapped to roles, and how to run the
-screenshot test, which renders every screen to PNG files without opening a window.
-
-## Tests
-
-`SkylauncherTest` runs the disc checks, settings, text helpers, texture decoder, install checklist, game logs and the updater against your own image:
-
-```sh
-ninja -C build SkylauncherTest
-./build/SkylauncherTest /path/to/your/game.iso /tmp/skylauncher-test
-```
-
-## Licence
-
-MIT, see `LICENSE`. Third-party components and their licences are listed in `THIRD_PARTY_NOTICES.md`.
-Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision; you need
-your own copy of the game.
+Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision. You need your
+own copy of the game.
