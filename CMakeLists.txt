@@ -132,6 +132,6 @@ target_include_directories(SkylauncherTest PRIVATE ${XENON_ROOT}/thirdparty/tiny
 # A stand-in for the kit's SSABuild, in <build>/fake-kit: the install screens and SkylauncherTest run against it.
 add_executable(FakeSSABuild EXCLUDE_FROM_ALL tests/fake_ssabuild.c)
 set_target_properties(FakeSSABuild PROPERTIES OUTPUT_NAME SSABuild RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fake-kit)
-file(WRITE ${CMAKE_BINARY_DIR}/fake-kit/VERSION "fake-1\n")
+file(WRITE ${CMAKE_BINARY_DIR}/fake-kit/kit.txt "version=0.0\nbuild=fake-1\n")
 add_dependencies(SkylauncherTest FakeSSABuild)
 target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit")

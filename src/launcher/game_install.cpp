@@ -55,10 +55,19 @@ namespace
         if (!std::filesystem::is_regular_file(ssabuild, error))
             return {};
         InstallKit kit{ folder, ssabuild, {} };
-        std::ifstream file(folder / "VERSION");
-        std::string line;
-        if (file && std::getline(file, line))
-            kit.version = Trim(line);
+        // kit.txt: "key=value" lines; "build" changes with every kit made, "version" with releases.
+        std::ifstream file(folder / "kit.txt");
+        std::string version;
+        for (std::string line; std::getline(file, line);)
+        {
+            std::string_view text = Trim(line);
+            if (text.starts_with("build="))
+                kit.version = Trim(text.substr(6));
+            else if (text.starts_with("version="))
+                version = Trim(text.substr(8));
+        }
+        if (kit.version.empty())
+            kit.version = version;
         if (kit.version.empty())
         {
             // No version file: SSABuild's size and date, which change with every kit.
