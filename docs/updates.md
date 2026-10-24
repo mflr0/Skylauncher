@@ -41,7 +41,8 @@ incremental. `[update] repo=` changes where the launcher itself is looked up.
 
 The release job of `.github/workflows/build.yml` attaches `Skylauncher.exe`, `Skylauncher-x86_64.AppImage`,
 `Skylauncher-macOS.dmg`, `Skylauncher-macOS.zip` and **`SHA256SUMS`** (`sha256sum` format, one line per asset, written by the
-job). Tags must be `vX.Y.Z` for the version compare to work; the CI's default `v0.1.<run number>` is one.
+job). Only a pushed tag `vX.Y.Z` publishes, and it must match `SKYLAUNCHER_VERSION` in `CMakeLists.txt`: bump that first,
+then tag the commit. Branch builds publish nothing.
 
 ## Testing
 

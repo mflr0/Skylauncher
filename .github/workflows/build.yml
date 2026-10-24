@@ -1,9 +1,10 @@
 name: Build
 
-# Every push to main or feat/** builds Windows, Linux and macOS; main then publishes a release tagged v0.1.<run number> with:
+# Every push to main or feat/** builds Windows, Linux and macOS. Pushing a tag vX.Y.Z (the version in CMakeLists.txt)
+# publishes a release with:
 # Skylauncher.exe, Skylauncher-x86_64.AppImage, Skylauncher-macOS.dmg and Skylauncher-macOS.zip (the .app), and SHA256SUMS
-# (their SHA-256, which the launcher's updater checks).
-# Pushing a tag v* publishes that tag instead. Pull requests only build.
+# (their SHA-256, which the launcher's updater checks). Branches and pull requests only build, with the version in
+# CMakeLists.txt.
 on:
   push:
     branches: [main, 'feat/**']
@@ -16,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v0.1.{0}', github.run_number) }}
+  VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
 
 jobs:
   windows:
@@ -29,8 +30,9 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          $version = "${{ env.VERSION }}".TrimStart('v')
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DSKYLAUNCHER_VERSION="$version"
+          $extra = @()
+          if ("${{ env.VERSION }}") { $extra += "-DSKYLAUNCHER_VERSION=$("${{ env.VERSION }}".TrimStart('v'))" }
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl @extra
           cmake --build build --target Skylauncher
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item build/Skylauncher.exe dist/Skylauncher.exe
@@ -55,7 +57,7 @@ jobs:
         # XenonUtils' headers rely on Clang (anonymous structs with non-trivial members), as XenonRecomp does.
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-            -DSKYLAUNCHER_VERSION="${VERSION#v}"
+            ${VERSION:+"-DSKYLAUNCHER_VERSION=${VERSION#v}"}
           cmake --build build --target Skylauncher
           cmake --install build --prefix AppDir/usr
       - name: AppImage
@@ -83,7 +85,7 @@ jobs:
       - name: Build (Apple Silicon + Intel)
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DSKYLAUNCHER_VERSION="${VERSION#v}"
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ${VERSION:+"-DSKYLAUNCHER_VERSION=${VERSION#v}"}
           cmake --build build --target Skylauncher
       - name: Icon, signature, .dmg and .zip
         run: |
@@ -108,8 +110,8 @@ jobs:
 
   release:
     needs: [windows, linux, macos]
-    # Feature branches only build; main and v* tags publish.
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    # Only a v* tag publishes.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: write
