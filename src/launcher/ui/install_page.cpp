@@ -447,6 +447,32 @@ namespace launcher_ui
     void App::TestInstallScript(uint64_t now)
     {
         InstallProgress progress = m_installer.Snapshot();
+        if (m_testReal)
+        {
+            // The real kit: INSTALL, then a screenshot every few minutes until it ends.
+            const char* every = SDL_getenv("SSA_LAUNCHER_TEST_EVERY");
+            uint64_t interval = (every != nullptr ? uint64_t(std::atoi(every)) : 120) * 1000;
+            if (m_testStep == 0)
+            {
+                m_page = Page::Play;
+                if (m_disc == DiscState::None && !m_testDrop.empty())
+                    StartVerify(m_testDrop);
+                if (m_disc == DiscState::Ready)
+                    StartInstall();
+                if (m_installView)
+                    m_testAt = now + 3000;
+            }
+            else if (m_installer.Running() || m_installView)
+                m_testAt = now + (m_installer.Running() ? interval : 2000);
+            else if (m_testStep < 1000)
+            {
+                m_testStep = 1000; // after the last shot
+                m_testAt = now + 1500;
+            }
+            else
+                m_running = false;
+            return;
+        }
         switch (m_testStep)
         {
         case 0:

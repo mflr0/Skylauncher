@@ -13,10 +13,15 @@ backgrounds) is read at run time from the disc image you provide, then cached on
 - Drag and drop of an `.iso`, or a Browse button. The image is checked: Xbox 360 file system, `default.xex`
   present and readable, and a release the runtime supports (SHA-256 of `default.xex`).
 - Once the disc is verified, the game's own name, icon and logo are shown.
-- Settings: graphics (fullscreen, resolution scale x1 to x10, frame rate limit, VSync, texture filtering), controls
-  (which gamepad or the keyboard, every key remappable, Portal of Power type), text and voice language, game data.
+- Settings: graphics (fullscreen, resolution scale Auto or x1 to x10, frame rate limit, VSync, texture filtering), controls
+  (which gamepad or the keyboard, every key remappable, button glyphs, Portal of Power type), text and voice language, game data.
 - Collection: your figures with their portraits from the game, filters and search, each figure's stats, rename, backups,
   reset, new figures, import of your own dumps, and which figures start on the portal.
+- Installing the game shows a checklist of the steps, an overall bar, the time left and what is happening now; it carries on
+  after a restart (`docs/install.md`).
+- Settings > Game data: Copy game log, Open logs folder; Controls: Test the portal. If the game stops with an error, a dialog
+  offers Copy log and Report (`docs/support.md`).
+- Updates from the GitHub releases, checked against a SHA-256, from a banner or Settings > About (`docs/updates.md`).
 - The game runtime reads the same settings file; `docs/settings.md` lists every key and which ones it applies yet.
 - The choice is saved in `launcher.ini`, shared with the game runtime. Its location is the SDL preferences folder
   of the app `SSARecomp`: `~/Library/Application Support/SSARecomp/` on macOS, `%APPDATA%\SSARecomp\` on Windows,
@@ -69,7 +74,7 @@ screenshot test, which renders every screen to PNG files without opening a windo
 
 ## Tests
 
-`SkylauncherTest` runs the disc checks, settings, text helpers and texture decoder against your own image:
+`SkylauncherTest` runs the disc checks, settings, text helpers, texture decoder, install checklist, game logs and the updater against your own image:
 
 ```sh
 ninja -C build SkylauncherTest

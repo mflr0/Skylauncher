@@ -343,6 +343,7 @@ namespace launcher_ui
         // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
         std::string m_shots, m_testDrop;
         bool m_testUpdate = false;  // SSA_LAUNCHER_TEST_UPDATE: the update screens (SKYLAUNCHER_UPDATE_URL names a fake release)
+        bool m_testReal = false;    // SSA_LAUNCHER_TEST_INSTALL=real: the real kit, a screenshot every SSA_LAUNCHER_TEST_EVERY seconds
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         int m_testStep = 0;
         uint64_t m_testAt = 0;

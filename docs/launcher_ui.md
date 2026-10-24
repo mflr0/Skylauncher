@@ -13,6 +13,10 @@ is easy to iterate without touching the game runtime.
 - `src/launcher/ui/launcher_app.h` - the window's class (`App`) and helpers shared by the page files.
 - `src/launcher/ui/launcher_ui.{h,cpp}` - the window (Dear ImGui on SDL_Renderer): backdrop, sidebar, the Home, Play and Settings
   pages, the launcher's widgets (`BigButton`, `PillButton`, `Toggle`, `BeginCard`, `Chip`), disc verification and the screenshot test.
+- `src/launcher/install_checklist.{h,cpp}`, `ui/install_page.cpp` - the install card (docs/install.md);
+  `game_run.{h,cpp}`, `ui/support_page.cpp` - game logs, the crash dialog, the portal test (docs/support.md);
+  `updater.{h,cpp}`, `ui/update_page.cpp` - updates, the banner and About (docs/updates.md);
+  `shared/mini_json.{h,cpp}` - the JSON reader for GitHub's answer.
 - `src/launcher/ui/collection_page.cpp` - the collection: grid, filters, figure sheet, figure creator, import, portal.
 - `src/assets/launcher_assets.{h,cpp}` - reads frontend art from the player's disc, decodes it and caches it.
 - `src/shared/` - what isn't the launcher's alone: the disc reader (`vfs`), the platform layer, `stb_impl.cpp`, the embedded fonts
@@ -73,6 +77,20 @@ Current role mapping:
 `manifest.ini` in the cache records the title ID and where each role came from. The cached files are
 local only and are ignored by git; deleting the cache is always safe.
 
+## Legibility
+- Outfit was loaded from its variable file at the font's default axis, **Thin (100)**, and "bold" was that thin text drawn twice.
+  It is now `Outfit-Regular.ttf` and `Outfit-SemiBold.ttf`, static instances of the same OFL font (`fontTools.varLib.instancer`
+  at wght 400 and 600); bold text (`AddBoldText`, `BoldText`, bold buttons) is SemiBold. Only `BolderPasses` (the chosen
+  controller) still draws a second copy.
+- Contrast, WCAG AA, measured on every text colour against every surface it sits on (the dark greys of the sidebar, panels,
+  fields, the band, the raised buttons and the page gradient). Two tokens failed and changed, keeping their hues:
+  `TextDim` 0x9C9CA8 -> 0xB8B8C4 (4.1:1 on the raised greys, now 4.5 to 8) and `Danger` 0xF85149 -> 0xFF817A (3.4:1, now 4.5 or
+  more). Text, TextSecondary, Accent, Ok and the sidebar ink were already above 4.5 (5.4 to 15). Ink on the accent is 8.3.
+- Sizes at 1x: 17 body, 14 small (hints, status), `CaptionSize` 12 as the floor, titles 22 and up.
+- Glyphs are rasterized at the screen's density with no extra oversampling (`OversampleH/V=1`, `PixelSnapH`): stems stay
+  one pixel on a 1.5x or 2x display. FreeType (`imgui_freetype`, light hinting) isn't built in: it would be a new library,
+  and with static weights the stb rasterizer is crisp enough; revisit if a display shows blur.
+
 ## Size on high-DPI screens
 Every size is in launcher points. `App::UpdateUiScale` picks how many window units a point is: `[launcher] ui_scale`, else
 the display's scale beyond its pixel density (Windows at 200 %: 2; a Retina Mac: 2 / 2 = 1, its window units are
@@ -103,6 +121,11 @@ It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.pn
 `07-figure-sheet.png` and `08-new-figure.png` (it creates a few figures in its own settings folder first).
 With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
 (`docs/install.md`).
+
+## Other screenshot variables
+`SSA_LAUNCHER_TEST_UPDATE=1` with `SKYLAUNCHER_UPDATE_URL=file://<fake latest.json>` shows the update screens (`20-` to `24-`).
+`SSA_LAUNCHER_TEST_INSTALL=real` runs the real kit. `private/shoot.sh <out dir> [VAR=value...]` is the wrapper used in this
+repository's working copy (its own HOME, the offscreen driver).
 
 ## Notes
 - Drag & drop ISO is supported through `SDL_EVENT_DROP_FILE`.

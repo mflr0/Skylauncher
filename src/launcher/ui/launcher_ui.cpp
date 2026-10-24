@@ -342,6 +342,7 @@ namespace launcher_ui
             if (const char* drop = SDL_getenv("SSA_LAUNCHER_TEST_DROP"))
                 m_testDrop = drop;
             m_testInstall = SDL_getenv("SSA_LAUNCHER_TEST_INSTALL") != nullptr;
+            m_testReal = m_testInstall && std::string_view(SDL_getenv("SSA_LAUNCHER_TEST_INSTALL")) == "real";
             m_testUpdate = SDL_getenv("SSA_LAUNCHER_TEST_UPDATE") != nullptr;
         }
         RefreshGamepads();
@@ -1547,7 +1548,9 @@ namespace launcher_ui
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-installing-compile", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
-            if (m_testUpdate)
+            if (m_testReal)
+                Screenshot(fmt::format("30-real-{:02}", m_testStep).c_str());
+            else if (m_testUpdate)
                 Screenshot(UpdateNames[std::min<int>(m_testStep, int(std::size(UpdateNames)) - 1)]);
             else if (m_testInstall)
                 Screenshot(InstallNames[std::min<int>(m_testStep, int(std::size(InstallNames)) - 1)]);
