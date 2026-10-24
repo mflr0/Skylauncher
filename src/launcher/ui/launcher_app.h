@@ -6,6 +6,7 @@
 #include "assets/launcher_assets.h"
 #include "launcher/game_install.h"
 #include "launcher/game_run.h"
+#include "launcher/updater.h"
 #include "launcher/launcher.h"
 #include "launcher/theme/launcher_theme.h"
 #include "shared/figures/figure_collection.h"
@@ -185,7 +186,12 @@ namespace launcher_ui
         void DrawControls();
         void DrawLanguage();
         void DrawGameData();
-        void DrawAbout();
+        void DrawAbout();        // update_page.cpp: About, and the update banner
+        void StartUpdateCheck(bool manual);
+        void PollUpdates();
+        float BannerHeight();
+        void DrawUpdateBanner(float height);
+        void DrawWhatsNew();
         void DrawPortalTest();   // support_page.cpp
         void DrawLogs();
         void DrawToast();
@@ -254,6 +260,7 @@ namespace launcher_ui
         void Screenshot(const char* name);
         void TestScript();
         void TestInstallScript(uint64_t now);
+        void TestUpdateScript(uint64_t now);
 
         const GameInfo& m_game;
         std::string m_configPath;
@@ -278,6 +285,16 @@ namespace launcher_ui
         uint64_t m_discSize = 0;
         VerifyJob m_verify;
         ProbeJob m_probe;
+
+        // Updates (update_page.cpp).
+        UpdateManager m_updates;
+        bool m_updateManual = false;     // the running check was asked for: say the answer, even "up to date"
+        bool m_updateLater = false;      // the player closed the banner for this session
+        bool m_kitLater = false;
+        bool m_whatsNewOpen = false;
+        bool m_updateWasBusy = false;
+        std::string m_updateDoneNote;    // the last answer of a manual check, shown in About
+        float m_bannerH = 0;             // the height the banner takes at the top of the page, this frame
         GameSourceCheck m_check;
         TitleMetadata m_meta;
         LauncherAssets::Provider m_assets;
@@ -325,6 +342,7 @@ namespace launcher_ui
 
         // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
         std::string m_shots, m_testDrop;
+        bool m_testUpdate = false;  // SSA_LAUNCHER_TEST_UPDATE: the update screens (SKYLAUNCHER_UPDATE_URL names a fake release)
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         int m_testStep = 0;
         uint64_t m_testAt = 0;

@@ -20,6 +20,7 @@ struct InstallKit
 {
     std::filesystem::path folder;
     std::filesystem::path ssabuild; // the kit's SSABuild executable
+    std::string release;            // "version=" in kit.txt: the release it came from, "" when it has none
     std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
 };
 

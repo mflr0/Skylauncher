@@ -119,6 +119,8 @@ public:
     void UpdateLauncher();                     // download, verify, replace; needs a Check that found one
     void UpdateKit();
     void Cancel() { m_cancel = true; }
+    void Dismiss();                            // clears a failure or a note
+
     State Snapshot();
     bool Busy() const { return m_busy; }
 

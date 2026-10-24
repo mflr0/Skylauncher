@@ -16,6 +16,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fmt/format.h>
 #include <fstream>
@@ -328,6 +329,7 @@ namespace launcher_ui
             if (const char* drop = SDL_getenv("SSA_LAUNCHER_TEST_DROP"))
                 m_testDrop = drop;
             m_testInstall = SDL_getenv("SSA_LAUNCHER_TEST_INSTALL") != nullptr;
+            m_testUpdate = SDL_getenv("SSA_LAUNCHER_TEST_UPDATE") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -365,6 +367,14 @@ namespace launcher_ui
         }
         if (std::string previous = SettingGet(m_config, m_game.id, "iso"); !previous.empty() && m_shots.empty())
             StartVerify(previous);
+        if (m_shots.empty() && SDL_getenv("SKYLAUNCHER_NO_UPDATE_CHECK") == nullptr)
+        {
+            CleanupOldUpdate(LauncherSelf()); // the .old a previous update left
+            // At most once a day, and only if the player left it on.
+            int64_t last = SettingInt(m_config, "update", "last_check", 0), now = int64_t(std::time(nullptr));
+            if (ParseBool(SettingGet(m_config, "update", "auto_check", "1")) && (last <= 0 || now - last > 86400 || last > now))
+                StartUpdateCheck(false);
+        }
         while (m_running)
         {
             SDL_Event event;
@@ -373,6 +383,7 @@ namespace launcher_ui
             if (m_disc == DiscState::Verifying && m_verify.done)
                 FinishVerify();
             PollInstall();
+            PollUpdates();
             Frame();
             TestScript();
         }
@@ -1046,7 +1057,7 @@ namespace launcher_ui
             ImVec2 at(position.x + (available.x - text.x) / 2, areaTop + (areaH - text.y) / 2);
             ImGui::SetCursorScreenPos(at);
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Text));
-            ImGui::PushTextWrapPos(at.x + wrap);
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap); // window coordinates, not the screen's
             ImGui::TextUnformatted(m_game.name);
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
@@ -1087,8 +1098,14 @@ namespace launcher_ui
             case DiscState::Ready:
                 ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_discSize).c_str());
                 if (NeedsInstall())
-                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Install builds the game on your PC from your disc: about %d minutes "
-                        "and %d GB, internet needed once for the compiler.", InstallMinutes, InstallGigabytes);
+                {
+                    ImGui::PushTextWrapPos(available.x - 40); // window coordinates
+                    ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+                    ImGui::TextWrapped("Install builds the game on your PC from your disc: about %d minutes and %d GB, internet needed "
+                        "once for the compiler.", InstallMinutes, InstallGigabytes);
+                    ImGui::PopStyleColor();
+                    ImGui::PopTextWrapPos();
+                }
                 else if (UpdateAvailable())
                 {
                     ImGui::TextColored(ImColor(Rgb(TextSecondary)), "A new version of the game is ready to build.");
@@ -1106,7 +1123,7 @@ namespace launcher_ui
                 break;
             case DiscState::Failed:
                 ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-                ImGui::PushTextWrapPos(end.x - 40);
+                ImGui::PushTextWrapPos(available.x - 40);
                 ImGui::TextWrapped("%s", m_check.message.c_str());
                 ImGui::PopTextWrapPos();
                 ImGui::PopStyleColor();
@@ -1366,21 +1383,6 @@ namespace launcher_ui
             "runtime= in the [launcher] section of %s.", m_game.runtime, m_configPath.c_str());
     }
 
-    void App::DrawAbout()
-    {
-        Title("Skylauncher", HeadlineSize);
-        ImGui::TextWrapped("A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown from the game is read from your own disc and kept on this computer.");
-        ImGui::Dummy(ImVec2(0, 8));
-        ImGui::TextWrapped("Made with SDL 3, Dear ImGui, stb, XenonRecomp's XEX readers, the Outfit and Bungee fonts (SIL OFL). Licences: THIRD_PARTY_NOTICES.md. Skylauncher is MIT licensed.");
-        ImGui::Dummy(ImVec2(0, 8));
-        if (PillButton("Project page", false, 200))
-            SDL_OpenURL("https://github.com/mflr0/Skylauncher");
-        ImGui::Dummy(ImVec2(0, 8));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextWrapped("Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision.");
-        ImGui::PopStyleColor();
-    }
-
     void App::DrawSettings()
     {
         // A centred column: settings read badly when they stretch across a wide window.
@@ -1438,7 +1440,7 @@ namespace launcher_ui
     // text is English for now.
     void App::DrawLanguageMenu()
     {
-        ImVec2 at(ImGui::GetIO().DisplaySize.x - Pad - LanguageMenuW, Pad);
+        ImVec2 at(ImGui::GetIO().DisplaySize.x - Pad - LanguageMenuW, Pad + m_bannerH);
         ImVec2 padding(12, 6);
         int selected = ChoiceIndex(LanguageChoices, SettingGet(m_config, m_game.id, "language"), 0);
         const char* current = LanguageChoices[selected].label;
@@ -1495,8 +1497,11 @@ namespace launcher_ui
         DrawSidebar();
 
         ImVec2 size = ImGui::GetIO().DisplaySize;
-        ImGui::SetNextWindowPos(ImVec2(SidebarW, 0));
-        ImGui::SetNextWindowSize(ImVec2(size.x - SidebarW, size.y));
+        m_bannerH = BannerHeight(); // an update on offer, or being installed: a band above the page
+        if (m_bannerH > 0)
+            DrawUpdateBanner(m_bannerH);
+        ImGui::SetNextWindowPos(ImVec2(SidebarW, m_bannerH));
+        ImGui::SetNextWindowSize(ImVec2(size.x - SidebarW, size.y - m_bannerH));
         // Play fills the page to its edges; Settings sits inside the usual margins.
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, m_page == Page::Play ? ImVec2(0, 0) : ImVec2(Pad + 8, Pad + 4));
         ImGui::Begin("##page", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBackground |
@@ -1512,6 +1517,7 @@ namespace launcher_ui
             DrawLanguageMenu();
         ImGui::End();
         ImGui::PopStyleVar();
+        DrawWhatsNew();
         DrawToast();
 
         ImGui::Render();
@@ -1527,7 +1533,10 @@ namespace launcher_ui
                 "07-figure-sheet", "08-new-figure" };
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-installing-compile", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
-            if (m_testInstall)
+            static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
+            if (m_testUpdate)
+                Screenshot(UpdateNames[std::min<int>(m_testStep, int(std::size(UpdateNames)) - 1)]);
+            else if (m_testInstall)
                 Screenshot(InstallNames[std::min<int>(m_testStep, int(std::size(InstallNames)) - 1)]);
             else
                 Screenshot(Names[std::min<int>(m_testStep, int(std::size(Names)) - 1)]);
@@ -1561,6 +1570,11 @@ namespace launcher_ui
         if (m_testInstall)
         {
             TestInstallScript(now);
+            return;
+        }
+        if (m_testUpdate)
+        {
+            TestUpdateScript(now);
             return;
         }
         switch (m_testStep)

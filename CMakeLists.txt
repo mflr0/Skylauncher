@@ -99,7 +99,8 @@ target_sources(SkylauncherCore PRIVATE
     src/launcher/updater.cpp
     src/shared/mini_json.cpp
     src/launcher/ui/install_page.cpp
-    src/launcher/ui/support_page.cpp)
+    src/launcher/ui/support_page.cpp
+    src/launcher/ui/update_page.cpp)
 # Figure files are AES encrypted: tiny-AES-c comes with XenonUtils (built into XenonXex).
 target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz ${XENON_ROOT}/thirdparty/tiny-AES-c)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)

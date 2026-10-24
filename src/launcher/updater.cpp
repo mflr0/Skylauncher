@@ -593,6 +593,17 @@ void UpdateManager::Join()
         m_thread.join();
 }
 
+void UpdateManager::Dismiss()
+{
+    if (m_busy)
+        return;
+    std::lock_guard lock(m_mutex);
+    if (m_state.phase == Phase::Failed || m_state.phase == Phase::Done)
+        m_state.phase = Phase::Idle;
+    m_state.error.clear();
+    m_state.note.clear();
+}
+
 UpdateManager::State UpdateManager::Snapshot()
 {
     std::lock_guard lock(m_mutex);

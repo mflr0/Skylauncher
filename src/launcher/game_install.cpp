@@ -54,7 +54,7 @@ namespace
         std::filesystem::path ssabuild = folder / SsaBuildName;
         if (!std::filesystem::is_regular_file(ssabuild, error))
             return {};
-        InstallKit kit{ folder, ssabuild, {} };
+        InstallKit kit{ folder, ssabuild, {}, {} };
         // kit.txt: "key=value" lines; "build" changes with every kit made, "version" with releases.
         std::ifstream file(folder / "kit.txt");
         std::string version;
@@ -66,6 +66,7 @@ namespace
             else if (text.starts_with("version="))
                 version = Trim(text.substr(8));
         }
+        kit.release = version;
         if (kit.version.empty())
             kit.version = version;
         if (kit.version.empty())
