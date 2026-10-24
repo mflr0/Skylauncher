@@ -6,7 +6,8 @@
 
 namespace
 {
-    // Each step's usual share of a first install on a Windows laptop (the compile is most of it). Only the ratios matter.
+    // Each step's usual share of an install (the compile and the shaders are most of it; measured on an Apple silicon Mac, a Windows
+    // first install adds the compiler download). Only the ratios matter.
     struct KnownStep
     {
         const char* id;
@@ -14,14 +15,14 @@ namespace
         float weight;
     };
     constexpr KnownStep KnownSteps[] = {
-        { "toolchain", "Preparing the compiler", 6 },
+        { "toolchain", "Preparing the compiler", 8 },
         { "disc", "Reading the disc", 2 },
-        { "recompile", "Translating the game code", 10 },
-        { "shaders", "Translating the shaders", 8 },
-        { "compile", "Compiling the game", 50 },
+        { "recompile", "Translating the game code", 6 },
+        { "shaders", "Translating the shaders", 14 },
+        { "compile", "Compiling the game", 42 },
         { "link", "Linking the game", 4 },
         { "movies", "Adding the movie shaders", 12 },
-        { "finish", "Finishing", 8 },
+        { "finish", "Finishing", 12 },
     };
     constexpr float UnknownWeight = 4;
 }
