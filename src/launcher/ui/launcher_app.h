@@ -5,6 +5,7 @@
 // public entry point.
 #include "assets/launcher_assets.h"
 #include "launcher/game_install.h"
+#include "launcher/game_run.h"
 #include "launcher/launcher.h"
 #include "launcher/theme/launcher_theme.h"
 #include "shared/figures/figure_collection.h"
@@ -53,14 +54,19 @@ namespace launcher_ui
     {
         const char* value;
         const char* label;
+        const char* aliases = nullptr; // other values of the settings file that show as this choice (space separated)
     };
 
-    inline constexpr Choice FpsChoices[] = { { "30", "30 (original)" }, { "60", "60" }, { "120", "120" }, { "144", "144" },
-        { "240", "240" }, { "0", "Unlimited" } };
+    // The runtime runs at 30 or 60: any other limit it is given means 60 (docs/settings.md).
+    inline constexpr Choice FpsChoices[] = { { "30", "30 (original)" }, { "60", "60 (experimental)", "0 120 144 240" } };
+    inline constexpr Choice ScaleChoices[] = { { "auto", "Auto" }, { "1", "x1" }, { "2", "x2" }, { "3", "x3" }, { "4", "x4" },
+        { "5", "x5" }, { "6", "x6" }, { "7", "x7" }, { "8", "x8" }, { "9", "x9" }, { "10", "x10" } };
+    inline constexpr Choice GlyphChoices[] = { { "auto", "Automatic (follows what you play with)" }, { "xbox360", "Xbox 360" },
+        { "xboxone", "Xbox One / Series", "xbox" }, { "playstation", "PlayStation" }, { "nintendo", "Nintendo" }, { "keyboard", "Keyboard" } };
     inline constexpr Choice FilterChoices[] = { { "1", "Trilinear" }, { "2", "Anisotropic 2x" }, { "4", "Anisotropic 4x" },
         { "8", "Anisotropic 8x" }, { "16", "Anisotropic 16x" } };
-    inline constexpr Choice PortalChoices[] = { { "auto", "Real portal if plugged in, else virtual" }, { "emulated", "Virtual portal" },
-        { "hid", "Wii / Wii U / PlayStation portal (HID)" }, { "usb", "Xbox 360 / Xbox One portal (USB)" } };
+    inline constexpr Choice PortalChoices[] = { { "auto", "Auto: a real portal if plugged in, else virtual" }, { "emulated", "Virtual (no portal needed)" },
+        { "real", "Real portal (Wii, PlayStation, Xbox)", "hid usb" } };
     inline constexpr Choice LanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
         { "it", "Italiano" }, { "nl", "Nederlands" }, { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
 
@@ -69,6 +75,9 @@ namespace launcher_ui
     {
         for (size_t i = 0; i < N; i++)
             if (value == choices[i].value)
+                return int(i);
+        for (size_t i = 0; i < N; i++)
+            if (choices[i].aliases != nullptr && (" " + std::string(choices[i].aliases) + " ").find(" " + value + " ") != std::string::npos)
                 return int(i);
         return fallback;
     }
@@ -107,6 +116,23 @@ namespace launcher_ui
         void Join() { if (thread.joinable()) thread.join(); }
         std::string Stage() { std::lock_guard lock(mutex); return stage; }
         void Start(const std::string& image, const GameInfo& game);
+    };
+
+    // "Test the portal": the runtime's --portal-probe, on a worker thread.
+    struct ProbeJob
+    {
+        std::thread thread;
+        std::atomic<bool> done{ true }, ran{ false }; // `ran`: a result is there to show
+        PortalProbeResult result;
+        ~ProbeJob() { Join(); }
+        void Join() { if (thread.joinable()) thread.join(); }
+        void Start(const std::string& runtime)
+        {
+            Join();
+            done = false;
+            ran = true;
+            thread = std::thread([this, runtime] { result = RunPortalProbe(runtime); done = true; });
+        }
     };
 
     // ---- The collection -------------------------------------------------------------------------------------------
@@ -160,6 +186,8 @@ namespace launcher_ui
         void DrawLanguage();
         void DrawGameData();
         void DrawAbout();
+        void DrawPortalTest();   // support_page.cpp
+        void DrawLogs();
         void DrawToast();
         void DrawLanguageMenu();
 
@@ -249,6 +277,7 @@ namespace launcher_ui
         std::string m_discPath;
         uint64_t m_discSize = 0;
         VerifyJob m_verify;
+        ProbeJob m_probe;
         GameSourceCheck m_check;
         TitleMetadata m_meta;
         LauncherAssets::Provider m_assets;
@@ -289,8 +318,6 @@ namespace launcher_ui
         uint16_t m_newBase = 0xFFFF; // the toy picked in the creator, then its variants
         uint16_t m_newVariant = 0xFFFF; // the variant picked (a toy type); starts as the plain toy
         uint64_t m_locksCheckedAt = 0;
-
-        int m_uiLanguage = 0; // index in LanguageChoices; the launcher isn't translated yet, so nothing reads it
 
         std::string m_toast;
         uint64_t m_toastUntil = 0;

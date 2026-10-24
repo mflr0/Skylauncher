@@ -95,7 +95,9 @@ add_library(SkylauncherCore STATIC
 # The launcher shell: install progress, game runs and logs, updates, About (kept apart from the list above).
 target_sources(SkylauncherCore PRIVATE
     src/launcher/install_checklist.cpp
-    src/launcher/ui/install_page.cpp)
+    src/launcher/game_run.cpp
+    src/launcher/ui/install_page.cpp
+    src/launcher/ui/support_page.cpp)
 # Figure files are AES encrypted: tiny-AES-c comes with XenonUtils (built into XenonXex).
 target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz ${XENON_ROOT}/thirdparty/tiny-AES-c)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)

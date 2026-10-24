@@ -1,6 +1,7 @@
 // SkylauncherTest's checks for the launcher shell: the install checklist, game runs and logs, the updater, settings.
 // Called from launcher_test.cpp's main; returns the number of failures.
 #include "launcher/game_install.h"
+#include "launcher/game_run.h"
 #include "launcher/install_checklist.h"
 #include <SDL3/SDL.h>
 #include <cstdio>
@@ -101,8 +102,57 @@ namespace
     }
 }
 
+namespace
+{
+    void GameRunChecks(const std::filesystem::path& scratch)
+    {
+        PortalProbeResult none = ParsePortalProbe("{\"done\":true,\"count\":0}\n");
+        SHELL_EXPECT(none.ran && none.portals.empty() && none.error.empty());
+        PortalProbeResult found = ParsePortalProbe("log noise\r\n{\"kind\":\"hid\",\"vid\":\"1430\",\"pid\":\"0150\",\"product\":\"Wii \\\"Portal\\\"\",\"opened\":true,"
+            "\"status\":\"ok\"}\r\n{\"kind\":\"usb\",\"vid\":\"1430\",\"pid\":\"1f17\",\"name\":\"Xbox\",\"opened\":false,\"status\":\"error: access denied\"}\n"
+            "{\"done\":true,\"count\":2}");
+        SHELL_EXPECT(found.ran && found.portals.size() == 2);
+        SHELL_EXPECT(found.portals[0].product == "Wii \"Portal\"" && found.portals[0].opened && found.portals[0].vid == "1430");
+        SHELL_EXPECT(found.portals[1].product == "Xbox" && !found.portals[1].opened && found.portals[1].status == "error: access denied");
+        SHELL_EXPECT(!ParsePortalProbe("{\"kind\":\"hid\"").ran && !ParsePortalProbe("").ran);
+
+#if !defined(_WIN32)
+        // A stand-in runtime: a shell script that prints, then exits with a code, or answers --portal-probe.
+        std::filesystem::path logs = scratch / "logs";
+        std::filesystem::create_directories(logs);
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LOG_DIR", logs.string().c_str(), true);
+        std::filesystem::path script = scratch / "fake_runtime.sh";
+        std::ofstream(script) << "#!/bin/sh\nif [ \"$1\" = --portal-probe ]; then echo '{\"kind\":\"hid\",\"vid\":\"1430\",\"pid\":\"0150\","
+            "\"product\":\"Fake\",\"opened\":true,\"status\":\"ok\"}'; echo '{\"done\":true,\"count\":1}'; exit 0; fi\n"
+            "echo out line; echo err line >&2; exit 3\n";
+        std::filesystem::permissions(script, std::filesystem::perms::owner_all);
+        GameRunResult run = RunGame(script.string(), "disc.iso");
+        SHELL_EXPECT(run.started && run.exitCode == 3);
+        std::string capture = ReadLogTail(logs / CaptureLogName);
+        SHELL_EXPECT(capture.find("out line") != std::string::npos && capture.find("err line") != std::string::npos);
+        SHELL_EXPECT(capture.find("exit code 3") != std::string::npos);
+        RunGame(script.string(), "disc.iso");
+        SHELL_EXPECT(std::filesystem::exists(logs / "skylauncher-game.prev.log"));
+        std::ofstream(logs / RuntimeLogName) << "[settings] scale 1\n";
+        std::string text = GameLogText();
+        SHELL_EXPECT(text.find("===== SSARecomp.log =====") != std::string::npos && text.find("[settings] scale 1") != std::string::npos);
+        SHELL_EXPECT(text.find("===== skylauncher-game.log =====") != std::string::npos);
+        PortalProbeResult probe = RunPortalProbe(script.string());
+        SHELL_EXPECT(probe.ran && probe.portals.size() == 1 && probe.portals[0].product == "Fake");
+        SHELL_EXPECT(!RunGame((scratch / "nowhere").string(), "x").started);
+        SHELL_EXPECT(!RunPortalProbe((scratch / "nowhere").string()).ran);
+        // The tail starts on a whole line.
+        std::ofstream(logs / "big.log") << "aaaa\nbbbb\ncccc\n";
+        SHELL_EXPECT(ReadLogTail(logs / "big.log", 7) == "cccc\n" && ReadLogTail(logs / "big.log", 100) == "aaaa\nbbbb\ncccc\n");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LOG_DIR");
+#endif
+        printf("Game run: capture of stdout and stderr, exit code, logs text and portal probe checked\n");
+    }
+}
+
 int ShellChecks(const std::filesystem::path& scratch)
 {
     ChecklistChecks(scratch);
+    GameRunChecks(scratch);
     return g_shellFailures;
 }

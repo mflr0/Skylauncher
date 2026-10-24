@@ -1215,16 +1215,16 @@ namespace launcher_ui
         if (Toggle("##fullscreen", &fullscreen))
             Set("video", "fullscreen", fullscreen ? "1" : "0");
 
-        SettingRow("Resolution scale", "Renders the 3D at a multiple of the console's resolution: sharper, heavier on the GPU.");
-        int scale = std::clamp(SettingInt(m_config, "video", "resolution_scale", 1), 1, 10);
-        ImGui::SetNextItemWidth(-1);
-        if (ImGui::SliderInt("##scale", &scale, 1, 10, "x%d"))
-            Set("video", "resolution_scale", std::to_string(scale));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::Text("%d x %d for the 3D scene", 1120 * scale, 704 * scale);
-        ImGui::PopStyleColor();
+        SettingRow("Resolution scale", "Auto picks x1 on integrated graphics. x2 or x3 need a dedicated graphics card.");
+        Combo("##scale", "video", "resolution_scale", ScaleChoices, 0);
+        if (int scale = SettingInt(m_config, "video", "resolution_scale", 0); scale >= 1)
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+            ImGui::Text("%d x %d for the 3D scene", 1120 * std::min(scale, 10), 704 * std::min(scale, 10));
+            ImGui::PopStyleColor();
+        }
 
-        SettingRow("Frame rate limit", "The game was made for 30 FPS; higher limits are experimental.");
+        SettingRow("Frame rate limit", "The game was made for 30 FPS; 60 is experimental.");
         Combo("##fps", "video", "fps_limit", FpsChoices, 0);
 
         SettingRow("VSync", "Waits for the screen's refresh: no tearing, a little more latency.");
@@ -1256,6 +1256,14 @@ namespace launcher_ui
 
         Title("Portal of Power", TitleSize, Text);
         Combo("##portal", "portal", "mode", PortalChoices, 0, 440);
+        DrawPortalTest();
+        ImGui::Dummy(ImVec2(0, 12));
+
+        Title("Button glyphs", TitleSize, Text);
+        Combo("##glyphs", "input", "glyphs", GlyphChoices, 0, 440);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextUnformatted("The button pictures the game shows in its menus and prompts.");
+        ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 12));
 
         // Keyboard bindings, two columns of actions.
@@ -1333,16 +1341,15 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 16));
         Title("Folders", TitleSize, Text);
         auto folder = [&](const char* label, const char* sub) {
-            std::string path = PreferencePath(sub);
             if (PillButton(label, false, 260))
-            {
-                SDL_CreateDirectory(path.c_str());
-                SDL_OpenURL(("file://" + path).c_str());
-            }
+                OpenFolder(std::filesystem::path(PreferencePath(sub)));
         };
         folder("Saves and settings", "");
         ImGui::SameLine();
         folder("Figures", "figures");
+        ImGui::Dummy(ImVec2(0, 16));
+        Title("Support", TitleSize, Text);
+        DrawLogs();
         ImGui::Dummy(ImVec2(0, 16));
         Title("Game runtime", TitleSize, Text);
         if (!m_installed.runtime.empty())
@@ -1352,10 +1359,7 @@ namespace launcher_ui
                 StartInstall();
             ImGui::SameLine();
             if (PillButton("Open the game folder", false, 260))
-            {
-                std::u8string folder = GameInstallFolder(m_check.xexSha256).u8string();
-                SDL_OpenURL(("file://" + std::string(folder.begin(), folder.end())).c_str());
-            }
+                OpenFolder(GameInstallFolder(m_check.xexSha256));
             ImGui::Dummy(ImVec2(0, 8));
         }
         ImGui::TextWrapped("Skylauncher starts the game it built for the disc, else the game runtime (%s) next to it, or the one set as "
@@ -1430,12 +1434,14 @@ namespace launcher_ui
         ImGui::EndChild();
     }
 
-    // The launcher's own language, top right of every page but Settings. A placeholder: it is neither saved nor applied yet.
+    // The game's text language, top right of Home and Play (Settings > Language has it with the voices). The launcher's own
+    // text is English for now.
     void App::DrawLanguageMenu()
     {
         ImVec2 at(ImGui::GetIO().DisplaySize.x - Pad - LanguageMenuW, Pad);
         ImVec2 padding(12, 6);
-        const char* current = LanguageChoices[m_uiLanguage].label;
+        int selected = ChoiceIndex(LanguageChoices, SettingGet(m_config, m_game.id, "language"), 0);
+        const char* current = LanguageChoices[selected].label;
         ImGui::PushFont(nullptr, TextSize + 1);
         // The frame has no fill, so the bold copy of the current language can go under it.
         ImGui::GetWindowDrawList()->AddText(ImVec2(at.x + padding.x + BoldOffset, at.y + padding.y), IM_COL32_WHITE, current);
@@ -1454,8 +1460,8 @@ namespace launcher_ui
         if (open)
         {
             for (int i = 0; i < int(std::size(LanguageChoices)); i++)
-                if (ImGui::Selectable(LanguageChoices[i].label, i == m_uiLanguage))
-                    m_uiLanguage = i;
+                if (ImGui::Selectable(LanguageChoices[i].label, i == selected))
+                    Set(m_game.id, "language", LanguageChoices[i].value);
             ImGui::EndCombo();
         }
         ImGui::PopFont();

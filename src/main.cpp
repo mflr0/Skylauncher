@@ -1,10 +1,53 @@
 // Skylauncher: shows the launcher, then starts the game runtime with the disc image the player chose.
 #include "launcher/game_install.h"
+#include "launcher/game_run.h"
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <fmt/format.h>
 #include <string>
+
+namespace
+{
+    std::string UrlEncode(const std::string& text)
+    {
+        std::string out;
+        for (unsigned char c : text)
+            if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+                out += char(c);
+            else
+                out += fmt::format("%{:02X}", c);
+        return out;
+    }
+
+    // "The game stopped unexpectedly": Copy log (the dialog stays), Report (opens a GitHub issue, the log is on the
+    // clipboard), Close.
+    void ShowGameStopped(const GameInfo& game, int exitCode)
+    {
+        SDL_InitSubSystem(SDL_INIT_VIDEO);
+        std::string message = fmt::format("{} stopped unexpectedly (exit code {}).\n\nIts log has what happened: press Copy log, "
+            "then Report to tell us about it. The log stays on your computer until you paste it.\n\nLogs folder: {}", game.name, exitCode,
+            GameLogFolder().string());
+        const SDL_MessageBoxButtonData buttons[] = { { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 2, "Report" }, { 0, 1, "Copy log" },
+            { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, "Close" } };
+        SDL_MessageBoxData box{ SDL_MESSAGEBOX_ERROR, nullptr, "The game stopped unexpectedly", message.c_str(), 3, buttons, nullptr };
+        for (;;)
+        {
+            int pressed = 0;
+            if (!SDL_ShowMessageBox(&box, &pressed) || pressed == 0)
+                return;
+            SDL_SetClipboardText(GameLogText().c_str());
+            if (pressed == 2)
+            {
+                std::string title = fmt::format("The game stopped unexpectedly (exit code {})", exitCode);
+                std::string body = "What I was doing:\n\n\nThe log is in my clipboard, I paste it below:\n\n```\n\n```\n";
+                SDL_OpenURL(("https://github.com/mflr0/Skylauncher/issues/new?title=" + UrlEncode(title) + "&body=" + UrlEncode(body)).c_str());
+                return;
+            }
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -47,15 +90,16 @@ int main(int argc, char** argv)
     pass("SSA_LANGUAGE", game->id, "language");
     pass("SSA_VOICE_LANGUAGE", game->id, "voice_language");
 
-    const char* arguments[] = { runtime.c_str(), chosen.c_str(), nullptr };
-    SDL_Process* process = SDL_CreateProcess(arguments, false);
-    if (process == nullptr)
+    // The launcher stays until the game ends: it keeps the game's output in skylauncher-game.log, and says so if the game
+    // stops with an error (docs/support.md).
+    GameRunResult run = RunGame(runtime, chosen);
+    if (!run.started)
     {
-        std::string message = "Could not start " + runtime + ": " + SDL_GetError();
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, message.c_str(), nullptr);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, run.error.c_str(), nullptr);
         return 1;
     }
-    SDL_DestroyProcess(process); // the game keeps running on its own
+    if (run.exitCode != 0)
+        ShowGameStopped(*game, run.exitCode);
     SDL_Quit();
     return 0;
 }
