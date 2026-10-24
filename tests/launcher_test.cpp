@@ -219,7 +219,7 @@ namespace
         EXPECT(failed.state == InstallProgress::State::Failed && failed.error.find("didn't compile") != std::string::npos);
         EXPECT(failed.steps.size() == 4 && failed.runtime.empty());
         InstallProgress done = run(nullptr);
-        EXPECT(done.state == InstallProgress::State::Done && done.steps.size() == 6);
+        EXPECT(done.state == InstallProgress::State::Done && done.steps.size() == 10);
         EXPECT(std::filesystem::path(done.runtime).filename().string().starts_with("SSARecomp"));
         EXPECT(std::filesystem::exists(scratch / "game" / "install.log"));
         printf("  fake kit: failure at step %zu, then built %s\n", failed.steps.size(), done.runtime.c_str());
@@ -303,6 +303,8 @@ namespace
     }
 }
 
+int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
+
 int main(int argc, char** argv)
 {
     if (argc < 3)
@@ -323,6 +325,7 @@ int main(int argc, char** argv)
 
     FigureChecks(scratch);
     InstallChecks(scratch, iso.string());
+    g_failures += ShellChecks(scratch);
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };

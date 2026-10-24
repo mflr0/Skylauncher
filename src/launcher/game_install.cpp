@@ -208,6 +208,7 @@ void InstallProgress::Apply(std::string_view line, uint64_t now)
         std::string title(space == std::string_view::npos ? rest : Trim(rest.substr(space + 1)));
         steps.push_back({ id, title, now, 0 });
         done = total = 0;
+        action.clear();
         log.emplace_back(fmt::format("== {}", title));
     }
     else if (event("@progress", rest))
@@ -220,7 +221,10 @@ void InstallProgress::Apply(std::string_view line, uint64_t now)
         }
     }
     else if (event("@log", rest))
+    {
         log.emplace_back(rest);
+        action = rest;
+    }
     else if (event("@error", rest))
     {
         error = rest;
@@ -235,6 +239,20 @@ void InstallProgress::Apply(std::string_view line, uint64_t now)
     else
         log.emplace_back(line);
     logLines = log.size();
+}
+
+InstallProgress ReadInstallLog(const std::filesystem::path& gameFolder)
+{
+    InstallProgress progress;
+    std::ifstream file(gameFolder / "install.log", std::ios::binary);
+    if (!file)
+        return progress;
+    for (std::string line; std::getline(file, line);)
+        progress.Apply(line, 0);
+    progress.state = !progress.runtime.empty() ? InstallProgress::State::Done
+        : !progress.error.empty()              ? InstallProgress::State::Failed
+                                               : InstallProgress::State::Interrupted;
+    return progress;
 }
 
 GameInstaller::~GameInstaller()
@@ -313,6 +331,7 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     }
     m_job = job;
 #endif
+    m_pid = uint32_t(SDL_GetNumberProperty(SDL_GetProcessProperties(m_process), SDL_PROP_PROCESS_PID_NUMBER, 0));
     m_running = true;
     m_thread = std::thread([this] { Read(); });
     return true;
@@ -377,6 +396,7 @@ void GameInstaller::Read()
             progress.error = exitCode != 0 ? fmt::format("The installer stopped with exit code {}.", exitCode)
                                            : std::string("The installer stopped before the game was built.");
     }
+    m_pid = 0;
     m_running = false;
 }
 
@@ -423,6 +443,7 @@ InstallProgress GameInstaller::Snapshot(size_t logTail)
     copy.total = m_progress.total;
     copy.error = m_progress.error;
     copy.runtime = m_progress.runtime;
+    copy.action = m_progress.action;
     copy.logLines = m_progress.log.size();
     size_t first = m_progress.log.size() - std::min(logTail, m_progress.log.size());
     copy.log.assign(m_progress.log.begin() + first, m_progress.log.end());

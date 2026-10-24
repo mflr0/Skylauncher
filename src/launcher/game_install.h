@@ -52,7 +52,7 @@ inline constexpr int InstallGigabytes = 6;
 // What SSABuild has said so far.
 struct InstallProgress
 {
-    enum class State { Idle, Running, Failed, Cancelled, Done };
+    enum class State { Idle, Running, Failed, Cancelled, Done, Interrupted }; // Interrupted: read back from install.log
     struct Step
     {
         std::string id, title;
@@ -64,12 +64,17 @@ struct InstallProgress
     uint64_t done = 0, total = 0;  // the current step's @progress
     std::string error;             // @error, or why SSABuild stopped
     std::string runtime;           // @done
+    std::string action;            // the current step's last @log line
     std::vector<std::string> log;  // every line, @log text and anything else SSABuild printed
     size_t logLines = 0;           // lines in the full log (the copy may hold only the last ones)
 
     // Applies one stdout line at time `now`.
     void Apply(std::string_view line, uint64_t now);
 };
+
+// An install read back from its install.log (the launcher was closed while it ran, or it failed): Interrupted, or
+// Failed when SSABuild reported an error. Its steps have no times. Idle when there is no log.
+InstallProgress ReadInstallLog(const std::filesystem::path& gameFolder);
 
 // Runs SSABuild for one disc. Its stdout (and stderr) is read on a thread; the window polls Snapshot().
 class GameInstaller
@@ -85,6 +90,7 @@ public:
     InstallProgress Snapshot(size_t logTail = 0);
     std::string FullLog();
     bool Running() const { return m_running; }
+    uint32_t ProcessId() const { return m_pid; } // SSABuild's, while it runs
 
 private:
     void Read();
@@ -96,6 +102,7 @@ private:
     std::atomic<bool> m_running{ false }, m_cancelled{ false };
     std::atomic<uint64_t> m_cancelledAt{ 0 };
     SDL_Process* m_process = nullptr;
+    std::atomic<uint32_t> m_pid{ 0 };
     void* m_job = nullptr; // Windows job object holding SSABuild and its compilers
     std::filesystem::path m_logFile;
 };

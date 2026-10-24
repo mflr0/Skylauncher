@@ -262,7 +262,8 @@ namespace launcher_ui
         config.FontDataOwnedByAtlas = false; // the vectors outlive the atlas
         m_textFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[0].data(), int(m_fontData[0].size()), TextSize, &config);
         m_titleFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[1].data(), int(m_fontData[1].size()), TitleSize, &config);
-        return m_textFont != nullptr && m_titleFont != nullptr;
+        m_monoFont = io.Fonts->AddFontDefaultVector(); // logs: Dear ImGui's own monospace font
+        return m_textFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr;
     }
 
     bool App::Init()
@@ -529,189 +530,6 @@ namespace launcher_ui
         Set(m_game.id, "iso", m_discPath); // remembered even if the player quits without playing
         m_disc = DiscState::Ready;
         RefreshInstall();
-    }
-
-    // ---- Installing the game -------------------------------------------------------------------------------------
-
-    void App::RefreshInstall()
-    {
-        m_kit = FindInstallKit(m_config);
-        m_installed = FindInstalledGame(m_config, m_check.xexSha256);
-        m_ownRuntime = FindRuntime(m_game, m_config);
-    }
-
-    bool App::NeedsInstall() const
-    {
-        return m_disc == DiscState::Ready && m_installed.runtime.empty() && m_ownRuntime.empty();
-    }
-
-    bool App::UpdateAvailable() const
-    {
-        return m_disc == DiscState::Ready && !m_installed.runtime.empty() && m_kit && m_kit->version != m_installed.kitVersion;
-    }
-
-    void App::StartInstall()
-    {
-        RefreshInstall();
-        m_installSha = m_check.xexSha256;
-        m_installKitVersion = m_kit ? m_kit->version : std::string();
-        m_installView = true;
-        m_installLog = false;
-        m_page = Page::Play;
-        m_installer.Start(m_kit, m_discPath, GameInstallFolder(m_installSha));
-    }
-
-    void App::PollInstall()
-    {
-        if (!m_installView || m_installer.Running())
-            return;
-        InstallProgress progress = m_installer.Snapshot();
-        if (progress.state == InstallProgress::State::Done)
-        {
-            RecordInstalledGame(m_config, m_installSha, progress.runtime, m_installKitVersion);
-            if (!SaveLauncherConfig(m_configPath, m_config))
-                Toast("Couldn't save the settings");
-            else
-                Toast("The game is installed: press PLAY");
-            m_installView = false;
-            RefreshInstall();
-        }
-        else if (progress.state == InstallProgress::State::Cancelled)
-        {
-            m_installView = false;
-            Toast("Installation cancelled");
-        }
-    }
-
-    // The progress card: SSABuild's steps, the current one's progress and time, its log, and Cancel (Copy log and Retry
-    // once it failed).
-    void App::DrawInstall(ImVec2 at, ImVec2 size)
-    {
-        InstallProgress progress = m_installer.Snapshot(m_installLog ? 400 : 0);
-        bool failed = progress.state == InstallProgress::State::Failed;
-        bool running = progress.state == InstallProgress::State::Running;
-        uint64_t now = SDL_GetTicks();
-        auto duration = [](uint64_t ms) { return fmt::format("{}:{:02}", ms / 60000, ms / 1000 % 60); };
-
-        ImGui::SetCursorScreenPos(at);
-        BeginCard("##install", size);
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        float width = ImGui::GetContentRegionAvail().x;
-        Title(failed ? "Installation stopped" : "Installing the game", TitleSize, failed ? Danger : Text);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("The game is built on your PC from your disc, about %d minutes. If it stops, running it again carries on "
-            "where it left off.", InstallMinutes);
-        ImGui::PopStyleColor();
-        ImGui::Dummy(ImVec2(0, 6));
-
-        // The steps: done ones ticked with their time, the current one with its running time. With the details open, only
-        // the current one.
-        size_t first = m_installLog && !progress.steps.empty() ? progress.steps.size() - 1 : 0;
-        if (progress.steps.empty())
-            ImGui::TextColored(ImColor(Rgb(TextDim)), running ? "Starting the installer..." : "");
-        for (size_t i = first; i < progress.steps.size(); i++)
-        {
-            const InstallProgress::Step& step = progress.steps[i];
-            bool current = step.endedAt == 0 || (i + 1 == progress.steps.size() && !running && failed);
-            ImVec2 row = ImGui::GetCursorScreenPos();
-            float lineH = ImGui::GetTextLineHeight();
-            ImVec2 dot(row.x + 9, row.y + lineH / 2 + 1);
-            if (current && failed)
-            {
-                draw->AddCircleFilled(dot, 8, Rgb(Danger), 20);
-                draw->AddLine(ImVec2(dot.x - 3, dot.y - 3), ImVec2(dot.x + 3, dot.y + 3), Rgb(Panel), 2.0f);
-                draw->AddLine(ImVec2(dot.x - 3, dot.y + 3), ImVec2(dot.x + 3, dot.y - 3), Rgb(Panel), 2.0f);
-            }
-            else if (current)
-            {
-                draw->AddCircle(dot, 8, Rgb(Border), 24, 2.5f);
-                float angle = float(now % 1000) / 1000.0f * 6.2832f;
-                draw->PathArcTo(dot, 8, angle, angle + 2.0f, 12);
-                draw->PathStroke(Rgb(Accent), 0, 2.5f);
-            }
-            else
-            {
-                draw->AddCircleFilled(dot, 8, Rgb(Ok), 20);
-                draw->AddPolyline(std::array{ ImVec2(dot.x - 4, dot.y), ImVec2(dot.x - 1, dot.y + 3), ImVec2(dot.x + 4, dot.y - 3) }.data(),
-                    3, Rgb(Panel), 0, 2.0f);
-            }
-            ImGui::SetCursorScreenPos(ImVec2(row.x + 28, row.y));
-            if (current)
-                BoldText(step.title.c_str(), Text);
-            else
-                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", step.title.c_str());
-            std::string time = duration((step.endedAt != 0 ? step.endedAt : now) - step.startedAt);
-            float timeW = ImGui::CalcTextSize(time.c_str()).x;
-            draw->AddText(ImVec2(row.x + width - timeW, row.y), Rgb(current ? Text : TextDim), time.c_str());
-            ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + lineH + 8));
-        }
-
-        if (running && progress.total > 0)
-        {
-            ImGui::Dummy(ImVec2(0, 2));
-            std::string count = fmt::format("{} / {}", progress.done, progress.total);
-            float countW = ImGui::CalcTextSize(count.c_str()).x;
-            ImGui::ProgressBar(float(double(progress.done) / double(progress.total)), ImVec2(width - countW - 12, 10), "");
-            ImGui::SameLine(0, 12);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", count.c_str());
-        }
-        if (failed)
-        {
-            ImGui::Dummy(ImVec2(0, 4));
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-            ImGui::TextWrapped("%s", progress.error.c_str());
-            ImGui::PopStyleColor();
-        }
-
-        // The log, in the space left above the buttons.
-        constexpr float ButtonsH = 52;
-        if (m_installLog)
-        {
-            ImGui::Dummy(ImVec2(0, 4));
-            float logH = std::max(60.0f, ImGui::GetContentRegionAvail().y - ButtonsH);
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
-            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusSmall);
-            ImGui::BeginChild("##installlog", ImVec2(0, logH), ImGuiChildFlags_Borders, ImGuiWindowFlags_HorizontalScrollbar);
-            bool atBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4;
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-            for (const std::string& line : progress.log)
-                ImGui::TextUnformatted(line.c_str());
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
-            if (atBottom)
-                ImGui::SetScrollHereY(1.0f);
-            ImGui::EndChild();
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor();
-        }
-
-        // Buttons along the card's bottom edge.
-        ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - Pad - 40));
-        if (PillButton(m_installLog ? "Hide details" : "Show details", false, 150))
-            m_installLog = !m_installLog;
-        if (failed)
-        {
-            ImGui::SameLine();
-            if (PillButton("Copy log", false, 130))
-            {
-                SDL_SetClipboardText(m_installer.FullLog().c_str());
-                Toast("Log copied");
-            }
-            ImGui::SameLine(Pad + width - 130 * 2 - ImGui::GetStyle().ItemSpacing.x);
-            if (PillButton("Close", false, 130))
-                m_installView = false;
-            ImGui::SameLine();
-            if (PillButton("Retry", true, 130, true))
-                StartInstall();
-        }
-        else if (running)
-        {
-            ImGui::SameLine(Pad + width - 130);
-            if (PillButton("Cancel", false, 130))
-                m_installer.Cancel();
-        }
-        EndCard();
     }
 
     void App::Browse()
@@ -1691,8 +1509,8 @@ namespace launcher_ui
         {
             static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-collection", "06-home",
                 "07-figure-sheet", "08-new-figure" };
-            static const char* const InstallNames[] = { "10-install", "11-installing", "12-install-details", "13-install-failed",
-                "14-installed", "15-game-data" };
+            static const char* const InstallNames[] = { "10-install", "11-installing", "12-installing-compile", "13-install-details",
+                "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             if (m_testInstall)
                 Screenshot(InstallNames[std::min<int>(m_testStep, int(std::size(InstallNames)) - 1)]);
             else
@@ -1787,58 +1605,6 @@ namespace launcher_ui
         }
     }
 
-    // The install screens (SSA_LAUNCHER_TEST_INSTALL, with SKYLAUNCHER_KIT set to <build>/fake-kit): the Install button, the
-    // progress card with and without its log, a failure, then a retry that succeeds.
-    void App::TestInstallScript(uint64_t now)
-    {
-        InstallProgress progress = m_installer.Snapshot();
-        switch (m_testStep)
-        {
-        case 0:
-            m_page = Page::Play;
-            if (m_disc == DiscState::None && !m_testDrop.empty())
-                StartVerify(m_testDrop);
-            if (m_disc == DiscState::Ready || m_disc == DiscState::Failed || m_testDrop.empty())
-                m_testAt = now + 400;
-            break;
-        case 1:
-            if (!m_installView)
-            {
-                SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL", "compile", true);
-                StartInstall();
-                break;
-            }
-            if (progress.steps.size() >= 3 || progress.state != InstallProgress::State::Running)
-                m_testAt = now + 300;
-            break;
-        case 2:
-            m_installLog = true;
-            m_testAt = now + 300;
-            break;
-        case 3:
-            if (progress.state != InstallProgress::State::Running)
-                m_testAt = now + 300;
-            break;
-        case 4:
-            if (progress.state == InstallProgress::State::Failed)
-            {
-                SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
-                m_installLog = false;
-                StartInstall();
-            }
-            else if (!m_installView)
-                m_testAt = now + 400;
-            break;
-        case 5:
-            m_page = Page::Settings;
-            m_tab = SettingsTab::GameData;
-            m_testAt = now + 400;
-            break;
-        default:
-            m_running = false;
-            break;
-        }
-    }
 }
 
 using namespace launcher_ui;

@@ -81,6 +81,8 @@ namespace launcher_ui
     SDL_Texture* LoadPngFile(SDL_Renderer* renderer, const std::string& path);
     SDL_Texture* LoadRgba(SDL_Renderer* renderer, const std::vector<uint8_t>& rgba, int width, int height);
     ImTextureRef Ref(SDL_Texture* texture);
+    // Opens a folder in Explorer / the Finder / the file manager (a path, not a URL: spaces and accents are fine).
+    bool OpenFolder(const std::filesystem::path& folder);
 
     // ---- Drawing --------------------------------------------------------------------------------------------------
 
@@ -205,6 +207,8 @@ namespace launcher_ui
         void StartInstall();
         void PollInstall();
         void DrawInstall(ImVec2 at, ImVec2 size);
+        InstallProgress InstallSnapshot(size_t logTail = 0); // this session's install, else the one read back from its log
+        void SetInstallState(const std::string& sha, const char* state); // [install.<sha>] state=, for a launcher restart
 
         void UpdateUiScale(bool resize);
         void StartVerify(const std::string& path);
@@ -236,6 +240,7 @@ namespace launcher_ui
         std::vector<uint8_t> m_fontData[2];
         ImFont* m_textFont = nullptr;
         ImFont* m_titleFont = nullptr;
+        ImFont* m_monoFont = nullptr;
 
         Page m_page = Page::Home; // the launcher opens on its menu; the player picks a game in the sidebar
         SettingsTab m_tab = SettingsTab::Graphics;
@@ -261,6 +266,8 @@ namespace launcher_ui
         std::string m_installKitVersion;
         bool m_installView = false;  // the progress card replaces the logo
         bool m_installLog = false;   // "Show details"
+        InstallProgress m_installPast; // an install of an earlier launcher session, read back from its install.log
+        uint32_t m_installPastPid = 0; // its SSABuild, if that one may still be running
 
         std::vector<SDL_JoystickID> m_gamepads;
         const KeyAction* m_capturing = nullptr;

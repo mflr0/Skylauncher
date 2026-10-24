@@ -91,6 +91,10 @@ add_library(SkylauncherCore STATIC
     src/shared/platform/platform_process.cpp
     lib/miniz/miniz.c
     ${CMAKE_BINARY_DIR}/embedded_fonts.cpp)
+# The launcher shell: install progress, game runs and logs, updates, About (kept apart from the list above).
+target_sources(SkylauncherCore PRIVATE
+    src/launcher/install_checklist.cpp
+    src/launcher/ui/install_page.cpp)
 # Figure files are AES encrypted: tiny-AES-c comes with XenonUtils (built into XenonXex).
 target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz ${XENON_ROOT}/thirdparty/tiny-AES-c)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
@@ -142,3 +146,6 @@ set_target_properties(FakeSSABuild PROPERTIES OUTPUT_NAME SSABuild RUNTIME_OUTPU
 file(WRITE ${CMAKE_BINARY_DIR}/fake-kit/kit.txt "version=0.0\nbuild=fake-1\n")
 add_dependencies(SkylauncherTest FakeSSABuild)
 target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit")
+
+# The launcher shell's checks (tests/shell_test.cpp), run by SkylauncherTest.
+target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp)

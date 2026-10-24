@@ -1,7 +1,10 @@
 /* A stand-in for the player kit's SSABuild (docs/install.md): prints its events with delays, so the launcher's install
  * screens can be tried without the real kit. Built as fake-kit/SSABuild in the build folder (target FakeSSABuild);
  * point the launcher at that folder with SKYLAUNCHER_KIT.
- *   FAKE_SSABUILD_FAIL=<step id>  fail half way through that step (toolchain, disc, recompile, shaders, compile, link)
+ * Same steps, titles and order as the real one: toolchain, disc, recompile, shaders, compile, link, movies, then the
+ * second shaders/compile/link pass that follows the movie shaders.
+ *   FAKE_SSABUILD_FAIL=<step id>  fail half way through that step (toolchain, disc, recompile, shaders, compile, link,
+ *                                 movies)
  *   FAKE_SSABUILD_DELAY=<seconds> pause between events (default 0.05) */
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,7 +33,7 @@ static void step(const char* id, const char* title, int count)
     {
         printf("@progress %d %d\n", i, count);
         if (i % 10 == 0)
-            printf("@log %s: item %d of %d\n", id, i, count);
+            printf("@log %s: file %d of %d\n", id, i, count);
         if (fail != NULL && strcmp(fail, id) == 0 && i == count / 2)
         {
             fflush(stdout);
@@ -63,12 +66,17 @@ int main(int argc, char** argv)
     }
 
     printf("@log fake SSABuild, iso %s\n", iso);
-    step("toolchain", "Getting the compiler (llvm-mingw)", 10);
+    step("toolchain", "Preparing the compiler", 10);
     step("disc", "Reading the disc", 10);
-    step("recompile", "Recompiling the game code", 40);
-    step("shaders", "Building the shader cache", 30);
-    step("compile", "Compiling", 80);
+    step("recompile", "Translating the game code", 40);
+    step("shaders", "Translating the shaders", 30);
+    step("compile", "Compiling the game", 80);
     step("link", "Linking the game", 5);
+    step("movies", "Adding the movie shaders", 10);
+    step("shaders", "Translating the shaders", 5);
+    step("compile", "Compiling the game", 5);
+    step("link", "Linking the game", 2);
+    printf("@log finished\n");
 
     char path[4096];
     MAKE_DIR(out);
