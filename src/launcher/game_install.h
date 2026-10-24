@@ -1,0 +1,101 @@
+#pragma once
+
+// Installing the game: the player kit's SSABuild recompiles and builds the game from the player's own disc, on their
+// machine (docs/install.md). The launcher finds the kit, starts SSABuild, follows its "@" events on stdout and remembers
+// the built game per disc, by the SHA-256 of its default.xex.
+#include "launcher/launcher.h"
+#include <atomic>
+#include <cstdint>
+#include <filesystem>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <vector>
+
+struct SDL_Process;
+
+struct InstallKit
+{
+    std::filesystem::path folder;
+    std::filesystem::path ssabuild; // the kit's SSABuild executable
+    std::string version;            // the kit's VERSION file, else a fingerprint of SSABuild
+};
+
+// The kit: SKYLAUNCHER_KIT, else "[launcher] kit=", else a folder next to the launcher (or its macOS app bundle) named
+// ssa-kit, kit, or starting with ssa-kit (an unzipped "ssa-kit-windows-x64"). Empty when none holds SSABuild.
+std::optional<InstallKit> FindInstallKit(const LauncherConfig& config);
+
+// A runtime the player set up themselves: SKYLAUNCHER_RUNTIME, else "[launcher] runtime=" in the settings file, else
+// the game's runtime executable next to the launcher (or inside its macOS app bundle). Empty when none exists.
+// `overrideOnly` keeps only SKYLAUNCHER_RUNTIME, which wins over an installed game.
+std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly = false);
+
+// Where a disc's game is built: <data>/games/<sha256>, <data> being %LOCALAPPDATA%\Skylauncher on Windows,
+// ~/Library/Application Support/Skylauncher on macOS, ~/.local/share/Skylauncher on Linux. Never next to the ISO.
+std::filesystem::path GameInstallFolder(const std::string& xexSha256);
+
+// The game built for a disc, from "[install.<sha256>] runtime= kit=". Empty runtime when none was built or it is gone.
+struct InstalledGame
+{
+    std::string runtime;
+    std::string kitVersion;
+};
+InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string& xexSha256);
+void RecordInstalledGame(LauncherConfig& config, const std::string& xexSha256, const std::string& runtime, const std::string& kitVersion);
+
+// Rough figures shown before installing.
+inline constexpr int InstallMinutes = 15;
+inline constexpr int InstallGigabytes = 6;
+
+// What SSABuild has said so far.
+struct InstallProgress
+{
+    enum class State { Idle, Running, Failed, Cancelled, Done };
+    struct Step
+    {
+        std::string id, title;
+        uint64_t startedAt = 0, endedAt = 0; // SDL ticks (ms); endedAt is 0 while it runs
+    };
+
+    State state = State::Idle;
+    std::vector<Step> steps;
+    uint64_t done = 0, total = 0;  // the current step's @progress
+    std::string error;             // @error, or why SSABuild stopped
+    std::string runtime;           // @done
+    std::vector<std::string> log;  // every line, @log text and anything else SSABuild printed
+    size_t logLines = 0;           // lines in the full log (the copy may hold only the last ones)
+
+    // Applies one stdout line at time `now`.
+    void Apply(std::string_view line, uint64_t now);
+};
+
+// Runs SSABuild for one disc. Its stdout (and stderr) is read on a thread; the window polls Snapshot().
+class GameInstaller
+{
+public:
+    ~GameInstaller();
+    // Starts SSABuild; false (and Failed with the reason) when there is no kit or it can't start.
+    bool Start(const std::optional<InstallKit>& kit, const std::string& iso, const std::filesystem::path& out);
+    // Stops SSABuild, the process this installer started, and on Windows the processes it started in turn. Returns at
+    // once; the state becomes Cancelled when SSABuild has exited.
+    void Cancel();
+    // A copy of the progress with at most `logTail` log lines (the last ones).
+    InstallProgress Snapshot(size_t logTail = 0);
+    std::string FullLog();
+    bool Running() const { return m_running; }
+
+private:
+    void Read();
+    void Join();
+
+    std::mutex m_mutex;
+    InstallProgress m_progress;
+    std::thread m_thread;
+    std::atomic<bool> m_running{ false }, m_cancelled{ false };
+    std::atomic<uint64_t> m_cancelledAt{ 0 };
+    SDL_Process* m_process = nullptr;
+    void* m_job = nullptr; // Windows job object holding SSABuild and its compilers
+    std::filesystem::path m_logFile;
+};

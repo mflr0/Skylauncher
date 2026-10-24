@@ -49,6 +49,7 @@ struct GameSourceCheck
 {
     GameSourceStatus status{};
     std::string message; // why the source can't be used, for the player
+    std::string xexSha256; // the verified default.xex (Ok only): which installed game belongs to this disc
 };
 
 std::string Sha256Hex(std::span<const uint8_t> data); // lowercase hex

@@ -6,3 +6,4 @@
 *.iso
 *.xex
 launcher-cache/
+/build-win64/

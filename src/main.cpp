@@ -1,49 +1,10 @@
 // Skylauncher: shows the launcher, then starts the game runtime with the disc image the player chose.
+#include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
-#include <filesystem>
 #include <string>
-#include <vector>
-
-namespace
-{
-    // The runtime that plays `game`: SKYLAUNCHER_RUNTIME, else "[launcher] runtime=" in the settings file, else the
-    // game's runtime executable next to the launcher (or inside its macOS app bundle). Empty when none exists.
-    std::string FindRuntime(const GameInfo& game, LauncherConfig& config)
-    {
-        std::vector<std::filesystem::path> candidates;
-        if (const char* path = SDL_getenv("SKYLAUNCHER_RUNTIME"))
-            candidates.emplace_back(path);
-        if (auto section = config.find("launcher"); section != config.end())
-            if (auto runtime = section->second.find("runtime"); runtime != section->second.end() && !runtime->second.empty())
-                candidates.emplace_back(runtime->second);
-
-        if (const char* base = SDL_GetBasePath())
-        {
-            std::filesystem::path directory = base;
-            std::string name = game.runtime;
-#if defined(_WIN32)
-            candidates.push_back(directory / (name + ".exe"));
-#else
-            candidates.push_back(directory / name);
-            candidates.push_back(directory / (name + ".app") / "Contents" / "MacOS" / name);
-#endif
-        }
-
-        for (std::filesystem::path path : candidates)
-        {
-            // An app bundle names its executable after itself.
-            if (path.extension() == ".app")
-                path = path / "Contents" / "MacOS" / path.stem();
-            std::error_code error;
-            if (std::filesystem::is_regular_file(path, error))
-                return path.string();
-        }
-        return {};
-    }
-}
 
 int main(int argc, char** argv)
 {
@@ -55,11 +16,15 @@ int main(int argc, char** argv)
 
     std::string configPath = LauncherConfigPath();
     LauncherConfig config = LoadLauncherConfig(configPath);
-    std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"]);
+    std::string installed;
+    std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed);
     if (chosen.empty())
         return 0;
 
-    std::string runtime = FindRuntime(*game, config);
+    // SKYLAUNCHER_RUNTIME, else the game built for this disc, else the player's own runtime.
+    std::string runtime = FindRuntime(*game, config, true);
+    if (runtime.empty())
+        runtime = !installed.empty() ? installed : FindRuntime(*game, config);
     if (runtime.empty())
     {
         std::string message = std::string("The game runtime (") + game->runtime + ") was not found next to the launcher.\n\n"

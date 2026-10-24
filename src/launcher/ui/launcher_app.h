@@ -4,6 +4,7 @@
 // and collection_page.cpp (the figure collection). Nothing outside launcher/ui includes this; launcher_ui.h is the
 // public entry point.
 #include "assets/launcher_assets.h"
+#include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "launcher/theme/launcher_theme.h"
 #include "shared/figures/figure_collection.h"
@@ -13,6 +14,7 @@
 #include <imgui.h>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <span>
 #include <string>
 #include <thread>
@@ -138,6 +140,7 @@ namespace launcher_ui
         App(const GameInfo& game, const std::string& configPath, LauncherConfig& config) : m_game(game), m_configPath(configPath), m_config(config) {}
         ~App() { Shutdown(); }
         std::string Run();
+        const std::string& ChosenRuntime() const { return m_chosenRuntime; }
 
     private:
         bool Init();
@@ -195,6 +198,14 @@ namespace launcher_ui
         bool Chip(const char* label, bool selected, unsigned color = Accent);
         void Badge(ImDrawList* draw, ImVec2 at, const char* text, unsigned fill, unsigned ink);
 
+        // Installing the game (the band's INSTALL button, the progress card in place of the logo).
+        void RefreshInstall();
+        bool NeedsInstall() const;
+        bool UpdateAvailable() const;
+        void StartInstall();
+        void PollInstall();
+        void DrawInstall(ImVec2 at, ImVec2 size);
+
         void StartVerify(const std::string& path);
         void FinishVerify();
         void Browse();
@@ -209,11 +220,13 @@ namespace launcher_ui
         void SetStartupFigure(const std::string& file, bool on);
         void Screenshot(const char* name);
         void TestScript();
+        void TestInstallScript(uint64_t now);
 
         const GameInfo& m_game;
         std::string m_configPath;
         LauncherConfig& m_config;
         std::string m_chosen;
+        std::string m_chosenRuntime; // the game built for the chosen disc, if any
         bool m_running = true;
 
         SDL_Window* m_window = nullptr;
@@ -236,6 +249,16 @@ namespace launcher_ui
         SDL_Texture* m_background = nullptr; // the window's backdrop, from the player's disc once verified
         SDL_Texture* m_github = nullptr;
         bool m_dragOver = false;
+
+        // Install state for the verified disc.
+        std::optional<InstallKit> m_kit;
+        InstalledGame m_installed;
+        std::string m_ownRuntime;    // a runtime the player set up (FindRuntime): no install needed
+        GameInstaller m_installer;
+        std::string m_installSha;    // the disc being installed
+        std::string m_installKitVersion;
+        bool m_installView = false;  // the progress card replaces the logo
+        bool m_installLog = false;   // "Show details"
 
         std::vector<SDL_JoystickID> m_gamepads;
         const KeyAction* m_capturing = nullptr;
@@ -265,6 +288,7 @@ namespace launcher_ui
 
         // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
         std::string m_shots, m_testDrop;
+        bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };

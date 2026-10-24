@@ -5,6 +5,9 @@ set(SKYLAUNCHER_VERSION "0.1.0" CACHE STRING "Version shown in the app bundle")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_SHARED_LIBS OFF)
+if(MINGW)
+    add_compile_definitions(_WIN32_WINNT=0x0A00) # Windows 10 APIs (CreateFile2), as MSVC's SDK headers default to
+endif()
 if(MSVC)
     add_compile_options(/utf-8) # fmt requires it
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # no VC++ runtime to install
@@ -37,6 +40,10 @@ add_subdirectory(lib/SDL EXCLUDE_FROM_ALL)
 # Only the XEX and XDBF readers of XenonUtils: its disassembler (GNU binutils, GPL) is not built or linked.
 set(XENON_ROOT ${CMAKE_SOURCE_DIR}/lib/XenonRecomp)
 add_subdirectory(${XENON_ROOT}/thirdparty/fmt EXCLUDE_FROM_ALL)
+if(MINGW)
+    # fmt's format.h calls malloc/free without including <cstdlib>, which libc++ does not pull in on mingw.
+    target_compile_options(fmt PUBLIC "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include cstdlib>")
+endif()
 add_library(XenonXex STATIC
     ${XENON_ROOT}/XenonUtils/xex.cpp
     ${XENON_ROOT}/XenonUtils/image.cpp
@@ -70,6 +77,7 @@ target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
 add_library(SkylauncherCore STATIC
     src/launcher/launcher.cpp
     src/launcher/launcher_games.cpp
+    src/launcher/game_install.cpp
     src/launcher/ui/launcher_ui.cpp
     src/launcher/ui/collection_page.cpp
     src/assets/launcher_assets.cpp
@@ -121,3 +129,9 @@ endif()
 add_executable(SkylauncherTest EXCLUDE_FROM_ALL tests/launcher_test.cpp)
 target_link_libraries(SkylauncherTest PRIVATE SkylauncherCore)
 target_include_directories(SkylauncherTest PRIVATE ${XENON_ROOT}/thirdparty/tiny-AES-c)
+# A stand-in for the kit's SSABuild, in <build>/fake-kit: the install screens and SkylauncherTest run against it.
+add_executable(FakeSSABuild EXCLUDE_FROM_ALL tests/fake_ssabuild.c)
+set_target_properties(FakeSSABuild PROPERTIES OUTPUT_NAME SSABuild RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fake-kit)
+file(WRITE ${CMAKE_BINARY_DIR}/fake-kit/VERSION "fake-1\n")
+add_dependencies(SkylauncherTest FakeSSABuild)
+target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit")
