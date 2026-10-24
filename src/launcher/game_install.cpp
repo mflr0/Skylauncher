@@ -171,6 +171,9 @@ InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string&
     if (xexSha256.empty())
         return {};
     InstalledGame game{ Setting(config, InstallSection(xexSha256), "runtime"), Setting(config, InstallSection(xexSha256), "kit") };
+    std::filesystem::path runtime = Path(game.runtime);
+    if (runtime.extension() == ".app") // a macOS app: its executable is named after it
+        game.runtime = Utf8(runtime / "Contents" / "MacOS" / runtime.stem());
     std::error_code error;
     if (!game.runtime.empty() && !std::filesystem::is_regular_file(Path(game.runtime), error))
         game.runtime.clear();
