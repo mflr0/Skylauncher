@@ -1,7 +1,7 @@
 #pragma once
 
-#include "launcher.h"
-#include "vfs.h"
+#include "launcher/launcher.h"
+#include "shared/vfs.h"
 #include <SDL3/SDL.h>
 #include <span>
 #include <string>
@@ -46,6 +46,12 @@ namespace LauncherAssets
         // documents where the other frontend art lives on the disc.
         void ExtractFromDisc(DiscFileSystem& disc, const TitleMetadata& meta);
         Asset Get(Role role);
+
+        // Every toy's pictures from the disc's uigameimage.str: the 128 px HUD portrait ("toy_<name>_hud") and the
+        // 512 px "versus" picture ("<name>_vs"), cached as figures/<image name>.png. Already cached ones are kept.
+        void ExtractFigurePortraits(DiscFileSystem& disc);
+        // The cached picture for an image name (figures::PortraitImageName / PortraitLargeImageName), empty if none.
+        std::string FigurePortraitPath(const std::string& imageName) const;
     };
 
     // Decode a named APKF texture from a start-menu STRM into RGBA pixels. Exposed so tests can

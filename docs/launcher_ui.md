@@ -4,25 +4,55 @@ The launcher is a Skylanders-flavoured take on the Minecraft Launcher. Keep the 
 is easy to iterate without touching the game runtime.
 
 ## Structure
-- `src/launcher_theme.h` - every colour, size, radius and font size, plus the ImGui style (`Apply`). Change the look here first.
-- `src/launcher_ui.{h,cpp}` - the window (Dear ImGui on SDL_Renderer): backdrop, sidebar, the Play and Settings pages
-  (My Skylanders is a Settings tab), the launcher's widgets (`BigButton`, `PillButton`, `Toggle`, `BeginCard`), disc verification and the
-  screenshot test.
-- `src/launcher_assets.{h,cpp}` - reads frontend art from the player's disc, decodes it and caches it.
-- `src/figures/figure_catalog.{h,cpp}` - every toy the game knows: name, element, portrait name.
+- `src/launcher/theme/launcher_theme.h` - every colour, size, radius and font size, plus the ImGui style (`Apply`). Change the look here first.
+- `src/main.cpp` - picks the game and disc, shows the launcher, starts the runtime.
+- `src/launcher/` - the launcher: `launcher.{h,cpp}` (disc checks, settings file), `launcher_games.cpp` (the game table),
+  `ui/`, `theme/`.
+- `src/assets/` - the art read from the player's disc (`launcher_assets`).
+- `src/launcher/ui/launcher_app.h` - the window's class (`App`) and helpers shared by the page files.
+- `src/launcher/ui/launcher_ui.{h,cpp}` - the window (Dear ImGui on SDL_Renderer): backdrop, sidebar, the Home, Play and Settings
+  pages, the launcher's widgets (`BigButton`, `PillButton`, `Toggle`, `BeginCard`, `Chip`), disc verification and the screenshot test.
+- `src/launcher/ui/collection_page.cpp` - the collection: grid, filters, figure sheet, figure creator, import, portal.
+- `src/assets/launcher_assets.{h,cpp}` - reads frontend art from the player's disc, decodes it and caches it.
+- `src/shared/` - what isn't the launcher's alone: the disc reader (`vfs`), the platform layer, `stb_impl.cpp`, the embedded fonts
+  and the figure engine.
+- `src/shared/figures/` - the figure engine: `figure_catalog` (every toy: game, category, variant, element, portraits),
+  `figure_file` (the tag dump: header, encryption, progress), `figure_collection` (the folder: import, create, backups, locks),
+  `figure_icons` (generated icons and their `IconStyle`).
+- `lib/` - third-party code (SDL, Dear ImGui, XenonRecomp as submodules; stb and miniz vendored).
 - `resources/fonts/` - licensed fonts (Bungee, Outfit) with their OFL licences; they are also built into the executable.
 - `docs/settings.md` - the settings file the launcher writes and the game reads.
 
 ## Layout
-The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now.
-A language menu (not wired yet) sits top right on every page but Settings. No game is selected until
-the player clicks one in the sidebar.
-1. Left sidebar (grey, fixed width) - the six games as full-width rows (Spyro's Adventure enabled, the others "Coming later"), and the Settings gear at the bottom.
+The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
+GitHub issue) and the GitHub link bottom right. A language menu (not wired yet) sits top right on Home and Play. No game is
+selected until the player clicks one in the sidebar.
+1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure enabled, the others "Coming later",
+   SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom.
 2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
    (current device, a menu of the others), the main button (CHOOSE ISO, then PLAY once the disc is verified) and, on the right,
    the disc name with "Change disc...".
-3. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, My Skylanders (figures from the
-   figures folder; click one to start with it on the portal), Game data, About. Clicking a game goes back to Play.
+3. Collection - see below.
+4. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About. Clicking a game
+   goes back to Play.
+
+## Collection
+- The grid: every figure file with its icon, name (the nickname when it has one), level and gold, and badges for the variant
+  (Legendary, Dark...), favourite, "starts on the portal" and "in use" (a running game holds it: see docs/settings.md).
+- Filters: category chips with counts (Skylanders, Giants, Swap Force, Trap Masters, Minis, Traps, Vehicles, Magic items,
+  Adventure packs, Imaginators, Creation crystals), "Playable in" a game, favourites, and a search over names, nicknames
+  and file names.
+- The portal bar: virtual or real portal (`[portal] mode`) and the figures that start on it (`[portal] place`).
+- The figure sheet (click a figure): its picture, what it is, the games it plays in, its progress read from the figure (level,
+  experience, gold, nickname, hat, upgrades, play time), and rename, favourite, on the portal at start, back up, restore,
+  reset and delete (with confirmation; a backup is kept before every change). Nothing can be changed while a game uses it.
+- + New figure: a category, a figure, its variant; the figure engine writes a new, never played figure.
+- Import... (or drop files on the window): .sky, .bin and .dmp dumps join the collection after a check.
+- Icons: the disc's portraits (`toy_<name>_hud` and `<name>_vs` in `uigameimage.str`, cached in `launcher-cache/<titleid>/figures/`)
+  once a disc is verified; otherwise a generated icon (shape by category, element colour, variant badge, initials). Its
+  look is `figures::IconStyle`.
+- Only Spyro's Adventure's toys are in the catalogue; the other games' categories are there, empty until their toys are added
+  from a verified source. Later: give the game's Toy Box the same look, since it shows the same collection.
 
 ## Disc art
 The launcher never ships Skylanders artwork. After an ISO is verified it:
@@ -36,7 +66,7 @@ Current role mapping:
 | Role | Disc asset | Size |
 | --- | --- | --- |
 | `logo.png` | `...\startmenu\skylanderslogo.dds` | 1024x512 |
-| `hero_bg.png` | `fullscreen_000` in `uiimage.str` (the painted Skylands sky) | 512x512 (the window's backdrop, replacing the drawn sky and stars) |
+| `hero_bg.png` | `fullscreen_000` in `uiimage.str` (the painted Skylands sky) | 512x512 (the Play page's backdrop, replacing the drawn sky and stars; the other pages use a plain gradient) |
 | `title_icon.png` | `default.xex` XDBF resource | as stored |
 
 `manifest.ini` in the cache records the title ID and where each role came from. The cached files are
@@ -60,7 +90,8 @@ SSA_LAUNCHER_TEST_DROP="/path/to/game.iso" \
 SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ./build/Skylauncher.app/Contents/MacOS/Skylauncher
 ```
-It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-skylanders.png` and `06-home.png`.
+It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
+`07-figure-sheet.png` and `08-new-figure.png` (it creates a few figures in its own settings folder first).
 
 ## Notes
 - Drag & drop ISO is supported through `SDL_EVENT_DROP_FILE`.

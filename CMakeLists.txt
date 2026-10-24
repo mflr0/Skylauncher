@@ -10,7 +10,7 @@ if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>") # no VC++ runtime to install
 endif()
 
-if(NOT EXISTS ${CMAKE_SOURCE_DIR}/thirdparty/SDL/CMakeLists.txt OR NOT EXISTS ${CMAKE_SOURCE_DIR}/thirdparty/XenonRecomp/thirdparty/fmt/CMakeLists.txt)
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/lib/SDL/CMakeLists.txt OR NOT EXISTS ${CMAKE_SOURCE_DIR}/lib/XenonRecomp/thirdparty/fmt/CMakeLists.txt)
     message(FATAL_ERROR "Submodules missing: run `git submodule update --init --recursive`")
 endif()
 
@@ -27,15 +27,15 @@ function(skylauncher_apply_patch directory patch)
 endfunction()
 
 # XenonUtils (XenonRecomp, MIT) reads the disc's default.xex: some images declare a larger size than their blocks fill.
-skylauncher_apply_patch(${CMAKE_SOURCE_DIR}/thirdparty/XenonRecomp ${CMAKE_SOURCE_DIR}/patches/xenonutils.patch)
+skylauncher_apply_patch(${CMAKE_SOURCE_DIR}/lib/XenonRecomp ${CMAKE_SOURCE_DIR}/patches/xenonutils.patch)
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
-add_subdirectory(thirdparty/SDL EXCLUDE_FROM_ALL)
+add_subdirectory(lib/SDL EXCLUDE_FROM_ALL)
 
 # Only the XEX and XDBF readers of XenonUtils: its disassembler (GNU binutils, GPL) is not built or linked.
-set(XENON_ROOT ${CMAKE_SOURCE_DIR}/thirdparty/XenonRecomp)
+set(XENON_ROOT ${CMAKE_SOURCE_DIR}/lib/XenonRecomp)
 add_subdirectory(${XENON_ROOT}/thirdparty/fmt EXCLUDE_FROM_ALL)
 add_library(XenonXex STATIC
     ${XENON_ROOT}/XenonUtils/xex.cpp
@@ -60,7 +60,7 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
     COMMENT "Embedding the launcher fonts")
 
 # Dear ImGui (MIT) with its SDL 3 platform and SDL_Renderer backends.
-set(IMGUI_ROOT ${CMAKE_SOURCE_DIR}/thirdparty/imgui)
+set(IMGUI_ROOT ${CMAKE_SOURCE_DIR}/lib/imgui)
 add_library(imgui STATIC ${IMGUI_ROOT}/imgui.cpp ${IMGUI_ROOT}/imgui_draw.cpp ${IMGUI_ROOT}/imgui_tables.cpp
     ${IMGUI_ROOT}/imgui_widgets.cpp ${IMGUI_ROOT}/backends/imgui_impl_sdl3.cpp ${IMGUI_ROOT}/backends/imgui_impl_sdlrenderer3.cpp)
 target_include_directories(imgui PUBLIC ${IMGUI_ROOT} ${IMGUI_ROOT}/backends)
@@ -68,17 +68,23 @@ target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
 
 # Everything but the window: disc checks, settings, title metadata. Shared by the app and the test.
 add_library(SkylauncherCore STATIC
-    src/launcher.cpp
-    src/launcher_games.cpp
-    src/launcher_ui.cpp
-    src/launcher_assets.cpp
-    src/figures/figure_catalog.cpp
-    src/stb_impl.cpp
-    src/vfs.cpp
-    src/platform/platform_file.cpp
-    thirdparty/miniz/miniz.c
+    src/launcher/launcher.cpp
+    src/launcher/launcher_games.cpp
+    src/launcher/ui/launcher_ui.cpp
+    src/launcher/ui/collection_page.cpp
+    src/assets/launcher_assets.cpp
+    src/shared/figures/figure_catalog.cpp
+    src/shared/figures/figure_collection.cpp
+    src/shared/figures/figure_file.cpp
+    src/shared/figures/figure_icons.cpp
+    src/shared/stb_impl.cpp
+    src/shared/vfs.cpp
+    src/shared/platform/platform_file.cpp
+    src/shared/platform/platform_process.cpp
+    lib/miniz/miniz.c
     ${CMAKE_BINARY_DIR}/embedded_fonts.cpp)
-target_include_directories(SkylauncherCore PUBLIC src PRIVATE thirdparty/stb thirdparty/miniz)
+# Figure files are AES encrypted: tiny-AES-c comes with XenonUtils (built into XenonXex).
+target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz ${XENON_ROOT}/thirdparty/tiny-AES-c)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
 target_compile_definitions(SkylauncherCore PRIVATE SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
 if(APPLE)
@@ -114,3 +120,4 @@ endif()
 # Checks against the player's own disc image: SkylauncherTest <game disc .iso> <scratch dir> [<damaged copy>...]
 add_executable(SkylauncherTest EXCLUDE_FROM_ALL tests/launcher_test.cpp)
 target_link_libraries(SkylauncherTest PRIVATE SkylauncherCore)
+target_include_directories(SkylauncherTest PRIVATE ${XENON_ROOT}/thirdparty/tiny-AES-c)

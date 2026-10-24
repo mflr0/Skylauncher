@@ -1,6 +1,6 @@
 #pragma once
 
-#include "platform/platform.h"
+#include "shared/platform/platform.h"
 #include <cstdint>
 #include <string>
 #include <unordered_map>
