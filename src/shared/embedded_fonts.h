@@ -8,5 +8,7 @@ extern const unsigned char g_embeddedOutfit[];
 extern const size_t g_embeddedOutfitSize;
 extern const unsigned char g_embeddedOutfitBold[];
 extern const size_t g_embeddedOutfitBoldSize;
+extern const unsigned char g_embeddedIcon[]; // the window's icon, a 128x128 PNG (resources/icons)
+extern const size_t g_embeddedIconSize;
 extern const unsigned char g_embeddedBungee[];
 extern const size_t g_embeddedBungeeSize;

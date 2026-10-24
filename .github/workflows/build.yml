@@ -1,7 +1,8 @@
 name: Build
 
 # Every push to main or feat/** builds Windows, Linux and macOS; main then publishes a release tagged v0.1.<run number> with:
-# Skylauncher.exe, Skylauncher-x86_64.AppImage, Skylauncher-macOS.dmg and Skylauncher-macOS.zip (the .app).
+# Skylauncher.exe, Skylauncher-x86_64.AppImage, Skylauncher-macOS.dmg and Skylauncher-macOS.zip (the .app), and SHA256SUMS
+# (their SHA-256, which the launcher's updater checks).
 # Pushing a tag v* publishes that tag instead. Pull requests only build.
 on:
   push:
@@ -121,6 +122,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The launcher's updater checks every download against this file (docs/updates.md): one line per asset.
+          (cd dist && sha256sum Skylauncher.exe Skylauncher-x86_64.AppImage Skylauncher-macOS.dmg Skylauncher-macOS.zip > SHA256SUMS && cat SHA256SUMS)
           notes="Built from ${GITHUB_SHA::7}. You need your own copy of the game and the SSARecomp runtime next to the launcher; see the README."
           gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "Skylauncher $VERSION" --notes "$notes"

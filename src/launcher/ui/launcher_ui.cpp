@@ -296,6 +296,19 @@ namespace launcher_ui
         SDL_DestroyProperties(properties);
         if (m_window == nullptr)
             return false;
+        // The window's icon (taskbar, Alt-Tab, the Dock).
+        {
+            int iw, ih, channels;
+            if (stbi_uc* pixels = stbi_load_from_memory(g_embeddedIcon, int(g_embeddedIconSize), &iw, &ih, &channels, 4))
+            {
+                if (SDL_Surface* icon = SDL_CreateSurfaceFrom(iw, ih, SDL_PIXELFORMAT_RGBA32, pixels, iw * 4))
+                {
+                    SDL_SetWindowIcon(m_window, icon);
+                    SDL_DestroySurface(icon);
+                }
+                stbi_image_free(pixels);
+            }
+        }
         // Sized once the window knows its display's scale, then shown.
         UpdateUiScale(true);
         SDL_ShowWindow(m_window);
