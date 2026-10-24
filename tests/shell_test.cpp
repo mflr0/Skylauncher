@@ -326,6 +326,58 @@ namespace
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(!manager.Snapshot().kitNewer);
+        // The kit download INSTALL starts with: the release of this launcher's tag, else the latest, verified, then found.
+        auto setEnv = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
+        setEnv("SKYLAUNCHER_DATA", (updates / "data").string());
+        std::string launcherTag = "v" + LauncherVersion();
+        std::string dlZip = MakeZip(updates / "dl" / KitAssetName(), { { "ssa-kit/", "" }, { "ssa-kit/SSABuild", "dl kit" }, { "ssa-kit/SSABuild.exe", "dl kit" }, { "ssa-kit/kit.txt", "build=b9\n" } });
+        MakeRelease(updates / "dl", launcherTag, { { KitAssetName(), dlZip } }, {});
+        std::filesystem::create_directories(updates / "dl-other");
+        std::filesystem::copy_file(updates / "dl" / "latest.json", updates / "dl-other" / (launcherTag + ".json"));
+        MakeRelease(updates / "dl-other", "v77.0.0", { { KitAssetName(), "wrong zip" } }, {}); // the latest: must not be used
+        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-other" / "latest.json"));
+        std::string kitError, kitTag;
+        uint64_t lastBytes = 0;
+        std::filesystem::path kitDir = DownloadKit("x/y", launcherTag, DownloadedKitsFolder(), [&](uint64_t bytes, uint64_t) { lastBytes = bytes; }, nullptr, kitError, &kitTag);
+        SHELL_EXPECT(!kitDir.empty() && kitDir == DownloadedKitsFolder() / launcherTag && kitTag == launcherTag && lastBytes == dlZip.size());
+        SHELL_EXPECT(ReadBytes(kitDir / "SSABuild") == "dl kit" && !std::filesystem::exists(DownloadedKitsFolder() / ".download"));
+        auto found = FindInstallKit({});
+        SHELL_EXPECT(found && found->folder == kitDir && found->version == "b9");
+        // A newer downloaded kit wins, whatever the folder dates are.
+        WriteBytes(DownloadedKitsFolder() / "v0.10.0" / "SSABuild", "newer");
+        WriteBytes(DownloadedKitsFolder() / "v0.10.0" / "SSABuild.exe", "newer");
+        found = FindInstallKit({});
+        SHELL_EXPECT(found && found->folder == DownloadedKitsFolder() / "v0.10.0");
+        std::filesystem::remove_all(DownloadedKitsFolder() / "v0.10.0");
+        // No release of that tag: the latest.
+        std::string latestZip = MakeZip(updates / "dl-latest" / KitAssetName(), { { "SSABuild", "latest kit" }, { "SSABuild.exe", "latest kit" } });
+        MakeRelease(updates / "dl-latest", "v77.0.0", { { KitAssetName(), latestZip } }, {});
+        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-latest" / "latest.json"));
+        kitDir = DownloadKit("x/y", launcherTag, updates / "data2" / "kit", {}, nullptr, kitError);
+        SHELL_EXPECT(kitDir == updates / "data2" / "kit" / "v77.0.0" && ReadBytes(kitDir / "SSABuild") == "latest kit");
+        // A bad hash and a SHA256SUMS without the line are refused, and nothing is left behind.
+        MakeRelease(updates / "dl-bad", "v78.0.0", { { KitAssetName(), latestZip } }, { { KitAssetName(), std::string(64, 'b') } });
+        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-bad" / "latest.json"));
+        kitDir = DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError);
+        SHELL_EXPECT(kitDir.empty() && kitError.find("SHA-256") != std::string::npos && !std::filesystem::exists(updates / "data3" / "kit" / "v78.0.0"));
+        MakeRelease(updates / "dl-line", "v79.0.0", { { KitAssetName(), latestZip }, { "other.bin", "x" } }, {});
+        WriteBytes(updates / "dl-line" / "SHA256SUMS", Sha("x") + "  other.bin\n");
+        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-line" / "latest.json"));
+        kitDir = DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError);
+        SHELL_EXPECT(kitDir.empty() && kitError.find("doesn't list") != std::string::npos);
+        MakeRelease(updates / "dl-noasset", "v80.0.0", { { "Skylauncher.exe", "x" } }, {});
+        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-noasset" / "latest.json"));
+        SHELL_EXPECT(DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError).empty() && kitError.find(KitAssetName()) != std::string::npos);
+        // On a thread, as the card polls it.
+        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-latest" / "latest.json"));
+        KitDownloader downloader;
+        downloader.Start("x/y", launcherTag, updates / "data4" / "kit");
+        for (int i = 0; i < 500 && downloader.Running(); i++)
+            SDL_Delay(20);
+        KitDownloader::Snapshot_ result = downloader.Snapshot();
+        SHELL_EXPECT(result.state == KitDownloader::State::Done && result.tag == "v77.0.0" && std::filesystem::exists(result.folder / "SSABuild"));
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA");
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL");
         printf("Updater: versions, release JSON, SHA-256 check, swap with rollback, kit zip and the manager checked\n");
     }
