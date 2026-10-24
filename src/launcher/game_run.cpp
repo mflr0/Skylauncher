@@ -239,7 +239,14 @@ PortalProbeResult ParsePortalProbe(const std::string& output)
                         return value;
                 return std::string();
             };
-            if (get("done") == "true")
+            if (!get("transport").empty() && get("available") == "false")
+            {
+                std::string why = get("status");
+                if (why.starts_with("error: "))
+                    why.erase(0, 7);
+                result.notes.push_back(std::string(get("transport") == "usb" ? "USB (Xbox) portals" : "HID portals") + " can't be used: " + why);
+            }
+            else if (get("done") == "true")
                 result.ran = true;
             else if (!get("kind").empty())
             {

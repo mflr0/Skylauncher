@@ -44,6 +44,7 @@ struct PortalProbeResult
     bool ran = false;    // the runtime started and printed its final line
     std::string error;   // when it didn't
     std::vector<PortalProbeEntry> portals;
+    std::vector<std::string> notes; // transports that can't be used at all here ("USB portals can't be used: libusb-1.0 not found")
 };
 // Parses the probe's output (the part tests and the UI share).
 PortalProbeResult ParsePortalProbe(const std::string& output);

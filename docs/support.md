@@ -34,7 +34,7 @@ and reads its stdout, at most 15 s:
 {"done":true,"count":1}
 ```
 
-One flat JSON object per line (`kind` `hid` or `usb`, `opened`, `status` `ok` or `error: <why>`; `name` is read as `product`
+Transport lines (`{"transport":"usb","available":false,"status":"error: ..."}`) become a note under the result. One flat JSON object per line (`kind` `hid` or `usb`, `opened`, `status` `ok` or `error: <why>`; `name` is read as `product`
 too), then the `done` line; anything else on stdout is ignored. The card lists each portal ("Found" / "Found, not usable"
 with the reason) and says what the game will do given the mode: real portal, virtual portal, or waiting for one. No
 portal: "No portal found: the game will use the virtual portal". A runtime without `--portal-probe` exits with code 2: "This

@@ -65,6 +65,12 @@ namespace launcher_ui
                 ImGui::PopFont();
             }
         }
+        for (const std::string& note : result.notes)
+        {
+            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", note.c_str());
+            ImGui::PopFont();
+        }
         bool good = false;
         std::string verdict = PortalVerdict(mode, result, good);
         ImGui::TextColored(ImColor(Rgb(good ? Ok : TextSecondary)), "%s", verdict.c_str());
