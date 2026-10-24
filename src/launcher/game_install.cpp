@@ -273,9 +273,13 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     std::ofstream(m_logFile, std::ios::trunc);
 
     std::string program = Utf8(kit->ssabuild), outText = Utf8(out), kitText = Utf8(kit->folder);
-    const char* arguments[] = { program.c_str(), "--iso", iso.c_str(), "--out", outText.c_str(), "--kit", kitText.c_str(), nullptr };
+    std::vector<const char*> arguments{ program.c_str(), "--iso", iso.c_str(), "--out", outText.c_str(), "--kit", kitText.c_str() };
+    const char* jobs = SDL_getenv("SKYLAUNCHER_BUILD_JOBS"); // else SSABuild picks
+    if (jobs != nullptr && *jobs != 0)
+        arguments.insert(arguments.end(), { "--jobs", jobs });
+    arguments.push_back(nullptr);
     SDL_PropertiesID properties = SDL_CreateProperties();
-    SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, arguments);
+    SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, arguments.data());
     SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
     SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
     SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);

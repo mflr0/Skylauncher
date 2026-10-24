@@ -21,7 +21,7 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
 
 Cancel stops only the process the launcher started: SIGTERM then SIGKILL after 3 s on macOS and Linux; on Windows
 SSABuild runs in a job object, so the compilers it started stop with it (also when the launcher is closed).
-SSABuild's output is also written to `install.log` in the game folder.
+SSABuild's output is also written to `install.log` in the game folder. `SKYLAUNCHER_BUILD_JOBS=N` passes `--jobs N`.
 
 ## Where things are
 
