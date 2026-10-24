@@ -1,0 +1,301 @@
+#include "figure_tag.h"
+#include "figure_crypto.h"
+#include <cstring>
+
+namespace figures
+{
+    namespace
+    {
+        constexpr char KeyConstant[] = " Copyright (C) 2010 Activision. All Rights Reserved. ";
+        constexpr size_t AreaBlocks[2] = { 0x08, 0x24 };
+        constexpr size_t AreaSpan = 9 * FigureBlockSize; // 7 data blocks and the 2 trailers between them
+        constexpr uint8_t AccessReadOnly[4] = { 0x0F, 0x0F, 0x0F, 0x69 };
+        constexpr uint8_t AccessReadWrite[4] = { 0x7F, 0x0F, 0x08, 0x69 };
+
+        bool IsTrailer(size_t block) { return block % 4 == 3; }
+        bool IsZero(const uint8_t* data, size_t size)
+        {
+            for (size_t i = 0; i < size; i++)
+            {
+                if (data[i] != 0)
+                    return false;
+            }
+            return true;
+        }
+
+        Aes128 BlockCipher(const FigureData& tag, size_t block)
+        {
+            uint8_t input[0x20 + 1 + sizeof(KeyConstant) - 1];
+            memcpy(input, tag.data(), 0x20);
+            input[0x20] = uint8_t(block);
+            memcpy(input + 0x21, KeyConstant, sizeof(KeyConstant) - 1);
+            Md5Digest key = Md5(input, sizeof(input));
+            return Aes128(key.data());
+        }
+
+        uint16_t Le16(const uint8_t* p) { return uint16_t(p[0] | p[1] << 8); }
+        uint32_t Le32(const uint8_t* p) { return p[0] | p[1] << 8 | p[2] << 16 | uint32_t(p[3]) << 24; }
+        void Put16(uint8_t* p, uint32_t v) { p[0] = uint8_t(v); p[1] = uint8_t(v >> 8); }
+        void Put32(uint8_t* p, uint32_t v) { Put16(p, v); Put16(p + 2, v >> 16); }
+
+        Date ReadDate(const uint8_t* p) { return { p[0], p[1], p[2], p[3], Le16(p + 4) }; }
+        void WriteDate(uint8_t* p, const Date& date)
+        {
+            p[0] = date.minute;
+            p[1] = date.hour;
+            p[2] = date.day;
+            p[3] = date.month;
+            Put16(p + 4, date.year);
+        }
+
+        // The three checksums of an area (`a` = its first byte), CRC-16/CCITT-FALSE, little-endian:
+        // 0x0E: the first block with 05 00 in place of the checksum itself;
+        // 0x0C: the next two data blocks and the one after the trailer (0x10-0x2F, 0x40-0x4F);
+        // 0x0A: the last three data blocks (0x50-0x6F, 0x80-0x8F) followed by 0xE0 zero bytes.
+        uint16_t HeaderChecksum(const uint8_t* a)
+        {
+            uint8_t header[16];
+            memcpy(header, a, 16);
+            header[0x0E] = 0x05;
+            header[0x0F] = 0x00;
+            return FigureChecksum(header, sizeof(header));
+        }
+
+        uint16_t FirstChecksum(const uint8_t* a)
+        {
+            uint8_t data[0x30];
+            memcpy(data, a + 0x10, 0x20);
+            memcpy(data + 0x20, a + 0x40, 0x10);
+            return FigureChecksum(data, sizeof(data));
+        }
+
+        uint16_t SecondChecksum(const uint8_t* a)
+        {
+            uint8_t data[0x110] = {};
+            memcpy(data, a + 0x50, 0x20);
+            memcpy(data + 0x20, a + 0x80, 0x10);
+            return FigureChecksum(data, sizeof(data));
+        }
+
+        bool AreaValid(const uint8_t* a)
+        {
+            return Le16(a + 0x0E) == HeaderChecksum(a) && Le16(a + 0x0C) == FirstChecksum(a) && Le16(a + 0x0A) == SecondChecksum(a);
+        }
+
+        void SealArea(uint8_t* a)
+        {
+            Put16(a + 0x0A, SecondChecksum(a));
+            Put16(a + 0x0C, FirstChecksum(a));
+            Put16(a + 0x0E, HeaderChecksum(a));
+        }
+
+        bool AreaBlank(const uint8_t* a)
+        {
+            for (size_t offset = 0; offset < AreaSpan; offset += FigureBlockSize)
+            {
+                if (!IsTrailer(offset / FigureBlockSize) && !IsZero(a + offset, FigureBlockSize))
+                    return false;
+            }
+            return true;
+        }
+
+        // Index of the area to read, or -1 if neither is valid.
+        int NewestArea(const FigureData& plain)
+        {
+            const uint8_t* a = plain.data() + AreaBlocks[0] * FigureBlockSize;
+            const uint8_t* b = plain.data() + AreaBlocks[1] * FigureBlockSize;
+            bool validA = AreaValid(a), validB = AreaValid(b);
+            if (validA && validB)
+                return uint8_t(a[0x09] + 1) == b[0x09] ? 1 : 0;
+            return validA ? 0 : validB ? 1 : -1;
+        }
+    }
+
+    const uint32_t LevelExperience[MaxLevel] = { 0, 1000, 2200, 3800, 6000, 9000, 13000, 18200, 24800, 33000 };
+
+    int LevelForExperience(uint32_t experience)
+    {
+        int level = 1;
+        while (level < MaxLevel && experience >= LevelExperience[level])
+            level++;
+        return level;
+    }
+
+    FigureData Decrypt(const FigureData& tag)
+    {
+        FigureData plain = tag;
+        for (size_t block = 8; block < FigureBlockCount; block++)
+        {
+            uint8_t* data = plain.data() + block * FigureBlockSize;
+            if (!IsTrailer(block) && !IsZero(data, FigureBlockSize))
+                BlockCipher(tag, block).Decrypt(data, data);
+        }
+        return plain;
+    }
+
+    FigureData Encrypt(const FigureData& plain)
+    {
+        // Every block of an area in use is encrypted, zero or not (the title does the same); other zero blocks are
+        // left zero, as on a new figure.
+        bool areaUsed[2];
+        for (int i = 0; i < 2; i++)
+            areaUsed[i] = !AreaBlank(plain.data() + AreaBlocks[i] * FigureBlockSize);
+
+        FigureData tag = plain;
+        for (size_t block = 8; block < FigureBlockCount; block++)
+        {
+            if (IsTrailer(block))
+                continue;
+            uint8_t* data = tag.data() + block * FigureBlockSize;
+            bool inUsedArea = false;
+            for (int i = 0; i < 2; i++)
+                inUsedArea |= areaUsed[i] && block >= AreaBlocks[i] && block < AreaBlocks[i] + AreaSpan / FigureBlockSize;
+            if (inUsedArea || !IsZero(data, FigureBlockSize))
+                BlockCipher(plain, block).Encrypt(data, data);
+        }
+        return tag;
+    }
+
+    uint16_t ToyType(const FigureData& tag) { return Le16(&tag[0x10]); }
+    uint16_t Variant(const FigureData& tag) { return Le16(&tag[0x1C]); }
+
+    void WriteSectorKeys(FigureData& tag)
+    {
+        for (int sector = 0; sector < int(FigureBlockCount / 4); sector++)
+        {
+            uint8_t* trailer = tag.data() + (sector * 4 + 3) * FigureBlockSize;
+            std::array<uint8_t, 6> key = SectorKeyA(tag.data(), sector);
+            memcpy(trailer, key.data(), key.size());
+            memcpy(trailer + 6, sector == 0 ? AccessReadOnly : AccessReadWrite, 4);
+        }
+    }
+
+    FigureData CreateFigure(uint16_t toyType, uint16_t variant)
+    {
+        FigureData tag = CreateBlankFigure(toyType, variant);
+        WriteSectorKeys(tag);
+        return tag;
+    }
+
+    AreaState ReadStats(const FigureData& tag, FigureStats& stats)
+    {
+        FigureData plain = Decrypt(tag);
+        int area = NewestArea(plain);
+        stats = {};
+        if (area < 0)
+        {
+            bool blank = AreaBlank(plain.data() + AreaBlocks[0] * FigureBlockSize) && AreaBlank(plain.data() + AreaBlocks[1] * FigureBlockSize);
+            return blank ? AreaState::Blank : AreaState::Damaged;
+        }
+
+        const uint8_t* a = plain.data() + AreaBlocks[area] * FigureBlockSize;
+        stats.experience = a[0] | a[1] << 8 | a[2] << 16;
+        stats.gold = Le16(a + 0x03);
+        stats.playSeconds = Le32(a + 0x05);
+        stats.sequence = a[0x09];
+        stats.upgrades = Le16(a + 0x10);
+        stats.platforms = a[0x13];
+        stats.hat = Le16(a + 0x14);
+        memcpy(stats.owner.data(), a + 0x18, stats.owner.size());
+        for (size_t i = 0; i < 16; i++)
+        {
+            char16_t unit = char16_t(Le16(a + (i < 8 ? 0x20 + i * 2 : 0x40 + (i - 8) * 2)));
+            if (unit == 0)
+                break;
+            stats.nickname += unit;
+        }
+        stats.lastPlaced = ReadDate(a + 0x50);
+        stats.heroicChallenges = Le32(a + 0x56);
+        stats.heroPoints = Le16(a + 0x5A);
+        stats.lastReset = ReadDate(a + 0x60);
+        return AreaState::Valid;
+    }
+
+    void WriteStats(FigureData& tag, const FigureStats& stats)
+    {
+        // Start from the area the title would read, so that bytes this editor does not know about are kept.
+        FigureData plain = Decrypt(tag);
+        int newest = NewestArea(plain);
+        uint8_t area[AreaSpan] = {};
+        if (newest >= 0)
+            memcpy(area, plain.data() + AreaBlocks[newest] * FigureBlockSize, AreaSpan);
+
+        uint8_t* a = area;
+        a[0] = uint8_t(stats.experience);
+        a[1] = uint8_t(stats.experience >> 8);
+        a[2] = uint8_t(stats.experience >> 16);
+        Put16(a + 0x03, stats.gold);
+        Put32(a + 0x05, stats.playSeconds);
+        Put16(a + 0x10, stats.upgrades);
+        a[0x13] = stats.platforms;
+        Put16(a + 0x14, stats.hat);
+        memcpy(a + 0x18, stats.owner.data(), stats.owner.size());
+        memset(a + 0x20, 0, 0x10);
+        memset(a + 0x40, 0, 0x10);
+        for (size_t i = 0; i < stats.nickname.size() && i < 16; i++)
+            Put16(a + (i < 8 ? 0x20 + i * 2 : 0x40 + (i - 8) * 2), stats.nickname[i]);
+        WriteDate(a + 0x50, stats.lastPlaced);
+        Put32(a + 0x56, stats.heroicChallenges);
+        Put16(a + 0x5A, stats.heroPoints);
+        WriteDate(a + 0x60, stats.lastReset);
+
+        // Area A gets sequence + 1 and area B sequence + 2, so B is the newer copy and both hold the same data.
+        for (int i = 0; i < 2; i++)
+        {
+            uint8_t* target = plain.data() + AreaBlocks[i] * FigureBlockSize;
+            for (size_t offset = 0; offset < AreaSpan; offset += FigureBlockSize)
+            {
+                if (!IsTrailer(AreaBlocks[i] + offset / FigureBlockSize))
+                    memcpy(target + offset, a + offset, FigureBlockSize);
+            }
+            target[0x09] = uint8_t(stats.sequence + 1 + i);
+            SealArea(target);
+        }
+        tag = Encrypt(plain);
+    }
+
+    std::string NicknameUtf8(const FigureStats& stats)
+    {
+        std::string text;
+        for (char16_t unit : stats.nickname)
+        {
+            uint32_t c = unit;
+            if (c < 0x80)
+                text += char(c);
+            else if (c < 0x800)
+            {
+                text += char(0xC0 | (c >> 6));
+                text += char(0x80 | (c & 0x3F));
+            }
+            else
+            {
+                text += char(0xE0 | (c >> 12));
+                text += char(0x80 | ((c >> 6) & 0x3F));
+                text += char(0x80 | (c & 0x3F));
+            }
+        }
+        return text;
+    }
+
+    void SetNicknameUtf8(FigureStats& stats, const std::string& text)
+    {
+        // Characters of the Basic Multilingual Plane only (the title's fonts have no others).
+        stats.nickname.clear();
+        for (size_t i = 0; i < text.size() && stats.nickname.size() < 16;)
+        {
+            uint8_t lead = uint8_t(text[i]);
+            uint32_t c;
+            size_t length;
+            if (lead < 0x80) { c = lead; length = 1; }
+            else if ((lead & 0xE0) == 0xC0) { c = lead & 0x1F; length = 2; }
+            else if ((lead & 0xF0) == 0xE0) { c = lead & 0x0F; length = 3; }
+            else { c = '?'; length = (lead & 0xF8) == 0xF0 ? 4 : 1; }
+            if (i + length > text.size())
+                break;
+            for (size_t k = 1; k < length && length < 4; k++)
+                c = (c << 6) | (uint8_t(text[i + k]) & 0x3F);
+            stats.nickname += char16_t(c);
+            i += length;
+        }
+    }
+}

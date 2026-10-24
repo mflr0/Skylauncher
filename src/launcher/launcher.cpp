@@ -296,6 +296,9 @@ TitleMetadata ReadTitleMetadata(const std::vector<uint8_t>& xex)
 
 std::string LauncherConfigPath()
 {
+    // Tests point the launcher and the game at the same scratch file (the runtime reads this name too).
+    if (const char* file = SDL_getenv("SSA_LAUNCHER_INI"))
+        return file;
     char* directory = SDL_GetPrefPath("", g_launcherName);
     if (directory == nullptr)
         return {};

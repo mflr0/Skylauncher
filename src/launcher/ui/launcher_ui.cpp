@@ -4,7 +4,6 @@
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/embedded_fonts.h"
-#include "shared/figures/figure_catalog.h"
 #include "assets/launcher_assets.h"
 #include "launcher/theme/launcher_theme.h"
 #include "shared/vfs.h"
@@ -344,6 +343,7 @@ namespace launcher_ui
             m_testInstall = SDL_getenv("SSA_LAUNCHER_TEST_INSTALL") != nullptr;
             m_testReal = m_testInstall && std::string_view(SDL_getenv("SSA_LAUNCHER_TEST_INSTALL")) == "real";
             m_testUpdate = SDL_getenv("SSA_LAUNCHER_TEST_UPDATE") != nullptr;
+            m_testCollection = SDL_getenv("SSA_LAUNCHER_TEST_COLLECTION") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -359,7 +359,7 @@ namespace launcher_ui
             ImGui_ImplSDL3_Shutdown();
             ImGui::DestroyContext();
         }
-        ClearFigureIcons();
+        m_collection->ClearIcons();
         for (SDL_Texture* texture : { m_icon, m_logo, m_background, m_github })
             if (texture != nullptr)
                 SDL_DestroyTexture(texture);
@@ -456,11 +456,10 @@ namespace launcher_ui
             break;
         case SDL_EVENT_DROP_FILE:
             m_dragOver = false;
-            if (event.drop.data != nullptr && figures::IsFigureFileName(std::filesystem::path(event.drop.data).filename()))
-            {
-                m_page = Page::Collection; // a figure dump joins the collection
-                ImportFigureFile(event.drop.data);
-            }
+            // Figure dumps (or, on the collection page, folders of them) join the collection.
+            if (event.drop.data != nullptr && (collection::IsDumpName(std::filesystem::path(event.drop.data).filename().string()) ||
+                (m_page == Page::Collection && std::filesystem::is_directory(event.drop.data))) && m_collection->Drop(event.drop.data))
+                m_page = Page::Collection;
             else if (event.drop.data != nullptr && m_installer.Running())
                 Toast("Wait for the installation to finish");
             else if (event.drop.data != nullptr)
@@ -555,7 +554,7 @@ namespace launcher_ui
             m_assets.ExtractFromDisc(disc, m_meta);
             m_assets.ExtractFigurePortraits(disc);
         }
-        ClearFigureIcons(); // the collection's pictures now come from the disc
+        m_collection->ClearIcons(); // the collection's pictures now come from the disc
         if (LauncherAssets::Asset logo = m_assets.Get(LauncherAssets::Role::Logo); logo.valid)
             m_logo = LoadPngFile(m_renderer, logo.path);
         if (LauncherAssets::Asset background = m_assets.Get(LauncherAssets::Role::HeroBackground); background.valid)
@@ -621,32 +620,6 @@ namespace launcher_ui
         }
         else
             Set("input", "device", value);
-    }
-
-    std::vector<std::string> App::StartupFigures() const
-    {
-        std::vector<std::string> files;
-        std::string list = SettingGet(m_config, "portal", "place");
-        for (size_t begin = 0; begin < list.size();)
-        {
-            size_t end = std::min(list.find(',', begin), list.size());
-            if (end > begin)
-                files.push_back(list.substr(begin, end - begin));
-            begin = end + 1;
-        }
-        return files;
-    }
-
-    void App::SetStartupFigure(const std::string& file, bool on)
-    {
-        std::vector<std::string> files = StartupFigures();
-        files.erase(std::remove(files.begin(), files.end(), file), files.end());
-        if (on)
-            files.push_back(file);
-        std::string list;
-        for (const std::string& name : files)
-            list += (list.empty() ? "" : ",") + name;
-        Set("portal", "place", list);
     }
 
     // ---- Widgets -------------------------------------------------------------------------------------------------
@@ -1377,7 +1350,11 @@ namespace launcher_ui
         };
         folder("Saves and settings", "");
         ImGui::SameLine();
-        folder("Figures", "figures");
+        if (PillButton("Figures", false, 260))
+        {
+            SDL_CreateDirectory(m_collection->Folder().c_str());
+            { std::string folder = m_collection->Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
+        }
         ImGui::Dummy(ImVec2(0, 16));
         Title("Support", TitleSize, Text);
         DrawLogs();
@@ -1524,7 +1501,7 @@ namespace launcher_ui
         {
         case Page::Home: DrawHome(); break;
         case Page::Play: DrawPlay(); break;
-        case Page::Collection: DrawCollection(); break;
+        case Page::Collection: m_collection->Draw(); break;
         case Page::Settings: DrawSettings(); break;
         }
         if (m_page == Page::Home || m_page == Page::Play) // Settings has its own Language tab, the collection its buttons there
@@ -1548,7 +1525,9 @@ namespace launcher_ui
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-installing-compile", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
-            if (m_testReal)
+            if (m_testCollection)
+                Screenshot(CollectionPage::TestShotName(m_testStep));
+            else if (m_testReal)
                 Screenshot(fmt::format("30-real-{:02}", m_testStep).c_str());
             else if (m_testUpdate)
                 Screenshot(UpdateNames[std::min<int>(m_testStep, int(std::size(UpdateNames)) - 1)]);
@@ -1593,6 +1572,21 @@ namespace launcher_ui
             TestUpdateScript(now);
             return;
         }
+        if (m_testCollection)
+        {
+            // The collection's screens, in the scratch collection SSA_COLLECTION names.
+            if (m_testStep >= CollectionPage::TestShotCount())
+                m_running = false;
+            else
+            {
+                if (m_testStep == 0)
+                    m_collection->Seed();
+                m_page = Page::Collection;
+                m_collection->TestScreen(m_testStep);
+                m_testAt = now + 700;
+            }
+            return;
+        }
         switch (m_testStep)
         {
         case 0:
@@ -1615,17 +1609,11 @@ namespace launcher_ui
             m_testAt = now + 400;
             break;
         case 4:
-            // A few figures to show, in the test's own settings folder: a character, a legendary, a sidekick, an item
-            // and an adventure pack; one starts on the portal.
-            if (std::error_code error; !std::filesystem::exists(FiguresFolder(), error))
-            {
-                for (uint16_t toyType : { 14, 416, 28, 505, 200, 300 })
-                    figures::NewFigure(FiguresFolder(), *figures::FindToy(toyType));
-                SetStartupFigure("014 Gill Grunt.sky", true);
-                SetFavourite("416 Legendary Spyro.sky", true);
-            }
-            m_collectionLoaded = false;
+            // A few figures to show, in the test's own collection: characters, a legendary, a sidekick, an item and an
+            // adventure pack; some sit on the next session's seats.
+            m_collection->Seed();
             m_page = Page::Collection;
+            m_collection->TestScreen(0);
             m_testAt = now + 600;
             break;
         case 5:
@@ -1634,15 +1622,11 @@ namespace launcher_ui
             break;
         case 6:
             m_page = Page::Collection;
-            m_sheetFile = "416 Legendary Spyro.sky";
+            m_collection->TestScreen(3);
             m_testAt = now + 600;
             break;
         case 7:
-            m_sheetFile.clear();
-            m_newFigureOpen = true;
-            m_newCategory = int(figures::Category::Skylander);
-            m_newBase = 16;
-            m_newVariant = 416;
+            m_collection->TestScreen(6);
             m_testAt = now + 600;
             break;
         default:

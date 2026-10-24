@@ -17,13 +17,12 @@ is easy to iterate without touching the game runtime.
   `game_run.{h,cpp}`, `ui/support_page.cpp` - game logs, the crash dialog, the portal test (docs/support.md);
   `updater.{h,cpp}`, `ui/update_page.cpp` - updates, the banner and About (docs/updates.md);
   `shared/mini_json.{h,cpp}` - the JSON reader for GitHub's answer.
-- `src/launcher/ui/collection_page.cpp` - the collection: grid, filters, figure sheet, figure creator, import, portal.
+- `src/launcher/ui/collection_*.{h,cpp}` - the collection page on the shared library: seats, sections, View, Figure page, Add a figure, Manage (`docs/collection_ui.md`).
 - `src/assets/launcher_assets.{h,cpp}` - reads frontend art from the player's disc, decodes it and caches it.
 - `src/shared/` - what isn't the launcher's alone: the disc reader (`vfs`), the platform layer, `stb_impl.cpp`, the embedded fonts
   and the figure engine.
-- `src/shared/figures/` - the figure engine: `figure_catalog` (every toy: game, category, variant, element, portraits),
-  `figure_file` (the tag dump: header, encryption, progress), `figure_collection` (the folder: import, create, backups, locks),
-  `figure_icons` (generated icons and their `IconStyle`).
+- `src/shared/collection/` and `src/shared/figures/` - SSARecomp's collection library (copied by `tools/sync_collection.sh`:
+  tag, crypto, catalogue, folder, locks, backups) and the launcher's `figure_icons` (generated icons and their `IconStyle`).
 - `lib/` - third-party code (SDL, Dear ImGui, XenonRecomp as submodules; stb and miniz vendored).
 - `resources/fonts/` - licensed fonts (Bungee, Outfit) with their OFL licences; they are also built into the executable.
 - `docs/settings.md` - the settings file the launcher writes and the game reads.
@@ -42,22 +41,10 @@ selected until the player clicks one in the sidebar.
    goes back to Play.
 
 ## Collection
-- The grid: every figure file with its icon, name (the nickname when it has one), level and gold, and badges for the variant
-  (Legendary, Dark...), favourite, "starts on the portal" and "in use" (a running game holds it: see docs/settings.md).
-- Filters: category chips with counts (Skylanders, Giants, Swap Force, Trap Masters, Minis, Traps, Vehicles, Magic items,
-  Adventure packs, Imaginators, Creation crystals), "Playable in" a game, favourites, and a search over names, nicknames
-  and file names.
-- The portal bar: virtual or real portal (`[portal] mode`) and the figures that start on it (`[portal] place`).
-- The figure sheet (click a figure): its picture, what it is, the games it plays in, its progress read from the figure (level,
-  experience, gold, nickname, hat, upgrades, play time), and rename, favourite, on the portal at start, back up, restore,
-  reset and delete (with confirmation; a backup is kept before every change). Nothing can be changed while a game uses it.
-- + New figure: a category, a figure, its variant; the figure engine writes a new, never played figure.
-- Import... (or drop files on the window): .sky, .bin and .dmp dumps join the collection after a check.
-- Icons: the disc's portraits (`toy_<name>_hud` and `<name>_vs` in `uigameimage.str`, cached in `launcher-cache/<titleid>/figures/`)
-  once a disc is verified; otherwise a generated icon (shape by category, element colour, variant badge, initials). Its
-  look is `figures::IconStyle`.
-- Only Spyro's Adventure's toys are in the catalogue; the other games' categories are there, empty until their toys are added
-  from a verified source. Later: give the game's Toy Box the same look, since it shows the same collection.
+See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favourites, backups
+and six-game catalogue) with the Toy Box's organisation: the seats of the next session, My Skylanders in sections, the
+View menu, the Figure page, Add a figure and Manage. The icons are the disc's portraits when cached, else the generated
+ones (`figures::IconStyle`).
 
 ## Disc art
 The launcher never ships Skylanders artwork. After an ISO is verified it:
@@ -112,13 +99,14 @@ The launcher can drive itself without opening a visible window:
 SDL_VIDEO_DRIVER=offscreen \
 CFFIXED_USER_HOME="$PWD/private/launcher-home" \
 HOME="$PWD/private/launcher-home" \
+SSA_LAUNCHER_INI="$PWD/private/launcher-home/launcher.ini" \
 SSA_LAUNCHER_SHOTS="$PWD/private/launcher-shots" \
 SSA_LAUNCHER_TEST_DROP="/path/to/game.iso" \
 SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ./build/Skylauncher.app/Contents/MacOS/Skylauncher
 ```
 It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
-`07-figure-sheet.png` and `08-new-figure.png` (it creates a few figures in its own settings folder first).
+`07-figure-sheet.png` and `08-new-figure.png` (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
 With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
 (`docs/install.md`).
 
