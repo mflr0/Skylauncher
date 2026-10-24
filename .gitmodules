@@ -1,9 +1,9 @@
 [submodule "thirdparty/SDL"]
-	path = thirdparty/SDL
+	path = lib/SDL
 	url = https://github.com/libsdl-org/SDL.git
 [submodule "thirdparty/XenonRecomp"]
-	path = thirdparty/XenonRecomp
+	path = lib/XenonRecomp
 	url = https://github.com/hedge-dev/XenonRecomp.git
 [submodule "thirdparty/imgui"]
-	path = thirdparty/imgui
+	path = lib/imgui
 	url = https://github.com/ocornut/imgui.git
