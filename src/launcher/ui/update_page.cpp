@@ -59,21 +59,12 @@ namespace launcher_ui
         }
         UpdateManager::Settings settings;
         settings.repo = SettingGet(m_config, "update", "repo", "mflr0/Skylauncher");
-        settings.kitRepo = SettingGet(m_config, "update", "kit_repo");
+        settings.kitRepo = SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher");
         settings.kitInstalled = SettingGet(m_config, "update", "kit_tag", m_kit ? m_kit->release : std::string());
-        settings.kitFolder = m_kit ? m_kit->folder : std::filesystem::path();
-        if (settings.kitFolder.empty())
-            if (const char* base = SDL_GetBasePath())
-            {
-                std::filesystem::path folder(std::u8string(base, base + strlen(base)));
-                if (folder.filename().empty())
-                    folder = folder.parent_path();
-                if (folder.filename() == "Resources" && folder.parent_path().filename() == "Contents") // next to the .app
-                    folder = folder.parent_path().parent_path().parent_path();
-                else
-                    folder = folder.parent_path() / folder.filename();
-                settings.kitFolder = folder / "ssa-kit";
-            }
+        settings.kitRoot = DownloadedKitsFolder();
+        // A kit next to the launcher (development, offline) is updated in place; a downloaded one gets its own kit/<tag>/.
+        if (m_kit && m_kit->folder.parent_path() != settings.kitRoot)
+            settings.kitFolder = m_kit->folder;
         m_updateWasBusy = true;
         m_updates.Check(settings);
     }
@@ -98,7 +89,7 @@ namespace launcher_ui
             {
                 Set("update", "kit_tag", state.kit.tag);
                 RefreshInstall();
-                if (m_disc == DiscState::Ready && !m_installer.Running())
+                if (m_disc == DiscState::Ready && !Installing())
                     StartInstall(); // the new kit builds the game
             }
         }

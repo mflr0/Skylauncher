@@ -120,7 +120,29 @@ namespace launcher_ui
         m_installLog = false;
         m_installPast = {};
         m_installPastPid = 0;
+        m_kitUsed = false;
+        m_kitError.clear();
         m_page = Page::Play;
+        if (m_kit)
+            StartInstaller();
+        else
+            StartKitDownload();
+    }
+
+    // No kit next to the launcher or downloaded yet: the first step of the install fetches it (docs/install.md).
+    void App::StartKitDownload()
+    {
+        m_kitUsed = true;
+        m_kitStep = { "kit", "Downloading the game tools", SDL_GetTicks(), 0 };
+#if defined(_WIN32) || defined(__APPLE__)
+        m_kitDownload.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), "v" + LauncherVersion(), DownloadedKitsFolder());
+#else
+        m_kitError = "The game can't be installed on Linux yet: there is no game kit for Linux.";
+#endif
+    }
+
+    void App::StartInstaller()
+    {
         if (m_installer.Start(m_kit, m_discPath, GameInstallFolder(m_installSha)))
         {
             auto& section = m_config["install." + m_installSha];
@@ -132,6 +154,27 @@ namespace launcher_ui
 
     InstallProgress App::InstallSnapshot(size_t logTail)
     {
+        if (m_kitUsed)
+        {
+            KitDownloader::Snapshot_ kit = m_kitDownload.Snapshot();
+            using Kit = KitDownloader::State;
+            InstallProgress progress;
+            progress.steps.push_back(m_kitStep);
+            if (!m_kitError.empty() || kit.state != Kit::Done)
+            {
+                progress.state = !m_kitError.empty() || kit.state == Kit::Failed ? InstallProgress::State::Failed
+                    : kit.state == Kit::Cancelled                               ? InstallProgress::State::Cancelled
+                                                                                : InstallProgress::State::Running;
+                progress.error = !m_kitError.empty() ? m_kitError : kit.error;
+                progress.done = kit.done >> 20; // MB
+                progress.total = kit.total >> 20;
+                return progress;
+            }
+            // Downloaded: the kit's step, done, then SSABuild's.
+            progress = m_installer.Snapshot(logTail);
+            progress.steps.insert(progress.steps.begin(), m_kitStep);
+            return progress;
+        }
         if (m_installPast.state == InstallProgress::State::Idle)
             return m_installer.Snapshot(logTail);
         InstallProgress progress = m_installPast;
@@ -145,6 +188,29 @@ namespace launcher_ui
         // An SSABuild left running by an earlier launcher: wait for it to stop before offering to resume.
         if (m_installPastPid != 0 && SDL_GetTicks() % 1000 < 20 && !PlatformProcessAlive(m_installPastPid))
             m_installPastPid = 0;
+        if (m_kitUsed && m_kitError.empty() && m_installView && !m_installer.Running() && m_kitStep.endedAt == 0)
+        {
+            KitDownloader::Snapshot_ kit = m_kitDownload.Snapshot();
+            if (kit.state == KitDownloader::State::Done)
+            {
+                m_kitStep.endedAt = SDL_GetTicks();
+                Set("update", "kit_tag", kit.tag);
+                RefreshInstall();
+                if (m_kit)
+                {
+                    m_installKitVersion = m_kit->version;
+                    StartInstaller();
+                }
+                else
+                    m_kitError = "The game tools were downloaded but SSABuild wasn't found in them.";
+            }
+            else if (kit.state == KitDownloader::State::Cancelled)
+            {
+                m_installView = m_kitUsed = false;
+                Toast("Installation cancelled");
+            }
+            return;
+        }
         if (!m_installView || m_installer.Running() || m_installPast.state != InstallProgress::State::Idle)
             return;
         InstallProgress progress = m_installer.Snapshot();
@@ -195,7 +261,7 @@ namespace launcher_ui
             ImGui::SetCursorScreenPos(closeAt);
             if (ImGui::InvisibleButton("##closeinstall", ImVec2(CloseSize, CloseSize)))
             {
-                m_installView = false;
+                m_installView = m_kitUsed = false;
                 SetInstallState(m_installSha, nullptr);
                 m_installPast = {};
             }
@@ -418,6 +484,8 @@ namespace launcher_ui
                 std::string text;
                 if (m_installPast.state == State::Idle)
                     text = m_installer.FullLog();
+                if (m_kitUsed && !progress.error.empty())
+                    text += progress.error + "\n";
                 for (const std::string& line : m_installPast.log)
                     text += line + "\n";
                 SDL_SetClipboardText(text.c_str());
@@ -436,7 +504,10 @@ namespace launcher_ui
         {
             rightButtons(1);
             if (PillButton("Cancel", false, ButtonW))
+            {
                 m_installer.Cancel();
+                m_kitDownload.Cancel();
+            }
         }
         EndCard();
     }

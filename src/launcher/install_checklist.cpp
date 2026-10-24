@@ -15,6 +15,7 @@ namespace
         float weight;
     };
     constexpr KnownStep KnownSteps[] = {
+        { "kit", "Downloading the game tools", 6 }, // only when the launcher fetched the kit itself
         { "toolchain", "Preparing the compiler", 8 },
         { "disc", "Reading the disc", 2 },
         { "recompile", "Translating the game code", 6 },
@@ -31,8 +32,11 @@ InstallChecklist MakeInstallChecklist(const InstallProgress& progress, uint64_t 
 {
     InstallChecklist list;
     std::vector<float> weights;
+    bool downloadedKit = std::any_of(progress.steps.begin(), progress.steps.end(), [](const InstallProgress::Step& step) { return step.id == "kit"; });
     for (const KnownStep& step : KnownSteps)
     {
+        if (!downloadedKit && std::string_view(step.id) == "kit")
+            continue;
         list.rows.push_back({ step.id, step.title });
         weights.push_back(step.weight);
     }
@@ -185,6 +189,8 @@ std::string InstallFailureHeadline(const InstallChecklist& list, const InstallPr
     if (has("cannot write") || has("couldn't create") || has("permission") || has("access is denied"))
         return "A file of the game folder couldn't be written.";
     std::string step = list.current >= 0 ? list.rows[size_t(list.current)].id : std::string();
+    if (step == "kit")
+        return has("linux") ? "The game can't be installed on Linux yet." : "The game tools couldn't be downloaded. Check the internet connection.";
     if (step == "toolchain" && (has("download") || has("curl") || has("http") || has("sha-256") || has("checksum")))
         return "The compiler couldn't be downloaded. Check the internet connection.";
     if (step == "disc")

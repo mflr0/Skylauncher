@@ -309,6 +309,24 @@ std::string LatestReleaseUrl(const std::string& repo)
     return "https://api.github.com/repos/" + repo + "/releases/latest";
 }
 
+fs::path KitFolderFor(const fs::path& kitRoot, const std::string& tag)
+{
+    std::string name;
+    for (char c : tag)
+        name += std::isalnum(static_cast<unsigned char>(c)) || c == '.' || c == '-' || c == '_' ? c : '_';
+    return kitRoot / FromUtf8(name.empty() ? "kit" : name);
+}
+
+std::string TaggedReleaseUrl(const std::string& repo, const std::string& tag)
+{
+    if (const char* url = SDL_getenv("SKYLAUNCHER_UPDATE_URL"); url != nullptr && *url != 0)
+    {
+        std::string base = url;
+        return base.substr(0, base.find_last_of('/') + 1) + tag + ".json";
+    }
+    return "https://api.github.com/repos/" + repo + "/releases/tags/" + tag;
+}
+
 // ---- Download and checks ------------------------------------------------------------------------------------------
 
 HttpResult HttpDownload(const std::string& url, const fs::path& file, const std::function<void(uint64_t)>& progress, const std::atomic<bool>* cancel)
@@ -585,6 +603,91 @@ bool InstallKitZip(const fs::path& zip, const fs::path& kitFolder, std::string& 
     return ok;
 }
 
+fs::path DownloadKit(const std::string& repo, const std::string& tag, const fs::path& kitRoot,
+    const std::function<void(uint64_t, uint64_t)>& progress, const std::atomic<bool>* cancel, std::string& error, std::string* releaseTag)
+{
+    std::error_code fsError;
+    fs::path work = kitRoot / ".download";
+    fs::remove_all(work, fsError);
+    fs::create_directories(work, fsError);
+    ReleaseInfo release;
+    std::string tagError;
+    fs::path file = work / "release.json";
+    // The release of this launcher's version, else the latest one.
+    if (!(HttpDownload(TaggedReleaseUrl(repo, tag), file, {}, cancel).ok && ParseRelease(ReadText(file), release, &tagError)))
+    {
+        HttpResult result = HttpDownload(LatestReleaseUrl(repo), file, {}, cancel);
+        if (result.ok)
+            result.ok = ParseRelease(ReadText(file), release, &result.error);
+        if (!result.ok)
+        {
+            fs::remove_all(work, fsError);
+            error = result.error;
+            return {};
+        }
+    }
+    const ReleaseAsset* asset = FindAsset(release, KitAssetName());
+    if (asset == nullptr)
+    {
+        fs::remove_all(work, fsError);
+        error = fmt::format("The release {} has no {}", release.tag, KitAssetName());
+        return {};
+    }
+    uint64_t size = asset->size;
+    fs::path zip = DownloadVerified(release, KitAssetName(), work, [&](uint64_t bytes) { if (progress) progress(bytes, size); }, cancel, error);
+    fs::path folder;
+    if (!zip.empty())
+    {
+        folder = KitFolderFor(kitRoot, release.tag);
+        if (InstallKitZip(zip, folder, error))
+        {
+            if (releaseTag != nullptr)
+                *releaseTag = release.tag;
+        }
+        else
+            folder.clear();
+    }
+    fs::remove_all(work, fsError);
+    return folder;
+}
+
+void KitDownloader::Join()
+{
+    if (m_thread.joinable())
+        m_thread.join();
+}
+
+KitDownloader::Snapshot_ KitDownloader::Snapshot()
+{
+    std::lock_guard lock(m_mutex);
+    return m_state;
+}
+
+void KitDownloader::Start(const std::string& repo, const std::string& tag, const fs::path& kitRoot)
+{
+    if (m_running)
+        return;
+    Join();
+    m_running = true;
+    m_cancel = false;
+    { std::lock_guard lock(m_mutex); m_state = {}; m_state.state = State::Running; }
+    m_thread = std::thread([this, repo, tag, kitRoot] {
+        std::string error, releaseTag;
+        auto progress = [&](uint64_t bytes, uint64_t size) {
+            std::lock_guard lock(m_mutex);
+            m_state.done = bytes;
+            m_state.total = size;
+        };
+        fs::path folder = DownloadKit(repo, tag, kitRoot, progress, &m_cancel, error, &releaseTag);
+        std::lock_guard lock(m_mutex);
+        m_state.state = !folder.empty() ? State::Done : m_cancel ? State::Cancelled : State::Failed;
+        m_state.error = error;
+        m_state.tag = releaseTag;
+        m_state.folder = folder;
+        m_running = false;
+    });
+}
+
 // ---- The manager --------------------------------------------------------------------------------------------------
 
 void UpdateManager::Join()
@@ -784,6 +887,11 @@ void UpdateManager::UpdateKit()
         fs::path kitFolder;
         { std::lock_guard lock(m_mutex); release = m_state.kit; kitFolder = m_settings.kitFolder; m_state.error.clear(); m_state.note.clear(); }
         std::error_code fsError;
+        if (kitFolder.empty() && !m_settings.kitRoot.empty()) // no kit next to the launcher: a new one goes in kit/<tag>
+        {
+            kitFolder = KitFolderFor(m_settings.kitRoot, release.tag);
+            fs::create_directories(m_settings.kitRoot, fsError);
+        }
         if (kitFolder.empty() || !Writable(kitFolder.parent_path()))
         {
             Fail("The folder next to Skylauncher can't be written to: move Skylauncher somewhere you can write, then try again");

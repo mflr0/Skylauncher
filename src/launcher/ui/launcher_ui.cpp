@@ -460,7 +460,7 @@ namespace launcher_ui
             if (event.drop.data != nullptr && (collection::IsDumpName(std::filesystem::path(event.drop.data).filename().string()) ||
                 (m_page == Page::Collection && std::filesystem::is_directory(event.drop.data))) && m_collection->Drop(event.drop.data))
                 m_page = Page::Collection;
-            else if (event.drop.data != nullptr && m_installer.Running())
+            else if (event.drop.data != nullptr && Installing())
                 Toast("Wait for the installation to finish");
             else if (event.drop.data != nullptr)
             {
@@ -1125,7 +1125,7 @@ namespace launcher_ui
         draw->AddRectFilled(bar, barEnd, Rgb(BottomBar));
         float middle = bar.y + BottomBarH / 2;
 
-        bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying, installing = m_installer.Running();
+        bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying, installing = Installing();
         bool install = ready && NeedsInstall();
         const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : "Upload Iso";
         float mainX = bar.x + (available.x - PlayButtonW) / 2, buttonY = middle - PlayButtonH / 2 + 3;
@@ -1363,7 +1363,7 @@ namespace launcher_ui
         if (!m_installed.runtime.empty())
         {
             ImGui::TextWrapped("Built on this computer for this disc: %s", m_installed.runtime.c_str());
-            if (PillButton("Reinstall the game", false, 260) && !m_installer.Running())
+            if (PillButton("Reinstall the game", false, 260) && !Installing())
                 StartInstall();
             ImGui::SameLine();
             if (PillButton("Open the game folder", false, 260))

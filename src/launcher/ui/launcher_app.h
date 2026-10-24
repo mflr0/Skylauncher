@@ -200,6 +200,9 @@ namespace launcher_ui
         // Installing the game (the band's INSTALL button, the progress card in place of the logo).
         void RefreshInstall();
         bool NeedsInstall() const;
+        bool Installing() const { return m_installer.Running() || m_kitDownload.Running(); }
+        void StartInstaller();
+        void StartKitDownload();
         bool UpdateAvailable() const;
         void StartInstall();
         void PollInstall();
@@ -270,6 +273,10 @@ namespace launcher_ui
         InstalledGame m_installed;
         std::string m_ownRuntime;    // a runtime the player set up (FindRuntime): no install needed
         GameInstaller m_installer;
+        KitDownloader m_kitDownload;  // the first step of an install when there is no kit yet
+        std::string m_kitError;       // why there is no download (Linux)
+        bool m_kitUsed = false;       // this install started with that download
+        InstallProgress::Step m_kitStep;
         std::string m_installSha;    // the disc being installed
         std::string m_installKitVersion;
         bool m_installView = false;  // the progress card replaces the logo

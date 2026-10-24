@@ -24,8 +24,17 @@ struct InstallKit
     std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
 };
 
+// Where Skylauncher keeps what it makes: SKYLAUNCHER_DATA (tests), else %LOCALAPPDATA%\Skylauncher on Windows, ~/Library/Application
+// Support/Skylauncher on macOS, ~/.local/share/Skylauncher on Linux. The built games are in games/, the downloaded kits in kit/.
+std::filesystem::path LauncherDataFolder();
+std::filesystem::path DownloadedKitsFolder(); // kit/<release tag>/ folders, each holding SSABuild
+
+// The kit in `folder`: empty when it holds no SSABuild.
+std::optional<InstallKit> InstallKitIn(const std::filesystem::path& folder);
+
 // The kit: SKYLAUNCHER_KIT, else "[launcher] kit=", else a folder next to the launcher (or its macOS app bundle) named
-// ssa-kit, kit, or starting with ssa-kit (an unzipped "ssa-kit-windows-x64"). Empty when none holds SSABuild.
+// ssa-kit, kit, or starting with ssa-kit (an unzipped "ssa-kit-windows-x64"), else the newest downloaded kit. Empty when
+// none holds SSABuild.
 std::optional<InstallKit> FindInstallKit(const LauncherConfig& config);
 
 // A runtime the player set up themselves: SKYLAUNCHER_RUNTIME, else "[launcher] runtime=" in the settings file, else

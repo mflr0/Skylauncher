@@ -1,4 +1,5 @@
 #include "launcher/game_install.h"
+#include "launcher/updater.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <fmt/format.h>
@@ -85,6 +86,28 @@ namespace
     }
 }
 
+std::filesystem::path LauncherDataFolder()
+{
+    if (const char* folder = SDL_getenv("SKYLAUNCHER_DATA"); folder != nullptr && *folder != 0)
+        return Path(folder);
+    std::filesystem::path data;
+#if defined(_WIN32)
+    if (const char* local = SDL_getenv("LOCALAPPDATA"); local != nullptr && *local != 0)
+        data = Path(local) / "Skylauncher";
+#endif
+    if (data.empty())
+        if (char* pref = SDL_GetPrefPath("", "Skylauncher"))
+        {
+            data = Path(pref);
+            SDL_free(pref);
+        }
+    return data;
+}
+
+std::filesystem::path DownloadedKitsFolder() { return LauncherDataFolder() / "kit"; }
+
+std::optional<InstallKit> InstallKitIn(const std::filesystem::path& folder) { return KitIn(folder); }
+
 std::optional<InstallKit> FindInstallKit(const LauncherConfig& config)
 {
     if (const char* path = SDL_getenv("SKYLAUNCHER_KIT"); path != nullptr && *path != 0)
@@ -114,7 +137,23 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config)
                 if (auto kit = KitIn(entry.path()))
                     return kit;
     }
-    return {};
+
+    // The kits Skylauncher downloaded (kit/<release tag>/): the newest release.
+    std::optional<InstallKit> best;
+    SemVer bestTag;
+    std::error_code error;
+    for (const auto& entry : std::filesystem::directory_iterator(DownloadedKitsFolder(), error))
+    {
+        std::string name = Utf8(entry.path().filename());
+        auto kit = entry.is_directory(error) && !name.starts_with(".") ? KitIn(entry.path()) : std::nullopt;
+        SemVer tag = ParseSemVer(name);
+        if (kit && (!best || CompareSemVer(tag, bestTag) > 0))
+        {
+            best = kit;
+            bestTag = tag;
+        }
+    }
+    return best;
 }
 
 std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly)
@@ -153,18 +192,7 @@ std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool
 
 std::filesystem::path GameInstallFolder(const std::string& xexSha256)
 {
-    std::filesystem::path data;
-#if defined(_WIN32)
-    if (const char* local = SDL_getenv("LOCALAPPDATA"); local != nullptr && *local != 0)
-        data = Path(local) / "Skylauncher";
-#endif
-    if (data.empty())
-        if (char* pref = SDL_GetPrefPath("", "Skylauncher"))
-        {
-            data = Path(pref);
-            SDL_free(pref);
-        }
-    return data / "games" / xexSha256;
+    return LauncherDataFolder() / "games" / xexSha256;
 }
 
 InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string& xexSha256)

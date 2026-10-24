@@ -85,6 +85,44 @@ std::filesystem::path LauncherSelf();
 // then swapped in with ReplaceInPlace, so a failure leaves the old kit.
 bool InstallKitZip(const std::filesystem::path& zip, const std::filesystem::path& kitFolder, std::string& error);
 
+// Where the kit of release `tag` goes: kitRoot/<tag>.
+std::filesystem::path KitFolderFor(const std::filesystem::path& kitRoot, const std::string& tag);
+
+// The release tagged `tag` of "owner/name"; with SKYLAUNCHER_UPDATE_URL set, "<tag>.json" next to that file.
+std::string TaggedReleaseUrl(const std::string& repo, const std::string& tag);
+
+// Downloads the kit for this OS into `kitRoot`/<release tag>/: from the release tagged `tag` (v<launcher version>), else
+// the latest one; verified against its SHA256SUMS, then unpacked. Returns the folder ("" and `error` otherwise).
+// `progress` gets the bytes so far and the asset's size (0 when unknown).
+std::filesystem::path DownloadKit(const std::string& repo, const std::string& tag, const std::filesystem::path& kitRoot,
+    const std::function<void(uint64_t, uint64_t)>& progress, const std::atomic<bool>* cancel, std::string& error, std::string* releaseTag = nullptr);
+
+// DownloadKit on a thread, for the INSTALL card to poll.
+class KitDownloader
+{
+public:
+    enum class State { Idle, Running, Done, Failed, Cancelled };
+    struct Snapshot_
+    {
+        State state = State::Idle;
+        uint64_t done = 0, total = 0; // bytes
+        std::string error, tag;
+        std::filesystem::path folder;
+    };
+    ~KitDownloader() { Cancel(); Join(); }
+    void Start(const std::string& repo, const std::string& tag, const std::filesystem::path& kitRoot);
+    void Cancel() { m_cancel = true; }
+    Snapshot_ Snapshot();
+    bool Running() const { return m_running; }
+
+private:
+    void Join();
+    std::mutex m_mutex;
+    Snapshot_ m_state;
+    std::thread m_thread;
+    std::atomic<bool> m_running{ false }, m_cancel{ false };
+};
+
 // ---- The manager the window polls -------------------------------------------------------------------------------------
 
 class UpdateManager
@@ -94,9 +132,10 @@ public:
     struct Settings
     {
         std::string repo = "mflr0/Skylauncher";
-        std::string kitRepo;            // empty: no kit updates
+        std::string kitRepo;            // empty: no kit updates (the default is the launcher's own repository)
         std::string kitInstalled;       // the installed kit's version or release tag
-        std::filesystem::path kitFolder; // where the kit is, or goes
+        std::filesystem::path kitFolder; // where the kit is (a kit next to the launcher); empty: a new kit goes in kitRoot/<tag>
+        std::filesystem::path kitRoot;   // DownloadedKitsFolder()
     };
     struct State
     {
