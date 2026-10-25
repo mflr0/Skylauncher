@@ -180,10 +180,18 @@ std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool
     return {};
 }
 
+namespace
+{
+    std::string g_activeGame = "ssa";
+}
+
+void SetActiveGame(std::string_view id) { g_activeGame = id; }
+std::string_view ActiveGame() { return g_activeGame; }
+
 std::filesystem::path GameInstallFolder(const std::string&)
 {
     // One folder per game, whatever the disc's release: the built game and its data are in it (docs/install.md).
-    return LauncherDataFolder() / datadir::GameFolderName("ssa");
+    return LauncherDataFolder() / datadir::GameFolderName(g_activeGame);
 }
 
 InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string& xexSha256)

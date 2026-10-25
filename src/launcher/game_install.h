@@ -43,7 +43,13 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config);
 // `overrideOnly` keeps only SKYLAUNCHER_RUNTIME, which wins over an installed game.
 std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly = false);
 
-// Where a disc's game is built: <data>/SSA, which also holds the game's saves, settings and log. Never next to the ISO.
+// The game the launcher is showing ("ssa", "giants": GameInfo::id). Set by main() before a game's window opens; the
+// functions below that take no game (GameInstallFolder, the log folders) answer for it. "ssa" until set.
+void SetActiveGame(std::string_view id);
+std::string_view ActiveGame();
+
+// Where the active game is built: <data>/SSA or <data>/Giants (datadir::GameFolderName), which also holds the game's
+// saves, settings and log. Never next to the ISO. The argument is unused (one folder per game, whatever its release).
 std::filesystem::path GameInstallFolder(const std::string& xexSha256);
 
 // The game built for a disc, from "[install.<sha256>] runtime= kit=". Empty runtime when none was built or it is gone.
@@ -68,6 +74,8 @@ bool IsOlderLayoutBuild(const std::filesystem::path& runtime, const std::filesys
 
 // Rough figures shown before installing.
 inline constexpr int InstallMinutes = 15;
+inline constexpr int GiantsInstallMinutes = 25; // 4394 shaders to translate instead of 1118
+inline int InstallMinutesFor(std::string_view gameId) { return gameId == "giants" ? GiantsInstallMinutes : InstallMinutes; }
 inline constexpr int InstallGigabytes = 6;
 
 // What SSABuild has said so far.

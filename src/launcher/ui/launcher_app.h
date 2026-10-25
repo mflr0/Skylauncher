@@ -152,6 +152,7 @@ namespace launcher_ui
         ~App() { Shutdown(); }
         std::string Run();
         const std::string& ChosenRuntime() const { return m_chosenRuntime; }
+        const std::string& SwitchTo() const { return m_switchTo; } // the player picked another game in the sidebar
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
 
     private:
@@ -239,6 +240,7 @@ namespace launcher_ui
         LauncherConfig& m_config;
         std::string m_chosen;
         std::string m_chosenRuntime; // the game built for the chosen disc, if any
+        std::string m_switchTo;      // another game's id: the window closes and main() opens that game's
         bool m_running = true;
 
         SDL_Window* m_window = nullptr;
