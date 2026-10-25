@@ -273,7 +273,7 @@ namespace launcher_ui
         std::string m_ownRuntime;    // a runtime the player set up (FindRuntime): no install needed
         GameInstaller m_installer;
         KitDownloader m_kitDownload;  // the first step of an install when there is no kit yet
-        std::string m_kitError;       // why there is no download (Linux)
+        std::string m_kitError;       // why the downloaded kit can't be used
         bool m_kitUsed = false;       // this install started with that download
         InstallProgress::Step m_kitStep;
         std::string m_installSha;    // the disc being installed

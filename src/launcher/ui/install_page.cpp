@@ -134,11 +134,7 @@ namespace launcher_ui
     {
         m_kitUsed = true;
         m_kitStep = { "kit", "Downloading the game tools", SDL_GetTicks(), 0 };
-#if defined(_WIN32) || defined(__APPLE__)
         m_kitDownload.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), "v" + LauncherVersion(), DownloadedKitsFolder());
-#else
-        m_kitError = "The game can't be installed on Linux yet: there is no game kit for Linux.";
-#endif
     }
 
     void App::StartInstaller()
@@ -520,7 +516,7 @@ namespace launcher_ui
         InstallProgress progress = m_installer.Snapshot();
         if (m_testReal)
         {
-            // The real kit: INSTALL, then a screenshot every few minutes until it ends.
+            // The real kit: INSTALL, then a screenshot every few minutes until it ends (and PLAY with SSA_LAUNCHER_TEST_PLAY).
             const char* every = SDL_getenv("SSA_LAUNCHER_TEST_EVERY");
             uint64_t interval = (every != nullptr ? uint64_t(std::atoi(every)) : 120) * 1000;
             if (m_testStep == 0)
@@ -541,7 +537,16 @@ namespace launcher_ui
                 m_testAt = now + 1500;
             }
             else
+            {
+                // SSA_LAUNCHER_TEST_PLAY: then PLAY, as the button does, once the game is built.
+                if (SDL_getenv("SSA_LAUNCHER_TEST_PLAY") != nullptr && m_disc == DiscState::Ready && !NeedsInstall())
+                {
+                    m_chosen = m_discPath;
+                    m_chosenRuntime = m_installed.runtime;
+                    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_SHOTS"); // else the game runs its own shots
+                }
                 m_running = false;
+            }
             return;
         }
         switch (m_testStep)

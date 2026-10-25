@@ -43,7 +43,8 @@ jobs:
           path: dist/*
 
   linux:
-    runs-on: ubuntu-24.04
+    # 22.04: the AppImage needs the glibc it was built against (2.35), and the game kit's baseline is 2.34.
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,13 +52,13 @@ jobs:
       - name: Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+          sudo apt-get install -y ninja-build clang-15 libstdc++-12-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
             libxi-dev libxss-dev libxtst-dev libxkbcommon-dev libwayland-dev wayland-protocols libegl1-mesa-dev \
             libgl1-mesa-dev libgles2-mesa-dev libdbus-1-dev libudev-dev libdrm-dev libgbm-dev librsvg2-bin libfuse2
       - name: Build
         # XenonUtils' headers rely on Clang (anonymous structs with non-trivial members), as XenonRecomp does.
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-15 -DCMAKE_CXX_COMPILER=clang++-15 \
             ${VERSION:+"-DSKYLAUNCHER_VERSION=${VERSION#v}"}
           cmake --build build --target Skylauncher
           cmake --install build --prefix AppDir/usr

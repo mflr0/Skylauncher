@@ -180,6 +180,12 @@ GameRunResult RunGame(const std::string& runtime, const std::string& iso, const 
     std::filesystem::path capture = folder / CaptureLogName;
     std::filesystem::rename(capture, folder / "skylauncher-game.prev.log", error);
 
+    // On Linux SDL forks before it finds out that the program is missing: the child then only exits.
+    if (!std::filesystem::exists(Path(runtime), error))
+    {
+        result.error = fmt::format("Couldn't start {}: the file doesn't exist", runtime);
+        return result;
+    }
     std::vector<std::string> arguments{ runtime, iso };
     arguments.insert(arguments.end(), extraArguments.begin(), extraArguments.end());
     SDL_Process* process = Spawn(arguments, result.error);

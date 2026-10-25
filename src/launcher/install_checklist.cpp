@@ -190,7 +190,7 @@ std::string InstallFailureHeadline(const InstallChecklist& list, const InstallPr
         return "A file of the game folder couldn't be written.";
     std::string step = list.current >= 0 ? list.rows[size_t(list.current)].id : std::string();
     if (step == "kit")
-        return has("linux") ? "The game can't be installed on Linux yet." : "The game tools couldn't be downloaded. Check the internet connection.";
+        return "The game tools couldn't be downloaded. Check the internet connection.";
     if (step == "toolchain" && (has("download") || has("curl") || has("http") || has("sha-256") || has("checksum")))
         return "The compiler couldn't be downloaded. Check the internet connection.";
     if (step == "disc")
