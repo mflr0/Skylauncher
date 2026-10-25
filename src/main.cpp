@@ -1,11 +1,13 @@
 // Skylauncher: shows the launcher, then starts the game runtime with the disc image the player chose.
 #include "launcher/game_install.h"
+#include "launcher/game_settings.h"
 #include "shared/collection/datadir.h"
 #include "launcher/game_run.h"
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <cstdio>
 #include <fmt/format.h>
 #include <string>
 
@@ -52,21 +54,37 @@ namespace
 
 int main(int argc, char** argv)
 {
-    (void)argc;
-    (void)argv;
+    LauncherArguments arguments = ParseLauncherArguments(argc, argv);
+    if (arguments.help)
+    {
+        fprintf(stderr, "%s\n", LauncherUsage());
+#ifdef _WIN32
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Skylauncher", LauncherUsage(), nullptr); // a Windows app has no console
+#endif
+        return 0;
+    }
+    for (const std::string& unknown : arguments.unknown)
+        fprintf(stderr, "launcher: ignoring the option %s (--help lists them)\n", unknown.c_str());
     datadir::MigrateOnce(); // the older folders into <data root> (docs/install.md), before any path is used
     std::string configPath = LauncherConfigPath();
     LauncherConfig config = LoadLauncherConfig(configPath);
 
     // The game last shown ([launcher] game=), else Spyro's Adventure. Picking another game in the sidebar switches the
     // window to it in place; the game that was shown when PLAY was pressed is the one that runs.
-    const GameInfo* game = FindGame(config["launcher"]["game"]);
+    const GameInfo* game = arguments.game.empty() ? FindGame(config["launcher"]["game"]) : FindGame(arguments.game);
+    if (!arguments.game.empty() && game == nullptr)
+        fprintf(stderr, "launcher: no game called \"%s\" (ssa or giants)\n", arguments.game.c_str());
+    if (game == nullptr)
+        game = FindGame(config["launcher"]["game"]);
     if (game == nullptr)
         game = FindGame("ssa");
     if (game == nullptr)
         return 1;
     std::string installed;
-    std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed, &game);
+    LauncherOptions options;
+    options.openGame = !arguments.game.empty() && FindGame(arguments.game) != nullptr;
+    options.play = arguments.play;
+    std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed, &game, options);
     if (chosen.empty())
         return 0;
 
@@ -91,6 +109,9 @@ int main(int argc, char** argv)
         if (value != entry->second.end() && !value->second.empty())
             SDL_SetEnvironmentVariable(SDL_GetEnvironment(), variable, value->second.c_str(), true);
     };
+    // The video settings of this game are what the runtime reads from [video] (game_settings.h).
+    ApplyGameVideo(config, game->id);
+    SaveLauncherConfig(configPath, config);
     pass("SSA_PORTAL", "portal", "mode");
     pass("SSA_PORTAL_PLACE", "portal", "place");
     pass("SSA_LANGUAGE", game->id, "language");
@@ -114,6 +135,12 @@ int main(int argc, char** argv)
     // The launcher stays until the game ends: it keeps the game's output in skylauncher-game.log, and says so if the game
     // stops with an error (docs/support.md).
     GameRunResult run = RunGame(runtime, chosen);
+    // What the game changed in [video] (its own Settings menu) is this game's again; the other game keeps its own.
+    {
+        LauncherConfig after = LoadLauncherConfig(configPath);
+        StoreGameVideo(after, game->id);
+        SaveLauncherConfig(configPath, after);
+    }
     if (!run.started)
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, run.error.c_str(), nullptr);

@@ -6,8 +6,10 @@
 #include "assets/launcher_assets.h"
 #include "launcher/game_install.h"
 #include "launcher/game_run.h"
+#include "launcher/game_settings.h"
 #include "launcher/updater.h"
 #include "launcher/launcher.h"
+#include "launcher/ui/launcher_ui.h"
 #include "launcher/portal_status.h"
 #include "launcher/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
@@ -142,9 +144,11 @@ namespace launcher_ui
     };
 
     // Home is the menu (the SKYLAUNCHER title opens it), Play is the game art and the main button, Collection is the
-    // figures (its sidebar row), the gear opens Settings.
-    enum class Page { Home, Play, Collection, Settings };
-    enum class SettingsTab { Graphics, Controls, Language, GameData, About };
+    // figures (its sidebar row), the gear opens the launcher's Settings, and the game's Settings button (on its Play
+    // page) opens that game's own settings.
+    enum class Page { Home, Play, Collection, Settings, GameSettings };
+    enum class SettingsTab { Controls, Launcher, Support, About };
+    enum class GameTab { Video, Language, Disc, Saves, Game };
     enum class DiscState { None, Verifying, Ready, Failed };
     // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
     enum class FocusTo { None, Sidebar, Page };
@@ -187,9 +191,12 @@ namespace launcher_ui
         uint32_t installPastPid = 0; // its SSABuild, if that one may still be running
         uint64_t installPastCheck = 0; // when to look again whether it still runs
 
-        // Settings > Game data: the saves' backups (save_backup.h), read when the tab opens and after a restore.
+        // Game settings > Saves: the saves' backups (save_backup.h), read when the tab opens and after a restore.
         std::vector<savebackup::Entry> saveBackups;
         bool saveBackupsLoaded = false;
+        // Game settings > Game: what delete and uninstall would free, read when the tab opens and after an action.
+        GameDataSizes dataSizes;
+        bool dataSizesLoaded = false;
 
         // The collection page and its state.
         std::unique_ptr<CollectionPage> collection;
@@ -198,7 +205,7 @@ namespace launcher_ui
     class App
     {
     public:
-        App(const GameInfo& game, const std::string& configPath, LauncherConfig& config);
+        App(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const LauncherOptions& options = {});
         ~App() { Shutdown(); }
         std::string Run();
         const GameInfo& ChosenGame() const { return m_s->game; } // the game that was shown when Run returned
@@ -217,15 +224,30 @@ namespace launcher_ui
         void DrawSidebar();
         void DrawHome();
         void DrawPlay();
-        void DrawSettings();
-        void DrawGraphics();
+        void DrawSettings();     // the launcher's settings (the gear): Controls, Launcher, Support, About
         void DrawControls();
-        void DrawLanguage();
-        void DrawGameData();
+        void DrawLauncherTab();
+        void DrawSupport();      // support_page.cpp: logs and the problem report
+        // A game's own settings (game_settings_page.cpp), opened from the Settings button on its Play page.
+        void DrawGameSettings();
+        void DrawGameVideo();
+        void DrawGameLanguage();
+        void DrawGameDisc();
         void DrawSaveBackups();
         void RefreshSaveBackups();
         void RestoreSaveBackup(const std::string& stamp);
-        void DrawAbout();        // update_page.cpp: About, and the update banner
+        void DrawGameTab();
+        void DrawDataActions();
+        void CreateShortcut();
+        void ForgetDisc();       // "Remove the disc": the game forgets its image; the built game and the files stay
+        void RefreshDataSizes();
+        void RunDataAction(const DataResult& result, const char* done); // the toast, and the lists read again
+        void RunUninstall(const DataResult& result);
+        // The tabs of a settings page: words on one line, an accent line under the selected one; LB / RB change tab.
+        // True when the tab changed (by a click or a bumper).
+        bool DrawTabBar(const char* const* labels, int count, int* current);
+        void DrawAbout();        // update_page.cpp: About
+        void DrawUpdates();      // update_page.cpp: check for updates, and the automatic check; in Settings > Launcher
         void StartUpdateCheck(bool manual);
         void PollUpdates();
         float BannerHeight();
@@ -306,7 +328,9 @@ namespace launcher_ui
         void TestUpdateScript(uint64_t now);
         void TestNavScript(uint64_t now);
         void TestSwitchScript(uint64_t now);
+        void TestSeatXScript(uint64_t now);
         void PlayNow(); // PLAY on the shown game: its disc and built game are what the launcher returns
+        void AutoPlay(); // --play: PLAY as soon as the shown game's disc is checked, if it can
 
         std::string m_configPath;
         LauncherConfig& m_config;
@@ -316,6 +340,7 @@ namespace launcher_ui
 
         SDL_Window* m_window = nullptr;
         float m_uiScale = 1.0f; // launcher points per window unit (UpdateUiScale)
+        bool m_uiScaleLogged = false;
         SDL_Renderer* m_renderer = nullptr;
         std::vector<uint8_t> m_fontData[3];
         ImFont* m_textFont = nullptr;
@@ -328,7 +353,9 @@ namespace launcher_ui
         FocusTo m_focusTo = FocusTo::Sidebar;
         bool m_focusShow = false;    // the focus request came from the keyboard or the pad: show the ring
         bool m_backTaken = false;    // last frame, something else answered B / Escape (a menu, a dialog, a field)
-        SettingsTab m_tab = SettingsTab::Graphics;
+        SettingsTab m_tab = SettingsTab::Controls;
+        GameTab m_gameTab = GameTab::Video;
+        bool m_autoPlay = false; // --play: start the game as soon as it is ready (a desktop shortcut)
         ProbeJob m_probe;
         launcher_portal::Watcher m_portal;
         bool m_reportOpen = false;      // "Report a problem" shown (support_page.cpp)
@@ -366,6 +393,8 @@ namespace launcher_ui
         bool m_testReal = false;    // SSA_LAUNCHER_TEST_INSTALL=real: the real kit, a screenshot every SSA_LAUNCHER_TEST_EVERY seconds
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
+        bool m_testSeatX = false;      // SSA_LAUNCHER_TEST_SEATX: the X on every seat, by mouse, keyboard and pad
+        std::vector<std::string> m_testSeats; // the seats the SEATX script restores before each try
         bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
         int m_testFailures = 0;
         uint64_t m_testBegan = 0;
@@ -375,4 +404,23 @@ namespace launcher_ui
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };
+
+    template<size_t N>
+    bool App::Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width)
+    {
+        int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
+        bool changed = false;
+        ImGui::SetNextItemWidth(width);
+        if (ImGui::BeginCombo(label, choices[index].label))
+        {
+            for (size_t i = 0; i < N; i++)
+                if (ImGui::Selectable(choices[i].label, int(i) == index))
+                {
+                    Set(section, key, choices[i].value);
+                    changed = true;
+                }
+            ImGui::EndCombo();
+        }
+        return changed;
+    }
 }

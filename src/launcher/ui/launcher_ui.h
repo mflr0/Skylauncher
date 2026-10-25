@@ -26,8 +26,14 @@ std::span<const LauncherGameEntry> LauncherGameCatalog();
 // receives the game the launcher built for the chosen disc (empty when there is none). When the player picks another
 // enabled game in the sidebar the window stays and shows that game (each game's state is kept for the session); `played`
 // receives the game the chosen image is for. The last game shown is remembered in `[launcher] game=`.
+// `options` are the command line's (docs/launcher_ui.md, "Command line").
+struct LauncherOptions
+{
+    bool openGame = false; // --game <id>: open on that game's Play page
+    bool play = false;     // --play: start the game as soon as its disc is checked and it is built
+};
 std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config,
-    const std::string& previous, std::string* installed = nullptr, const GameInfo** played = nullptr);
+    const std::string& previous, std::string* installed = nullptr, const GameInfo** played = nullptr, const LauncherOptions& options = {});
 
 // Small pure helpers, also used by SSALauncherTest.
 std::string LauncherLanguageLabel(const LauncherConfig& config, const GameInfo& game);

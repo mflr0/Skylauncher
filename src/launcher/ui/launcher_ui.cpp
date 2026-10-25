@@ -42,17 +42,12 @@ namespace launcher_ui
             constexpr const char* ChooseDisc = "Choose disc";
             constexpr const char* PlayWith = "PLAY WITH";
             constexpr const char* DiscGone = "\"{}\" isn't there any more. Was it moved, renamed, or is its drive disconnected? Choose it again.";
-            constexpr const char* GameText = "Game text";
-            constexpr const char* GameTextHint = "The game's menus, subtitles and on-screen text. Skylauncher itself is in English.";
-            constexpr const char* GameVoices = "Game voices";
-            constexpr const char* GameVoicesHint = "The game's spoken lines and cutscenes. They can differ from the text.";
+            constexpr const char* LauncherLanguageHint = "Skylauncher is in English for now; its translation is planned (#4). The game's own text "
+                                                         "and voice languages are in each game's settings.";
+            constexpr const char* DataFolderHint = "Settings, saves, figures, the games Skylauncher built and its logs. The same folder for both games.";
+            constexpr const char* GameSettings = "Game settings";
             constexpr const char* ResetKeys = "Reset to defaults";
             constexpr const char* ResetKeysHint = "Hold to put every key back to its default.";
-            constexpr const char* Reinstall = "Reinstall the game";
-            constexpr const char* ReinstallHint = "Hold to build the game again from your disc.";
-            constexpr const char* RestoreSaves = "Restore";
-            constexpr const char* RestoreSavesHint = "Hold to restore this backup. The saves you have now are backed up first.";
-            constexpr const char* OpenFigures = "Open figures folder";
             constexpr const char* NoGamepad = "No gamepad connected.";
             constexpr const char* OneGamepad = "1 gamepad connected.";
             constexpr const char* Gamepads = "{} gamepads connected.";
@@ -377,6 +372,7 @@ namespace launcher_ui
             m_testCollection = SDL_getenv("SSA_LAUNCHER_TEST_COLLECTION") != nullptr;
             m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
             m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
+            m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -384,10 +380,16 @@ namespace launcher_ui
         return true;
     }
 
-    App::App(const GameInfo& game, const std::string& configPath, LauncherConfig& config) : m_configPath(configPath), m_config(config)
+    App::App(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const LauncherOptions& options)
+        : m_configPath(configPath), m_config(config)
     {
         m_s = &SlotFor(game);
         SetActiveGame(game.id);
+        m_autoPlay = options.play;
+        if (options.openGame)
+            m_page = Page::Play; // a shortcut opens on the game, not on the launcher's menu
+        for (const GameInfo& each : g_games)
+            SeedGameVideo(m_config, each.id); // each game starts from the video settings the player already had
     }
 
     // The slot of `game`, made the first time it is asked for.
@@ -512,6 +514,7 @@ namespace launcher_ui
                 HandleEvent(event);
             PollSlots();
             PollUpdates();
+            AutoPlay();
             Frame();
             TestScript();
         }
@@ -634,9 +637,14 @@ namespace launcher_ui
         bool bounded = SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(m_window), &usable) && usable.w > 0 && usable.h > 40;
         if (bounded)
             scale = std::min({ scale, usable.w / WindowMinW, (usable.h - 40) / WindowMinH });
+        float previous = m_uiScale;
         m_uiScale = std::clamp(scale, MinUiScale, MaxUiScale);
-        fprintf(stderr, "launcher: ui scale %.2f (display scale %.2f, pixel density %.2f, usable %dx%d)\n", m_uiScale,
-            SDL_GetWindowDisplayScale(m_window), SDL_GetWindowPixelDensity(m_window), usable.w, usable.h);
+        if (m_uiScale != previous || !m_uiScaleLogged) // once, then only when it changes
+        {
+            m_uiScaleLogged = true;
+            fprintf(stderr, "launcher: ui scale %.2f (display scale %.2f, pixel density %.2f, usable %dx%d)\n", m_uiScale,
+                SDL_GetWindowDisplayScale(m_window), SDL_GetWindowPixelDensity(m_window), usable.w, usable.h);
+        }
 
         SDL_SetWindowMinimumSize(m_window, int(WindowMinW * m_uiScale), int(WindowMinH * m_uiScale));
         if (resize && !(SDL_GetWindowFlags(m_window) & SDL_WINDOW_FULLSCREEN))
@@ -722,6 +730,19 @@ namespace launcher_ui
         m_s->chosenRuntime = m_s->installed.runtime;
         Set(m_s->game.id, "iso", m_s->chosen);
         m_running = false;
+    }
+
+    // --play (a desktop shortcut): PLAY as soon as the shown game's disc is checked and the game is built. If it can't
+    // be played (no disc, a disc that fails, nothing built), the window stays as it is and says why on its page.
+    void App::AutoPlay()
+    {
+        if (!m_autoPlay || m_s->disc == DiscState::Verifying)
+            return;
+        m_autoPlay = false;
+        if (m_s->disc == DiscState::Ready && !NeedsInstall() && !Installing())
+            PlayNow();
+        else
+            Toast(m_s->disc == DiscState::Ready ? "The game isn't built yet: INSTALL it first" : "The game's disc image is needed first");
     }
 
     void App::Browse()
@@ -980,25 +1001,6 @@ namespace launcher_ui
         ImGui::PopStyleVar();
     }
 
-    template<size_t N>
-    bool App::Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width)
-    {
-        int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
-        bool changed = false;
-        ImGui::SetNextItemWidth(width);
-        if (ImGui::BeginCombo(label, choices[index].label))
-        {
-            for (size_t i = 0; i < N; i++)
-                if (ImGui::Selectable(choices[i].label, int(i) == index))
-                {
-                    Set(section, key, choices[i].value);
-                    changed = true;
-                }
-            ImGui::EndCombo();
-        }
-        return changed;
-    }
-
     void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)
     {
         ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Panel, 235));
@@ -1116,14 +1118,14 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             // Selected only once the player has picked it: Play is that game's page.
-            bool selected = m_page == Page::Play && std::string_view(entry.id) == m_s->game.id;
+            bool selected = (m_page == Page::Play || m_page == Page::GameSettings) && std::string_view(entry.id) == m_s->game.id;
             if (row("game", GameRowH, selected, entry.enabled, position))
             {
                 if (std::string_view(entry.id) != m_s->game.id)
                     SelectGame(*FindGame(entry.id));
                 GoTo(Page::Play);
             }
-            if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home))
+            if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings))
                 TakeFocus(FocusTo::Sidebar);
             // The game's icon from the player's disc once it is verified, else its initial on its colour.
             ImVec2 badge(position.x + 34, position.y + GameRowH / 2);
@@ -1449,14 +1451,14 @@ namespace launcher_ui
             }
         }
 
-        // "Change disc...", right-aligned and centred in the band once a disc is verified; styled like the controller picker.
-        if (ready && !installing)
+        // "Game settings", right-aligned and centred in the band, styled like the controller picker: this game's disc (change
+        // or remove it), video, languages, saves and data. A plain button for now; its look is the art direction's.
         {
-            constexpr float ChangeDiscW = 170;
-            ImGui::SetCursorScreenPos(ImVec2(barEnd.x - Pad - 8 - ChangeDiscW, middle - 20));
+            constexpr float GameSettingsW = 170;
+            ImGui::SetCursorScreenPos(ImVec2(barEnd.x - Pad - 8 - GameSettingsW, middle - 20));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
-            if (PillButton("Change disc...", false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
-                Browse();
+            if (PillButton(strings::GameSettings, false, GameSettingsW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+                GoTo(Page::GameSettings);
             ImGui::PopStyleVar();
         }
     }
@@ -1469,65 +1471,6 @@ namespace launcher_ui
         ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", line.c_str());
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", strings::PortalTip);
-    }
-
-    void App::DrawGraphics()
-    {
-        if (!BeginSettingsTable("##graphics"))
-            return;
-
-        SettingRow("Fullscreen", "Play in fullscreen instead of a window.");
-        bool fullscreen = ParseBool(SettingGet(m_config, "video", "fullscreen"));
-        if (Toggle("##fullscreen", &fullscreen))
-            Set("video", "fullscreen", fullscreen ? "1" : "0");
-
-        SettingRow("Resolution scale", "Auto picks x1 on integrated graphics. x2 or x3 need a dedicated graphics card.");
-        Combo("##scale", "video", "resolution_scale", ScaleChoices, 0);
-        if (int scale = SettingInt(m_config, "video", "resolution_scale", 0); scale >= 1)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-            ImGui::Text("%d x %d for the 3D scene", 1120 * std::min(scale, 10), 704 * std::min(scale, 10));
-            ImGui::PopStyleColor();
-        }
-
-        SettingRow("Frame rate limit", "The game was made for 30 FPS; 60 is experimental.");
-        Combo("##fps", "video", "fps_limit", FpsChoices, 0);
-
-        SettingRow("Skip intro movies", "Skips the start-up logos; the story movies still play.");
-        bool skipIntroMovies = ParseBool(SettingGet(m_config, "video", "skip_intro_movies", "0"));
-        if (Toggle("##skipintromovies", &skipIntroMovies))
-            Set("video", "skip_intro_movies", skipIntroMovies ? "1" : "0");
-
-        SettingRow("VSync", "Waits for the screen's refresh: no tearing, a little more latency.");
-        bool vsync = ParseBool(SettingGet(m_config, "video", "vsync", "1"));
-        if (Toggle("##vsync", &vsync))
-            Set("video", "vsync", vsync ? "1" : "0");
-
-        SettingRow("Texture filtering", "Anisotropic filtering keeps ground textures sharp at an angle.");
-        Combo("##filter", "video", "anisotropy", FilterChoices, 0);
-
-        SettingRow("Widescreen", "Auto shows more to the sides on a window wider than 16:9. 16:9 keeps the game's picture, with bars.");
-        Combo("##aspect", "video", "aspect", AspectChoices, 0);
-
-        SettingRow("HD texture packs", "Replaces the game's textures with the files of the textures folder.");
-        bool texturePacks = ParseBool(SettingGet(m_config, "video", "texture_packs", "1"));
-        if (Toggle("##texturepacks", &texturePacks))
-            Set("video", "texture_packs", texturePacks ? "1" : "0");
-        if (PillButton("Open texture packs folder", false, 300))
-        {
-            if (!OpenFolder(GameInstallFolder({}) / "textures"))
-                Toast("Couldn't open the folder");
-        }
-        EndSettingsTable();
-
-        if (ImGui::CollapsingHeader("Advanced") && BeginSettingsTable("##graphicsadvanced"))
-        {
-            SettingRow("Dump textures (for pack makers)", "Writes the game's textures as DDS files into the textures folder, to make a pack from.");
-            bool textureDump = ParseBool(SettingGet(m_config, "video", "texture_dump", "0"));
-            if (Toggle("##texturedump", &textureDump))
-                Set("video", "texture_dump", textureDump ? "1" : "0");
-            EndSettingsTable();
-        }
     }
 
     void App::DrawControls()
@@ -1620,175 +1563,32 @@ namespace launcher_ui
         ImGui::PopStyleColor();
     }
 
-    void App::DrawLanguage()
+    // The tabs of a settings page: words on one line, an accent line under the selected one (like the sidebar's bar).
+    // LB / RB change tab, as in the console launchers.
+    bool App::DrawTabBar(const char* const* labels, int count, int* current)
     {
-        if (!BeginSettingsTable("##language"))
-            return;
-        SettingRow(strings::GameText, strings::GameTextHint);
-        Combo("##text", m_s->game.id, "language", LanguageChoices, 0);
-        SettingRow(strings::GameVoices, strings::GameVoicesHint);
-        Combo("##voice", m_s->game.id, "voice_language", LanguageChoices, 0);
-        EndSettingsTable();
-    }
-
-    void App::DrawGameData()
-    {
-        Title("Disc image", TitleSize, Text);
-        ImGui::TextWrapped("%s", m_s->discPath.empty() ? "None chosen yet." : m_s->discPath.c_str());
-        if (m_s->disc == DiscState::Ready)
-            ImGui::TextColored(ImColor(Rgb(Ok)), "Verified, %s", LauncherFormatSize(m_s->discSize).c_str());
-        if (PillButton("Change disc...", true, 200))
-            Browse();
-        ImGui::Dummy(ImVec2(0, 16));
-        Title("Folders", TitleSize, Text);
-        if (PillButton("Open data folder", false, 260))
-        {
-            std::error_code error;
-            std::filesystem::create_directories(LauncherDataFolder(), error);
-            OpenFolder(LauncherDataFolder()); // the "Skylanders" folder: settings, saves, figures, the game, logs
-        }
-        ImGui::SameLine();
-        if (PillButton(strings::OpenFigures, false, 260))
-        {
-            SDL_CreateDirectory(m_s->collection->Folder().c_str());
-            { std::string folder = m_s->collection->Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
-        }
-        ImGui::Dummy(ImVec2(0, 16));
-        DrawSaveBackups();
-        ImGui::Dummy(ImVec2(0, 16));
-        Title("Support", TitleSize, Text);
-        DrawLogs();
-        ImGui::Dummy(ImVec2(0, 16));
-        Title("Game runtime", TitleSize, Text);
-        if (!m_s->installed.runtime.empty())
-        {
-            ImGui::TextWrapped("Built on this computer for this disc: %s", m_s->installed.runtime.c_str());
-            if (HoldButton(strings::Reinstall, 260, strings::ReinstallHint) && !Installing())
-                StartInstall();
-            ImGui::SameLine();
-            if (PillButton("Open the game folder", false, 260))
-                OpenFolder(GameInstallFolder(m_s->check.xexSha256));
-            ImGui::Dummy(ImVec2(0, 8));
-        }
-        ImGui::TextWrapped("Skylauncher starts the game it built for the disc, else the game runtime (%s) next to it, or the one set as "
-            "runtime= in the [launcher] section of %s.", m_s->game.runtime, m_configPath.c_str());
-    }
-
-    // The game's save backups (save_backup.h): one row per backup (date, time, size) and the button that puts it back.
-    // The game keeps them itself before it overwrites a save; restoring one first keeps the saves the player has now.
-    void App::RefreshSaveBackups()
-    {
-        m_s->saveBackups = savebackup::List(savebackup::Root(m_s->game.id));
-        m_s->saveBackupsLoaded = true;
-    }
-
-    void App::RestoreSaveBackup(const std::string& stamp)
-    {
-        const savebackup::Restore restore = savebackup::RestoreBackup(savebackup::Root(m_s->game.id), stamp);
-        m_s->saveBackupsLoaded = false; // the restore made a backup of its own
-        if (restore.ok)
-            Toast("Saves restored from " + stamp.substr(0, 4) + "-" + stamp.substr(4, 2) + "-" + stamp.substr(6, 2) + " " +
-                stamp.substr(9, 2) + ":" + stamp.substr(11, 2) + ".");
-        else if (restore.error == "the game is running")
-            Toast("Quit the game before restoring a backup.");
-        else
-            Toast("The backup could not be restored: " + restore.error + ".");
-    }
-
-    void App::DrawSaveBackups()
-    {
-        Title("Save backups", TitleSize, Text);
-        if (!m_s->saveBackupsLoaded)
-            RefreshSaveBackups();
-        const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
-        ImGui::TextWrapped(running ? "The game is running: quit it to restore a backup."
-            : "The game keeps the previous version of a save here before it overwrites it. Restoring one keeps the saves you have now "
-              "first.");
-        ImGui::PopTextWrapPos();
-        ImGui::PopStyleColor();
-        if (m_s->saveBackups.empty())
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-            ImGui::TextUnformatted("No backups yet.");
-            ImGui::PopStyleColor();
-            return;
-        }
-
-        // Ten rows at a time; the newest first.
-        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(300.0f, 44.0f * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
-        if (ImGui::BeginTable("##savebackups", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
-        {
-            ImGui::TableSetupColumn("when");
-            ImGui::TableSetupColumn("size", ImGuiTableColumnFlags_WidthFixed, 110);
-            ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthFixed, 128);
-            for (const savebackup::Entry& backup : m_s->saveBackups)
-            {
-                ImGui::TableNextRow(ImGuiTableRowFlags_None, 40);
-                ImGui::TableSetColumnIndex(0);
-                ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(backup.date.c_str());
-                ImGui::SameLine();
-                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-                ImGui::TextUnformatted(backup.time.c_str());
-                ImGui::PopStyleColor();
-                if (backup.files == 1 && ImGui::IsItemHovered())
-                    ImGui::SetTooltip("One file");
-                ImGui::TableSetColumnIndex(1);
-                ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(LauncherFormatSize(backup.bytes).c_str());
-                ImGui::TableSetColumnIndex(2);
-                ImGui::BeginDisabled(running);
-                ImGui::PushID(backup.stamp.c_str());
-                if (HoldButton(strings::RestoreSaves, 112, strings::RestoreSavesHint))
-                    RestoreSaveBackup(backup.stamp);
-                ImGui::PopID();
-                ImGui::EndDisabled();
-            }
-            ImGui::EndTable();
-        }
-        ImGui::EndChild();
-    }
-
-    void App::DrawSettings()
-    {
-        // A centred column: settings read badly when they stretch across a wide window.
-        float available = ImGui::GetContentRegionAvail().x;
-        float width = std::min(available, 940.0f);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
-
-        constexpr std::pair<SettingsTab, const char*> Tabs[] = { { SettingsTab::Graphics, "Graphics" }, { SettingsTab::Controls, "Controls" },
-            { SettingsTab::Language, "Language" }, { SettingsTab::GameData, "Game data" },
-            { SettingsTab::About, "About" } };
-        Title("SETTINGS", HeadlineSize, Text);
-        ImGui::Dummy(ImVec2(0, 4));
-        // The tabs: words on one line, an accent line under the selected one (like the sidebar's bar).
-        // LB / RB change tab, as in the console launchers.
+        bool changed = false;
         if (!ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) && !ImGui::IsAnyItemActive())
         {
-            int index = int(m_tab), count = int(std::size(Tabs));
             int step = ImGui::IsKeyPressed(ImGuiKey_GamepadL1, false) ? -1 : ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false) ? 1 : 0;
-            if (step != 0)
+            if (step != 0 && std::clamp(*current + step, 0, count - 1) != *current)
             {
-                m_tab = Tabs[std::clamp(index + step, 0, count - 1)].first;
-                m_capturing = nullptr;
-                m_s->saveBackupsLoaded = false;
+                *current = std::clamp(*current + step, 0, count - 1);
+                changed = true;
                 RequestFocus(FocusTo::Page); // the ring follows to the new tab
             }
         }
         ImGui::PushFont(nullptr, SidebarTextSize);
-        for (const auto& [tab, label] : Tabs)
+        for (int i = 0; i < count; i++)
         {
-            bool active = m_tab == tab;
+            const char* label = labels[i];
+            bool active = *current == i;
             ImVec2 at = ImGui::GetCursorScreenPos(), text = ImGui::CalcTextSize(label);
             ImVec2 size(text.x + BoldOffset, text.y + 10 + TabUnderlineH);
             if (ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav))
             {
-                m_tab = tab;
-                m_capturing = nullptr;
-                m_s->saveBackupsLoaded = false; // the saves may have changed since the tab was last open
+                changed = changed || *current != i;
+                *current = i;
             }
             bool hovered = ImGui::IsItemHovered();
             FocusRing(RadiusSmall);
@@ -1808,23 +1608,94 @@ namespace launcher_ui
         ImGui::PopFont();
         ImGui::NewLine();
         ImGui::Dummy(ImVec2(0, 4));
+        if (changed)
+        {
+            m_capturing = nullptr;
+            m_s->saveBackupsLoaded = m_s->dataSizesLoaded = false; // the saves and the folders may have changed since the tab was open
+        }
+        return changed;
+    }
+
+    // The launcher's settings, apart from any game's: the controller and keys (both games read the same), the launcher
+    // itself, support and About. Each game has its own settings page (game_settings_page.cpp).
+    void App::DrawSettings()
+    {
+        // A centred column: settings read badly when they stretch across a wide window.
+        float available = ImGui::GetContentRegionAvail().x;
+        float width = std::min(available, 940.0f);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
+        ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+
+        static const char* const Tabs[] = { "Controls", "Launcher", "Support", "About" };
+        Title("LAUNCHER SETTINGS", HeadlineSize, Text);
+        ImGui::PushFont(nullptr, SmallSize);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextUnformatted("For Skylauncher and what both games share. Each game has its own settings on its page.");
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+        ImGui::Dummy(ImVec2(0, 4));
+        int tab = int(m_tab);
+        DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
+        m_tab = SettingsTab(tab);
         BeginCard("##settings", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
         switch (m_tab)
         {
-        case SettingsTab::Graphics: DrawGraphics(); break;
         case SettingsTab::Controls: DrawControls(); break;
-        case SettingsTab::Language: DrawLanguage(); break;
-        case SettingsTab::GameData: DrawGameData(); break;
+        case SettingsTab::Launcher: DrawLauncherTab(); break;
+        case SettingsTab::Support: DrawSupport(); break;
         case SettingsTab::About: DrawAbout(); break;
         }
         EndCard();
         ImGui::EndChild();
     }
 
+    void App::DrawLauncherTab()
+    {
+        // The launcher's own language: the slot for #4 (translating Skylauncher). Until then it is English only.
+        Title("Language", TitleSize, Text);
+        ImGui::BeginDisabled();
+        ImGui::SetNextItemWidth(440);
+        if (ImGui::BeginCombo("##launcherlanguage", "English"))
+            ImGui::EndCombo();
+        ImGui::EndDisabled();
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextWrapped("%s", strings::LauncherLanguageHint);
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 16));
+        Title("Updates", TitleSize, Text);
+        DrawUpdates();
+        ImGui::Dummy(ImVec2(0, 16));
+        Title("Data folder", TitleSize, Text);
+        ImGui::TextWrapped("%s", datadir::Text(LauncherDataFolder()).c_str());
+        if (PillButton("Open data folder", false, 260))
+        {
+            std::error_code error;
+            std::filesystem::create_directories(LauncherDataFolder(), error);
+            OpenFolder(LauncherDataFolder());
+        }
+        ImGui::PushFont(nullptr, SmallSize);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+        ImGui::TextWrapped("%s", strings::DataFolderHint);
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+    }
+
+    void App::DrawSupport()
+    {
+        Title("Support", TitleSize, Text);
+        DrawLogs();
+    }
+
     void App::GoTo(Page page)
     {
         if ((page == Page::Settings || page == Page::Collection) && (m_page == Page::Home || m_page == Page::Play))
             m_backPage = m_page;
+        else if (page == Page::GameSettings)
+            m_backPage = Page::Play; // a game's settings are opened from its page, and close back to it
+        else if (page == Page::Settings && m_page == Page::GameSettings)
+            m_backPage = Page::Play;
+        else if (page == Page::Collection && m_page == Page::GameSettings)
+            m_backPage = Page::Play;
         m_page = page;
         m_capturing = nullptr;
         RequestFocus(FocusTo::Page);
@@ -1833,7 +1704,7 @@ namespace launcher_ui
     // B / Escape when nothing else took it: out of Settings and Collection, else to the sidebar.
     void App::Back()
     {
-        if (m_page == Page::Settings || m_page == Page::Collection)
+        if (m_page == Page::Settings || m_page == Page::Collection || m_page == Page::GameSettings)
             GoTo(m_backPage);
         else
             RequestFocus(FocusTo::Sidebar);
@@ -1925,9 +1796,9 @@ namespace launcher_ui
         ImGuiIO& frameIo = ImGui::GetIO();
         frameIo.DisplaySize = ImVec2(frameIo.DisplaySize.x / m_uiScale, frameIo.DisplaySize.y / m_uiScale);
         frameIo.DisplayFramebufferScale = ImVec2(frameIo.DisplayFramebufferScale.x * m_uiScale, frameIo.DisplayFramebufferScale.y * m_uiScale);
-        if (SDL_GetMouseFocus() == nullptr) // the backend's outside-the-window position is in unscaled window units
+        if (SDL_GetMouseFocus() == nullptr && !m_testSeatX) // the backend's outside-the-window position is in unscaled window units
             frameIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-        if (m_testNav)
+        if (m_testNav || m_testSeatX)
             frameIo.BackendFlags |= ImGuiBackendFlags_HasGamepad; // the test's pad keys count with no pad plugged in
         ImGui::NewFrame();
         if (!m_backTaken && (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false)))
@@ -1951,6 +1822,7 @@ namespace launcher_ui
         case Page::Play: DrawPlay(); break;
         case Page::Collection: m_s->collection->Draw(); break;
         case Page::Settings: DrawSettings(); break;
+        case Page::GameSettings: DrawGameSettings(); break;
         }
         ImGui::End();
         ImGui::PopStyleVar();
@@ -1972,8 +1844,9 @@ namespace launcher_ui
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
         if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
         {
-            static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-collection", "06-home",
-                "07-figure-sheet", "08-new-figure", "09-play-with", "10-language", "11-disc-gone" };
+            static const char* const Names[] = { "01-no-iso", "02-verified", "03-game-video", "04-controls", "05-collection", "06-home",
+                "07-figure-sheet", "08-new-figure", "09-play-with", "10-language", "11-game-disc", "12-game-saves", "13-game-data",
+                "14-launcher-settings", "15-disc-gone" };
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-quit-while-installing", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
@@ -1982,6 +1855,8 @@ namespace launcher_ui
                 "50-nav-back-to-play", "51-nav-settings-controls", "52-nav-settings-back" };
             if (m_testNav)
                 Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
+            else if (m_testSeatX)
+                Screenshot(fmt::format("60-seat-x-{:02}", m_testStep).c_str());
             else if (m_testCollection)
                 Screenshot(CollectionPage::TestShotName(m_testStep));
             else if (m_testReal)
@@ -2110,6 +1985,89 @@ namespace launcher_ui
         }
     }
 
+    // The X on every seat (players, item, adventure), pressed three ways: the mouse on the X, Delete on the focused seat, and the
+    // pad's X on it. Each try puts the seats back, presses, and checks that this seat alone is empty. Four steps per try.
+    void App::TestSeatXScript(uint64_t now)
+    {
+        constexpr int Modes = 3, StepsPerTry = 4;
+        std::vector<std::string> seats = m_s->collection->TestSeats();
+        if (m_testStep == 0)
+        {
+            m_page = Page::Collection;
+            m_s->collection->Seed();
+            m_testAt = now + 600;
+            return;
+        }
+        if (m_testStep == 1) // the seeded seats, once the page has loaded them
+        {
+            m_testSeats = seats;
+            if (std::count_if(seats.begin(), seats.end(), [](const std::string& seat) { return !seat.empty(); }) != 4)
+            {
+                fprintf(stderr, "FAIL seat X: the seeded collection has no figure on every seat\n");
+                m_testFailures++;
+                m_running = false;
+            }
+            m_testAt = now + 300;
+            return;
+        }
+        int tries = int(m_testSeats.size()) * Modes, step = m_testStep - 2, seat = step / StepsPerTry / Modes, mode = step / StepsPerTry % Modes;
+        if (step / StepsPerTry >= tries)
+        {
+            m_running = false;
+            return;
+        }
+        static const char* const ModeNames[Modes] = { "mouse", "keyboard", "pad" };
+        ImGuiIO& io = ImGui::GetIO();
+        switch (step % StepsPerTry)
+        {
+        case 0: // every seat occupied again
+            m_s->collection->TestSetSeats(m_testSeats);
+            break;
+        case 1: // the pointer on the X, or the focus on the seat
+            if (mode == 0)
+            {
+                ImVec2 at = m_s->collection->TestCrossAt(size_t(seat));
+                if (at.x < 0)
+                {
+                    fprintf(stderr, "FAIL seat X: seat %d has no X on screen\n", seat);
+                    m_testFailures++;
+                }
+                io.AddMousePosEvent(at.x, at.y);
+            }
+            else
+                m_s->collection->TestFocusSeat(size_t(seat));
+            break;
+        case 2: // the press
+            if (mode == 0)
+            {
+                io.AddMouseButtonEvent(0, true);
+                io.AddMouseButtonEvent(0, false);
+            }
+            else
+            {
+                ImGuiKey key = mode == 1 ? ImGuiKey_Delete : ImGuiKey_GamepadFaceLeft;
+                io.AddKeyEvent(key, true);
+                io.AddKeyEvent(key, false);
+            }
+            break;
+        case 3: // only this seat is empty
+        {
+            bool ok = seats.size() == m_testSeats.size();
+            for (size_t i = 0; ok && i < seats.size(); i++)
+                ok = int(i) == seat ? seats[i].empty() : seats[i] == m_testSeats[i];
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL seat X: seat %d by %s did not take its figure off\n", seat, ModeNames[mode]);
+                m_testFailures++;
+            }
+            else
+                printf("seat X: seat %d by %s: taken off\n", seat, ModeNames[mode]);
+            break;
+        }
+        }
+        m_testAt = now + 500;
+    }
+
     void App::TestNavScript(uint64_t now)
     {
         // A key is pressed and released, unless Hold (down only) or Release (up only) wraps it.
@@ -2186,6 +2144,11 @@ namespace launcher_ui
             TestSwitchScript(now);
             return;
         }
+        if (m_testSeatX)
+        {
+            TestSeatXScript(now);
+            return;
+        }
         if (m_testCollection)
         {
             // The collection's screens, in the scratch collection SSA_COLLECTION names.
@@ -2214,11 +2177,12 @@ namespace launcher_ui
                 m_testAt = now + 400;
             break;
         case 2:
-            m_page = Page::Settings;
-            m_tab = SettingsTab::Graphics;
+            m_page = Page::GameSettings;
+            m_gameTab = GameTab::Video;
             m_testAt = now + 400;
             break;
         case 3:
+            m_page = Page::Settings;
             m_tab = SettingsTab::Controls;
             m_testAt = now + 400;
             break;
@@ -2249,11 +2213,28 @@ namespace launcher_ui
             m_testAt = now + 500;
             break;
         case 9:
-            m_page = Page::Settings;
-            m_tab = SettingsTab::Language;
+            m_page = Page::GameSettings;
+            m_gameTab = GameTab::Language;
             m_testAt = now + 400;
             break;
         case 10:
+            m_gameTab = GameTab::Disc;
+            m_testAt = now + 400;
+            break;
+        case 11:
+            m_gameTab = GameTab::Saves;
+            m_testAt = now + 400;
+            break;
+        case 12:
+            m_gameTab = GameTab::Game;
+            m_testAt = now + 400;
+            break;
+        case 13:
+            m_page = Page::Settings;
+            m_tab = SettingsTab::Launcher;
+            m_testAt = now + 400;
+            break;
+        case 14:
             // The verified image moved away: INSTALL says so instead of failing later.
             m_page = Page::Play;
             if (m_s->disc == DiscState::Ready)
@@ -2395,11 +2376,11 @@ std::string LauncherDisplayName(std::string_view xdbfName, const GameInfo& game)
 }
 
 std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const std::string& previous,
-    std::string* installed, const GameInfo** played)
+    std::string* installed, const GameInfo** played, const LauncherOptions& options)
 {
     if (!previous.empty())
         config[game.id]["iso"] = previous;
-    App app(game, configPath, config);
+    App app(game, configPath, config, options);
     std::string chosen = app.Run();
     if (installed != nullptr)
         *installed = app.ChosenRuntime();

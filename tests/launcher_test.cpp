@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -538,6 +539,7 @@ void EditChecks()
 }
 
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
+int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
 
 // The launcher window switching games in place (App::TestSwitchScript, in an offscreen window): both discs checked, a
 // build of each made by the fake kit, the state of each kept across switches, PLAY returning the shown game's runtime.
@@ -570,6 +572,34 @@ static void SwitchChecks(const std::filesystem::path& scratch, const std::string
     SetActiveGame("ssa");
 }
 
+// The X on every seat of the collection page, in the offscreen window (App::TestSeatXScript): players, item and adventure seats,
+// each emptied by the mouse on the X, by Delete and by the pad's X. It runs the launcher itself as a child process, because the
+// collection's folder is fixed for a process by its first use, and the checks above have used theirs. Scratch folders only.
+static void SeatXChecks(const std::filesystem::path& scratch)
+{
+    std::filesystem::path root = scratch / "seatx";
+    std::filesystem::create_directories(root / "shots");
+    std::filesystem::create_directories(root / "home");
+    std::string command = "env -u SSA_MIGRATE_FROM -u SSA_FIGURES -u SSA_SETTINGS SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy HOME='" + (root / "home").string() +
+        "' SKYLANDERS_DATA='" + (root / "data").string() + "' SKYLAUNCHER_DATA='" + (root / "launcher").string() +
+        "' SSA_COLLECTION='" + (root / "collection").string() + "' SSA_SAVE_DIR='" + (root / "saves").string() +
+        "' SSA_LAUNCHER_INI='" + (root / "x.ini").string() + "' SKYLAUNCHER_NO_UPDATE_CHECK=1 SSA_LAUNCHER_SHOTS='" + (root / "shots").string() +
+        "' SSA_LAUNCHER_TEST_SEATX=1 '" + SKYLAUNCHER_TEST_EXE + "' > '" + (root / "out.txt").string() + "' 2>&1";
+    EXPECT(std::system(command.c_str()) == 0);
+    std::ifstream in(root / "out.txt");
+    std::string line;
+    int emptied = 0;
+    while (std::getline(in, line))
+    {
+        if (line.find("FAIL") != std::string::npos)
+            fprintf(stderr, "%s\n", line.c_str());
+        EXPECT(line.find("FAIL") == std::string::npos);
+        emptied += line.find("taken off") != std::string::npos;
+    }
+    EXPECT(emptied == 12); // 4 seats, 3 ways each
+    printf("Seat X: %d of 12 tries emptied their seat\n", emptied);
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 3)
@@ -594,6 +624,7 @@ int main(int argc, char** argv)
     PortalChecks();
     InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);
+    g_failures += SettingsChecks(scratch / "settings");
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };
@@ -697,6 +728,8 @@ int main(int argc, char** argv)
         printf("Switching games in the window:\n");
         SwitchChecks(scratch, iso.string(), giantsIso);
     }
+    printf("The seats' X in the window:\n");
+    SeatXChecks(scratch);
     printf("Command line without UI:\n");
     EXPECT(ResolveHeadless({ iso.string() }) == iso.string());
     EXPECT(ResolveHeadless({ "--select-iso", iso.string() }) == iso.string());
