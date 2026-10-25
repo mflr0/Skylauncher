@@ -948,12 +948,14 @@ namespace launcher_ui
             else
                 m_app.BoldText(title.c_str(), section.kind == Section::Kind::Portal ? Accent : TextSecondary);
             ImGui::Dummy(ImVec2(0, 2));
+            ImGui::PushID(int(s)); // a figure can be in two sections (On the portal, Recent): one ID per card
             for (size_t i = 0; i < section.items.size(); i++)
             {
                 if (i % columns != 0)
                     ImGui::SameLine(0, Gap);
                 DrawCard(m_list[section.items[i]], Cell, foreign);
             }
+            ImGui::PopID();
             ImGui::Dummy(ImVec2(0, 12));
         }
         // The section the list is scrolled to.
