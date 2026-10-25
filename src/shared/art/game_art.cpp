@@ -7,6 +7,7 @@
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -18,7 +19,7 @@ namespace art
     namespace
     {
         // Bump when a picture is read or composed differently: the cached pictures (not the portraits) are made again.
-        constexpr int CacheVersion = 2;
+        constexpr int CacheVersion = 3;
 
         std::string Lower(std::string text)
         {
@@ -145,25 +146,147 @@ namespace art
                 }
         }
 
-        // [Giants] The title's logo is a sprite sheet (spritelogo.png, 1024x1024): "SKYLANDERS" (the arch), "GIANTS"
-        // and the row of element symbols, apart. The title screen draws "GIANTS" under the arch's middle, behind it
-        // (as in the title's own flat picture, title_giants_3d.png); the symbols are left out, like the box art.
-        bool ComposeGiantsLogo(const Image& sheet, Image& logo)
+        // The runs of columns of `band` that hold opaque texels, apart by more than `gap` columns.
+        std::vector<Band> ColumnRuns(const Image& image, const Band& band, uint32_t gap)
+        {
+            std::vector<Band> runs;
+            uint32_t last = 0;
+            for (uint32_t x = band.left; x < band.right; x++)
+            {
+                uint32_t top = band.bottom, bottom = band.top;
+                for (uint32_t y = band.top; y < band.bottom; y++)
+                    if ((image.rgba[size_t(y) * image.width + x] >> 24) > 16)
+                        top = std::min(top, y), bottom = y + 1;
+                if (top >= bottom)
+                    continue;
+                if (runs.empty() || x - last > gap)
+                    runs.push_back({ top, bottom, x, x });
+                runs.back().right = x + 1, last = x;
+                runs.back().top = std::min(runs.back().top, top), runs.back().bottom = std::max(runs.back().bottom, bottom);
+            }
+            return runs;
+        }
+
+        // The dark blue plate that backs the logo (the title's mesh draws it from title_giants_3d.png): the silhouette of
+        // `pieces` grown by `radius`, each row filled from its first to its last texel, with soft edges and a darker rim.
+        // `base` is the plate's blue, sampled from the game's own texture.
+        Image BackingPlate(const Image& pieces, uint32_t radius, uint32_t base)
+        {
+            const int w = int(pieces.width), h = int(pieces.height), r = int(radius);
+            std::vector<int> count(size_t(h) * (w + 1), 0); // per row: opaque texels before column x
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    count[size_t(y) * (w + 1) + x + 1] = count[size_t(y) * (w + 1) + x] + ((pieces.rgba[size_t(y) * w + x] >> 24) > 16 ? 1 : 0);
+            std::vector<float> mask(size_t(w) * h, 0.0f);
+            for (int y = 0; y < h; y++)
+            {
+                int first = w, last = -1;
+                for (int x = 0; x < w; x++)
+                {
+                    bool grown = false;
+                    for (int dy = -r; dy <= r && !grown; dy++)
+                    {
+                        int row = y + dy, half = int(std::sqrt(float(r * r - dy * dy)));
+                        if (row < 0 || row >= h)
+                            continue;
+                        int from = std::max(0, x - half), to = std::min(w, x + half + 1);
+                        grown = count[size_t(row) * (w + 1) + to] > count[size_t(row) * (w + 1) + from];
+                    }
+                    if (grown)
+                        first = std::min(first, x), last = x;
+                }
+                for (int x = first; x <= last; x++)
+                    mask[size_t(y) * w + x] = 1.0f;
+            }
+            // Three box blurs of 3 texels: soft edges.
+            std::vector<float> tmp(mask.size());
+            for (int pass = 0; pass < 6; pass++)
+            {
+                const bool horizontal = pass % 2 == 0;
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                    {
+                        float sum = 0;
+                        for (int d = -3; d <= 3; d++)
+                        {
+                            int xx = horizontal ? std::clamp(x + d, 0, w - 1) : x, yy = horizontal ? y : std::clamp(y + d, 0, h - 1);
+                            sum += mask[size_t(yy) * w + xx];
+                        }
+                        tmp[size_t(y) * w + x] = sum / 7;
+                    }
+                mask.swap(tmp);
+            }
+            Image plate;
+            plate.width = pieces.width, plate.height = pieces.height;
+            plate.rgba.assign(mask.size(), 0);
+            for (size_t i = 0; i < mask.size(); i++)
+            {
+                float coverage = std::clamp((mask[i] - 0.25f) * 2.0f, 0.0f, 1.0f);       // the edge, antialiased
+                float body = std::clamp((mask[i] - 0.55f) / 0.35f, 0.0f, 1.0f);           // 0 on the rim, 1 inside
+                uint32_t out = uint32_t(coverage * 255 + 0.5f) << 24;
+                for (int shift = 0; shift < 24; shift += 8)
+                    out |= uint32_t(float((base >> shift) & 0xFF) * (0.35f + 0.65f * body) + 0.5f) << shift;
+                plate.rgba[i] = out;
+            }
+            return plate;
+        }
+
+        // The plate's blue in the game's own flat title picture (title_giants_3d.png): the mean of its blue, dark texels.
+        uint32_t PlateBlue(const Image& flat)
+        {
+            uint64_t r = 0, g = 0, b = 0, n = 0;
+            for (uint32_t y = 0; y < flat.height / 2; y++)
+                for (uint32_t x = 0; x < flat.width; x++)
+                {
+                    uint32_t p = flat.rgba[size_t(y) * flat.width + x];
+                    uint32_t pr = p & 0xFF, pg = (p >> 8) & 0xFF, pb = (p >> 16) & 0xFF;
+                    if (pb > 60 && pb > pr * 2 + 40 && pb > pg && pr + pg + pb < 240)
+                        r += pr, g += pg, b += pb, n++;
+                }
+            if (n == 0)
+                return 0xFF642E00; // R 0, G 46, B 100: the same blue, if the texture is not there
+            return 0xFF000000 | uint32_t(b / n) << 16 | uint32_t(g / n) << 8 | uint32_t(r / n);
+        }
+
+        // [Giants] The title's logo is a sprite sheet (spritelogo.png, 1024x1024): "SKYLANDERS" (the arch), "GIANTS", the
+        // row of 8 element medallions and the TM mark, apart. The title draws "GIANTS" under the arch's middle, behind it
+        // (as in the title's own flat picture, title_giants_3d.png), the medallions under it, the TM at their height on
+        // the right, and the dark blue plate behind all but the TM. `flat` is title_giants_3d.png (the plate's blue).
+        bool ComposeGiantsLogo(const Image& sheet, const Image* flat, Image& logo)
         {
             std::vector<Band> bands = OpaqueBands(sheet);
-            // Top to bottom (once the right way up): the arch, the word, the symbols.
-            if (bands.size() < 2)
+            // Top to bottom (once the right way up): the arch, the word, the medallions with the TM.
+            if (bands.size() < 3)
                 return false;
             const Band& arch = bands[0];
             const Band& word = bands[1];
-            uint32_t archH = arch.bottom - arch.top, archW = arch.right - arch.left, wordH = word.bottom - word.top;
-            // "GIANTS" starts 0.507 of the arch's height down (measured on title_giants_3d.png: 215 of 424 px).
-            int wordTop = int(float(archH) * 0.507f + 0.5f);
-            logo.width = archW;
-            logo.height = std::max<uint32_t>(archH, uint32_t(wordTop) + wordH);
-            logo.rgba.assign(size_t(logo.width) * logo.height, 0);
-            Blit(sheet, arch, logo, 0, 0, false);
-            Blit(sheet, word, logo, int(word.left) - int(arch.left), wordTop, true); // as aligned on the sheet: centred
+            std::vector<Band> row = ColumnRuns(sheet, bands[2], 24);
+            if (row.size() < 2)
+                return false;
+            const Band& tm = row.back();
+            Band medals = row.front();
+            for (size_t i = 1; i + 1 < row.size(); i++)
+                medals.left = std::min(medals.left, row[i].left), medals.right = std::max(medals.right, row[i].right),
+                medals.top = std::min(medals.top, row[i].top), medals.bottom = std::max(medals.bottom, row[i].bottom);
+            const uint32_t archH = arch.bottom - arch.top, archW = arch.right - arch.left, wordH = word.bottom - word.top;
+            const uint32_t medalsH = medals.bottom - medals.top, margin = 10; // the plate reaches 10 texels past the pieces
+            // "GIANTS" starts 0.48 of the arch's height down, the medallions 0.08 of the word's height under it (both
+            // measured on the press logo, scaled to the sheet; title_giants_3d.png says 0.507, drawn in perspective).
+            const int wordTop = int(float(archH) * 0.48f + 0.5f), medalsTop = wordTop + int(wordH) + int(float(wordH) * 0.08f + 0.5f);
+            const int origin = int(arch.left); // sheet column of the logo's left edge (without the margin)
+            Image pieces;
+            pieces.width = std::max(archW, tm.right - arch.left) + 2 * margin;
+            pieces.height = uint32_t(medalsTop) + medalsH + 2 * margin;
+            pieces.rgba.assign(size_t(pieces.width) * pieces.height, 0);
+            const int m = int(margin);
+            Blit(sheet, arch, pieces, m, m, false);
+            Blit(sheet, word, pieces, m + int(word.left) - origin, m + wordTop, true); // as aligned on the sheet: centred
+            Blit(sheet, medals, pieces, m + int(medals.left) - origin, m + medalsTop, false);
+            Image plate = BackingPlate(pieces, margin, flat != nullptr ? PlateBlue(*flat) : PlateBlue(Image()));
+            Blit(sheet, tm, pieces, m + int(tm.left) - origin, m + medalsTop + int(tm.top) - int(medals.top), false); // not on the plate
+            logo = plate;
+            Band all{ 0, pieces.height, 0, pieces.width };
+            Blit(pieces, all, logo, 0, 0, false);
             return true;
         }
 
@@ -224,12 +347,19 @@ namespace art
         {
             if (auto archive = OpenArchive(disc, "level/Title.bld"))
                 if (auto scene = OpenScene(*archive, "level.bld"))
+                {
+                    Image sheet, flat;
+                    bool haveSheet = false, haveFlat = false;
                     for (const alchemy::IgzFile::Picture& picture : scene->Pictures())
                     {
-                        Image sheet;
-                        if (picture.name.ends_with("giantslogo/rig/textures/spritelogo.png") && alchemy::DecodePicture(*scene, picture, sheet))
-                            ComposeGiantsLogo(sheet, out.logo);
+                        if (picture.name.ends_with("giantslogo/rig/textures/spritelogo.png"))
+                            haveSheet = alchemy::DecodePicture(*scene, picture, sheet);
+                        else if (picture.name.ends_with("giantslogo/rig/textures/title_giants_3d.png"))
+                            haveFlat = alchemy::DecodePicture(*scene, picture, flat);
                     }
+                    if (haveSheet)
+                        ComposeGiantsLogo(sheet, haveFlat ? &flat : nullptr, out.logo);
+                }
             if (auto archive = OpenArchive(disc, "permanent/global.arc"))
                 if (auto file = OpenScene(*archive, "ui_levelfullscreen/mainmenu.png"))
                     for (const alchemy::IgzFile::Picture& picture : file->Pictures())
