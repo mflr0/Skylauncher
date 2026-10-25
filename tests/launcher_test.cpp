@@ -581,6 +581,14 @@ int main(int argc, char** argv)
     EXPECT(edited.size() == 1 && edited["ssa"].size() == 1 && edited["ssa"]["iso"] == "/a b/c.iso");
     EXPECT(LoadLauncherConfig((scratch / "missing.ini").string()).empty());
 
+    LauncherConfig video;
+    video["video"]["aspect"] = "16:9";
+    video["video"]["texture_packs"] = "0";
+    video["video"]["texture_dump"] = "1";
+    EXPECT(SaveLauncherConfig(settings.string(), video));
+    LauncherConfig videoBack = LoadLauncherConfig(settings.string());
+    EXPECT(videoBack["video"]["aspect"] == "16:9" && videoBack["video"]["texture_packs"] == "0" && videoBack["video"]["texture_dump"] == "1");
+
     std::filesystem::remove_all(scratch);
     printf(g_failures == 0 ? "All launcher checks passed\n" : "%d launcher check(s) failed\n", g_failures);
     return g_failures == 0 ? 0 : 1;
