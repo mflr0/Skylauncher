@@ -38,6 +38,9 @@ on your computer.
 Any gamepad works: Xbox, PlayStation, Switch and others. You can also play on the keyboard, and change every key in
 Settings > Controls.
 
+The launcher shows live whether a real Portal of Power is plugged in ("Portal: <model>" or "Portal: not detected"), next
+to PLAY and on the Collection page.
+
 | Action | Gamepad | Keyboard |
 |---|---|---|
 | Move | Left stick | W A S D |
