@@ -117,6 +117,7 @@ add_library(SkylauncherCore STATIC
 target_sources(SkylauncherCore PRIVATE
     src/launcher/install_checklist.cpp
     src/launcher/game_run.cpp
+    src/launcher/report.cpp
     src/launcher/updater.cpp
     src/shared/mini_json.cpp
     src/launcher/ui/install_page.cpp

@@ -173,6 +173,8 @@ namespace launcher_ui
         void DrawWhatsNew();
         void DrawPortalTest();   // support_page.cpp
         void DrawLogs();
+        void OpenProblemReport();
+        void DrawProblemReport();
         void DrawToast();
         void DrawLanguageMenu();
 
@@ -248,6 +250,8 @@ namespace launcher_ui
         uint64_t m_discSize = 0;
         VerifyJob m_verify;
         ProbeJob m_probe;
+        bool m_reportOpen = false;      // "Report a problem" shown (support_page.cpp)
+        std::string m_reportText;
 
         // Updates (update_page.cpp).
         UpdateManager m_updates;
