@@ -1,5 +1,5 @@
 // The game page in each game's own look (docs/launcher_ui.md, "Each game's look"): the disc's pictures as textures, the
-// logo's arrival, and the widgets drawn in the game's style (the main button, the game's settings button).
+// logo's arrival, and the action button in the game's colours (the main action and the game's settings).
 #include "launcher/ui/launcher_app.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -16,7 +16,7 @@ namespace LauncherTheme
 {
     const GameStyle& StyleOf(const char* game)
     {
-        static constexpr GameStyle Launcher = { AccentHover, AccentDark, 0x0A1B33, 0xFFFFFF, 0x0A1B33, Accent, false };
+        static constexpr GameStyle Launcher = { AccentHover, AccentDark, AccentInk, Accent };
         if (game != nullptr && strcmp(game, "ssa") == 0)
             return SpyrosAdventureStyle;
         if (game != nullptr && strcmp(game, "giants") == 0)
@@ -63,66 +63,105 @@ namespace launcher_ui
             return 1 + C3 * u * u * u + C1 * u * u;
         }
 
-        ImU32 WithAlpha(unsigned rgb, float alpha) { return Rgb(rgb, unsigned(std::clamp(alpha, 0.0f, 1.0f) * 255)); }
-
-        ImU32 Lighter(unsigned rgb, float amount, float alpha = 1)
+        unsigned Mix(unsigned a, unsigned b, float t)
         {
-            auto mix = [&](unsigned c) { return unsigned(c + (255 - c) * amount); };
-            return Rgb(mix(rgb >> 16 & 0xFF) << 16 | mix(rgb >> 8 & 0xFF) << 8 | mix(rgb & 0xFF), unsigned(alpha * 255));
+            auto channel = [&](int shift) {
+                float x = float(a >> shift & 0xFF), y = float(b >> shift & 0xFF);
+                return unsigned(std::lround(x + (y - x) * t)) << shift;
+            };
+            return channel(16) | channel(8) | channel(0);
         }
 
-        ImU32 Darker(unsigned rgb, float amount, float alpha = 1)
+        // Towards white (> 0) or black (< 0).
+        unsigned Lift(unsigned rgb, float amount) { return amount >= 0 ? Mix(rgb, 0xFFFFFF, amount) : Mix(rgb, 0x000000, -amount); }
+
+        float Luminance(unsigned rgb)
         {
-            auto mix = [&](unsigned c) { return unsigned(c * (1 - amount)); };
-            return Rgb(mix(rgb >> 16 & 0xFF) << 16 | mix(rgb >> 8 & 0xFF) << 8 | mix(rgb & 0xFF), unsigned(alpha * 255));
+            auto linear = [](unsigned c) { float v = c / 255.0f; return v <= 0.04045f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f); };
+            return 0.2126f * linear(rgb >> 16 & 0xFF) + 0.7152f * linear(rgb >> 8 & 0xFF) + 0.0722f * linear(rgb & 0xFF);
         }
 
-        // The face of a game-styled button inside its rim: a soft stone bevel (SSA) or a glossy gel (Giants).
-        void DrawFace(ImDrawList* draw, ImVec2 min, ImVec2 max, const GameStyle& style, float rounding, bool hovered, bool held, float alpha)
+        // Large bold text needs 3:1: white when it gets that on the fill, else the game's dark outline colour.
+        unsigned InkOn(unsigned fill, unsigned dark) { return 1.05f / (Luminance(fill) + 0.05f) >= 3.0f ? 0xFFFFFF : dark; }
+
+        // On whole output pixels: edges and text placed there stay sharp.
+        float Snap(float v)
         {
-            float height = max.y - min.y;
-            unsigned top = style.top, bottom = style.bottom;
-            ImU32 topColor = hovered && !held ? Lighter(top, 0.12f, alpha) : held ? Darker(top, 0.1f, alpha) : WithAlpha(top, alpha);
-            ImU32 bottomColor = hovered && !held ? Lighter(bottom, 0.1f, alpha) : held ? Darker(bottom, 0.12f, alpha) : WithAlpha(bottom, alpha);
-            if (style.gel)
+            float scale = ImGui::GetIO().DisplayFramebufferScale.y;
+            return std::round(v * scale) / scale;
+        }
+
+        // A soft shadow around a rounded shape: a few wider, fainter copies.
+        void SoftShadow(ImDrawList* draw, ImVec2 min, ImVec2 max, float rounding, float offsetY, float spread, float alpha)
+        {
+            constexpr int Layers = 5;
+            for (int i = Layers; i >= 1; i--)
             {
-                // Giants: the bottom half darker, a hard split at the middle, the top half bright and shiny.
-                float split = min.y + height * 0.5f;
-                GradientRect(draw, min, max, Darker(bottom, 0.05f, alpha), bottomColor, rounding);
-                GradientRect(draw, min, ImVec2(max.x, split), Lighter(top, 0.45f, alpha), topColor, rounding, ImDrawFlags_RoundCornersTop);
-                draw->AddLine(ImVec2(min.x + rounding * 0.5f, split), ImVec2(max.x - rounding * 0.5f, split), Lighter(top, 0.2f, alpha * 0.6f), 1.0f);
-                // A glint along the top edge, and the light the gel throws on its own bottom.
-                draw->AddRectFilled(ImVec2(min.x + rounding, min.y + 2), ImVec2(max.x - rounding, min.y + 4), Rgb(0xFFFFFF, unsigned(alpha * 150)), 2);
-                GradientRect(draw, ImVec2(min.x + 6, max.y - height * 0.22f), ImVec2(max.x - 6, max.y - 3), Rgb(0xFFFFFF, 0),
-                    Lighter(top, 0.3f, alpha * 0.45f), rounding * 0.6f, ImDrawFlags_RoundCornersBottom);
-            }
-            else
-            {
-                // SSA: the logo's sky gradient, a soft light on the upper part and a darker lip at the bottom.
-                GradientRect(draw, min, max, topColor, bottomColor, rounding);
-                GradientRect(draw, ImVec2(min.x + 3, min.y + 2), ImVec2(max.x - 3, min.y + height * 0.48f), Rgb(0xFFFFFF, unsigned(alpha * 95)),
-                    Rgb(0xFFFFFF, 0), rounding - 2, ImDrawFlags_RoundCornersTop);
-                draw->AddRectFilled(ImVec2(min.x + 2, max.y - 5), ImVec2(max.x - 2, max.y), Darker(bottom, 0.35f, alpha * 0.8f), rounding,
-                    ImDrawFlags_RoundCornersBottom);
+                float grow = spread * i / Layers;
+                draw->AddRectFilled(ImVec2(min.x - grow, min.y - grow + offsetY), ImVec2(max.x + grow, max.y + grow + offsetY),
+                    IM_COL32(0, 0, 0, int(alpha * 255 / Layers)), rounding + grow);
             }
         }
 
-        // Text with a rim, as the games letter their buttons: the rim drawn around, then the letters.
-        void RimmedText(ImDrawList* draw, ImVec2 at, ImU32 ink, ImU32 rim, const char* text, const char* end = nullptr, float width = 1.6f)
+        // One half of the action button as drawn.
+        struct Look
         {
-            for (int i = 0; i < 12; i++)
-            {
-                float angle = 6.2831853f * i / 12;
-                draw->AddText(ImVec2(at.x + std::cos(angle) * width, at.y + std::sin(angle) * width), rim, text, end);
-            }
-            draw->AddText(ImVec2(at.x, at.y + width * 0.9f), rim, text, end); // a little weight under the letters
-            draw->AddText(at, ink, text, end);
+            bool hovered = false, held = false, enabled = true;
+            float progress = -1; // 0..1 while busy
+            bool Busy() const { return progress >= 0; }
+        };
+
+        // A fill in its state: lighter under the pointer (or the focus), darker pressed, greyed when disabled, dark and
+        // tinted when busy.
+        unsigned Shade(unsigned rgb, const Look& look)
+        {
+            if (look.Busy())
+                return Mix(rgb, BottomBarRaised, 0.78f);
+            if (!look.enabled)
+                return Mix(rgb, 0x4A4A54, 0.7f);
+            return look.held ? Lift(rgb, -0.1f) : look.hovered ? Lift(rgb, 0.1f) : rgb;
+        }
+
+        // A busy button's progress on its face (min..max, `rounding`, `flags`): the done part tinted in the game's colour,
+        // and a bar along the bottom edge, both following the face's corners.
+        void DrawProgress(ImDrawList* draw, ImVec2 min, ImVec2 max, float rounding, ImDrawFlags flags, unsigned color, float progress)
+        {
+            float x = Snap(min.x + (max.x - min.x) * std::clamp(progress, 0.0f, 1.0f));
+            constexpr float BarH = 5;
+            draw->PushClipRect(ImVec2(min.x, max.y - BarH), max, true);
+            draw->AddRectFilled(min, max, Rgb(0xFFFFFF, 28), rounding, flags);
+            draw->PopClipRect();
+            draw->PushClipRect(min, ImVec2(x, max.y), true);
+            draw->AddRectFilled(min, max, Rgb(color, 60), rounding, flags);
+            draw->PushClipRect(ImVec2(min.x, max.y - BarH), ImVec2(x, max.y), true);
+            draw->AddRectFilled(min, max, Rgb(color), rounding, flags);
+            draw->PopClipRect();
+            draw->PopClipRect();
+        }
+
+        // The label with the current font, centred in `min..max` on its capitals, on whole pixels.
+        void DrawLabel(ImDrawList* draw, ImVec2 min, ImVec2 max, const char* text, ImU32 ink)
+        {
+            const ImFontGlyph* cap = ImGui::GetFontBaked()->FindGlyph('H');
+            float width = ImGui::CalcTextSize(text).x;
+            draw->AddText(ImVec2(Snap((min.x + max.x - width) / 2), Snap((min.y + max.y) / 2 - (cap->Y0 + cap->Y1) / 2)), ink, text);
+        }
+
+        // The size at which `text` fits in `width` with `font`, at most `size`.
+        float FitSize(ImFont* font, float size, const char* text, float width)
+        {
+            ImGui::PushFont(font, size);
+            float textW = ImGui::CalcTextSize(text).x;
+            ImGui::PopFont();
+            return textW > width ? std::floor(size * width / textW) : size;
         }
     }
 
+
     void GradientRect(ImDrawList* draw, ImVec2 min, ImVec2 max, ImU32 top, ImU32 bottom, float rounding, ImDrawFlags flags)
     {
-        // ImGui draws the shape; its vertices are then coloured by height, alpha included.
+        // ImGui draws the shape; its vertices are then coloured by height, alpha included. The anti-aliased fringe's
+        // vertices keep their transparency (else the edges come out hard and half a pixel wider).
         int first = draw->VtxBuffer.Size;
         draw->AddRectFilled(min, max, IM_COL32_WHITE, rounding, flags);
         ImVec4 a = ImGui::ColorConvertU32ToFloat4(top), b = ImGui::ColorConvertU32ToFloat4(bottom);
@@ -130,8 +169,9 @@ namespace launcher_ui
         for (int i = first; i < draw->VtxBuffer.Size; i++)
         {
             ImDrawVert& vertex = draw->VtxBuffer[i];
-            float t = std::clamp((vertex.pos.y - min.y) / height, 0.0f, 1.0f);
-            vertex.col = ImGui::ColorConvertFloat4ToU32(ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t));
+            float t = std::clamp((vertex.pos.y - min.y) / height, 0.0f, 1.0f), coverage = float(vertex.col >> IM_COL32_A_SHIFT & 0xFF) / 255;
+            vertex.col = ImGui::ColorConvertFloat4ToU32(ImVec4(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t,
+                (a.w + (b.w - a.w) * t) * coverage));
         }
     }
 
@@ -260,52 +300,77 @@ namespace launcher_ui
         DrawLogo(draw, logo, ImVec2(at.x, at.y - fall), size, std::clamp(t * 2.5f, 0.0f, 1.0f));
     }
 
-    bool App::GameButton(const char* label, ImVec2 size, const GameStyle& style, bool enabled)
+    App::MainActionHit App::DrawMainAction(ImVec2 at, const MainAction& action)
     {
-        ImVec2 position = ImGui::GetCursorScreenPos();
-        ImGui::BeginDisabled(!enabled);
-        bool pressed = ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
-        bool hovered = ImGui::IsItemHovered() && enabled, held = ImGui::IsItemActive() && enabled;
-        ImGui::EndDisabled();
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        float alpha = enabled ? 1.0f : 0.45f, rounding = style.gel ? Radius - 2 : Radius, sink = held ? 2.0f : 0.0f;
-        ImVec2 min(position.x, position.y + sink), max(position.x + size.x, position.y + size.y + sink);
-
-        if (hovered)
-            draw->AddRectFilled(ImVec2(min.x - 5, min.y - 5), ImVec2(max.x + 5, max.y + 5), Rgb(style.glow, 70), rounding + 5);
-        draw->AddRectFilled(ImVec2(position.x + 1, position.y + 5), ImVec2(position.x + size.x - 1, position.y + size.y + 5), IM_COL32(0, 0, 0, int(alpha * 80)), rounding);
-        draw->AddRectFilled(min, max, WithAlpha(style.outline, alpha), rounding);
-        constexpr float Rim = 3;
-        DrawFace(draw, ImVec2(min.x + Rim, min.y + Rim), ImVec2(max.x - Rim, max.y - Rim), style, rounding - Rim, hovered, held, alpha);
-
-        const char* labelEnd = std::strstr(label, "##");
-        if (labelEnd != label)
-        {
-            ImGui::PushFont(m_titleFont, size.y * 0.40f);
-            ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
-            RimmedText(draw, ImVec2(min.x + (size.x - text.x) / 2, min.y + (size.y - text.y) / 2 - 1), WithAlpha(style.ink, alpha),
-                WithAlpha(style.inkRim, alpha), label, labelEnd, 2.0f);
-            ImGui::PopFont();
-        }
-        FocusRing(rounding);
-        return pressed && enabled;
-    }
-
-    bool App::GameSettingsButton(const char* id, float size)
-    {
+        // One split button in the game's colour: a light gradient, the UI's corners, no outline; the main action on the
+        // left, the game's settings (a gear) in a segment on the right behind a hairline.
         const GameStyle& style = StyleOf(m_s->game.id);
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        bool pressed = GameButton(id, ImVec2(size, size), style);
-        bool held = ImGui::IsItemActive();
+        const float rounding = Radius;
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        ImVec2 center(at.x + size / 2, at.y + size / 2 + (held ? 2.0f : 0.0f));
-        float radius = size * 0.27f;
-        // The gear in the game's lettering: a dark rim, then the white gear, its hole showing the face.
-        DrawGear(draw, center, radius + 2.2f, Rgb(style.inkRim), Rgb(style.inkRim));
-        DrawGear(draw, center, radius, Rgb(style.ink), Rgb(style.gel ? style.top : style.bottom));
-        draw->AddCircle(center, radius * 0.36f, Rgb(style.inkRim), 24, 1.6f);
+        ImGuiIO& io = ImGui::GetIO();
+        MainActionHit hit = MainActionHit::None;
+        ImVec2 mainMin = at, mainMax(at.x + PlayButtonW, at.y + PlayButtonH);
+        ImVec2 gearMin(mainMax.x, at.y), gearMax(mainMax.x + PlayGearW, mainMax.y);
+        m_testMainAt = ImVec2((mainMin.x + mainMax.x) / 2, (mainMin.y + mainMax.y) / 2);
+        m_testGearAt = ImVec2((gearMin.x + gearMax.x) / 2, (gearMin.y + gearMax.y) / 2);
+        unsigned top = Mix(style.top, style.bottom, 0.2f), bottom = Mix(style.top, style.bottom, 0.58f), middle = Mix(top, bottom, 0.5f);
+
+        // The label: busy, its percentage instead of the dots.
+        std::string label = action.label;
+        if (action.progress >= 0)
+        {
+            if (label.ends_with("..."))
+                label.resize(label.size() - 3);
+            label += fmt::format(" {}%", int(std::floor(std::clamp(action.progress, 0.0f, 1.0f) * 100)));
+        }
+
+        // The main half (an id that keeps the focus when the label changes); the focused half is lit as under the pointer.
+        ImGui::PushStyleColor(ImGuiCol_NavCursor, 0); // the ring below instead of ImGui's
+        ImGui::SetCursorScreenPos(mainMin);
+        ImGui::BeginDisabled(!action.enabled);
+        if (ImGui::InvisibleButton("##main", ImVec2(PlayButtonW, PlayButtonH), ImGuiButtonFlags_EnableNav) && action.enabled)
+            hit = MainActionHit::Main;
+        ImGui::EndDisabled();
+        bool mainFocused = ImGui::IsItemFocused() && io.NavVisible;
+        Look main;
+        main.enabled = action.enabled;
+        main.hovered = action.enabled && (ImGui::IsItemHovered() || mainFocused);
+        main.held = action.enabled && ImGui::IsItemActive();
+        main.progress = action.progress;
+        TakeFocus(FocusTo::Page);
+
+        SoftShadow(draw, ImVec2(mainMin.x, mainMin.y + 2), gearMax, rounding, 2, 6, 0.35f);
+        GradientRect(draw, mainMin, mainMax, Rgb(Shade(top, main)), Rgb(Shade(bottom, main)), rounding, ImDrawFlags_RoundCornersLeft);
+        if (main.Busy())
+            DrawProgress(draw, mainMin, mainMax, rounding, ImDrawFlags_RoundCornersLeft, middle, main.progress);
+        draw->AddLine(ImVec2(mainMin.x + rounding, mainMin.y + 0.5f), ImVec2(mainMax.x, mainMin.y + 0.5f), Rgb(0xFFFFFF, main.enabled ? 70 : 25));
+        // The idle face's ink under the pointer and pressed (it never flips); the greyed or busy face's own otherwise.
+        unsigned ink = main.Busy() || !main.enabled ? InkOn(Shade(middle, main), style.outline) : InkOn(middle, style.outline);
+        ImGui::PushFont(m_titleFont, FitSize(m_titleFont, std::round(PlayButtonH * 0.4f), label.c_str(), PlayButtonW - 40));
+        DrawLabel(draw, mainMin, mainMax, label.c_str(), Rgb(ink, main.enabled || main.Busy() ? 255 : 150));
+        ImGui::PopFont();
+
+        // The settings half.
+        ImGui::SetCursorScreenPos(gearMin);
+        if (ImGui::InvisibleButton("##gamesettings", ImVec2(PlayGearW, PlayButtonH), ImGuiButtonFlags_EnableNav))
+            hit = MainActionHit::Settings;
+        bool gearFocused = ImGui::IsItemFocused() && io.NavVisible;
+        Look gear;
+        gear.hovered = ImGui::IsItemHovered() || gearFocused;
+        gear.held = ImGui::IsItemActive();
+        GradientRect(draw, gearMin, gearMax, Rgb(Shade(top, gear)), Rgb(Shade(bottom, gear)), rounding, ImDrawFlags_RoundCornersRight);
+        draw->AddLine(ImVec2(gearMin.x, gearMin.y + 0.5f), ImVec2(gearMax.x - rounding, gearMin.y + 0.5f), Rgb(0xFFFFFF, 70));
+        // The split: a dark hairline and a light one beside it, short of the edges.
+        draw->AddLine(ImVec2(gearMin.x - 0.5f, gearMin.y + 14), ImVec2(gearMin.x - 0.5f, gearMax.y - 14), Rgb(style.outline, 110));
+        draw->AddLine(ImVec2(gearMin.x + 0.5f, gearMin.y + 14), ImVec2(gearMin.x + 0.5f, gearMax.y - 14), Rgb(0xFFFFFF, 45));
+        DrawGear(draw, m_testGearAt, PlayButtonH * 0.22f, Rgb(InkOn(middle, style.outline)), Rgb(Shade(middle, gear)));
+        ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s settings", m_s->game.name);
-        return pressed;
+
+        // One ring around the whole button for the keyboard and pad focus, 4 points outside.
+        if (mainFocused || gearFocused)
+            draw->AddRect(ImVec2(mainMin.x - 4, mainMin.y - 4), ImVec2(gearMax.x + 4, gearMax.y + 4), Rgb(Accent), rounding + 4, 0, 2.0f);
+        return hit;
     }
 }
