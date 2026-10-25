@@ -22,7 +22,7 @@ is easy to iterate without touching the game runtime.
   `updater.{h,cpp}`, `ui/update_page.cpp` - updates, the banner and About (docs/updates.md);
   `shared/mini_json.{h,cpp}` - the JSON reader for GitHub's answer.
 - `src/launcher/ui/collection_*.{h,cpp}` - the collection page on the shared library: seats, sections, View, Figure page, Add a figure, Manage (`docs/collection_ui.md`).
-- `src/launcher/ui/game_look.cpp` - the game page in each game's own look: `GameButton`, `GameSettingsButton`, the logo's
+- `src/launcher/ui/game_look.cpp` - the game page in each game's own look: the action button (`DrawMainAction`), the logo's
   arrival (`LogoDrop`, `DrawHeroLogo`), the disc's pictures as textures (`LoadArt`, `CachedArt`), `SystemReducesMotion`.
 - `src/shared/art/` - SSARecomp's disc picture readers and per-game provider (`game_art`), copied by its
   `tools/sync_skylauncher.sh`: Xenos textures, SSA's `strm`/APKF, Giants' IGA/IGZ.
@@ -97,53 +97,48 @@ in the sidebar (`[launcher] game=`); the other is one click away.
    - Bottom left of the hero, the disc's lines: the image's file name, "DISC IMAGE:" and its state, the install note;
      "Change disc..." at the right of these lines once a disc is verified. (The small rounded app icon that sat here is
      gone: the owner's request, 2026-10-25.)
-   - The band under it: the controller button (current device; PLAY WITH: a menu of the others), then the **main button**
-     (CHOOSE DISC, INSTALL, then PLAY) and the **game's settings button** (a gear) beside it, both in the game's own look
-     ("Each game's look"), with the portal's line under them. PLAY and INSTALL check that the image is still there first.
+   - The band under it, one group centred in it: the controller button (current device; PLAY WITH: a menu of the others),
+     then the **action button** in the game's colours ("Each game's look"): the main action (CHOOSE DISC, INSTALL, then
+     PLAY) and the **game's settings** (a gear) in its right segment, with the portal's line under it. PLAY and INSTALL
+     check that the image is still there first.
 3. Collection - see below.
 4. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About. Clicking a game
    goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from. The game page's settings
    button opens it too, until each game has a settings page of its own (another branch).
 
 ## Each game's look
-What belongs to the game on its page is drawn in **the game's own art direction**, taken from its menus and logo
-(`GameStyle` in `launcher_theme.h`, `StyleOf(id)`):
+What belongs to the game on its page is drawn in **the game's own colours**, taken from its logo (`GameStyle` in
+`launcher_theme.h`, `StyleOf(id)`): the action button, and the glow of its Home card.
 
-| Game | Look | Tokens |
+| Game | Colours | Tokens |
 |---|---|---|
-| Spyro's Adventure | the logo's sky-blue-to-white letters in a navy outline: a soft stone bevel, a gradient from sky blue to deep blue, a light upper part, a darker lip | `SpyrosAdventureStyle` |
-| Giants | the menus' glossy "gel" buttons (the yes/no buttons of `global.bld`): a bright top half, a hard split at the middle, a darker bottom half, a glint, a dark rim; in the logo's gold and orange | `GiantsStyle` |
+| Spyro's Adventure | the logo's sky blue to deep blue, navy ink | `SpyrosAdventureStyle` |
+| Giants | the logo's gold to orange, dark brown ink | `GiantsStyle` |
 | any other | the launcher's own blue | |
 
-- `App::GameButton(label, size, style)`: the main button. A 3 px dark rim, the face (`gel` or bevel), the label in the
-  title font as the logos letter it (white with a dark rim), a glow in the game's colour under the pointer, a 2 px sink
-  when pressed, dimmed when disabled.
-- `App::GameSettingsButton(id, size)`: **the game's settings entry**, a square button with a gear in the shown game's
-  style (its tooltip: "<game> settings"). It is the one to call for the per-game settings page: it only draws and
-  returns the click.
+**The action button** (`App::DrawMainAction(at, {label, enabled, progress})`, the owner's choice of 2026-10-25, "flat and
+crisp"): one split button, `PlayButtonW` + `PlayGearW` by `PlayButtonH` (300 + 64 by 64 points).
+- Flat: a light gradient between the game's two colours (20 % to 58 % of the way), `Radius` corners, no outline, a soft
+  shadow, a hairline of light along the top. The label in Bungee, 40 % of the height (smaller if it would not fit), centred
+  on its capitals and placed on whole pixels; its ink is white when that reads at 3:1 on the fill, else the game's dark
+  ink (navy for SSA, brown for Giants), and it never changes under the pointer.
+- The game's settings: a gear in the right segment, behind a dark and a light hairline; its tooltip "<game> settings".
+- States, each half on its own: under the pointer 10 % lighter, pressed 10 % darker; **focused** (keyboard, pad): the
+  focused half lit as under the pointer and one accent ring around the whole button (ImGui's own ring hidden there);
+  **disabled**: greyed, a light faded label; **busy** (checking the disc, installing): a dark face tinted in the game's
+  colour up to the progress, a 5-point bar in that colour along the bottom edge, the label ending in the percentage
+  ("INSTALLING 42%").
+- The band's group (the controller picker, 40 points, the button) is centred in the band on whole points; the picker is
+  as tall as the button. At 100 % and 200 % and in the smallest window (1024x680) both share their top, bottom and
+  centre to the pixel, and the margins left and right are equal.
 - Everything else (the sidebar, the band, Settings, Collection) keeps the launcher's neutral look: the games' styles
   never mix.
 - A new game: add its `GameStyle` and a line in `StyleOf`.
 
-## Button styles (dev only, being chosen)
-The band's action area (the main button: PLAY, INSTALL, CHOOSE DISC, and the game's settings entry beside it) has three
-candidate styles, picked at start by `[launcher] button_style=1|2|3` in `launcher.ini` (unset or 0: the `GameButton` and
-`GameSettingsButton` above). `App::DrawMainAction` draws them (`game_look.cpp`); each keeps the game's colours.
-
-| Style | Look |
-|---|---|
-| 1, flat and crisp | one split button in the game's colour (a light gradient, `Radius` corners, no outline), Bungee label in white or the game's dark ink (whichever reads at 3:1 on the fill), the gear in its own segment behind a hairline |
-| 2, the game's finish refined | SSA's stone and Giants' gold kept, but a 2 pt rim, a soft sheen, a crisp light line and a dark lip instead of the glossy gel; white Bungee with a thin rim and a drop shadow; the gear a square button in the same finish |
-| 3, big launcher | one wide button (340 pt) in the game's colour, an icon (PLAY's triangle, INSTALL's arrow) and a spaced Outfit SemiBold label; the gear a quiet icon button in the band's grey |
-
-Every style: hover, pressed, the focus ring (the launcher's accent, one ring, ImGui's own hidden), disabled, and busy
-(checking the disc, installing): a dark face tinted in the game's colour up to the progress, a bar along its bottom edge
-and the percentage in the label. The controller picker takes the buttons' height.
-
 `SSA_LAUNCHER_TEST_BUTTONS=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=`)
-shoots the states for the style in the ini: for each game `00-install`, `01-hover`, `02-pressed`, `03-focused`,
-`04-settings-hover`, `05-disabled`, `06-installing`, `07-play`, `08-play-hover`, then `09-small` (1024x680),
-`10-scale150` and `11-scale200`, named `<game>-<nn>-<state>.png`.
+shoots the button's states: for each game `00-install`, `01-hover`, `02-pressed`, `03-focused`, `04-settings-hover`,
+`05-disabled`, `06-installing`, `07-play`, `08-play-hover`, then `09-small` (1024x680), `10-scale150` and `11-scale200`,
+named `<game>-<nn>-<state>.png`.
 
 ## The logo's arrival
 On each arrival on a game's page (from another page, or switching games, or when the logo appears because the disc was
@@ -254,8 +249,8 @@ The Windows executable declares per-monitor v2 DPI awareness in its manifest (`r
 
 ## How to change the look
 - Colours: edit the constants in `launcher_theme.h`; ImGui's own widget colours are set in `LauncherTheme::Apply`. Each
-  game's own look (its main and settings buttons) is its `GameStyle` there.
-- Spacing and sizes: `SidebarW`, `Pad`, `Radius*`, `PlayButtonW/H` and the font sizes in the same file.
+  game's own colours (its action button) are its `GameStyle` there.
+- Spacing and sizes: `SidebarW`, `Pad`, `Radius*`, `PlayButtonW/H`, `PlayGearW` and the font sizes in the same file.
 - Fonts: put an OFL- or Apache-licensed font in `resources/fonts/` and load it in `App::LoadFonts`
   (`SSA_LAUNCHER_FONT_DIR` overrides the folder while trying fonts).
 - Widgets: add them next to `BigButton` and `Toggle` in `launcher_ui.cpp`, taking every colour from the theme.

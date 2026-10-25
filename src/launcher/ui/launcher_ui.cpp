@@ -376,7 +376,6 @@ namespace launcher_ui
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
             m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
         }
-        m_buttonStyle = std::clamp(SettingInt(m_config, "launcher", "button_style", 0), 0, 3);
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
         m_portal.Start();
@@ -1479,11 +1478,11 @@ namespace launcher_ui
         bool ready = m_s->disc == DiscState::Ready, verifying = m_s->disc == DiscState::Verifying, installing = Installing();
         bool install = ready && NeedsInstall();
         const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : strings::ChooseDisc;
-        // The main button and the game's settings beside it, in the game's own look, centred together, unless the
-        // controller picker on their left would reach the sidebar (a narrow window).
-        constexpr float MinGap = 16;
-        MainActionLayout layout = MainActionLayoutOf(m_buttonStyle);
-        float mainX = std::max(bar.x + (available.x - layout.Width()) / 2, bar.x + Pad + ControllerW + MinGap), buttonY = middle - layout.height / 2;
+        // The band's group, centred in it on whole points (crisp edges at any scale): the controller picker, then the
+        // action button (the main action and the game's settings), both PlayButtonH tall. The smallest window fits it.
+        const float groupW = ControllerW + ControllerGap + PlayButtonW + PlayGearW;
+        float groupX = std::floor(bar.x + (barEnd.x - bar.x - groupW) / 2), buttonY = std::floor(middle - PlayButtonH / 2);
+        float mainX = groupX + ControllerW + ControllerGap;
         MainAction action{ label, !verifying && !installing && !m_testButtonsOff };
         if (installing)
             action.progress = MakeInstallChecklist(InstallSnapshot(), SDL_GetTicks()).overall;
@@ -1506,10 +1505,8 @@ namespace launcher_ui
             break;
         }
 
-        // Controller picker, left of the main button: what the game listens to, a menu of the choices above it (as tall
-        // as the buttons in the button styles).
-        float controllerGap = std::clamp(mainX - (bar.x + Pad) - ControllerW, MinGap, ControllerGap);
-        ImVec2 controllerAt(mainX - controllerGap - ControllerW, buttonY), controllerSize(ControllerW, m_buttonStyle == 0 ? PlayButtonH - 6 : layout.height);
+        // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
+        ImVec2 controllerAt(groupX, buttonY), controllerSize(ControllerW, PlayButtonH);
         ImGui::SetCursorScreenPos(controllerAt);
         if (ImGui::InvisibleButton("##controller", controllerSize, ImGuiButtonFlags_EnableNav) || m_testControllers)
         {
@@ -1584,7 +1581,7 @@ namespace launcher_ui
             if (!line.empty())
             {
                 ImGui::PushFont(nullptr, SmallSize);
-                ImGui::SetCursorScreenPos(ImVec2(mainX + (layout.mainW - ImGui::CalcTextSize(line.c_str()).x) / 2, buttonY + layout.height + 4));
+                ImGui::SetCursorScreenPos(ImVec2(mainX + (PlayButtonW - ImGui::CalcTextSize(line.c_str()).x) / 2, buttonY + PlayButtonH + 4));
                 DrawPortalStatus();
                 ImGui::PopFont();
             }
@@ -2261,8 +2258,8 @@ namespace launcher_ui
         m_testAt = now + (holding ? 1500 : 600);
     }
 
-    // The action area's states, to compare the button styles (SSA_LAUNCHER_TEST_BUTTONS, with a [launcher] kit= that is the
-    // fake kit and both games' iso=): for each game INSTALL, under the pointer, pressed, focused, the settings under the
+    // The action button's states (SSA_LAUNCHER_TEST_BUTTONS, with a [launcher] kit= that is the fake kit and both games'
+    // iso=): for each game INSTALL, under the pointer, pressed, focused, the settings under the
     // pointer, disabled, installing, then PLAY and PLAY under the pointer; then each game in the smallest window, at 150 %
     // and at 200 %. Shots "<game>-<step>-<state>".
     void App::TestButtonsScript(uint64_t now)

@@ -66,7 +66,7 @@ namespace LauncherTheme
     inline constexpr float SidebarW = 270;
     inline constexpr float Pad = 24;
     inline constexpr float Radius = 14, RadiusSmall = 10, RadiusLarge = 22;
-    inline constexpr float PlayButtonW = 300, PlayButtonH = 72;
+    inline constexpr float PlayButtonW = 300, PlayButtonH = 64, PlayGearW = 64; // the action button: its main half, height, gear half
     inline constexpr float BottomBarH = 150; // the band with the main button, under the game art
     inline constexpr float GameRowH = 56, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
     inline constexpr float TabUnderlineH = 3, TabGap = 34; // settings tabs: the line under the selected one, the space between them
@@ -81,21 +81,17 @@ namespace LauncherTheme
     inline constexpr float BoldOffset = 0.6f; // extra copies of SemiBold text, this far apart, for what must read heavier (the chosen controller)
     inline constexpr int BolderPasses = 2;
 
-    // Each game's own look, for what belongs to the game on its page: the main button and the game's settings button
-    // (docs/launcher_ui.md, "Each game's look"). Taken from the game's own menus and logo:
-    // - Spyro's Adventure: the logo's sky-blue-to-white letters in a navy outline, soft stone bevels;
-    // - Giants: the menus' glossy "gel" buttons (a bright top half, a hard split, a darker bottom half, a dark outline)
-    //   in the logo's gold-to-orange.
+    // Each game's own colours, for what belongs to the game on its page: the action button (docs/launcher_ui.md, "Each
+    // game's look"), and the Home cards' glow. Taken from the game's logo: Spyro's Adventure's sky blue to deep blue,
+    // Giants' gold to orange.
     struct GameStyle
     {
-        unsigned top, bottom;  // the button's fill, top to bottom
-        unsigned outline;      // the dark rim around it
-        unsigned ink, inkRim;  // the label: white letters with a dark rim, as on the logos
-        unsigned glow;         // under the pointer
-        bool gel;              // a hard highlight split (Giants) instead of a soft bevel (SSA)
+        unsigned top, bottom;  // the logo's colours, top to bottom (the button's gradient is drawn between them)
+        unsigned outline;      // its dark ink: the label and the gear when white wouldn't read on the fill
+        unsigned glow;         // the Home card under the pointer
     };
-    inline constexpr GameStyle SpyrosAdventureStyle = { 0x7CC8FF, 0x2C7FD8, 0x0C2A5C, 0xFFFFFF, 0x0C2A5C, 0x6BBAFF, false };
-    inline constexpr GameStyle GiantsStyle = { 0xFFD23C, 0xF06A10, 0x3A1404, 0xFFFFFF, 0x4A1A04, 0xFFB43A, true };
+    inline constexpr GameStyle SpyrosAdventureStyle = { 0x7CC8FF, 0x2C7FD8, 0x0C2A5C, 0x6BBAFF };
+    inline constexpr GameStyle GiantsStyle = { 0xFFD23C, 0xF06A10, 0x3A1404, 0xFFB43A };
     // The game's style by catalogue id; the launcher's own blue for a game without one.
     const GameStyle& StyleOf(const char* game);
 

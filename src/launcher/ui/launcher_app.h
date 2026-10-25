@@ -292,26 +292,15 @@ namespace launcher_ui
         friend class CollectionPage;
 
         // The game page in the game's own look (game_look.cpp, docs/launcher_ui.md "Each game's look").
-        // The main button, in the game's style (its label in the title font).
-        bool GameButton(const char* label, ImVec2 size, const GameStyle& style, bool enabled = true);
-        // The game's settings entry: a square button with a gear, in the shown game's style. Opens that game's settings.
-        bool GameSettingsButton(const char* id, float size);
-        // The band's action area: the main button (PLAY, INSTALL...) and the game's settings entry beside it, drawn in
-        // the style [launcher] button_style picks (dev only, docs/launcher_ui.md "Button styles"): 0 (unset) the
-        // GameButton above, 1 flat, 2 the game's finish refined, 3 a big launcher button. Takes the page's focus.
+        // The band's action button: the main action (PLAY, INSTALL...) and the game's settings (a gear) as one split
+        // button in the game's colours, PlayButtonW + PlayGearW by PlayButtonH at `at`. Takes the page's focus.
         struct MainAction
         {
             const char* label;
             bool enabled = true;
             float progress = -1; // 0..1 while busy (checking the disc, installing); < 0 otherwise
         };
-        struct MainActionLayout
-        {
-            float mainW, height, gap, settingsW;
-            float Width() const { return mainW + gap + settingsW; }
-        };
         enum class MainActionHit { None, Main, Settings };
-        MainActionLayout MainActionLayoutOf(int style) const;
         MainActionHit DrawMainAction(ImVec2 at, const MainAction& action);
         // A logo inside `size` at `at` (centred, aspect kept), with a soft shadow; `alpha` 0..1.
         void DrawLogo(ImDrawList* draw, const ArtTexture& logo, ImVec2 at, ImVec2 size, float alpha = 1, bool shadow = true);
@@ -445,7 +434,6 @@ namespace launcher_ui
         bool m_logoDropHad = false; // the logo was there (it may arrive after the page, once the disc is read)
         Page m_lastPage = Page::Home;
         std::map<std::string, ArtTexture> m_cachedArt; // CachedArt's, by "<game> <role> <width>"
-        int m_buttonStyle = 0; // [launcher] button_style, read once at start (DrawMainAction)
 
         std::string m_toast;
         uint64_t m_toastUntil = 0;
@@ -465,11 +453,11 @@ namespace launcher_ui
         std::string m_testSha, m_testPath, m_testRuntime[2];
         bool m_testNav = false;        // SSA_LAUNCHER_TEST_NAV: keyboard and pad navigation, keys sent to ImGui
         bool m_testControllers = false; // open the controller menu (its screenshot)
-        bool m_testButtons = false;     // SSA_LAUNCHER_TEST_BUTTONS: the action area's states, both games, in the chosen style
+        bool m_testButtons = false;     // SSA_LAUNCHER_TEST_BUTTONS: the action button's states, both games
         bool m_testButtonsOff = false;  // its "disabled" shot: the main button drawn disabled
         std::string m_testShot;         // the next shot's name, for scripts that name their own
         float m_testUiScale = 0;        // > 0: the UI scale, whatever the display (the button test)
-        ImVec2 m_testMainAt, m_testGearAt; // the action area's two buttons' centres, last drawn (where the script points)
+        ImVec2 m_testMainAt, m_testGearAt; // the action button's two halves' centres, last drawn (where the script points)
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };
