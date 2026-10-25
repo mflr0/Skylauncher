@@ -85,6 +85,34 @@ namespace launcher_ui
         }
     }
 
+    void CollectionPage::RefreshDisk()
+    {
+        if (m_diskGeneration == m_generation)
+            return;
+        m_diskGeneration = m_generation;
+        m_trash = collection::Trash();
+        m_starters = size_t(std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return collection::UntouchedStarter(f); }));
+        m_backups.clear();
+    }
+
+    const std::vector<CollectionPage::BackupRow>& CollectionPage::Backups(const std::string& figure)
+    {
+        RefreshDisk();
+        auto found = m_backups.find(figure);
+        if (found != m_backups.end())
+            return found->second;
+        std::vector<BackupRow> rows;
+        for (const std::string& backup : collection::Backups(figure))
+        {
+            Figure old;
+            std::string label = BackupLabel(backup);
+            if (collection::Read(backup, old) && HasProgress(old) && old.state == figures::AreaState::Valid)
+                label += fmt::format("   level {} · {} gold", old.level, old.stats.gold);
+            rows.push_back({ backup, label });
+        }
+        return m_backups[figure] = std::move(rows);
+    }
+
     void CollectionPage::DrawStats(const Figure& f, float width)
     {
         ImGui::BeginGroup();
@@ -297,9 +325,10 @@ namespace launcher_ui
         {
             std::string backup = collection::Backup(path);
             Toast(backup.empty() ? "Couldn't back it up" : "Backed up");
+            m_generation++; // Restore... lists it
         }
         ImGui::SameLine(0, 8);
-        std::vector<std::string> backups = collection::Backups(path);
+        const std::vector<BackupRow>& backups = Backups(path);
         ImGui::BeginDisabled(backups.empty());
         if (m_app.PillButton(backups.empty() ? "Restore (no backup)" : "Restore...", false, 170, true))
             ImGui::OpenPopup("##backups");
@@ -307,15 +336,9 @@ namespace launcher_ui
         if (ImGui::BeginPopup("##backups"))
         {
             ImGui::TextColored(ImColor(Rgb(TextDim)), "Put back the copy from");
-            for (const std::string& backup : backups)
-            {
-                Figure old;
-                std::string text = BackupLabel(backup);
-                if (collection::Read(backup, old) && HasProgress(old) && old.state == figures::AreaState::Valid)
-                    text += fmt::format("   level {} · {} gold", old.level, old.stats.gold);
-                if (ImGui::Selectable((text + "##" + backup).c_str()))
-                    m_confirm = "restore:" + backup;
-            }
+            for (const BackupRow& backup : backups)
+                if (ImGui::Selectable((backup.label + "##" + backup.path).c_str()))
+                    m_confirm = "restore:" + backup.path;
             ImGui::EndPopup();
         }
         ImGui::SameLine(0, 8);

@@ -84,6 +84,16 @@ namespace launcher_ui
         void CloseOverlay();
         void Toast(const std::string& text);
 
+        // What Manage and the Figure page show from disk, read again only once the collection changed (m_generation):
+        // drawn every frame, they read and decrypted every dump and backup at the display's rate.
+        struct BackupRow
+        {
+            std::string path;
+            std::string label; // "2026-10-24 10:15   level 6 · 2400 gold"
+        };
+        void RefreshDisk();
+        const std::vector<BackupRow>& Backups(const std::string& figure);
+
         void PutOn(size_t seat, const std::string& path);
         void OpenFigure(const std::string& path);
         void Import(const std::vector<std::string>& paths);
@@ -140,6 +150,10 @@ namespace launcher_ui
         char m_addSearch[64] = {};
         char m_addLabel[64] = {};
         std::string m_created;          // the figure Add a figure just made
+        int m_diskGeneration = -1;
+        std::vector<collection::TrashEntry> m_trash;
+        size_t m_starters = 0;          // untouched starters (Manage > Tidy)
+        std::map<std::string, std::vector<BackupRow>> m_backups; // per figure, filled as asked
         int m_manageTab = 0;
         std::string m_backupsOf;
         uint16_t m_unknownType = 0xFFFF;
