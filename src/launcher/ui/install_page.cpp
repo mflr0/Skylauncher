@@ -543,6 +543,7 @@ namespace launcher_ui
                 {
                     m_chosen = m_discPath;
                     m_chosenRuntime = m_installed.runtime;
+                    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_SHOTS"); // else the game runs its own shots
                 }
                 m_running = false;
             }
