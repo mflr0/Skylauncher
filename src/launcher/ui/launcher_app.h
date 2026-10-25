@@ -162,6 +162,7 @@ namespace launcher_ui
         void Shutdown();
         bool LoadFonts();
         void HandleEvent(const SDL_Event& event);
+        int IdleWait(); // how long the loop may sleep before the next frame, in ms (0: draw now)
         void Frame();
         void DrawBackdrop();
         void DrawSidebar();
@@ -256,6 +257,7 @@ namespace launcher_ui
         std::string m_chosen;
         std::string m_chosenRuntime; // the game built for the chosen disc, if any
         bool m_running = true;
+        int m_busyFrames = 0; // frames still drawn after an input, while ImGui settles (hover, focus, menus)
 
         SDL_Window* m_window = nullptr;
         float m_uiScale = 1.0f; // launcher points per window unit (UpdateUiScale)
@@ -318,6 +320,7 @@ namespace launcher_ui
         bool m_installLog = false;   // "Show details"
         InstallProgress m_installPast; // an install of an earlier launcher session, read back from its install.log
         uint32_t m_installPastPid = 0; // its SSABuild, if that one may still be running
+        uint64_t m_installPastCheck = 0; // when to look again whether it still runs
 
         std::vector<SDL_JoystickID> m_gamepads;
         const KeyAction* m_capturing = nullptr;

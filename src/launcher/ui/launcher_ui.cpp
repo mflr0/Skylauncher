@@ -386,6 +386,10 @@ namespace launcher_ui
         while (m_running)
         {
             SDL_Event event;
+            // Nothing moves on screen: sleep until an input comes, or the wait ends (jobs, the portal and the collection
+            // are polled then). The launcher doesn't redraw at the display's rate for nothing.
+            if (int wait = IdleWait(); wait > 0 && SDL_WaitEventTimeout(&event, wait))
+                HandleEvent(event);
             while (SDL_PollEvent(&event))
                 HandleEvent(event);
             if (m_disc == DiscState::Verifying && m_verify.done)
@@ -400,8 +404,33 @@ namespace launcher_ui
 
     // ---- Events and actions --------------------------------------------------------------------------------------
 
+    int App::IdleWait()
+    {
+        if (!m_shots.empty()) // the screenshot test runs flat out
+            return 0;
+        if (m_busyFrames > 0)
+        {
+            m_busyFrames--;
+            return 0;
+        }
+        // Something moves: a check, an install's spinner, an update's bar, a held button, a text cursor, a drag.
+        if (m_disc == DiscState::Verifying || Installing() || m_updates.Busy() || ImGui::IsAnyItemActive())
+            return 0;
+        constexpr int Idle = 500;
+        int wait = Idle;
+        uint64_t now = SDL_GetTicks();
+        if (!m_toast.empty() && m_toastUntil > now) // wake to take it down
+            wait = std::min<int>(wait, int(m_toastUntil - now) + 1);
+        // The night sky's stars twinkle, at 30 fps, while the window is seen.
+        bool seen = !(SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_OCCLUDED | SDL_WINDOW_HIDDEN));
+        if (seen && m_page == Page::Play && m_background == nullptr)
+            wait = std::min(wait, 33);
+        return wait;
+    }
+
     void App::HandleEvent(const SDL_Event& event)
     {
+        m_busyFrames = 3;
         // A key binding being captured takes the next key press for itself.
         if (m_capturing != nullptr && event.type == SDL_EVENT_KEY_DOWN)
         {

@@ -182,8 +182,12 @@ namespace launcher_ui
     void App::PollInstall()
     {
         // An SSABuild left running by an earlier launcher: wait for it to stop before offering to resume.
-        if (m_installPastPid != 0 && SDL_GetTicks() % 1000 < 20 && !PlatformProcessAlive(m_installPastPid))
-            m_installPastPid = 0;
+        if (m_installPastPid != 0 && SDL_GetTicks() >= m_installPastCheck)
+        {
+            m_installPastCheck = SDL_GetTicks() + 1000;
+            if (!PlatformProcessAlive(m_installPastPid))
+                m_installPastPid = 0;
+        }
         if (m_kitUsed && m_kitError.empty() && m_installView && !m_installer.Running() && m_kitStep.endedAt == 0)
         {
             KitDownloader::Snapshot_ kit = m_kitDownload.Snapshot();
