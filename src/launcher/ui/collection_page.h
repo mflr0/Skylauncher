@@ -44,6 +44,8 @@ namespace launcher_ui
         // A dropped file or folder: figure dumps join the collection. False if it holds none (a disc image).
         bool Drop(const std::string& path);
         std::string Folder() const;
+        // B / Escape belongs to the page: an overlay, the View menu or a search is open.
+        bool TakesBack() const { return m_overlay != Overlay::None || m_viewMenu || m_search[0] != 0; }
 
         // Screenshot test (SSA_LAUNCHER_TEST_COLLECTION): every screen, in a scratch collection.
         void Seed();
@@ -107,6 +109,9 @@ namespace launcher_ui
         size_t m_seat = 0;              // the focused seat: the list shows what goes there
         int m_navSeat = -1;             // the seat with the keyboard or pad focus this frame, -1: none
         int m_hoverSeat = -1;           // the seat under the mouse this frame
+        bool m_navEdgeCard = false;     // the focused card is the first of its row (Left goes to the seats)
+        int m_focusSeat = -1;           // the D-pad crosses between the columns: focus this seat next frame,
+        bool m_focusCard = false;       // or the list's first card
         int m_seatMenu = -1;            // the seat whose right-click menu is open
         std::string m_selected;         // the card with the focus (double click or Enter: put on the seat)
         std::string m_hovered;          // the card under the mouse or the focus (X: its Figure page)
@@ -117,6 +122,7 @@ namespace launcher_ui
         int m_currentSection = 0;
         std::vector<float> m_sectionY;  // where each section starts in the list (last frame)
         bool m_viewMenu = false;
+        bool m_viewFocus = false;       // the View menu just opened (focus it) or closed (focus its button)
 
         // The overlays.
         Overlay m_overlay = Overlay::None;

@@ -145,6 +145,8 @@ namespace launcher_ui
     enum class Page { Home, Play, Collection, Settings };
     enum class SettingsTab { Graphics, Controls, Language, GameData, About };
     enum class DiscState { None, Verifying, Ready, Failed };
+    // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
+    enum class FocusTo { None, Sidebar, Page };
 
     class App
     {
@@ -185,6 +187,13 @@ namespace launcher_ui
         void DrawProblemReport();
         void DrawToast();
         void DrawLanguageMenu();
+
+        // Pages and focus. The sidebar and the page are separate windows, which the D-pad doesn't cross: B / Escape
+        // moves the focus to the sidebar (or leaves Settings and Collection), A on a row moves it into the page.
+        void GoTo(Page page);
+        void Back();
+        void TakeFocus(FocusTo where); // after the item that takes the focus when `where` is asked for
+        void RequestFocus(FocusTo where) { m_focusTo = where; m_focusShow = ImGui::GetIO().NavVisible; }
 
         // The collection (collection_page.h): its page draws with the widgets below.
         friend class CollectionPage;
@@ -239,6 +248,7 @@ namespace launcher_ui
         void TestScript();
         void TestInstallScript(uint64_t now);
         void TestUpdateScript(uint64_t now);
+        void TestNavScript(uint64_t now);
 
         const GameInfo& m_game;
         std::string m_configPath;
@@ -257,6 +267,10 @@ namespace launcher_ui
         ImFont* m_boldFont = nullptr; // Outfit SemiBold
 
         Page m_page = Page::Home; // the launcher opens on its menu; the player picks a game in the sidebar
+        Page m_backPage = Page::Home; // where Settings and Collection go back to
+        FocusTo m_focusTo = FocusTo::Sidebar;
+        bool m_focusShow = false;    // the focus request came from the keyboard or the pad: show the ring
+        bool m_backTaken = false;    // last frame, something else answered B / Escape (a menu, a dialog, a field)
         SettingsTab m_tab = SettingsTab::Graphics;
         DiscState m_disc = DiscState::None;
         std::string m_discPath;
@@ -323,6 +337,7 @@ namespace launcher_ui
         bool m_testReal = false;    // SSA_LAUNCHER_TEST_INSTALL=real: the real kit, a screenshot every SSA_LAUNCHER_TEST_EVERY seconds
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
+        bool m_testNav = false;        // SSA_LAUNCHER_TEST_NAV: keyboard and pad navigation, keys sent to ImGui
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };

@@ -101,7 +101,7 @@ namespace launcher_ui
                 m_manageTab = i;
         }
         ImGui::Dummy(ImVec2(0, 6));
-        ImGui::BeginChild("##managebody", ImVec2(0, size.y - ImGui::GetCursorPosY() - Pad - 50), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##managebody", ImVec2(0, size.y - ImGui::GetCursorPosY() - Pad - 50), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         switch (m_manageTab)
         {
         case 0: DrawTrash(); break;

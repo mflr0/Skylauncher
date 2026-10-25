@@ -255,7 +255,7 @@ namespace launcher_ui
             constexpr float CloseSize = 30;
             ImVec2 closeAt(left + width - CloseSize, titleAt.y - 4);
             ImGui::SetCursorScreenPos(closeAt);
-            if (ImGui::InvisibleButton("##closeinstall", ImVec2(CloseSize, CloseSize)))
+            if (ImGui::InvisibleButton("##closeinstall", ImVec2(CloseSize, CloseSize), ImGuiButtonFlags_EnableNav))
             {
                 m_installView = m_kitUsed = false;
                 SetInstallState(m_installSha, nullptr);
