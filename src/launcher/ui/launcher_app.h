@@ -149,14 +149,61 @@ namespace launcher_ui
     // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
     enum class FocusTo { None, Sidebar, Page };
 
+    class App;
+
+    // One game's state in the window: its disc and install, its art, its saves' backups, its collection page. Each game
+    // the player opens keeps one for the session, so going back to it is instant; its jobs go on in the background.
+    struct GameSlot
+    {
+        GameSlot(const GameInfo& info, App& app) : game(info), collection(std::make_unique<CollectionPage>(app)) {}
+        const GameInfo& game;
+        bool started = false; // its remembered disc has been sent to the check
+        std::string chosen;
+        std::string chosenRuntime; // the game built for the chosen disc, if any
+        DiscState disc = DiscState::None;
+        std::string discPath;
+        uint64_t discSize = 0;
+        VerifyJob verify;
+        GameSourceCheck check;
+        TitleMetadata meta;
+        LauncherAssets::Provider assets;
+        SDL_Texture* icon = nullptr;
+        SDL_Texture* logo = nullptr;
+        SDL_Texture* background = nullptr; // the window's backdrop, from the player's disc once verified
+        // Install state for the verified disc.
+        std::optional<InstallKit> kit;
+        InstalledGame installed;
+        std::string ownRuntime;    // a runtime the player set up (FindRuntime): no install needed
+        GameInstaller installer;
+        KitDownloader kitDownload;  // the first step of an install when there is no kit yet
+        std::string kitError;       // why the downloaded kit can't be used
+        bool kitUsed = false;       // this install started with that download
+        InstallProgress::Step kitStep;
+        std::string installSha;    // the disc being installed
+        std::string installKitVersion;
+        bool installView = false;  // the progress card replaces the logo
+        bool installLog = false;   // "Show details"
+        InstallProgress installPast; // an install of an earlier launcher session, read back from its install.log
+        uint32_t installPastPid = 0; // its SSABuild, if that one may still be running
+        uint64_t installPastCheck = 0; // when to look again whether it still runs
+
+        // Settings > Game data: the saves' backups (save_backup.h), read when the tab opens and after a restore.
+        std::vector<savebackup::Entry> saveBackups;
+        bool saveBackupsLoaded = false;
+
+        // The collection page and its state.
+        std::unique_ptr<CollectionPage> collection;
+    };
+
     class App
     {
     public:
-        App(const GameInfo& game, const std::string& configPath, LauncherConfig& config) : m_game(game), m_configPath(configPath), m_config(config) {}
+        App(const GameInfo& game, const std::string& configPath, LauncherConfig& config);
         ~App() { Shutdown(); }
         std::string Run();
-        const std::string& ChosenRuntime() const { return m_chosenRuntime; }
-        const std::string& SwitchTo() const { return m_switchTo; } // the player picked another game in the sidebar
+        const GameInfo& ChosenGame() const { return m_s->game; } // the game that was shown when Run returned
+        const std::string& ChosenRuntime() const { return m_s->chosenRuntime; }
+        int TestFailures() const { return m_testFailures; } // SSA_LAUNCHER_TEST_SWITCH: the checks that failed
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
 
     private:
@@ -226,7 +273,7 @@ namespace launcher_ui
         // Installing the game (the band's INSTALL button, the progress card in place of the logo).
         void RefreshInstall();
         bool NeedsInstall() const;
-        bool Installing() const { return m_installer.Running() || m_kitDownload.Running(); }
+        bool Installing() const { return m_s->installer.Running() || m_s->kitDownload.Running(); }
         void StartInstaller();
         void StartKitDownload();
         bool UpdateAvailable() const;
@@ -237,6 +284,11 @@ namespace launcher_ui
         void SetInstallState(const std::string& sha, const char* state); // [install.<sha>] state=, for a launcher restart
 
         void UpdateUiScale(bool resize);
+        GameSlot& SlotFor(const GameInfo& game);
+        void SelectGame(const GameInfo& game); // the sidebar's switch: the window stays, its content is that game's
+        void PollSlots();
+        bool AnyInstalling() const;
+        bool AnyVerifying() const;
         void StartVerify(const std::string& path);
         void FinishVerify();
         void Browse();
@@ -253,13 +305,11 @@ namespace launcher_ui
         void TestInstallScript(uint64_t now);
         void TestUpdateScript(uint64_t now);
         void TestNavScript(uint64_t now);
+        void TestSwitchScript(uint64_t now);
+        void PlayNow(); // PLAY on the shown game: its disc and built game are what the launcher returns
 
-        const GameInfo& m_game;
         std::string m_configPath;
         LauncherConfig& m_config;
-        std::string m_chosen;
-        std::string m_chosenRuntime; // the game built for the chosen disc, if any
-        std::string m_switchTo;      // another game's id: the window closes and main() opens that game's
         bool m_running = true;
         bool m_quitPrompt = false; // a quit asked during an install: confirm it
         int m_busyFrames = 0; // frames still drawn after an input, while ImGui settles (hover, focus, menus)
@@ -279,18 +329,10 @@ namespace launcher_ui
         bool m_focusShow = false;    // the focus request came from the keyboard or the pad: show the ring
         bool m_backTaken = false;    // last frame, something else answered B / Escape (a menu, a dialog, a field)
         SettingsTab m_tab = SettingsTab::Graphics;
-        DiscState m_disc = DiscState::None;
-        std::string m_discPath;
-        uint64_t m_discSize = 0;
-        VerifyJob m_verify;
         ProbeJob m_probe;
         launcher_portal::Watcher m_portal;
         bool m_reportOpen = false;      // "Report a problem" shown (support_page.cpp)
         std::string m_reportText;
-
-        // Settings > Game data: the saves' backups (save_backup.h), read when the tab opens and after a restore.
-        std::vector<savebackup::Entry> m_saveBackups;
-        bool m_saveBackupsLoaded = false;
 
         // Updates (update_page.cpp).
         UpdateManager m_updates;
@@ -301,37 +343,16 @@ namespace launcher_ui
         bool m_updateWasBusy = false;
         std::string m_updateDoneNote;    // the last answer of a manual check, shown in About
         float m_bannerH = 0;             // the height the banner takes at the top of the page, this frame
-        GameSourceCheck m_check;
-        TitleMetadata m_meta;
-        LauncherAssets::Provider m_assets;
-        SDL_Texture* m_icon = nullptr;
-        SDL_Texture* m_logo = nullptr;
-        SDL_Texture* m_background = nullptr; // the window's backdrop, from the player's disc once verified
         SDL_Texture* m_github = nullptr;
         bool m_dragOver = false;
-
-        // Install state for the verified disc.
-        std::optional<InstallKit> m_kit;
-        InstalledGame m_installed;
-        std::string m_ownRuntime;    // a runtime the player set up (FindRuntime): no install needed
-        GameInstaller m_installer;
-        KitDownloader m_kitDownload;  // the first step of an install when there is no kit yet
-        std::string m_kitError;       // why the downloaded kit can't be used
-        bool m_kitUsed = false;       // this install started with that download
-        InstallProgress::Step m_kitStep;
-        std::string m_installSha;    // the disc being installed
-        std::string m_installKitVersion;
-        bool m_installView = false;  // the progress card replaces the logo
-        bool m_installLog = false;   // "Show details"
-        InstallProgress m_installPast; // an install of an earlier launcher session, read back from its install.log
-        uint32_t m_installPastPid = 0; // its SSABuild, if that one may still be running
-        uint64_t m_installPastCheck = 0; // when to look again whether it still runs
 
         std::vector<SDL_JoystickID> m_gamepads;
         const KeyAction* m_capturing = nullptr;
 
-        // The collection page and its state.
-        std::unique_ptr<CollectionPage> m_collection = std::make_unique<CollectionPage>(*this);
+        // The games opened this session (one slot each), and the one shown. Every slot's jobs are polled; the shown
+        // one's state is what the pages draw (m_s).
+        std::vector<std::unique_ptr<GameSlot>> m_slots;
+        GameSlot* m_s = nullptr;
 
         HoldConfirm m_hold;
 
@@ -345,6 +366,10 @@ namespace launcher_ui
         bool m_testReal = false;    // SSA_LAUNCHER_TEST_INSTALL=real: the real kit, a screenshot every SSA_LAUNCHER_TEST_EVERY seconds
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
+        bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
+        int m_testFailures = 0;
+        uint64_t m_testBegan = 0;
+        std::string m_testSha, m_testPath, m_testRuntime[2];
         bool m_testNav = false;        // SSA_LAUNCHER_TEST_NAV: keyboard and pad navigation, keys sent to ImGui
         bool m_testControllers = false; // open the controller menu (its screenshot)
         int m_testStep = 0;

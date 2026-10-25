@@ -46,9 +46,10 @@ The sidebar lists both games as playable. Each has its own folder in the data fo
 disc (`[ssa] iso=`, `[giants] iso=`), its own built game and its own install log; **one kit builds both** (`kit.txt`
 `games=ssa,giants`).
 
-- Clicking the other game closes the window and opens it again for that game (the window holds one game's state); the choice
-  is kept as `[launcher] game=` so the launcher starts on the game last shown. Code: `main.cpp` (the loop),
-  `RunLauncherWindow(..., switchTo)`, `SetActiveGame()` in `game_install.cpp` (the folder helpers answer for that game).
+- Clicking the other game switches the window to it in place, with that game's state kept in a slot (docs/launcher_ui.md); the
+  choice is kept as `[launcher] game=` so the launcher starts on the game last shown. Code: `App::SelectGame` and `PollSlots`,
+  `RunLauncherWindow(..., played)`, `SetActiveGame()` in `game_install.cpp` (the folder helpers answer for the active game, which
+  the launcher sets to each slot's game while it polls that slot).
 - The disc check is per game: the table in `src/launcher/launcher_games.cpp` (title ID, SHA-256 of `default.xex`). A Giants
   disc dropped on Spyro's Adventure says it is another game, and the other way round. The name and icon on the game page come
   from the disc's own XDBF, as for SSA.

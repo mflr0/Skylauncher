@@ -36,6 +36,7 @@ namespace launcher_ui
     {
     public:
         explicit CollectionPage(App& app) : m_app(app) {}
+        void SelectGame(const std::string& id) { m_model.gameId = id; } // before the page is first opened
         ~CollectionPage() { ClearIcons(); }
 
         void Draw();

@@ -169,7 +169,7 @@ namespace launcher_ui
 
         // The launcher's cache of the disc's pictures, else the game's (docs/collection.md), else a generated icon.
         FigureIconTexture icon;
-        if (std::string path = m_app.m_assets.FigurePortraitPath(image); !path.empty())
+        if (std::string path = m_app.m_s->assets.FigurePortraitPath(image); !path.empty())
             icon.texture = LoadPngFile(m_app.m_renderer, path);
         if (icon.texture == nullptr && toy != nullptr)
             if (std::string path = collection::DiscImagePath(*toy); !path.empty())

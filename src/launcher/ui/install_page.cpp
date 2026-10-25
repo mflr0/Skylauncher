@@ -59,41 +59,41 @@ namespace launcher_ui
 
     void App::RefreshInstall()
     {
-        m_kit = FindInstallKit(m_config);
-        m_installed = FindInstalledGame(m_config, m_check.xexSha256);
-        m_ownRuntime = FindRuntime(m_game, m_config);
+        m_s->kit = FindInstallKit(m_config);
+        m_s->installed = FindInstalledGame(m_config, m_s->check.xexSha256);
+        m_s->ownRuntime = FindRuntime(m_s->game, m_config);
 
         // An install of an earlier session that never finished (the launcher was closed, or it failed): shown again, with
         // its steps read back from its log, so the player can resume it.
-        if (m_installer.Running() || m_installView || m_check.xexSha256.empty())
+        if (m_s->installer.Running() || m_s->installView || m_s->check.xexSha256.empty())
             return;
-        std::string section = "install." + m_check.xexSha256;
+        std::string section = "install." + m_s->check.xexSha256;
         std::string state = SettingGet(m_config, section, "state");
         if (state != "running" && state != "failed")
             return;
-        m_installPast = ReadInstallLog(GameInstallFolder(m_check.xexSha256));
-        if (m_installPast.state == InstallProgress::State::Idle || m_installPast.state == InstallProgress::State::Done)
+        m_s->installPast = ReadInstallLog(GameInstallFolder(m_s->check.xexSha256));
+        if (m_s->installPast.state == InstallProgress::State::Idle || m_s->installPast.state == InstallProgress::State::Done)
             return;
         if (state == "running")
         {
             uint32_t pid = uint32_t(SettingInt(m_config, section, "pid", 0));
-            m_installPastPid = PlatformProcessAlive(pid) ? pid : 0;
+            m_s->installPastPid = PlatformProcessAlive(pid) ? pid : 0;
         }
-        m_installSha = m_check.xexSha256;
-        m_installView = true;
-        m_installLog = false;
+        m_s->installSha = m_s->check.xexSha256;
+        m_s->installView = true;
+        m_s->installLog = false;
         if (m_shots.empty())
             m_page = Page::Play;
     }
 
     bool App::NeedsInstall() const
     {
-        return m_disc == DiscState::Ready && m_installed.runtime.empty() && m_ownRuntime.empty();
+        return m_s->disc == DiscState::Ready && m_s->installed.runtime.empty() && m_s->ownRuntime.empty();
     }
 
     bool App::UpdateAvailable() const
     {
-        return m_disc == DiscState::Ready && !m_installed.runtime.empty() && m_kit && m_kit->version != m_installed.kitVersion;
+        return m_s->disc == DiscState::Ready && !m_s->installed.runtime.empty() && m_s->kit && m_s->kit->version != m_s->installed.kitVersion;
     }
 
     void App::SetInstallState(const std::string& sha, const char* state)
@@ -116,16 +116,16 @@ namespace launcher_ui
         if (!DiscStillThere())
             return;
         RefreshInstall();
-        m_installSha = m_check.xexSha256;
-        m_installKitVersion = m_kit ? m_kit->version : std::string();
-        m_installView = true;
-        m_installLog = false;
-        m_installPast = {};
-        m_installPastPid = 0;
-        m_kitUsed = false;
-        m_kitError.clear();
+        m_s->installSha = m_s->check.xexSha256;
+        m_s->installKitVersion = m_s->kit ? m_s->kit->version : std::string();
+        m_s->installView = true;
+        m_s->installLog = false;
+        m_s->installPast = {};
+        m_s->installPastPid = 0;
+        m_s->kitUsed = false;
+        m_s->kitError.clear();
         m_page = Page::Play;
-        if (m_kit)
+        if (m_s->kit)
             StartInstaller();
         else
             StartKitDownload();
@@ -134,48 +134,48 @@ namespace launcher_ui
     // No kit next to the launcher or downloaded yet: the first step of the install fetches it (docs/install.md).
     void App::StartKitDownload()
     {
-        m_kitUsed = true;
-        m_kitStep = { "kit", "Downloading the game tools", SDL_GetTicks(), 0 };
-        m_kitDownload.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), "v" + LauncherVersion(), DownloadedKitsFolder());
+        m_s->kitUsed = true;
+        m_s->kitStep = { "kit", "Downloading the game tools", SDL_GetTicks(), 0 };
+        m_s->kitDownload.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), "v" + LauncherVersion(), DownloadedKitsFolder());
     }
 
     void App::StartInstaller()
     {
-        if (m_installer.Start(m_kit, m_discPath, GameInstallFolder(m_installSha)))
+        if (m_s->installer.Start(m_s->kit, m_s->discPath, GameInstallFolder(m_s->installSha)))
         {
-            auto& section = m_config["install." + m_installSha];
-            section["pid"] = std::to_string(m_installer.ProcessId());
+            auto& section = m_config["install." + m_s->installSha];
+            section["pid"] = std::to_string(m_s->installer.ProcessId());
             section["started"] = std::to_string(int64_t(std::time(nullptr)));
-            SetInstallState(m_installSha, "running");
+            SetInstallState(m_s->installSha, "running");
         }
     }
 
     InstallProgress App::InstallSnapshot(size_t logTail)
     {
-        if (m_kitUsed)
+        if (m_s->kitUsed)
         {
-            KitDownloader::Snapshot_ kit = m_kitDownload.Snapshot();
+            KitDownloader::Snapshot_ kit = m_s->kitDownload.Snapshot();
             using Kit = KitDownloader::State;
             InstallProgress progress;
-            progress.steps.push_back(m_kitStep);
-            if (!m_kitError.empty() || kit.state != Kit::Done)
+            progress.steps.push_back(m_s->kitStep);
+            if (!m_s->kitError.empty() || kit.state != Kit::Done)
             {
-                progress.state = !m_kitError.empty() || kit.state == Kit::Failed ? InstallProgress::State::Failed
+                progress.state = !m_s->kitError.empty() || kit.state == Kit::Failed ? InstallProgress::State::Failed
                     : kit.state == Kit::Cancelled                               ? InstallProgress::State::Cancelled
                                                                                 : InstallProgress::State::Running;
-                progress.error = !m_kitError.empty() ? m_kitError : kit.error;
+                progress.error = !m_s->kitError.empty() ? m_s->kitError : kit.error;
                 progress.done = kit.done >> 20; // MB
                 progress.total = kit.total >> 20;
                 return progress;
             }
             // Downloaded: the kit's step, done, then SSABuild's.
-            progress = m_installer.Snapshot(logTail);
-            progress.steps.insert(progress.steps.begin(), m_kitStep);
+            progress = m_s->installer.Snapshot(logTail);
+            progress.steps.insert(progress.steps.begin(), m_s->kitStep);
             return progress;
         }
-        if (m_installPast.state == InstallProgress::State::Idle)
-            return m_installer.Snapshot(logTail);
-        InstallProgress progress = m_installPast;
+        if (m_s->installPast.state == InstallProgress::State::Idle)
+            return m_s->installer.Snapshot(logTail);
+        InstallProgress progress = m_s->installPast;
         size_t first = progress.log.size() - std::min(logTail, progress.log.size());
         progress.log.erase(progress.log.begin(), progress.log.begin() + ptrdiff_t(first));
         return progress;
@@ -184,61 +184,61 @@ namespace launcher_ui
     void App::PollInstall()
     {
         // An SSABuild left running by an earlier launcher: wait for it to stop before offering to resume.
-        if (m_installPastPid != 0 && SDL_GetTicks() >= m_installPastCheck)
+        if (m_s->installPastPid != 0 && SDL_GetTicks() >= m_s->installPastCheck)
         {
-            m_installPastCheck = SDL_GetTicks() + 1000;
-            if (!PlatformProcessAlive(m_installPastPid))
-                m_installPastPid = 0;
+            m_s->installPastCheck = SDL_GetTicks() + 1000;
+            if (!PlatformProcessAlive(m_s->installPastPid))
+                m_s->installPastPid = 0;
         }
-        if (m_kitUsed && m_kitError.empty() && m_installView && !m_installer.Running() && m_kitStep.endedAt == 0)
+        if (m_s->kitUsed && m_s->kitError.empty() && m_s->installView && !m_s->installer.Running() && m_s->kitStep.endedAt == 0)
         {
-            KitDownloader::Snapshot_ kit = m_kitDownload.Snapshot();
+            KitDownloader::Snapshot_ kit = m_s->kitDownload.Snapshot();
             if (kit.state == KitDownloader::State::Done)
             {
-                m_kitStep.endedAt = SDL_GetTicks();
+                m_s->kitStep.endedAt = SDL_GetTicks();
                 Set("update", "kit_tag", kit.tag);
                 RefreshInstall();
-                if (m_kit)
+                if (m_s->kit)
                 {
-                    m_installKitVersion = m_kit->version;
+                    m_s->installKitVersion = m_s->kit->version;
                     StartInstaller();
                 }
                 else
-                    m_kitError = "The game tools were downloaded but SSABuild wasn't found in them.";
+                    m_s->kitError = "The game tools were downloaded but SSABuild wasn't found in them.";
             }
             else if (kit.state == KitDownloader::State::Cancelled)
             {
-                m_installView = m_kitUsed = false;
+                m_s->installView = m_s->kitUsed = false;
                 Toast("Installation cancelled");
             }
             return;
         }
-        if (!m_installView || m_installer.Running() || m_installPast.state != InstallProgress::State::Idle)
+        if (!m_s->installView || m_s->installer.Running() || m_s->installPast.state != InstallProgress::State::Idle)
             return;
-        InstallProgress progress = m_installer.Snapshot();
+        InstallProgress progress = m_s->installer.Snapshot();
         if (progress.state == InstallProgress::State::Done)
         {
-            RecordInstalledGame(m_config, m_installSha, progress.runtime, m_installKitVersion);
-            SetInstallState(m_installSha, nullptr);
+            RecordInstalledGame(m_config, m_s->installSha, progress.runtime, m_s->installKitVersion);
+            SetInstallState(m_s->installSha, nullptr);
             Toast("The game is installed: press PLAY");
-            m_installView = false;
+            m_s->installView = false;
             RefreshInstall();
         }
         else if (progress.state == InstallProgress::State::Cancelled)
         {
-            SetInstallState(m_installSha, nullptr);
-            m_installView = false;
+            SetInstallState(m_s->installSha, nullptr);
+            m_s->installView = false;
             Toast("Installation cancelled");
         }
-        else if (progress.state == InstallProgress::State::Failed && SettingGet(m_config, "install." + m_installSha, "state") != "failed")
-            SetInstallState(m_installSha, "failed");
+        else if (progress.state == InstallProgress::State::Failed && SettingGet(m_config, "install." + m_s->installSha, "state") != "failed")
+            SetInstallState(m_s->installSha, "failed");
     }
 
     // The progress card: a checklist of SSABuild's steps (waiting, running with a spinner, done with a tick and its time,
     // failed), the overall bar and the time left, the current action on one line, the log behind "Show details".
     void App::DrawInstall(ImVec2 at, ImVec2 size)
     {
-        InstallProgress progress = InstallSnapshot(m_installLog ? 600 : 0);
+        InstallProgress progress = InstallSnapshot(m_s->installLog ? 600 : 0);
         uint64_t now = SDL_GetTicks();
         InstallChecklist list = MakeInstallChecklist(progress, now);
         using State = InstallProgress::State;
@@ -263,9 +263,9 @@ namespace launcher_ui
             ImGui::SetCursorScreenPos(closeAt);
             if (ImGui::InvisibleButton("##closeinstall", ImVec2(CloseSize, CloseSize), ImGuiButtonFlags_EnableNav))
             {
-                m_installView = m_kitUsed = false;
-                SetInstallState(m_installSha, nullptr);
-                m_installPast = {};
+                m_s->installView = m_s->kitUsed = false;
+                SetInstallState(m_s->installSha, nullptr);
+                m_s->installPast = {};
             }
             bool hovered = ImGui::IsItemHovered();
             FocusRing(CloseSize / 2);
@@ -321,7 +321,7 @@ namespace launcher_ui
         float lineH = ImGui::GetTextLineHeight();
         float rowH = lineH + 10;
         bool fold = (failed || interrupted) && list.current > 0;
-        if (fold && !m_installLog)
+        if (fold && !m_s->installLog)
         {
             ImVec2 rowAt = ImGui::GetCursorScreenPos();
             ImVec2 dot(rowAt.x + 10, rowAt.y + lineH / 2 + 1);
@@ -336,7 +336,7 @@ namespace launcher_ui
         {
             const InstallChecklist::Row& row = list.rows[i];
             bool current = int(i) == list.current;
-            if ((m_installLog || fold) && !current)
+            if ((m_s->installLog || fold) && !current)
                 continue;
             ImVec2 rowAt = ImGui::GetCursorScreenPos();
             ImVec2 dot(rowAt.x + 10, rowAt.y + lineH / 2 + 1);
@@ -432,7 +432,7 @@ namespace launcher_ui
         {
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
             ImGui::PushTextWrapPos(left + width);
-            ImGui::TextWrapped(m_installPastPid != 0 ? "The installer started earlier is still stopping. Resume will be possible in a moment."
+            ImGui::TextWrapped(m_s->installPastPid != 0 ? "The installer started earlier is still stopping. Resume will be possible in a moment."
                                                      : "Skylauncher was closed before the game was built. Resume carries on where it stopped.");
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
@@ -440,7 +440,7 @@ namespace launcher_ui
 
         // The log, in the space left above the buttons: monospace, scrollable, following its end.
         constexpr float ButtonsH = 52;
-        if (m_installLog)
+        if (m_s->installLog)
         {
             ImGui::Dummy(ImVec2(0, 2));
             float logH = std::max(60.0f, ImGui::GetContentRegionAvail().y - ButtonsH);
@@ -472,8 +472,8 @@ namespace launcher_ui
         // Buttons along the card's bottom edge: details on the left, the actions on the right.
         ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - Pad - 40));
         float rowY = ImGui::GetCursorPosY();
-        if (PillButton(m_installLog ? "Hide details" : "Show details", false, 150))
-            m_installLog = !m_installLog;
+        if (PillButton(m_s->installLog ? "Hide details" : "Show details", false, 150))
+            m_s->installLog = !m_s->installLog;
         constexpr float ButtonW = 150;
         float gap = ImGui::GetStyle().ItemSpacing.x;
         auto rightButtons = [&](int count) {
@@ -485,20 +485,20 @@ namespace launcher_ui
             if (PillButton("Copy log", false, 120))
             {
                 std::string text;
-                if (m_installPast.state == State::Idle)
-                    text = m_installer.FullLog();
-                if (m_kitUsed && !progress.error.empty())
+                if (m_s->installPast.state == State::Idle)
+                    text = m_s->installer.FullLog();
+                if (m_s->kitUsed && !progress.error.empty())
                     text += progress.error + "\n";
-                for (const std::string& line : m_installPast.log)
+                for (const std::string& line : m_s->installPast.log)
                     text += line + "\n";
                 SDL_SetClipboardText(text.c_str());
                 Toast("Log copied");
             }
             ImGui::SameLine();
             if (PillButton("Open logs folder", false, 170))
-                OpenFolder(GameInstallFolder(m_installSha));
+                OpenFolder(GameInstallFolder(m_s->installSha));
             rightButtons(1);
-            ImGui::BeginDisabled(m_installPastPid != 0);
+            ImGui::BeginDisabled(m_s->installPastPid != 0);
             if (PillButton(failed ? "Retry" : "Resume", true, ButtonW, true))
                 StartInstall();
             ImGui::EndDisabled();
@@ -508,8 +508,8 @@ namespace launcher_ui
             rightButtons(1);
             if (PillButton("Cancel", false, ButtonW))
             {
-                m_installer.Cancel();
-                m_kitDownload.Cancel();
+                m_s->installer.Cancel();
+                m_s->kitDownload.Cancel();
             }
         }
         EndCard();
@@ -520,7 +520,7 @@ namespace launcher_ui
     // install read back after a restart.
     void App::TestInstallScript(uint64_t now)
     {
-        InstallProgress progress = m_installer.Snapshot();
+        InstallProgress progress = m_s->installer.Snapshot();
         if (m_testReal)
         {
             // The real kit: INSTALL, then a screenshot every few minutes until it ends (and PLAY with SSA_LAUNCHER_TEST_PLAY).
@@ -529,15 +529,15 @@ namespace launcher_ui
             if (m_testStep == 0)
             {
                 m_page = Page::Play;
-                if (m_disc == DiscState::None && !m_testDrop.empty())
+                if (m_s->disc == DiscState::None && !m_testDrop.empty())
                     StartVerify(m_testDrop);
-                if (m_disc == DiscState::Ready)
+                if (m_s->disc == DiscState::Ready)
                     StartInstall();
-                if (m_installView)
+                if (m_s->installView)
                     m_testAt = now + 3000;
             }
-            else if (m_installer.Running() || m_installView)
-                m_testAt = now + (m_installer.Running() ? interval : 2000);
+            else if (m_s->installer.Running() || m_s->installView)
+                m_testAt = now + (m_s->installer.Running() ? interval : 2000);
             else if (m_testStep < 1000)
             {
                 m_testStep = 1000; // after the last shot
@@ -546,10 +546,10 @@ namespace launcher_ui
             else
             {
                 // SSA_LAUNCHER_TEST_PLAY: then PLAY, as the button does, once the game is built.
-                if (SDL_getenv("SSA_LAUNCHER_TEST_PLAY") != nullptr && m_disc == DiscState::Ready && !NeedsInstall())
+                if (SDL_getenv("SSA_LAUNCHER_TEST_PLAY") != nullptr && m_s->disc == DiscState::Ready && !NeedsInstall())
                 {
-                    m_chosen = m_discPath;
-                    m_chosenRuntime = m_installed.runtime;
+                    m_s->chosen = m_s->discPath;
+                    m_s->chosenRuntime = m_s->installed.runtime;
                     SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_SHOTS"); // else the game runs its own shots
                 }
                 m_running = false;
@@ -560,13 +560,13 @@ namespace launcher_ui
         {
         case 0:
             m_page = Page::Play;
-            if (m_disc == DiscState::None && !m_testDrop.empty())
+            if (m_s->disc == DiscState::None && !m_testDrop.empty())
                 StartVerify(m_testDrop);
-            if (m_disc == DiscState::Ready || m_disc == DiscState::Failed || m_testDrop.empty())
+            if (m_s->disc == DiscState::Ready || m_s->disc == DiscState::Failed || m_testDrop.empty())
                 m_testAt = now + 400;
             break;
         case 1:
-            if (!m_installView)
+            if (!m_s->installView)
             {
                 SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL", "movies", true);
                 SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.08", true);
@@ -580,17 +580,17 @@ namespace launcher_ui
             // Closing the window now asks first.
             if ((progress.steps.size() >= 5 && progress.done >= 30) || progress.state != InstallProgress::State::Running)
             {
-                m_quitPrompt = Installing();
+                m_quitPrompt = AnyInstalling();
                 m_testAt = now + 100;
             }
             break;
         case 3:
             m_quitPrompt = false;
-            m_installLog = true;
+            m_s->installLog = true;
             m_testAt = now + 300;
             break;
         case 4:
-            m_installLog = false;
+            m_s->installLog = false;
             if (progress.state != InstallProgress::State::Running)
                 m_testAt = now + 300;
             break;
@@ -601,7 +601,7 @@ namespace launcher_ui
                 SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.01", true);
                 StartInstall();
             }
-            else if (!m_installView)
+            else if (!m_s->installView)
                 m_testAt = now + 400;
             break;
         case 6:
@@ -610,14 +610,14 @@ namespace launcher_ui
             m_testAt = now + 400;
             break;
         case 7:
-            if (!m_installView)
+            if (!m_s->installView)
             {
                 // As if the launcher had been closed during the compile.
-                std::ofstream(GameInstallFolder(m_check.xexSha256) / "install.log", std::ios::trunc)
+                std::ofstream(GameInstallFolder(m_s->check.xexSha256) / "install.log", std::ios::trunc)
                     << "@step toolchain Preparing the compiler\n@step disc Reading the disc\n@step recompile Translating the game code\n"
                        "@step shaders Translating the shaders\n@step compile Compiling the game\n@progress 812 2304\n";
-                m_config["install." + m_check.xexSha256]["pid"] = "0";
-                SetInstallState(m_check.xexSha256, "running");
+                m_config["install." + m_s->check.xexSha256]["pid"] = "0";
+                SetInstallState(m_s->check.xexSha256, "running");
                 RefreshInstall();
                 m_page = Page::Play;
                 m_testAt = now + 400;
