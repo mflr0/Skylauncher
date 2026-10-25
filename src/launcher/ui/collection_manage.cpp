@@ -148,11 +148,13 @@ namespace launcher_ui
     {
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Every change makes a backup; the newest 10 of each figure are kept.");
         ImGui::Dummy(ImVec2(0, 6));
+        bool any = false;
         for (const Figure& figure : m_model.figures)
         {
             const std::vector<BackupRow> backups = Backups(figure.path); // a copy: Restore below reloads them
             if (backups.empty())
                 continue;
+            any = true;
             ImGui::PushID(figure.path.c_str());
             if (m_app.Chip(fmt::format("{}  {}##b", Name(figure), backups.size()).c_str(), m_backupsOf == figure.path))
                 m_backupsOf = m_backupsOf == figure.path ? std::string() : figure.path;
@@ -177,6 +179,8 @@ namespace launcher_ui
                 ImGui::PopID();
             }
         }
+        if (!any)
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "No backups yet.");
     }
 
     void CollectionPage::DrawImportExport()

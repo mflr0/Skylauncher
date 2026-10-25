@@ -839,6 +839,8 @@ namespace launcher_ui
             PutOn(m_seat, figure.path);
         if (rightClick)
             OpenFigure(figure.path);
+        if (!ImGui::IsItemVisible()) // scrolled out of view: a big collection draws only what shows
+            return pressed;
 
         ImDrawList* draw = ImGui::GetWindowDrawList();
         ImVec2 end(at.x + width, at.y + height);
