@@ -74,6 +74,18 @@ std::string LauncherConfigPath();
 LauncherConfig LoadLauncherConfig(const std::string& path);
 bool SaveLauncherConfig(const std::string& path, const LauncherConfig& config);
 
+// The command line: `--game <id>` opens that game, `--play` starts it once its disc is checked (the desktop shortcut runs
+// `Skylauncher --game <id> --play`), `--help` shows the options. Anything else is listed in `unknown` and ignored.
+struct LauncherArguments
+{
+    std::string game;
+    bool play = false;
+    bool help = false;
+    std::vector<std::string> unknown;
+};
+LauncherArguments ParseLauncherArguments(int argc, const char* const* argv);
+const char* LauncherUsage();
+
 // The game's text and voice language codes (see language.h): SSA_LANGUAGE and SSA_VOICE_LANGUAGE, else the
 // "language" and "voice_language" keys of the game's section in the settings file. Empty where neither picks one.
 struct LanguageChoice

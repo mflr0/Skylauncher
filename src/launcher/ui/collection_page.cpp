@@ -626,6 +626,13 @@ namespace launcher_ui
             Toast("Couldn't write the next session's seats");
     }
 
+    void CollectionPage::TestSetSeats(const std::vector<std::string>& seats)
+    {
+        for (size_t i = 0; i < seats.size(); i++)
+            m_model.SetSeat(i, seats[i]);
+        m_generation++;
+    }
+
     void CollectionPage::DrawSeatMenu()
     {
         if (!ImGui::BeginPopup("##seatmenu"))
@@ -673,12 +680,15 @@ namespace launcher_ui
         std::string live = m_model.RunningGame();
         bool editable = m_model.CanEditSeats();
         m_navSeat = m_hoverSeat = -1;
+        m_crossAt.assign(game->seats.size(), ImVec2(-1, -1));
         for (size_t i = 0; i < game->seats.size(); i++)
         {
             constexpr float H = 78;
             ImVec2 at = ImGui::GetCursorScreenPos();
             float w = ImGui::GetContentRegionAvail().x;
             ImGui::PushID(int(i));
+            // The X is submitted over the seat: without this the seat keeps the hover and the X never sees the pointer.
+            ImGui::SetNextItemAllowOverlap();
             if (ImGui::InvisibleButton("##seat", ImVec2(w, H), ImGuiButtonFlags_EnableNav))
             {
                 m_seat = i;
@@ -751,6 +761,7 @@ namespace launcher_ui
                 else if (editable)
                 {
                     ImVec2 cross(at.x + w - 20, at.y + 18);
+                    m_crossAt[i] = cross;
                     ImGui::SetCursorScreenPos(ImVec2(cross.x - 12, cross.y - 12));
                     ImGui::PushID(int(i) + 100);
                     bool off = ImGui::InvisibleButton("##off", ImVec2(24, 24)); // the pad takes it off with X on the seat

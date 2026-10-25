@@ -284,18 +284,10 @@ namespace launcher_ui
         ImGui::PopStyleColor();
     }
 
-    void App::DrawAbout()
+    // Settings > Launcher: one check a day when it is on, nothing else is ever sent.
+    void App::DrawUpdates()
     {
         UpdateManager::State state = m_updates.Snapshot();
-        Title("Skylauncher", HeadlineSize);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Version %s, %s", LauncherVersion().c_str(), PlatformName());
-        ImGui::Dummy(ImVec2(0, 6));
-        ImGui::TextWrapped("A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown "
-            "from the game is read from your own disc and kept on this computer.");
-
-        // Updates: one check a day when it is on, nothing else is ever sent.
-        ImGui::Dummy(ImVec2(0, 14));
-        Title("Updates", TitleSize, Text);
         bool busy = m_updates.Busy();
         ImGui::BeginDisabled(busy);
         if (PillButton(state.phase == UpdateManager::Phase::Checking ? "Checking..." : "Check for updates", false, 220))
@@ -320,6 +312,15 @@ namespace launcher_ui
             "Updates are checked against the release's SHA-256 before they are installed.");
         ImGui::PopStyleColor();
         ImGui::PopFont();
+    }
+
+    void App::DrawAbout()
+    {
+        Title("Skylauncher", HeadlineSize);
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Version %s, %s", LauncherVersion().c_str(), PlatformName());
+        ImGui::Dummy(ImVec2(0, 6));
+        ImGui::TextWrapped("A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown "
+            "from the game is read from your own disc and kept on this computer.");
 
         ImGui::Dummy(ImVec2(0, 14));
         Title("Credits", TitleSize, Text);
@@ -364,7 +365,7 @@ namespace launcher_ui
         case 2:
             m_whatsNewOpen = false;
             m_page = Page::Settings;
-            m_tab = SettingsTab::About;
+            m_tab = SettingsTab::Launcher; // the updates are in the launcher's tab
             m_updateDoneNote.clear();
             m_testAt = now + 500;
             break;

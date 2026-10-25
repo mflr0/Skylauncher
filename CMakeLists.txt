@@ -119,6 +119,9 @@ target_sources(SkylauncherCore PRIVATE
     src/launcher/install_checklist.cpp
     src/launcher/game_run.cpp
     src/launcher/portal_status.cpp
+    src/launcher/game_settings.cpp
+    src/launcher/shortcut.cpp
+    src/launcher/ui/game_settings_page.cpp
     src/launcher/report.cpp
     src/launcher/updater.cpp
     src/shared/mini_json.cpp
@@ -130,6 +133,9 @@ target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex
 target_compile_definitions(SkylauncherCore PRIVATE SKYLAUNCHER_VERSION_STRING="${SKYLAUNCHER_VERSION}" SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
 if(APPLE)
     target_link_libraries(SkylauncherCore PUBLIC "-framework CoreGraphics")
+endif()
+if(WIN32)
+    target_link_libraries(SkylauncherCore PUBLIC ole32 uuid) # the desktop shortcut (IShellLink)
 endif()
 
 # Fonts are data, not game content: Outfit and Bungee (SIL Open Font License, licence files next to them).
@@ -173,9 +179,9 @@ target_link_libraries(SkylauncherTest PRIVATE SkylauncherCore)
 add_executable(FakeSSABuild EXCLUDE_FROM_ALL tests/fake_ssabuild.c)
 set_target_properties(FakeSSABuild PROPERTIES OUTPUT_NAME SSABuild RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fake-kit)
 file(WRITE ${CMAKE_BINARY_DIR}/fake-kit/kit.txt "version=0.0\nbuild=fake-1\n")
-add_dependencies(SkylauncherTest FakeSSABuild)
-target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit")
+add_dependencies(SkylauncherTest FakeSSABuild Skylauncher)
+target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit" SKYLAUNCHER_TEST_EXE="$<TARGET_FILE:Skylauncher>")
 
 # The launcher shell's checks (tests/shell_test.cpp), run by SkylauncherTest.
-target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp)
+target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp)
 target_include_directories(SkylauncherTest PRIVATE lib/miniz)

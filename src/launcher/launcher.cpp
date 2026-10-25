@@ -295,6 +295,34 @@ TitleMetadata ReadTitleMetadata(const std::vector<uint8_t>& xex)
     return metadata;
 }
 
+LauncherArguments ParseLauncherArguments(int argc, const char* const* argv)
+{
+    LauncherArguments arguments;
+    for (int i = 1; i < argc; i++)
+    {
+        std::string_view argument = argv[i];
+        if (argument == "--play")
+            arguments.play = true;
+        else if (argument == "--help" || argument == "-h")
+            arguments.help = true;
+        else if (argument == "--game" && i + 1 < argc)
+            arguments.game = argv[++i];
+        else if (argument.rfind("--game=", 0) == 0)
+            arguments.game = std::string(argument.substr(7));
+        else
+            arguments.unknown.emplace_back(argument);
+    }
+    return arguments;
+}
+
+const char* LauncherUsage()
+{
+    return "Skylauncher [--game <id>] [--play]\n\n"
+           "  --game <id>  open on that game's page: ssa (Spyro's Adventure) or giants (Giants)\n"
+           "  --play       start the game as soon as its disc is checked (what a desktop shortcut runs)\n"
+           "  --help       show this";
+}
+
 std::string LauncherConfigPath()
 {
     // Tests point the launcher and the game at the same scratch file (the runtime reads this name too).

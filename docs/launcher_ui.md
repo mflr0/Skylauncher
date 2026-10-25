@@ -10,9 +10,11 @@ is easy to iterate without touching the game runtime.
   `game_install.{h,cpp}` (installing the game with the kit's SSABuild, `docs/install.md`),
   `ui/`, `theme/`.
 - `src/assets/` - the art read from the player's disc (`launcher_assets`).
+- `src/launcher/game_settings.{h,cpp}`, `shortcut.{h,cpp}`, `ui/game_settings_page.cpp` - a game's own settings: its per-game video copy,
+  delete data and uninstall (no UI), the desktop shortcut files (no UI, one builder per system), and the page (below).
 - `src/launcher/ui/launcher_app.h` - the window's class (`App`) and helpers shared by the page files.
 - `src/launcher/ui/launcher_ui.{h,cpp}` - the window (Dear ImGui on SDL_Renderer): backdrop, sidebar, the Home, Play and Settings
-  pages, the launcher's widgets (`BigButton`, `PillButton`, `Toggle`, `BeginCard`, `Chip`), disc verification and the screenshot test.
+  pages (the launcher's Settings, the tab bar), the launcher's widgets (`BigButton`, `PillButton`, `Toggle`, `BeginCard`, `Chip`), disc verification and the screenshot test.
 - `src/launcher/install_checklist.{h,cpp}`, `ui/install_page.cpp` - the install card (docs/install.md);
   `game_run.{h,cpp}`, `ui/support_page.cpp` - game logs, the crash dialog, the portal test (docs/support.md);
   `updater.{h,cpp}`, `ui/update_page.cpp` - updates, the banner and About (docs/updates.md);
@@ -29,19 +31,40 @@ is easy to iterate without touching the game runtime.
 
 ## Layout
 The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
-GitHub issue) and the GitHub link bottom right. The top right is kept for the launcher's own language (#4): the game's text
-and voice languages are in Settings > Language ("Game text", "Game voices"). The game shown last is selected in the sidebar
-(`[launcher] game=`); the other is one click away.
+GitHub issue) and the GitHub link bottom right. The top right is kept for the launcher's own language (#4): its slot is
+Settings > Launcher > Language (English only, disabled, for now); the game's text and voice languages are in that game's
+settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
    SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
    and disc state ("Open" until the game is first shown, then "Checking your disc", "Needs your disc" or "Ready to play"); the
    selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
 2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
    (current device, PLAY WITH: a menu of the others), the main button (CHOOSE DISC, INSTALL, then PLAY) with the portal's
-   line under it and, on the right, "Change disc...". PLAY and INSTALL check that the image is still there first.
+   line under it and, on the right, **Game settings** (a plain button for now; its style is the art direction's). PLAY and
+   INSTALL check that the image is still there first. Changing the disc moved to the game's settings (Disc tab); CHOOSE DISC
+   stays the main button while there is no disc.
 3. Collection - see below.
-4. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About. Clicking a game
-   goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
+4. Settings (the gear) - **the launcher's own settings and what both games share**, in four tabs: Controls (device, portal, glyphs,
+   keyboard bindings), Launcher (language slot, updates, data folder), Support (report a problem, logs), About (version, credits).
+   Clicking a game goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
+5. Game settings (the Settings button on a game's Play page) - **that game's own settings**, five tabs (the sidebar keeps the
+   game selected; B / Escape or **Back** return to its Play page):
+   - Video: fullscreen, resolution scale, frame rate limit (30 or 60), skip intro movies, VSync, texture filtering, widescreen,
+     HD texture packs (and their folder), Advanced > dump textures. The game's own copy, `[<game>.video]` (docs/settings.md).
+   - Language: game text and game voices (`[<game>] language`, `voice_language`).
+   - Disc: the image's path and state; **Choose / Change disc...**, **Remove disc** (the launcher forgets it; the file is not
+     touched), **Show in folder**. Disabled while a check or an install runs.
+   - Saves: **Open saves folder** and the save backups with Restore (held, refused while the game runs).
+   - Game: **Create a desktop shortcut**, the folders, the built game with **Reinstall the game** (held), **Clear caches**,
+     **Delete saves and data** (held), **Uninstall the game** (held), each with the size it frees and what it keeps
+     (docs/install.md, "Delete data, uninstall").
+
+**Why the split.** The gear used to hold game things (disc image, graphics, game languages, saves) that looked like the
+launcher's. Now the gear is only what is the launcher's or is shared, and anything about one game is on that game's page, so
+the two games can differ (30 fps for one, 60 for the other, another disc, deleting one's saves). **The controller, the keys,
+the button glyphs and the portal stay in the launcher's settings** because both games read the same `[input]` and `[portal]`
+sections and the same hardware: a game page would only show the same values twice. If the games ever need different keys, the
+Controls tab moves to the game pages the way Video did (`GameVideoKeys` shows how).
 
 ## Interaction rules
 - **Focus.** Every control takes the keyboard and pad focus and shows it: ImGui's buttons draw it, the widgets drawn by
@@ -49,12 +72,12 @@ and voice languages are in Settings > Language ("Game text", "Game voices"). The
   1.91+ leaves invisible buttons out of navigation otherwise). The page's columns are `ImGuiChildFlags_NavFlattened`.
 - **Pad and keyboard.** The sidebar and the page are separate windows: B / Escape on Play or Home moves the focus to the
   sidebar's current row; A on a row opens its page with the focus on its first control (`App::GoTo`, `TakeFocus`).
-  B / Escape leave Settings and Collection, close dialogs and menus, clear the collection's search; whatever is open
-  answers it before the page does (`m_backTaken`). LB / RB change Settings tab and the collection's section. The
+  B / Escape leave Settings, Game settings and Collection, close dialogs and menus, clear the collection's search; whatever is open
+  answers it before the page does (`m_backTaken`). LB / RB change Settings and Game settings tab (`App::DrawTabBar`) and the collection's section. The
   launcher starts with the focus in the sidebar.
 - **Hold to confirm.** What deletes or overwrites is a red button held for a second (`App::HoldButton`, the state in
   `hold_confirm.h`): Reset and Delete (Figure page), Delete for good (trash), Mark as not in use (a stale lock), Restore
-  (a save backup), Reset to defaults (keyboard), Reinstall the game. The fill shows the time; releasing, or the pointer
+  (a save backup), Reset to defaults (keyboard), Reinstall the game, Delete saves and data, Uninstall the game. The fill shows the time; releasing, or the pointer
   leaving, cancels; it acts once per press; Space, Enter and the pad's A hold it too. The label is a plain verb, the
   instruction is the tooltip (shown on keyboard and pad focus too). Buttons are told apart by their ImGui ID.
 - **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
@@ -63,6 +86,29 @@ and voice languages are in Settings > Language ("Game text", "Game voices"). The
   check, an install, an update, a held button, a text cursor) and for three frames after an input; 30 fps for the night
   sky's stars; else it wakes every 0.5 s to poll the jobs, the portal and the collection.
 - **Copy.** New and changed sentences sit at the top of their file (`namespace strings`), ready for #4.
+
+## Desktop shortcut
+Game settings > Game > **Create a desktop shortcut** (enabled once the disc is verified: the icon comes from it) puts a launcher for
+that game on the Desktop. It starts Skylauncher as `Skylauncher --game <id> --play`: the window opens on that game's page, checks the
+disc, and starts the game as soon as it is ready. If it can't (no disc, a failed check, the game not built yet) the window stays
+open and says why, so the shortcut never leaves the player with nothing. Made again, it replaces the old one.
+The icon is the game's title icon decoded from the player's disc (`GameSlot::meta.iconPng`, memory only until the player asks).
+
+| System | File on the Desktop | Icon |
+| --- | --- | --- |
+| macOS | `Skylanders Giants.app`: `Contents/MacOS/launch` (a two-line `sh` script: `exec '<Skylauncher>' --game giants --play`), `Info.plist` | `Contents/Resources/icon.icns`, the PNG as an `icp6` (64 px; the type follows the width) |
+| Windows | `Skylanders Giants.lnk` (IShellLink: target Skylauncher.exe, arguments, working folder) | `<data>\Giants\shortcut.ico`, the PNG inside an .ico (Vista and later) |
+| Linux | `skylanders-giants.desktop`, executable (`Exec="<Skylauncher>" --game giants --play`, `Categories=Game;`) | `<data>/Giants/shortcut-icon.png` (some desktops ask "Allow launching" once) |
+
+`<Skylauncher>` is the running file (`SelfExecutable()`: the executable, or the `.AppImage` on Linux, not its temporary mount).
+If Skylauncher is moved afterwards the shortcut needs making again. On macOS the first write to the Desktop may ask for permission
+to access it. The Desktop is `SKYLAUNCHER_DESKTOP` when set (tests: nothing writes the real one), else the system's folder.
+Windows is not built or run here: its `.ico` bytes and every name and argument are tested on every system; the `.lnk` itself is
+the one standard COM call (`#ifdef _WIN32`, checked to compile with MinGW) and needs a look on a real PC.
+
+## Command line
+`Skylauncher [--game <id>] [--play] [--help]`: `--game ssa|giants` opens that game's page (else the game shown last),
+`--play` starts it once its disc is checked and it is built. Anything else is ignored with a line on stderr.
 
 ## Collection
 See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favourites, backups
@@ -130,8 +176,9 @@ SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ./build/Skylauncher.app/Contents/MacOS/Skylauncher
 ```
 It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
-`07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png` and `11-disc-gone.png`
-(INSTALL on an image that moved) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
+`07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-game-disc.png`,
+`12-game-saves.png`, `13-game-data.png`, `14-launcher-settings.png` and `15-disc-gone.png` (INSTALL on an image that moved; `03-` is the
+game's Video tab, `04-` the launcher's Controls) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
 With `SSA_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `52-`): B to the sidebar, A into Collection, Y for
 View, the D-pad to a seat and a card, X for its Figure page, Space held on Delete, B back, RB in Settings.
 With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
@@ -159,5 +206,10 @@ repository's working copy (its own HOME, the offscreen driver).
   the config) runs the switch script: SSA and Giants checked, an install of each with the fake SSABuild (SSA shown while
   Giants builds), a switch back and forth with each state kept, and PLAY on each returning its game and build. It is run by
   `SkylauncherTest` when `SKYLAUNCHER_TEST_GIANTS_ISO` is set.
-- `SkylauncherTest` checks verification, settings, font/text helpers, the disc texture decoder and the in-place game switch
-  (build it with `--target SkylauncherTest FakeSSABuild`).
+- `SSA_LAUNCHER_TEST_SEATX=1` (with `SSA_LAUNCHER_SHOTS`, `SSA_COLLECTION`, `SSA_SAVE_DIR` on scratch paths) runs the seat X script
+  (`App::TestSeatXScript`): the Collection page's four seats (player 1, player 2, item, adventure) each emptied by the mouse on the X,
+  by Delete and by the pad's X, checking after every try that only that seat is empty. It is run by `SkylauncherTest`.
+- `SkylauncherTest` checks verification, settings (`tests/settings_test.cpp`: per-game video, the command line, the shortcut files,
+  delete data and uninstall on scratch folders), font/text helpers, the disc texture decoder, the seat X and the in-place game switch
+  (build it with `--target SkylauncherTest FakeSSABuild`; set `SKYLAUNCHER_TEST_GIANTS_ISO` for the switch).
+- `launcher: ui scale` is logged once, then only when the scale changes (a display change, Ctrl +/-/0), not at every window event.

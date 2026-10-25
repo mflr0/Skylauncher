@@ -41,7 +41,9 @@ At the first visit to the page (`CollectionPage::Open`):
   written. The seat file is per game (`catalogue.json` `games[].seats`); only games with a runtime (SSA today) can be
   prepared, the others show their seats read-only.
 - Drag a card onto a seat, or double-click it, Enter, A (it goes to the focused seat); every way of taking it off a seat (issue #9; a player, the magic item and the adventure pack alike, the others stay):
-  the cross on the seat, Delete or the pad's X on the focused seat (or Delete with the mouse over it), the seat's right-click menu
+  the cross on the seat (**fixed**: the seat's own button, submitted first, kept the pointer, so the cross, drawn over it, never got
+  the click: `SetNextItemAllowOverlap()` before the seat's button lets the cross win where it is; `SSA_LAUNCHER_TEST_SEATX` checks
+  all four seats by mouse, keyboard and pad), Delete or the pad's X on the focused seat (or Delete with the mouse over it), the seat's right-click menu
   ("Take it off the seat", "Figure page") and dragging it off the seat onto the list; a seat whose figure is gone from the
   collection shows "Missing figure" and can be emptied the same way. The seats are read-only while the game runs.
   Under the seats one line sums the portal up (`collection::PortalOverviewLine`: "P1 Gill Grunt · Item Anvil Rain"); a figure

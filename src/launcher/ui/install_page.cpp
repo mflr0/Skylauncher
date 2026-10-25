@@ -605,8 +605,8 @@ namespace launcher_ui
                 m_testAt = now + 400;
             break;
         case 6:
-            m_page = Page::Settings;
-            m_tab = SettingsTab::GameData;
+            m_page = Page::GameSettings;
+            m_gameTab = GameTab::Game;
             m_testAt = now + 400;
             break;
         case 7:

@@ -23,15 +23,15 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `ssa` | `iso` | path | The verified disc image | yes |
 | `ssa` | `language` | `en` `fr` `de` `es` `it` `nl` `sv` `no` `da` `fi` | Text language | yes |
 | `ssa` | `voice_language` | same codes | Voice language | yes |
-| `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes |
+| `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes (the key is per game: see "Per-game video" below) |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
 | `video` | `fps_limit` | `30`, `60` | Frame rate cap (the game is made for 30; 60 is experimental). Other values the runtime reads as 60 | yes |
 | `video` | `skip_intro_movies` | `0`, `1` | Skip the start-up logos (legal, ATVI, XPEC, Toys for Bob); the story movies still play | yes |
 | `video` | `vsync` | `0`, `1` | Wait for the display's refresh | yes |
 | `video` | `anisotropy` | `1`, `2`, `4`, `8`, `16` | Texture filtering | yes |
 | `video` | `aspect` | `auto` (default), `16:9` | Widescreen: `auto` shows more to the sides on a window wider than 16:9, `16:9` keeps the game's picture with bars | yes |
-| `video` | `texture_packs` | `1` (default), `0` | Use the HD textures of the game's `textures/` folder (Settings > Graphics > Open texture packs folder) | yes |
-| `video` | `texture_dump` | `0` (default), `1` | Write the game's textures as DDS files, for pack makers (Settings > Graphics > Advanced) | yes |
+| `video` | `texture_packs` | `1` (default), `0` | Use the HD textures of the game's `textures/` folder (<game> settings > Video > Open texture packs folder) | yes |
+| `video` | `texture_dump` | `0` (default), `1` | Write the game's textures as DDS files, for pack makers (<game> settings > Video > Advanced) | yes |
 | `input` | `device` | `auto`, `keyboard`, `gamepad` | What the game listens to | yes |
 | `input` | `gamepad` | SDL GUID | The gamepad chosen when `device=gamepad` | yes |
 | `input` | `key_<action>` | SDL key name (`Space`, `Return`, `A`...) | Keyboard binding | yes |
@@ -41,6 +41,24 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `portal` | `place` | figure file names, comma separated | Figures put on the emulated portal at start | yes (`SSA_PORTAL_PLACE`) |
 | `collection` | `favourites` | figure file names, comma separated | Old favourites; moved once into the shared collection's `collection.json` | read once (see `collection_ui.md`) |
 | `collection` | `moved` | `1` | Set once the old favourites and `[portal] place` were moved | launcher only |
+
+## Per-game video
+
+The runtime reads one `[video]` section, but the two games do not have to share it. Each game keeps its own copy of the
+nine keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
+`anisotropy`, `aspect`, `texture_packs`, `texture_dump`) in **`[ssa.video]`** and **`[giants.video]`**:
+
+| Section | Key | Meaning |
+| --- | --- | --- |
+| `<game>.video` | the nine `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
+
+- The first time, a game's copy starts from the `[video]` the player already had (`SeedGameVideo`).
+- **PLAY** puts the copy of the game that starts into `[video]` (keys it lacks are dropped, so the runtime's defaults apply):
+  the runtime needs no change (`ApplyGameVideo`).
+- When the game ends, what is in `[video]` (the player may have changed it in the game's own Settings menu) becomes that
+  game's copy again (`StoreGameVideo`), so the other game never sees it.
+- What both games share stays in its own section: `[input]` (device, keys, glyphs), `[portal]`, and the launcher's
+  `[launcher]` and `[update]`. They are in the gear's Settings, not on a game page.
 
 Keyboard actions: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`, `left_left`,
 `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (camera), `dpad_up`, `dpad_down`,
