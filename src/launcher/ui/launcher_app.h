@@ -8,6 +8,7 @@
 #include "launcher/game_run.h"
 #include "launcher/updater.h"
 #include "launcher/launcher.h"
+#include "launcher/portal_status.h"
 #include "launcher/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
 #include "shared/collection/save_backup.h"
@@ -151,6 +152,7 @@ namespace launcher_ui
         ~App() { Shutdown(); }
         std::string Run();
         const std::string& ChosenRuntime() const { return m_chosenRuntime; }
+        void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
 
     private:
         bool Init();
@@ -255,6 +257,7 @@ namespace launcher_ui
         uint64_t m_discSize = 0;
         VerifyJob m_verify;
         ProbeJob m_probe;
+        launcher_portal::Watcher m_portal;
         bool m_reportOpen = false;      // "Report a problem" shown (support_page.cpp)
         std::string m_reportText;
 

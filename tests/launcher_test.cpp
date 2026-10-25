@@ -1,5 +1,6 @@
 // Checks the launcher's disc verification and settings file without showing any UI.
 // usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]
+#include "launcher/portal_status.h"
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "assets/launcher_assets.h"
@@ -386,6 +387,28 @@ namespace
     }
 }
 
+// The portal status: the VID:PID table and the status logic with fake enumerators.
+static void PortalChecks()
+{
+    using namespace launcher_portal;
+    EXPECT(ModelName(0x1430, 0x0150) == "Portal of Power");
+    EXPECT(ModelName(0x1430, 0x1F17) == "Xbox 360 portal");
+    EXPECT(ModelName(0x1430, 0x0ABC) == "Skylanders portal (1430:0ABC)");
+    EXPECT(ModelName(0x045E, 0x0150).empty());
+
+    Status plugged = Query([] { return Scan{ true, { { 0x1430, 0x0150 } } }; });
+    EXPECT(plugged.connected && plugged.Line() == "Portal: Portal of Power");
+    Status other = Query([] { return Scan{ true, { { 0x1430, 0x0ABC } } }; });
+    EXPECT(other.Line() == "Portal: Skylanders portal (1430:0ABC)");
+    Status unplugged = Query([] { return Scan{ true, {} }; });
+    EXPECT(!unplugged.connected && unplugged.Line() == "Portal: not detected");
+    Status foreign = Query([] { return Scan{ true, { { 0x045E, 0x0150 } } }; });
+    EXPECT(!foreign.connected && foreign.Line() == "Portal: not detected");
+    Status failed = Query([] { return Scan{}; });
+    EXPECT(!failed.connected && failed.Line().empty());
+    printf("Portal status: table and status line checked\n");
+}
+
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 
 int main(int argc, char** argv)
@@ -407,6 +430,7 @@ int main(int argc, char** argv)
     };
 
     CollectionChecks(scratch);
+    PortalChecks();
     InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);
 
