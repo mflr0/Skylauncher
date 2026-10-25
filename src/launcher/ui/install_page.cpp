@@ -113,6 +113,8 @@ namespace launcher_ui
 
     void App::StartInstall()
     {
+        if (!DiscStillThere())
+            return;
         RefreshInstall();
         m_installSha = m_check.xexSha256;
         m_installKitVersion = m_kit ? m_kit->version : std::string();

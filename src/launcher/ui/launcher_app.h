@@ -187,7 +187,6 @@ namespace launcher_ui
         void OpenProblemReport();
         void DrawProblemReport();
         void DrawToast();
-        void DrawLanguageMenu();
 
         // Pages and focus. The sidebar and the page are separate windows, which the D-pad doesn't cross: B / Escape
         // moves the focus to the sidebar (or leaves Settings and Collection), A on a row moves it into the page.
@@ -238,6 +237,7 @@ namespace launcher_ui
         void StartVerify(const std::string& path);
         void FinishVerify();
         void Browse();
+        bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
         void Toast(std::string text) { m_toast = std::move(text); m_toastUntil = SDL_GetTicks() + 2500; }
         void RefreshGamepads();
@@ -341,6 +341,7 @@ namespace launcher_ui
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
         bool m_testNav = false;        // SSA_LAUNCHER_TEST_NAV: keyboard and pad navigation, keys sent to ImGui
+        bool m_testControllers = false; // open the controller menu (its screenshot)
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };

@@ -33,6 +33,21 @@ namespace launcher_ui
 {
     ImFont* g_boldFont = nullptr; // Outfit SemiBold, for AddBoldText (set by App::LoadFonts)
 
+    namespace
+    {
+        // The window's words that changed in the polish pass (the rest are still inline, for #4).
+        namespace strings
+        {
+            constexpr const char* ChooseDisc = "Choose disc";
+            constexpr const char* PlayWith = "PLAY WITH";
+            constexpr const char* DiscGone = "\"{}\" isn't there any more. Was it moved, renamed, or is its drive disconnected? Choose it again.";
+            constexpr const char* GameText = "Game text";
+            constexpr const char* GameTextHint = "The game's menus, subtitles and on-screen text. Skylauncher itself is in English.";
+            constexpr const char* GameVoices = "Game voices";
+            constexpr const char* GameVoicesHint = "The game's spoken lines and cutscenes. They can differ from the text.";
+        }
+    }
+
     // ---- Settings file ------------------------------------------------------------------------------------------
 
     std::string SettingGet(const LauncherConfig& config, std::string_view section, std::string_view key, std::string fallback)
@@ -585,6 +600,20 @@ namespace launcher_ui
         Set(m_game.id, "iso", m_discPath); // remembered even if the player quits without playing
         m_disc = DiscState::Ready;
         RefreshInstall();
+    }
+
+    // PLAY and INSTALL check the image first: it may have been moved, or its drive unplugged, since it was verified.
+    bool App::DiscStillThere()
+    {
+        SDL_PathInfo info;
+        if (SDL_GetPathInfo(m_discPath.c_str(), &info) && info.type == SDL_PATHTYPE_FILE)
+            return true;
+        m_disc = DiscState::Failed;
+        m_check.status = GameSourceStatus::NotFound;
+        m_check.message = fmt::format(fmt::runtime(strings::DiscGone), m_discPath);
+        m_installView = m_kitUsed = false;
+        m_page = Page::Play;
+        return false;
     }
 
     void App::Browse()
@@ -1202,30 +1231,34 @@ namespace launcher_ui
 
         bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying, installing = Installing();
         bool install = ready && NeedsInstall();
-        const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : "Upload Iso";
-        float mainX = bar.x + (available.x - PlayButtonW) / 2, buttonY = middle - PlayButtonH / 2 + 3;
+        const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : strings::ChooseDisc;
+        // Centred, unless the controller picker on its left would reach the sidebar (a narrow window).
+        constexpr float MinGap = 16;
+        float mainX = std::max(bar.x + (available.x - PlayButtonW) / 2, bar.x + Pad + ControllerW + MinGap), buttonY = middle - PlayButtonH / 2 + 3;
         ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY));
         if (BigButton(label, ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, !verifying && !installing))
         {
-            if (install)
-                StartInstall();
-            else if (ready)
+            if (!ready)
+                Browse();
+            else if (install)
+                StartInstall(); // which checks first that the image is still there
+            else if (DiscStillThere())
             {
                 m_chosen = m_discPath;
                 m_chosenRuntime = m_installed.runtime;
                 Set(m_game.id, "iso", m_chosen);
                 m_running = false;
             }
-            else
-                Browse();
         }
         TakeFocus(FocusTo::Page);
 
         // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
-        ImVec2 controllerAt(mainX - ControllerGap - ControllerW, buttonY), controllerSize(ControllerW, PlayButtonH - 6);
+        float controllerGap = std::clamp(mainX - (bar.x + Pad) - ControllerW, MinGap, ControllerGap);
+        ImVec2 controllerAt(mainX - controllerGap - ControllerW, buttonY), controllerSize(ControllerW, PlayButtonH - 6);
         ImGui::SetCursorScreenPos(controllerAt);
-        if (ImGui::InvisibleButton("##controller", controllerSize, ImGuiButtonFlags_EnableNav))
+        if (ImGui::InvisibleButton("##controller", controllerSize, ImGuiButtonFlags_EnableNav) || m_testControllers)
         {
+            m_testControllers = false;
             RefreshGamepads();
             ImGui::OpenPopup("##controllers");
         }
@@ -1248,39 +1281,57 @@ namespace launcher_ui
         if (pickerHovered && !pickerOpen)
             ImGui::SetTooltip("Controller: %s", DeviceLabel().c_str());
 
+        // PLAY WITH, above the picker: rows of one height, the radio and its label centred on the row, the heading on the
+        // labels' column; an opaque surface with a border over the art behind it.
         ImGui::SetNextWindowPos(ImVec2(controllerAt.x, controllerAt.y - 8), ImGuiCond_Always, ImVec2(0, 1));
         ImGui::SetNextWindowSizeConstraints(ImVec2(ControllerW, 0), ImVec2(FLT_MAX, FLT_MAX));
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(BottomBarRaised, 250));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 10));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(BottomBarRaised));
+        ImGui::PushStyleColor(ImGuiCol_Border, Rgb(BottomBarBorder));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6, 10));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));
+        ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
         if (ImGui::BeginPopup("##controllers"))
         {
+            constexpr float RowH = 38, Dot = 6, DotX = 12 + Dot, LabelX = DotX + Dot + 12;
+            std::vector<std::pair<std::string, std::string>> options = DeviceOptions();
+            float labelsW = ImGui::CalcTextSize(strings::PlayWith).x;
+            for (const auto& [value, name] : options)
+                labelsW = std::max(labelsW, ImGui::CalcTextSize(name.c_str()).x);
+            float rowW = std::max(ControllerW - 12, LabelX + labelsW + 16);
             ImGui::PushFont(nullptr, SmallSize);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "  PLAY WITH");
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + LabelX);
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", strings::PlayWith);
             ImGui::PopFont();
-            for (const auto& [value, name] : DeviceOptions())
+            ImGui::Dummy(ImVec2(0, 2));
+            ImDrawList* popup = ImGui::GetWindowDrawList();
+            for (const auto& [value, name] : options)
             {
                 bool current = value == device;
                 ImVec2 at = ImGui::GetCursorScreenPos();
-                if (ImGui::Selectable(("      " + name).c_str(), current, 0, ImVec2(0, 30)))
+                ImGui::PushID(value.c_str());
+                if (ImGui::Selectable("##device", current, 0, ImVec2(rowW, RowH)))
                     SetDevice(value);
-                ImDrawList* popup = ImGui::GetWindowDrawList();
-                ImVec2 dot(at.x + 14, at.y + 15);
-                popup->AddCircle(dot, 6, Rgb(current ? Accent : TextDim), 16, 2.0f);
+                ImGui::PopID();
+                float mid = at.y + RowH / 2;
+                popup->AddCircle(ImVec2(at.x + DotX, mid), Dot, Rgb(current ? Accent : TextDim), 16, 2.0f);
                 if (current)
-                    popup->AddCircleFilled(dot, 3, Rgb(Accent), 12);
+                    popup->AddCircleFilled(ImVec2(at.x + DotX, mid), Dot - 3, Rgb(Accent), 12);
+                popup->AddText(ImVec2(at.x + LabelX, mid - ImGui::GetTextLineHeight() / 2), Rgb(Text), name.c_str());
             }
             ImGui::EndPopup();
         }
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(2);
 
-        // The portal's state, centred just above the band.
+        // The portal's state, small, under the main button (above the band it ran into the disc's lines).
         {
             std::string line = m_portal.Current().Line();
             if (!line.empty())
             {
-                ImGui::SetCursorScreenPos(ImVec2(bar.x + (available.x - ImGui::CalcTextSize(line.c_str()).x) / 2, bar.y - 28));
+                ImGui::PushFont(nullptr, SmallSize);
+                ImGui::SetCursorScreenPos(ImVec2(mainX + (PlayButtonW - ImGui::CalcTextSize(line.c_str()).x) / 2, buttonY + PlayButtonH + 4));
                 DrawPortalStatus();
+                ImGui::PopFont();
             }
         }
 
@@ -1457,9 +1508,9 @@ namespace launcher_ui
     {
         if (!BeginSettingsTable("##language"))
             return;
-        SettingRow("Text", "Menus, subtitles and on-screen text.");
+        SettingRow(strings::GameText, strings::GameTextHint);
         Combo("##text", m_game.id, "language", LanguageChoices, 0);
-        SettingRow("Voices", "Spoken lines and cutscenes. They can differ from the text.");
+        SettingRow(strings::GameVoices, strings::GameVoicesHint);
         Combo("##voice", m_game.id, "voice_language", LanguageChoices, 0);
         EndSettingsTable();
     }
@@ -1654,39 +1705,6 @@ namespace launcher_ui
         ImGui::EndChild();
     }
 
-    // The game's text language, top right of Home and Play (Settings > Language has it with the voices). The launcher's own
-    // text is English for now.
-    void App::DrawLanguageMenu()
-    {
-        ImVec2 at(ImGui::GetIO().DisplaySize.x - Pad - LanguageMenuW, Pad + m_bannerH);
-        ImVec2 padding(12, 6);
-        int selected = ChoiceIndex(LanguageChoices, SettingGet(m_config, m_game.id, "language"), 0);
-        const char* current = LanguageChoices[selected].label;
-        ImGui::PushFont(nullptr, TextSize + 1);
-        // The frame has no fill, so the bold copy of the current language can go under it.
-        ImGui::GetWindowDrawList()->AddText(ImVec2(at.x + padding.x + BoldOffset, at.y + padding.y), IM_COL32_WHITE, current);
-        ImGui::SetCursorScreenPos(at);
-        ImGui::SetNextItemWidth(LanguageMenuW);
-        // See-through: white outline and text, no fill.
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
-        ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32_WHITE);
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_WHITE);
-        for (ImGuiCol fill : { ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_Button, ImGuiCol_ButtonHovered })
-            ImGui::PushStyleColor(fill, IM_COL32(255, 255, 255, fill == ImGuiCol_FrameBgHovered || fill == ImGuiCol_ButtonHovered ? 30 : 0));
-        bool open = ImGui::BeginCombo("##uilanguage", current);
-        ImGui::PopStyleColor(6);
-        ImGui::PopStyleVar(2);
-        if (open)
-        {
-            for (int i = 0; i < int(std::size(LanguageChoices)); i++)
-                if (ImGui::Selectable(LanguageChoices[i].label, i == selected))
-                    Set(m_game.id, "language", LanguageChoices[i].value);
-            ImGui::EndCombo();
-        }
-        ImGui::PopFont();
-    }
-
     void App::GoTo(Page page)
     {
         if ((page == Page::Settings || page == Page::Collection) && (m_page == Page::Home || m_page == Page::Play))
@@ -1765,8 +1783,6 @@ namespace launcher_ui
         case Page::Collection: m_collection->Draw(); break;
         case Page::Settings: DrawSettings(); break;
         }
-        if (m_page == Page::Home || m_page == Page::Play) // Settings has its own Language tab, the collection its buttons there
-            DrawLanguageMenu();
         ImGui::End();
         ImGui::PopStyleVar();
         DrawWhatsNew();
@@ -1787,7 +1803,7 @@ namespace launcher_ui
         if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
         {
             static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-collection", "06-home",
-                "07-figure-sheet", "08-new-figure" };
+                "07-figure-sheet", "08-new-figure", "09-play-with", "10-language", "11-disc-gone" };
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-installing-compile", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
@@ -1955,6 +1971,26 @@ namespace launcher_ui
         case 7:
             m_collection->TestScreen(6);
             m_testAt = now + 600;
+            break;
+        case 8:
+            m_page = Page::Play;
+            m_testControllers = true;
+            m_testAt = now + 500;
+            break;
+        case 9:
+            m_page = Page::Settings;
+            m_tab = SettingsTab::Language;
+            m_testAt = now + 400;
+            break;
+        case 10:
+            // The verified image moved away: INSTALL says so instead of failing later.
+            m_page = Page::Play;
+            if (m_disc == DiscState::Ready)
+            {
+                m_discPath += ".moved";
+                StartInstall();
+            }
+            m_testAt = now + 400;
             break;
         default:
             m_running = false;
