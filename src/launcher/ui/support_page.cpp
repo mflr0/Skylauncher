@@ -1,11 +1,46 @@
-// Support in Settings: the game's logs (Copy game log, Open logs folder) and "Test the portal" (docs/support.md).
+// Support in Settings: the game's logs (Copy game log, Open logs folder), "Report a problem" (one text file with the
+// logs and the player's versions, shown before anything is saved or copied; nothing is uploaded) and "Test the portal"
+// (docs/support.md).
+#include "launcher/report.h"
 #include "launcher/ui/launcher_app.h"
 #include <fmt/format.h>
+#include <fstream>
+#include <memory>
+#include <mutex>
 
 namespace launcher_ui
 {
     namespace
     {
+        // The save dialog answers on a thread of its own: the callback writes the file and leaves the outcome here,
+        // the window tells the player on its next frame.
+        std::mutex g_saveMutex;
+        std::string g_savedPath;
+        bool g_saveOk = false, g_saveFailed = false;
+
+        void SDLCALL SaveReport(void* userdata, const char* const* files, int)
+        {
+            std::unique_ptr<std::string> text(static_cast<std::string*>(userdata));
+            std::lock_guard lock(g_saveMutex);
+            if (files == nullptr)
+            {
+                g_saveFailed = true;
+                return;
+            }
+            if (files[0] == nullptr) // cancelled
+                return;
+            std::ofstream out(files[0], std::ios::binary | std::ios::trunc);
+            out.write(text->data(), std::streamsize(text->size()));
+            out.close();
+            if (out)
+            {
+                g_savedPath = files[0];
+                g_saveOk = true;
+            }
+            else
+                g_saveFailed = true;
+        }
+
         // What the game will do with the portal, given the mode and what the test found.
         std::string PortalVerdict(const std::string& mode, const PortalProbeResult& result, bool& good)
         {
@@ -23,6 +58,109 @@ namespace launcher_ui
             return mode == "real" ? "The portal can't be opened: the game will wait for it."
                                   : "The portal can't be opened: the game will use the virtual portal.";
         }
+    }
+
+    // One text file with the last logs, the settings and the versions; it is shown before it can be saved or copied.
+    void App::OpenProblemReport()
+    {
+        launcher_report::Sources sources;
+        sources.runtimeFolder = RuntimeLogFolder();
+        sources.logFolder = GameLogFolder();
+        sources.settingsFile = std::filesystem::path(std::u8string(m_configPath.begin(), m_configPath.end()));
+        sources.iso = m_discPath;
+        std::string kit = m_installed.kitVersion;
+        if (kit.empty())
+            if (std::optional<InstallKit> found = FindInstallKit(m_config))
+                kit = found->version;
+        sources.versions = launcher_report::ReadVersions(LauncherVersion(), kit, sources.runtimeFolder);
+        launcher_report::Identity identity = launcher_report::CurrentIdentity(sources.iso);
+        sources.userName = identity.userName;
+        sources.computerName = identity.computerName;
+        sources.homeFolder = identity.homeFolder;
+        m_reportText = launcher_report::BuildReport(sources);
+        m_reportOpen = true;
+    }
+
+    void App::DrawProblemReport()
+    {
+        // Tell the player how the save went, whatever the dialog's thread answered.
+        {
+            std::lock_guard lock(g_saveMutex);
+            if (g_saveOk)
+            {
+                Toast("Report saved to " + g_savedPath);
+                g_saveOk = false;
+            }
+            else if (g_saveFailed)
+            {
+                Toast("Couldn't save the report");
+                g_saveFailed = false;
+            }
+        }
+
+        if (m_reportOpen && !ImGui::IsPopupOpen("##problemreport"))
+            ImGui::OpenPopup("##problemreport");
+        ImVec2 display = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowSize(ImVec2(std::min(880.0f, display.x - 80), std::min(680.0f, display.y - 60)));
+        ImGui::SetNextWindowPos(ImVec2(display.x / 2, display.y / 2), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(Panel, 250));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, RadiusLarge);
+        if (ImGui::BeginPopupModal("##problemreport", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+        {
+            if (!m_reportOpen)
+                ImGui::CloseCurrentPopup();
+            Title("Report a problem", TitleSize, Text);
+            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)),
+                "This is everything the report holds. Your account, your computer's name and your home folder are replaced. "
+                "Nothing is sent: save it, or copy it into an issue.");
+            ImGui::PopFont();
+            ImGui::Dummy(ImVec2(0, 6));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusSmall);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
+            ImGui::BeginChild("##reporttext", ImVec2(0, -52), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
+                ImGuiWindowFlags_NoBackground);
+            if (m_monoFont != nullptr)
+                ImGui::PushFont(m_monoFont, SmallSize);
+            ImGui::PushTextWrapPos(0);
+            ImGui::TextUnformatted(m_reportText.c_str());
+            ImGui::PopTextWrapPos();
+            if (m_monoFont != nullptr)
+                ImGui::PopFont();
+            ImGui::EndChild();
+            ImGui::PopStyleVar(2);
+            ImGui::PopStyleColor();
+            if (PillButton("Save as...", true, 160, true))
+            {
+                std::filesystem::path folder = GameLogFolder();
+                std::string name = launcher_report::FileName();
+                std::string start = (folder / name).string();
+                static const SDL_DialogFileFilter Filters[] = { { "Text file", "txt" } };
+                SDL_ShowSaveFileDialog(SaveReport, new std::string(m_reportText), m_window, Filters, 1, start.c_str());
+            }
+            ImGui::SameLine();
+            if (PillButton("Copy", false, 140))
+            {
+                SDL_SetClipboardText(m_reportText.c_str());
+                Toast("Report copied");
+            }
+            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
+            if (PillButton("Close", false, 120) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+            {
+                m_reportOpen = false;
+                ImGui::CloseCurrentPopup();
+            }
+            if (m_reportOpen && (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown, false)))
+            {
+                m_reportOpen = false;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
     }
 
     void App::DrawPortalTest()
@@ -93,6 +231,9 @@ namespace launcher_ui
         std::filesystem::path folder = GameLogFolder();
         std::error_code error;
         bool any = std::filesystem::exists(RuntimeLogFolder() / RuntimeLogName, error) || std::filesystem::exists(folder / CaptureLogName, error);
+        if (PillButton("Report a problem", true, 220, true))
+            OpenProblemReport();
+        ImGui::SameLine();
         ImGui::BeginDisabled(!any);
         if (PillButton("Copy game log", false, 220))
         {
@@ -107,6 +248,8 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
         ImGui::TextWrapped(any ? "The log of the last time the game ran, to send with a bug report. It stays on your computer until you paste it."
                                : "No game log yet: it appears after the game has run once.");
+        ImGui::TextWrapped("Report a problem makes one text file with the last logs, your settings and your versions, with your "
+                           "account, computer and folder names replaced. It is shown before you save or copy it; nothing is sent.");
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }

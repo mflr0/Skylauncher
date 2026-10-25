@@ -177,6 +177,8 @@ namespace launcher_ui
         void DrawWhatsNew();
         void DrawPortalTest();   // support_page.cpp
         void DrawLogs();
+        void OpenProblemReport();
+        void DrawProblemReport();
         void DrawToast();
         void DrawLanguageMenu();
 
@@ -252,6 +254,8 @@ namespace launcher_ui
         uint64_t m_discSize = 0;
         VerifyJob m_verify;
         ProbeJob m_probe;
+        bool m_reportOpen = false;      // "Report a problem" shown (support_page.cpp)
+        std::string m_reportText;
 
         // Settings > Game data: the saves' backups (save_backup.h), read when the tab opens and after a restore.
         std::vector<savebackup::Entry> m_saveBackups;

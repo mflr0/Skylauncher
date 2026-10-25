@@ -26,6 +26,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
 | `video` | `fps_limit` | `30`, `60` | Frame rate cap (the game is made for 30; 60 is experimental). Other values the runtime reads as 60 | yes |
+| `video` | `skip_intro_movies` | `0`, `1` | Skip the start-up logos (legal, ATVI, XPEC, Toys for Bob); the story movies still play | yes |
 | `video` | `vsync` | `0`, `1` | Wait for the display's refresh | yes |
 | `video` | `anisotropy` | `1`, `2`, `4`, `8`, `16` | Texture filtering | yes |
 | `input` | `device` | `auto`, `keyboard`, `gamepad` | What the game listens to | yes |

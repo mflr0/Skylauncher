@@ -12,8 +12,29 @@ In the "Skylanders" data folder (`%APPDATA%\Skylanders\` on Windows, `~/Library/
 | `SSA/install.log` (`.prev.log`), `SSA/install-logs/` | the launcher, SSABuild | what SSABuild printed during the install, and its own step logs kept after the build (docs/install.md) |
 | `logs/migration.log` | the first start after an update | what was moved from the older folders |
 
-Settings > Game data > Support: **Copy game log** (the end of `SSARecomp.log`, then of `skylauncher-game.log`, each under a
-heading) and **Open logs folder** (`logs/`). `SKYLAUNCHER_LOG_DIR` replaces both log folders (tests).
+Settings > Game data > Support: **Report a problem** (one text file with the last logs, the settings and the versions;
+see below), **Copy game log** (the end of `SSARecomp.log`, then of `skylauncher-game.log`, each under a heading) and
+**Open logs folder** (`logs/`). `SKYLAUNCHER_LOG_DIR` replaces both log folders (tests).
+
+## Report a problem
+
+**Report a problem** builds one text file and shows it in a window before anything else: the header has the launcher,
+kit and game build versions, the OS and the GPU line from the last game log (plus the disc image path), then the files,
+each under a `===== name =====` heading:
+
+- `launcher.ini`;
+- `logs/migration.log`;
+- `SSA/SSARecomp.log` and `SSA/SSARecomp.prev.log`;
+- `logs/skylauncher-game.log`;
+- `SSA/install.log`, `SSA/install.prev.log` and every file in `SSA/install-logs/`.
+
+Missing files are named as empty or not found, never skipped silently. Before it is shown the text is redacted
+(`src/launcher/report.cpp`): the account name becomes `<user>`, the computer name `<computer>`, the home folder and
+`/Users/<name>`, `C:\Users\<name>`, `C:/Users/<name>` and `/home/<name>` become `<home>`, and the folder holding the
+disc image becomes `<iso folder>`. The replacement is case-insensitive, whole names only, one pass; everything else is
+kept byte for byte. The window has **Save as...** (the extension is `.txt`, the name
+`Skylauncher-report-<yyyymmdd-hhmmss>.txt`) and **Copy**; nothing is uploaded. Unit tests for the redaction and the
+report are in `tests/shell_test.cpp` (`Report: ...`).
 
 ## The launcher stays while the game runs
 

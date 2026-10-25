@@ -1221,6 +1221,11 @@ namespace launcher_ui
         SettingRow("Frame rate limit", "The game was made for 30 FPS; 60 is experimental.");
         Combo("##fps", "video", "fps_limit", FpsChoices, 0);
 
+        SettingRow("Skip intro movies", "Skips the start-up logos; the story movies still play.");
+        bool skipIntroMovies = ParseBool(SettingGet(m_config, "video", "skip_intro_movies", "0"));
+        if (Toggle("##skipintromovies", &skipIntroMovies))
+            Set("video", "skip_intro_movies", skipIntroMovies ? "1" : "0");
+
         SettingRow("VSync", "Waits for the screen's refresh: no tearing, a little more latency.");
         bool vsync = ParseBool(SettingGet(m_config, "video", "vsync", "1"));
         if (Toggle("##vsync", &vsync))
@@ -1586,6 +1591,7 @@ namespace launcher_ui
         ImGui::End();
         ImGui::PopStyleVar();
         DrawWhatsNew();
+        DrawProblemReport();
         DrawToast();
 
         ImGui::Render();

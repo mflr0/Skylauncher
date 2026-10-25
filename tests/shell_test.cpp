@@ -4,6 +4,7 @@
 #include "launcher/game_run.h"
 #include "launcher/install_checklist.h"
 #include "launcher/launcher.h"
+#include "launcher/report.h"
 #include "launcher/updater.h"
 #include "shared/collection/save_backup.h"
 #include "shared/mini_json.h"
@@ -423,11 +424,105 @@ namespace
     }
 }
 
+namespace
+{
+    void ReportChecks(const std::filesystem::path& scratch)
+    {
+        launcher_report::Identity identity;
+        identity.userName = "alice";
+        identity.computerName = "Alices-MacBook-Pro.local";
+        identity.homeFolder = "/Users/alice";
+        identity.isoFolder = "/Volumes/My Games/SSA";
+
+        // The three home folders, with both separator spellings on Windows.
+        SHELL_EXPECT(launcher_report::Redact("/Users/alice/Library/Application Support/Skylanders", identity) ==
+            "<home>/Library/Application Support/Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("/home/alice/.local/share/Skylanders", identity) == "<home>/.local/share/Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData\\Roaming\\Skylanders", identity) ==
+            "<home>\\AppData\\Roaming\\Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("C:/Users/alice/AppData/Roaming/Skylanders", identity) ==
+            "<home>/AppData/Roaming/Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData", identity) == "<home>\\AppData");
+        // Another account is not touched, and neither is a longer name that starts with ours.
+        SHELL_EXPECT(launcher_report::Redact("/Users/alicia/x C:\\Users\\alice2\\x", identity) ==
+            "/Users/alicia/x C:\\Users\\alice2\\x");
+
+        // The account name inside other text, whole only.
+        SHELL_EXPECT(launcher_report::Redact("Logged in as alice; alicia stayed.", identity) ==
+            "Logged in as <user>; alicia stayed.");
+        SHELL_EXPECT(launcher_report::Redact("mail alice@example.test", identity) == "mail <user>@example.test");
+        SHELL_EXPECT(launcher_report::Redact("alice's files", identity) == "<user>'s files");
+
+        // The computer name, and its short form.
+        SHELL_EXPECT(launcher_report::Redact("host Alices-MacBook-Pro.local, name Alices-MacBook-Pro", identity) ==
+            "host <computer>, name <computer>");
+
+        // The disc image's folder, before the home folder it may sit in.
+        SHELL_EXPECT(launcher_report::Redact("/Volumes/My Games/SSA/disc.iso", identity) == "<iso folder>/disc.iso");
+        SHELL_EXPECT(launcher_report::Redact("D:\\Games\\SSA\\disc.iso", identity) == "D:\\Games\\SSA\\disc.iso");
+        launcher_report::Identity windows = identity;
+        windows.isoFolder = "D:\\Games\\SSA";
+        SHELL_EXPECT(launcher_report::Redact("D:\\Games\\SSA\\disc.iso", windows) == "<iso folder>\\disc.iso");
+        SHELL_EXPECT(launcher_report::Redact("/Volumes/My Games/SSA2/disc.iso", identity) == "/Volumes/My Games/SSA2/disc.iso");
+
+        // Nothing else changes: a text without the identity is returned as it is, byte for byte.
+        std::string plain = "line one\r\n\tspaced  two\n[]{}%$#@! caf\xC3\xA9\n";
+        SHELL_EXPECT(launcher_report::Redact(plain, identity) == plain);
+        SHELL_EXPECT(launcher_report::Redact("before /Users/alice after", identity) == "before <home> after");
+        SHELL_EXPECT(launcher_report::Redact("", identity).empty());
+
+        // The whole report: every file, the versions and the GPU line, all redacted.
+        std::filesystem::path data = scratch / "reportdata";
+        std::filesystem::path game = data / "SSA";
+        std::filesystem::create_directories(game / "install-logs");
+        std::filesystem::create_directories(data / "logs");
+        WriteBytes(data / "launcher.ini", "[video]\nvsync=1\n[ssa]\niso=/Users/alice/Documents/SSA.iso\n");
+        WriteBytes(game / "SSARecomp.log", "[log] /Users/alice/Library/Application Support/Skylanders/SSA/SSARecomp.log\n"
+            "[version] SSARecomp 1.0.0, build abc123\n[system] macOS 15\n"
+            "[gpu] adapter Apple M2: vendor 106B, integrated, unified memory, 8192 MB of video memory, driver n/a\n");
+        WriteBytes(game / "SSARecomp.prev.log", "previous run\n");
+        WriteBytes(game / "install.log", "@done /Users/alice/Applications/SSARecomp\n");
+        WriteBytes(game / "install.prev.log", "previous install\n");
+        WriteBytes(game / "install-logs" / "compile.txt", "compiled on Alices-MacBook-Pro.local\n");
+        WriteBytes(data / "logs" / "skylauncher-game.log", "started\n");
+        WriteBytes(data / "logs" / "migration.log", "moved /Users/alice/Library/Application Support/SSARecomp\n");
+
+        launcher_report::Sources sources;
+        sources.runtimeFolder = game;
+        sources.logFolder = data / "logs";
+        sources.settingsFile = data / "launcher.ini";
+        sources.iso = "/Users/alice/Documents/SSA.iso";
+        sources.userName = identity.userName;
+        sources.computerName = identity.computerName;
+        sources.homeFolder = identity.homeFolder;
+        sources.versions = launcher_report::ReadVersions("0.4.0", "1.2.3", game);
+        std::string report = launcher_report::BuildReport(sources);
+        SHELL_EXPECT(report.find("Launcher: 0.4.0\n") != std::string::npos && report.find("Kit: 1.2.3\n") != std::string::npos);
+        SHELL_EXPECT(report.find("Game build: SSARecomp 1.0.0, build abc123\n") != std::string::npos);
+        SHELL_EXPECT(report.find("GPU: Apple M2") != std::string::npos);
+        SHELL_EXPECT(report.find("===== launcher.ini =====") != std::string::npos);
+        SHELL_EXPECT(report.find("===== migration.log =====") != std::string::npos);
+        SHELL_EXPECT(report.find("===== SSARecomp.log =====") != std::string::npos);
+        SHELL_EXPECT(report.find("===== SSARecomp.prev.log =====") != std::string::npos);
+        SHELL_EXPECT(report.find("===== skylauncher-game.log =====") != std::string::npos);
+        SHELL_EXPECT(report.find("===== install.log =====") != std::string::npos);
+        SHELL_EXPECT(report.find("===== install.prev.log =====") != std::string::npos);
+        SHELL_EXPECT(report.find("===== install-logs/compile.txt =====") != std::string::npos);
+        SHELL_EXPECT(report.find("previous run") != std::string::npos && report.find("previous install") != std::string::npos);
+        SHELL_EXPECT(report.find("alice") == std::string::npos && report.find("Alices-MacBook-Pro") == std::string::npos);
+        SHELL_EXPECT(report.find("<home>") != std::string::npos && report.find("<iso folder>/SSA.iso") != std::string::npos);
+        SHELL_EXPECT(launcher_report::FileName().starts_with("Skylauncher-report-") &&
+            launcher_report::FileName().ends_with(".txt"));
+        printf("Report: the three home folders, names in text, computer and ISO folder redacted; nothing else changed\n");
+    }
+}
+
 int ShellChecks(const std::filesystem::path& scratch)
 {
     ChecklistChecks(scratch);
     GameRunChecks(scratch);
     UpdaterChecks(scratch);
     SaveBackupChecks(scratch);
+    ReportChecks(scratch);
     return g_shellFailures;
 }
