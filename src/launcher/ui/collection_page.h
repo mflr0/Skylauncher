@@ -139,7 +139,8 @@ namespace launcher_ui
         std::string m_figure;           // the Figure page's dump
         bool m_editing = false;
         figures::FigureStats m_edit;
-        char m_nickname[48] = {};
+        figures::FigureStats m_editBase; // as read when Edit stats opened: Save writes back only what changed since
+        char m_nickname[64] = {};        // 16 characters of up to 3 bytes, and the terminator
         char m_label[64] = {};
         bool m_renaming = false;
         std::string m_confirm;          // "restore:<backup>"

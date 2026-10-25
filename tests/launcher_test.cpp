@@ -501,6 +501,36 @@ void HoldChecks()
     printf("Hold to confirm: timing, cancel and identity checked\n");
 }
 
+// Edit stats and names (#9 S-11, S-17): Save keeps what a game changed meanwhile, a name of spaces is no name.
+void EditChecks()
+{
+    using launcher_ui::MergeEditedStats;
+    figures::FigureStats base{};
+    base.experience = 9000;
+    base.gold = 2400;
+    base.heroPoints = 3;
+    base.playSeconds = 600;
+    figures::SetNicknameUtf8(base, "Gilou");
+    // The game played it while the editor was open: more time, more gold.
+    figures::FigureStats now = base;
+    now.playSeconds = 4200;
+    now.gold = 2600;
+    // The player changed the experience only: the game's gold and time stay.
+    figures::FigureStats edited = base;
+    edited.experience = 12000;
+    figures::FigureStats saved = MergeEditedStats(now, base, edited, "Gilou", "Gilou");
+    EXPECT(saved.experience == 12000 && saved.gold == 2600 && saved.playSeconds == 4200 && saved.heroPoints == 3);
+    EXPECT(figures::NicknameUtf8(saved) == "Gilou");
+    // The gold and the nickname changed here: they win over the game's.
+    edited.gold = 100;
+    saved = MergeEditedStats(now, base, edited, "Gilou", "Gill");
+    EXPECT(saved.gold == 100 && saved.playSeconds == 4200 && figures::NicknameUtf8(saved) == "Gill");
+
+    using launcher_ui::Trimmed;
+    EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Gilou's  ") == "Gilou's" && Trimmed("A b") == "A b");
+    printf("Edit stats and names: merge and trim checked\n");
+}
+
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 
 int main(int argc, char** argv)
@@ -523,6 +553,7 @@ int main(int argc, char** argv)
 
     CollectionChecks(scratch);
     HoldChecks();
+    EditChecks();
     PortalChecks();
     InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);

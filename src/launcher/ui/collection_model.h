@@ -5,6 +5,7 @@
 #include "shared/collection/collection.h"
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace launcher_ui
@@ -36,6 +37,14 @@ namespace launcher_ui
     // Names a toy the catalogue does not know: an entry in the collection's catalogue.json (by toy type), which the
     // catalogue adds at the next start, as the game's Toy Box does.
     bool NameUnknownToy(uint16_t type, const std::string& name, collection::Category category, const std::string& game);
+
+    // A figure's name as typed, without the spaces around it: a name of spaces is no name (the toy's shows).
+    std::string Trimmed(std::string_view text);
+
+    // Edit stats' Save: the figure as it is `now` (a game may have played it since the editor opened on `base`), with
+    // only the fields the player changed (`edited`, and the nickname from `baseNickname` to `nickname`).
+    figures::FigureStats MergeEditedStats(const figures::FigureStats& now, const figures::FigureStats& base, const figures::FigureStats& edited,
+        const std::string& baseNickname, const std::string& nickname);
 
     class CollectionModel
     {

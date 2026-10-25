@@ -246,7 +246,7 @@ namespace launcher_ui
             ImGui::SameLine(0, 8);
             if (m_app.PillButton("Save the name", true, 160, true) || enter)
             {
-                collection::SetLabel(path, m_label);
+                collection::SetLabel(path, Trimmed(m_label));
                 m_renaming = false;
                 Reload();
             }
@@ -296,7 +296,7 @@ namespace launcher_ui
         ImGui::BeginDisabled(!writable || !HasProgress(f) || f.state == figures::AreaState::Damaged);
         if (m_app.PillButton("Edit stats", false, 130, true))
         {
-            m_edit = f.stats;
+            m_edit = m_editBase = f.stats;
             snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(f.stats).c_str());
             m_editing = true;
         }
@@ -441,8 +441,10 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 14));
         if (m_app.PillButton("Save", true, 140, true))
         {
-            figures::FigureStats stats = m_edit;
-            figures::SetNicknameUtf8(stats, m_nickname);
+            // The figure as it is now (a game may have played it since the editor opened), with only the fields changed here.
+            Figure now;
+            figures::FigureStats current = collection::Read(f.path, now) && now.state == figures::AreaState::Valid ? now.stats : m_editBase;
+            figures::FigureStats stats = MergeEditedStats(current, m_editBase, m_edit, figures::NicknameUtf8(m_editBase), m_nickname);
             std::string error;
             if (collection::WriteStats(f.path, stats, &error))
             {

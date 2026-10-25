@@ -372,7 +372,7 @@ namespace launcher_ui
             OpenFigure(figureOf(14));
             if (const Figure* figure = m_model.Find(m_figure))
             {
-                m_edit = figure->stats;
+                m_edit = m_editBase = figure->stats;
                 snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(figure->stats).c_str());
                 m_editing = true;
             }

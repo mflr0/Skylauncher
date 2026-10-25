@@ -294,4 +294,25 @@ namespace launcher_ui
                 paths.push_back(seat);
         return paths;
     }
+
+    std::string Trimmed(std::string_view text)
+    {
+        size_t first = text.find_first_not_of(" \t"), last = text.find_last_not_of(" \t");
+        return first == std::string_view::npos ? std::string() : std::string(text.substr(first, last - first + 1));
+    }
+
+    figures::FigureStats MergeEditedStats(const figures::FigureStats& now, const figures::FigureStats& base, const figures::FigureStats& edited,
+        const std::string& baseNickname, const std::string& nickname)
+    {
+        figures::FigureStats stats = now;
+        if (edited.experience != base.experience)
+            stats.experience = edited.experience;
+        if (edited.gold != base.gold)
+            stats.gold = edited.gold;
+        if (edited.heroPoints != base.heroPoints)
+            stats.heroPoints = edited.heroPoints;
+        if (nickname != baseNickname)
+            figures::SetNicknameUtf8(stats, nickname);
+        return stats;
+    }
 }

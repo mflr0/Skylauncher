@@ -175,8 +175,8 @@ namespace launcher_ui
                 {
                     if (variant != nullptr && variant->sameTag)
                         collection::SetEdition(path, variant->name, variant->kind);
-                    if (m_addLabel[0] != 0)
-                        collection::SetLabel(path, m_addLabel);
+                    if (std::string label = Trimmed(m_addLabel); !label.empty())
+                        collection::SetLabel(path, label);
                     m_created = path;
                     m_addLabel[0] = 0;
                     Reload();
