@@ -15,6 +15,7 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#include <fcntl.h>
 #include <io.h>
 #include <windows.h>
 #else
