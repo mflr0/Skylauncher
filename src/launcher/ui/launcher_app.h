@@ -231,6 +231,15 @@ namespace launcher_ui
         const GameInfo& ChosenGame() const { return m_s->game; } // the game that was shown when Run returned
         const std::string& ChosenRuntime() const { return m_s->chosenRuntime; }
         int TestFailures() const { return m_testFailures; } // SSA_LAUNCHER_TEST_SWITCH: the checks that failed
+        // What a game is doing, in a few words, for the sidebar and Home: the same state the game page draws, read from
+        // the game's own slot (nullptr: not opened this session). `progress` is 0..1 while it installs or updates.
+        struct SlotLine
+        {
+            std::string text;
+            unsigned dot;
+            float progress = -1;
+        };
+        SlotLine SlotStatus(GameSlot* slot);
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
 
     private:
@@ -242,7 +251,6 @@ namespace launcher_ui
         void Frame();
         void DrawBackdrop();
         void DrawSidebar();
-        const char* SlotStatus(const GameSlot* slot, bool* ready) const;
         void DrawHome();
         void DrawPlay();
         void DrawSettings();     // the launcher's settings (the gear): Controls, Launcher, Support, About
@@ -339,14 +347,17 @@ namespace launcher_ui
         // Installing the game (the band's INSTALL button, the progress card in place of the logo).
         void RefreshInstall();
         bool NeedsInstall() const;
+        bool NeedsInstall(const GameSlot& slot) const;
         bool Installing() const { return m_s->installer.Running() || m_s->kitDownload.Running(); }
         void StartInstaller();
         void StartKitDownload();
         bool UpdateAvailable() const;
+        bool UpdateAvailable(const GameSlot& slot) const;
         void StartInstall();
         void PollInstall();
         void DrawInstall(ImVec2 at, ImVec2 size);
         InstallProgress InstallSnapshot(size_t logTail = 0); // this session's install, else the one read back from its log
+        InstallProgress InstallSnapshot(GameSlot& slot, size_t logTail = 0); // the same, for any game's slot
         void SetInstallState(const std::string& sha, const char* state); // [install.<sha>] state=, for a launcher restart
 
         void UpdateUiScale(bool resize);
@@ -372,6 +383,7 @@ namespace launcher_ui
         void TestUpdateScript(uint64_t now);
         void TestNavScript(uint64_t now);
         void TestSwitchScript(uint64_t now);
+        void TestSidebarScript(uint64_t now);
         void TestSeatXScript(uint64_t now);
         void TestButtonsScript(uint64_t now);
         void PlayNow(); // PLAY on the shown game: its disc and built game are what the launcher returns
@@ -447,6 +459,7 @@ namespace launcher_ui
         bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
         bool m_testSeatX = false;      // SSA_LAUNCHER_TEST_SEATX: the X on every seat, by mouse, keyboard and pad
         std::vector<std::string> m_testSeats; // the seats the SEATX script restores before each try
+        bool m_testSidebar = false;    // SSA_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
         bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
         int m_testFailures = 0;
         uint64_t m_testBegan = 0;

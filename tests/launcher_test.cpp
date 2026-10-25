@@ -574,6 +574,38 @@ static void SwitchChecks(const std::filesystem::path& scratch, const std::string
     SetActiveGame("ssa");
 }
 
+// The sidebar's line for a game follows its state (App::TestSidebarScript, in an offscreen window): ready to install,
+// installing, updating at 0, 50 and 100 %, ready, update available, failed, with a screenshot of each in <scratch>/sidebar-shots.
+static void SidebarChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso)
+{
+    auto set = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
+    std::filesystem::create_directories(scratch / "sidebar-shots");
+    set("SDL_VIDEO_DRIVER", "offscreen");
+    set("SDL_AUDIO_DRIVER", "dummy");
+    set("SKYLANDERS_DATA", (scratch / "sidebar-data").string());
+    set("SKYLAUNCHER_DATA", (scratch / "sidebar-launcher-data").string());
+    set("SSA_COLLECTION", (scratch / "sidebar-collection").string());
+    set("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
+    set("SSA_LAUNCHER_SHOTS", (scratch / "sidebar-shots").string());
+    set("SSA_LAUNCHER_TEST_SIDEBAR", "1");
+    std::string ini = (scratch / "sidebar.ini").string();
+    set("SSA_LAUNCHER_INI", ini);
+    LauncherConfig config;
+    config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
+    config["ssa"]["iso"] = ssaIso;
+    config["giants"]["iso"] = giantsIso;
+    {
+        launcher_ui::App app(*FindGame("ssa"), ini, config);
+        app.Run();
+        EXPECT(app.TestFailures() == 0);
+    }
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_TEST_SIDEBAR");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_HOLD");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
+    SetActiveGame("ssa");
+}
+
 // The X on every seat of the collection page, in the offscreen window (App::TestSeatXScript): players, item and adventure seats,
 // each emptied by the mouse on the X, by Delete and by the pad's X. It runs the launcher itself as a child process, because the
 // collection's folder is fixed for a process by its first use, and the checks above have used theirs. Scratch folders only.
@@ -752,6 +784,8 @@ int main(int argc, char** argv)
         EXPECT(CheckGameSource(iso.string(), *giants).status == GameSourceStatus::WrongGame);
         printf("Switching games in the window:\n");
         SwitchChecks(scratch, iso.string(), giantsIso);
+        printf("The sidebar line through an install and an update:\n");
+        SidebarChecks(scratch, iso.string(), giantsIso);
     }
     printf("The seats' X in the window:\n");
     SeatXChecks(scratch);
