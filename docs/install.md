@@ -45,13 +45,50 @@ SSABuild's output is also written to `install.log` in the game folder. `SKYLAUNC
 | --- | --- |
 | The kit | `SKYLAUNCHER_KIT`, else `[launcher] kit=` in `launcher.ini`, else next to the launcher (next to `Skylauncher.app` on macOS): `ssa-kit/`, `kit/`, or a folder whose name starts with `ssa-kit` (an unzipped `ssa-kit-windows-x64`), else the newest `kit/<release tag>/` Skylauncher downloaded into its data folder. It must hold `SSABuild` (`SSABuild.exe`). |
 | The kit's version | `build=` (else `version=`) in the kit's `kit.txt`, else SSABuild's size and date |
-| The built game | `%LOCALAPPDATA%\Skylauncher\games\<sha256>` on Windows, `~/Library/Application Support/Skylauncher/games/<sha256>` on macOS, `~/.local/share/Skylauncher/games/<sha256>` on Linux. Never next to the ISO. |
+| The built game | `<data>/SSA` (see below). Never next to the ISO. |
 | What was built | `[install.<sha256>]` in `launcher.ini`: `runtime=` (the `@done` path), `kit=` (the kit version it was built with) |
 
 Which runtime PLAY starts: `SKYLAUNCHER_RUNTIME`, else the game built for this disc, else `[launcher] runtime=`, else
 `SSARecomp` next to the launcher. A runtime set up by hand (the last two) also hides INSTALL.
 
-`SKYLAUNCHER_DATA` replaces the data folder (the games and the downloaded kits), for tests.
+### One data folder, "Skylanders"
+
+The launcher, the game and SSABuild keep everything under one root per OS, chosen by the shared `datadir` helper
+(`src/shared/collection/datadir.{h,cpp}`, copied from SSARecomp by `tools/sync_collection.sh`):
+
+| OS | Root |
+| --- | --- |
+| Windows | `%APPDATA%\Skylanders` (everything, the built game and the compiler too) |
+| macOS | `~/Library/Application Support/Skylanders` |
+| Linux | `$XDG_DATA_HOME/Skylanders`, by default `~/.local/share/Skylanders` |
+
+| Inside the root | What |
+| --- | --- |
+| `Collection/` | the figures, shared by every game |
+| `launcher.ini` | the settings shared by the launcher and the games |
+| `kit/<release tag>/` | the kits the launcher downloaded |
+| `toolchains/` | the compiler SSABuild downloads (Windows) |
+| `logs/` | `skylauncher-game.log` (+ `.prev.log`) and `migration.log` |
+| `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `pipelines.bin`, `portal.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Another game (Giants) gets its own folder. |
+
+`SKYLANDERS_DATA` replaces the root (tests, portable use). `SKYLAUNCHER_DATA` still replaces the launcher's part of it
+(the game folder, the kits, the logs). Settings > Game data > **Open data folder** opens the root.
+
+**Moving from the older layout.** Before 0.3.1 the data was in `<roaming>/SSARecomp/` (and its nested `SSARecomp/`),
+in `Skylauncher/` (`games/<sha256>/`, `kit/`; `%LOCALAPPDATA%\Skylauncher` on Windows) and, on Windows,
+`%LOCALAPPDATA%\SSARecomp\toolchains`. The first start of the new launcher **or** the new game moves them (`datadir::MigrateOnce`):
+entries are renamed one by one; nothing is overwritten or deleted (a taken name keeps the moved entry as
+`<name>.old-<time>`); a failed rename is copied, checked, then deleted, else left for the next start; an old folder is
+removed only once empty; `launcher.ini` paths into a moved folder are rewritten (the ISO's stays); everything is logged
+in `logs/migration.log`. The full table and rules: SSARecomp's `docs/settings.md`. A run with `SKYLANDERS_DATA`,
+`SKYLAUNCHER_DATA`, `SSA_LAUNCHER_INI`, `SSA_SETTINGS`, `SSA_SAVE_DIR` or `SSA_COLLECTION` set never migrates.
+
+### Housekeeping
+
+After a **successful** install: `ssabuild-work/` (2-3 GB) is deleted and its `logs/` kept as `install-logs/` (an update
+therefore rebuilds everything); the kits in `kit/` older than the one that built the game are deleted; a compiler archive
+(`toolchains/*.zip`) whose extracted copy is ready is deleted. Each log keeps one previous run (`.prev.log`), and the art
+cache `SSA/launcher-cache` is trimmed to 256 MB (oldest files first) when a game starts.
 
 ## Code
 

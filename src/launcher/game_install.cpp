@@ -1,5 +1,6 @@
 #include "launcher/game_install.h"
 #include "launcher/updater.h"
+#include "shared/collection/datadir.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <fmt/format.h>
@@ -90,18 +91,7 @@ std::filesystem::path LauncherDataFolder()
 {
     if (const char* folder = SDL_getenv("SKYLAUNCHER_DATA"); folder != nullptr && *folder != 0)
         return Path(folder);
-    std::filesystem::path data;
-#if defined(_WIN32)
-    if (const char* local = SDL_getenv("LOCALAPPDATA"); local != nullptr && *local != 0)
-        data = Path(local) / "Skylauncher";
-#endif
-    if (data.empty())
-        if (char* pref = SDL_GetPrefPath("", "Skylauncher"))
-        {
-            data = Path(pref);
-            SDL_free(pref);
-        }
-    return data;
+    return datadir::Root();
 }
 
 std::filesystem::path DownloadedKitsFolder() { return LauncherDataFolder() / "kit"; }
@@ -190,9 +180,10 @@ std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool
     return {};
 }
 
-std::filesystem::path GameInstallFolder(const std::string& xexSha256)
+std::filesystem::path GameInstallFolder(const std::string&)
 {
-    return LauncherDataFolder() / "games" / xexSha256;
+    // One folder per game, whatever the disc's release: the built game and its data are in it (docs/install.md).
+    return LauncherDataFolder() / datadir::GameFolderName("ssa");
 }
 
 InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string& xexSha256)
@@ -284,6 +275,43 @@ InstallProgress ReadInstallLog(const std::filesystem::path& gameFolder)
     return progress;
 }
 
+void CleanAfterInstall(const std::filesystem::path& gameFolder, const std::filesystem::path& kitFolder)
+{
+    namespace fs = std::filesystem;
+    std::error_code error;
+    fs::path work = gameFolder / "ssabuild-work";
+    if (fs::is_directory(work, error))
+    {
+        fs::path kept = gameFolder / "install-logs";
+        if (fs::is_directory(work / "logs", error))
+        {
+            fs::remove_all(kept, error);
+            fs::rename(work / "logs", kept, error);
+        }
+        if (!error)
+            fs::remove_all(work, error); // an update then builds everything again
+    }
+
+    // Older kits: only those under kit/ with a release tag older than the one that built the game.
+    fs::path root = DownloadedKitsFolder();
+    if (!kitFolder.empty() && fs::equivalent(kitFolder.parent_path(), root, error))
+    {
+        SemVer built = ParseSemVer(Utf8(kitFolder.filename()));
+        for (const auto& entry : fs::directory_iterator(root, error))
+        {
+            SemVer tag = ParseSemVer(Utf8(entry.path().filename()));
+            if (built.valid && tag.valid && entry.is_directory(error) && CompareSemVer(tag, built) < 0)
+                fs::remove_all(entry.path(), error);
+        }
+    }
+
+    // A compiler archive whose extracted copy is ready (SSABuild deletes it itself; this is for older installs).
+    fs::path toolchains = LauncherDataFolder() / "toolchains";
+    for (const auto& entry : fs::directory_iterator(toolchains, error))
+        if (entry.path().extension() == ".zip" && fs::exists(entry.path().parent_path() / entry.path().stem() / "ssabuild-ready.txt", error))
+            fs::remove(entry.path(), error);
+}
+
 GameInstaller::~GameInstaller()
 {
     Cancel();
@@ -317,6 +345,9 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     if (error)
         return fail(fmt::format("Couldn't create the game folder {}: {}", Utf8(out), error.message()));
     m_logFile = out / "install.log";
+    m_out = out;
+    m_kitFolder = kit->folder;
+    std::filesystem::rename(m_logFile, out / "install.prev.log", error); // one previous log
     std::ofstream(m_logFile, std::ios::trunc);
 
     std::string program = Utf8(kit->ssabuild), outText = Utf8(out), kitText = Utf8(kit->folder);
@@ -324,6 +355,11 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     const char* jobs = SDL_getenv("SKYLAUNCHER_BUILD_JOBS"); // else SSABuild picks
     if (jobs != nullptr && *jobs != 0)
         arguments.insert(arguments.end(), { "--jobs", jobs });
+#if defined(_WIN32)
+    // The compiler is downloaded into the data folder (an older SSABuild would use %LOCALAPPDATA%).
+    std::string toolchainText = Utf8(LauncherDataFolder() / "toolchains");
+    arguments.insert(arguments.end(), { "--toolchain", toolchainText.c_str() });
+#endif
     arguments.push_back(nullptr);
     SDL_PropertiesID properties = SDL_CreateProperties();
     SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, arguments.data());
@@ -409,6 +445,14 @@ void GameInstaller::Read()
     if (!exited)
         SDL_WaitProcess(m_process, true, &exitCode);
     logFile.flush();
+
+    bool succeeded;
+    {
+        std::lock_guard lock(m_mutex);
+        succeeded = !m_cancelled && exitCode == 0 && !m_progress.runtime.empty();
+    }
+    if (succeeded)
+        CleanAfterInstall(m_out, m_kitFolder);
 
     std::lock_guard lock(m_mutex);
     InstallProgress& progress = m_progress;

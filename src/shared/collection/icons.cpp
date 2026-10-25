@@ -1,4 +1,5 @@
 #include "icons.h"
+#include "datadir.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cctype>
@@ -300,11 +301,8 @@ namespace collection
             std::string folder;
             if (const char* portraits = getenv("SSA_PORTRAITS"))
                 folder = std::string(portraits) + "/";
-            else if (char* data = SDL_GetPrefPath("", game.runtime.c_str()))
-            {
-                folder = std::string(data) + "portraits/";
-                SDL_free(data);
-            }
+            else if (std::filesystem::path data = datadir::Game(game.id); !data.empty())
+                folder = datadir::Text(data / "portraits") + "/";
             std::string path = folder + name + ".png";
             if (SDL_GetPathInfo(path.c_str(), nullptr))
                 return path;

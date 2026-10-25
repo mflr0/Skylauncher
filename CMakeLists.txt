@@ -103,6 +103,7 @@ add_library(SkylauncherCore STATIC
     src/shared/figures/figure_icons.cpp
     src/shared/collection/catalogue.cpp
     src/shared/collection/collection.cpp
+    src/shared/collection/datadir.cpp
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
     src/shared/stb_impl.cpp

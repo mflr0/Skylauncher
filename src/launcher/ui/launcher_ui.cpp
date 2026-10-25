@@ -73,16 +73,6 @@ namespace launcher_ui
         return file.good();
     }
 
-    std::string PreferencePath(const char* sub)
-    {
-        std::string path;
-        if (char* base = SDL_GetPrefPath("", g_launcherName))
-        {
-            path = std::string(base) + sub;
-            SDL_free(base);
-        }
-        return path;
-    }
 
     SDL_Texture* LoadPng(SDL_Renderer* renderer, std::span<const uint8_t> png)
     {
@@ -1344,11 +1334,12 @@ namespace launcher_ui
             Browse();
         ImGui::Dummy(ImVec2(0, 16));
         Title("Folders", TitleSize, Text);
-        auto folder = [&](const char* label, const char* sub) {
-            if (PillButton(label, false, 260))
-                OpenFolder(std::filesystem::path(PreferencePath(sub)));
-        };
-        folder("Saves and settings", "");
+        if (PillButton("Open data folder", false, 260))
+        {
+            std::error_code error;
+            std::filesystem::create_directories(LauncherDataFolder(), error);
+            OpenFolder(LauncherDataFolder()); // the "Skylanders" folder: settings, saves, figures, the game, logs
+        }
         ImGui::SameLine();
         if (PillButton("Figures", false, 260))
         {

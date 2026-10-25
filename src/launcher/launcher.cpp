@@ -1,5 +1,6 @@
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
+#include "shared/collection/datadir.h"
 #include "shared/vfs.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -299,12 +300,7 @@ std::string LauncherConfigPath()
     // Tests point the launcher and the game at the same scratch file (the runtime reads this name too).
     if (const char* file = SDL_getenv("SSA_LAUNCHER_INI"))
         return file;
-    char* directory = SDL_GetPrefPath("", g_launcherName);
-    if (directory == nullptr)
-        return {};
-    std::string path = std::string(directory) + "launcher.ini";
-    SDL_free(directory);
-    return path;
+    return datadir::Text(datadir::LauncherIni());
 }
 
 LauncherConfig LoadLauncherConfig(const std::string& path)

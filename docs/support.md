@@ -2,17 +2,18 @@
 
 ## Where the logs are
 
-All in the folder of `launcher.ini` (`%APPDATA%\SSARecomp\` on Windows, `~/Library/Application Support/SSARecomp/` on macOS,
-`~/.local/share/SSARecomp/` on Linux):
+In the "Skylanders" data folder (`%APPDATA%\Skylanders\` on Windows, `~/Library/Application Support/Skylanders/` on macOS,
+`~/.local/share/Skylanders/` on Linux; docs/install.md):
 
 | File | Written by | What |
 | --- | --- | --- |
-| `SSARecomp.log` (`.prev.log`: the run before) | the game runtime | its own log: version, OS, CPU, GPU, settings, `[perf]` |
-| `skylauncher-game.log` (`.prev.log`) | the launcher | the runtime's stdout and stderr, from its first byte: early crashes, a missing DLL's message |
-| `<game folder>/install.log` | the launcher | what SSABuild printed during the install (docs/install.md) |
+| `SSA/SSARecomp.log` (`.prev.log`: the run before) | the game runtime | its own log: version, OS, CPU, GPU, settings, `[perf]` |
+| `logs/skylauncher-game.log` (`.prev.log`) | the launcher | the runtime's stdout and stderr, from its first byte: early crashes, a missing DLL's message |
+| `SSA/install.log` (`.prev.log`), `SSA/install-logs/` | the launcher, SSABuild | what SSABuild printed during the install, and its own step logs kept after the build (docs/install.md) |
+| `logs/migration.log` | the first start after an update | what was moved from the older folders |
 
 Settings > Game data > Support: **Copy game log** (the end of `SSARecomp.log`, then of `skylauncher-game.log`, each under a
-heading) and **Open logs folder**. `SKYLAUNCHER_LOG_DIR` replaces the folder (tests).
+heading) and **Open logs folder** (`logs/`). `SKYLAUNCHER_LOG_DIR` replaces both log folders (tests).
 
 ## The launcher stays while the game runs
 

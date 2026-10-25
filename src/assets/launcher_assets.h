@@ -10,7 +10,7 @@
 
 // Asset provider layer for the launcher: pulls official assets from the player's
 // own verified ISO at runtime and caches decoded images in
-// SDL_GetPrefPath/<pref>/launcher-cache/<titleid>/. Nothing here is committed or shipped.
+// <data root>/SSA/launcher-cache/<titleid>/ (trimmed to 256 MB, oldest files first, when a game starts). Nothing here is committed or shipped.
 // The procedural theme is the fallback before an ISO is loaded or if extraction fails.
 namespace LauncherAssets
 {

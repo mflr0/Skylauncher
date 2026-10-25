@@ -1,4 +1,5 @@
 #include "launcher/game_run.h"
+#include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -158,15 +159,16 @@ namespace
 
 std::filesystem::path GameLogFolder()
 {
-    std::filesystem::path folder;
     if (const char* override = SDL_getenv("SKYLAUNCHER_LOG_DIR"); override != nullptr && *override != 0) // tests
         return Path(override);
-    if (char* pref = SDL_GetPrefPath("", g_launcherName))
-    {
-        folder = Path(pref);
-        SDL_free(pref);
-    }
-    return folder;
+    return LauncherDataFolder() / "logs";
+}
+
+std::filesystem::path RuntimeLogFolder()
+{
+    if (const char* override = SDL_getenv("SKYLAUNCHER_LOG_DIR"); override != nullptr && *override != 0) // tests
+        return Path(override);
+    return GameInstallFolder({});
 }
 
 GameRunResult RunGame(const std::string& runtime, const std::string& iso, const std::vector<std::string>& extraArguments)
@@ -213,9 +215,8 @@ std::string ReadLogTail(const std::filesystem::path& file, size_t maxBytes)
 
 std::string GameLogText(size_t maxBytesEach)
 {
-    std::filesystem::path folder = GameLogFolder();
     std::string text;
-    for (const char* name : { RuntimeLogName, CaptureLogName })
+    for (const auto& [folder, name] : { std::pair{ RuntimeLogFolder(), RuntimeLogName }, std::pair{ GameLogFolder(), CaptureLogName } })
         if (std::string part = ReadLogTail(folder / name, maxBytesEach); !part.empty())
             text += fmt::format("===== {} =====\n{}\n", name, part);
     return text;

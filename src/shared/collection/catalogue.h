@@ -73,7 +73,7 @@ namespace collection
         std::vector<std::string> acceptsGames;  // ...or every toy that first came with these games
         std::map<uint16_t, std::string> names;  // the game's internal character names (SSA: portraits)
         std::map<uint16_t, std::string> images; // other toys' pictures among the game's UI images
-        std::string runtime;                    // SDL_GetPrefPath application of its runtime ("SSARecomp")
+        std::string runtime;                    // the runtime's executable name ("SSARecomp"); its data is in datadir::Game(id)
         std::vector<Seat> seats;                // in the order the menus show them
     };
 

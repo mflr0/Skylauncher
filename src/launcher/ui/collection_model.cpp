@@ -1,4 +1,5 @@
 #include "launcher/ui/collection_model.h"
+#include "shared/collection/datadir.h"
 #include "shared/collection/json.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -16,14 +17,9 @@ namespace launcher_ui
             return {};
         if (const char* saves = getenv("SSA_SAVE_DIR"))
             return std::string(saves) + "/portal.txt";
-        std::string file;
-        // The runtime's SDL_GetPrefPath(<runtime>, <runtime>), as host/portal.cpp asks for it.
-        if (char* folder = SDL_GetPrefPath(game.runtime.c_str(), game.runtime.c_str()))
-        {
-            file = std::string(folder) + "portal.txt";
-            SDL_free(folder);
-        }
-        return file;
+        // The game's folder in the data root, as host/portal.cpp asks for it.
+        std::filesystem::path folder = datadir::Game(game.id);
+        return folder.empty() ? std::string() : datadir::Text(folder / "portal.txt");
     }
 
     bool SeatAccepts(const collection::Seat& seat, const collection::Figure& figure)

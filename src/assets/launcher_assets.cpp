@@ -1,4 +1,5 @@
 #include "assets/launcher_assets.h"
+#include "shared/collection/datadir.h"
 #include "shared/figures/figure_icons.h"
 #include <algorithm>
 #include <cmath>
@@ -17,6 +18,7 @@ namespace LauncherAssets
 {
     namespace
     {
+        constexpr uint64_t CacheLimitBytes = 256ull << 20;
         constexpr uint32_t ApkfMagic = 0x41504B46; // "APKF"
         constexpr uint32_t TextureFormatDxt5 = 20; // k_DXT4_5
 
@@ -290,15 +292,15 @@ namespace LauncherAssets
             cacheDir.clear();
             return;
         }
-        char* pref = SDL_GetPrefPath("", g_launcherName);
-        if (pref == nullptr)
+        std::filesystem::path game = datadir::Game("ssa");
+        if (game.empty())
         {
             cacheDir.clear();
             enabled = false;
             return;
         }
-        cacheDir = std::string(pref) + "launcher-cache/";
-        SDL_free(pref);
+        cacheDir = datadir::Text(game / "launcher-cache") + "/";
+        datadir::TrimFolder(game / "launcher-cache", CacheLimitBytes);
         std::error_code error;
         std::filesystem::create_directories(cacheDir + fmt::format("{:08X}", titleId), error);
     }

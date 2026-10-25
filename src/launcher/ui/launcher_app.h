@@ -87,7 +87,6 @@ namespace launcher_ui
     // ---- Files and images -----------------------------------------------------------------------------------------
 
     bool ReadWholeFile(const std::string& path, std::vector<uint8_t>& out);
-    std::string PreferencePath(const char* sub); // in the settings folder shared with the runtime
     SDL_Texture* LoadPng(SDL_Renderer* renderer, std::span<const uint8_t> png);
     SDL_Texture* LoadPngFile(SDL_Renderer* renderer, const std::string& path);
     SDL_Texture* LoadRgba(SDL_Renderer* renderer, const std::vector<uint8_t>& rgba, int width, int height);

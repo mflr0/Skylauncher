@@ -80,7 +80,7 @@ namespace launcher_ui
     {
         std::filesystem::path folder = GameLogFolder();
         std::error_code error;
-        bool any = std::filesystem::exists(folder / RuntimeLogName, error) || std::filesystem::exists(folder / CaptureLogName, error);
+        bool any = std::filesystem::exists(RuntimeLogFolder() / RuntimeLogName, error) || std::filesystem::exists(folder / CaptureLogName, error);
         ImGui::BeginDisabled(!any);
         if (PillButton("Copy game log", false, 220))
         {

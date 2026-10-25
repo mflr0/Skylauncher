@@ -8,8 +8,10 @@
 #include <string>
 #include <vector>
 
-// The folder of launcher.ini, SSARecomp.log and skylauncher-game.log (the SDL preferences folder of "SSARecomp").
+// The launcher's logs folder: skylauncher-game.log, migration.log (<data root>/logs).
 std::filesystem::path GameLogFolder();
+// Where the runtime writes SSARecomp.log: the game's folder (<data root>/SSA).
+std::filesystem::path RuntimeLogFolder();
 inline constexpr char RuntimeLogName[] = "SSARecomp.log";
 inline constexpr char RuntimePreviousLogName[] = "SSARecomp.prev.log";
 inline constexpr char CaptureLogName[] = "skylauncher-game.log";

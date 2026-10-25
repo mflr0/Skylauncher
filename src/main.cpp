@@ -1,5 +1,6 @@
 // Skylauncher: shows the launcher, then starts the game runtime with the disc image the player chose.
 #include "launcher/game_install.h"
+#include "shared/collection/datadir.h"
 #include "launcher/game_run.h"
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
@@ -53,6 +54,7 @@ int main(int argc, char** argv)
 {
     (void)argc;
     (void)argv;
+    datadir::MigrateOnce(); // the older folders into <data root> (docs/install.md), before any path is used
     const GameInfo* game = FindGame("ssa");
     if (game == nullptr)
         return 1;

@@ -74,8 +74,8 @@ Portal of Power. Then click **Test the portal**.
 
 - Settings > Game data > **Copy game log** copies the log so you can send it to us. **Open logs folder** shows the
   files.
-- The logs are in `%APPDATA%\SSARecomp\` on Windows, `~/Library/Application Support/SSARecomp/` on Mac, and
-  `~/.local/share/SSARecomp/` on Linux.
+- Everything is in one "Skylanders" folder: `%APPDATA%\Skylanders\` on Windows, `~/Library/Application Support/Skylanders/`
+  on Mac, `~/.local/share/Skylanders/` on Linux. The logs are in its `logs/` and `SSA/` folders.
 - If the game stops with an error, a window offers Copy log and Report.
 - Updates are offered at start, at most once a day. Every download is checked against the release's SHA-256.
 

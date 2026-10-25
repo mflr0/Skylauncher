@@ -1,4 +1,5 @@
 #include "collection.h"
+#include "datadir.h"
 #include "json.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -282,13 +283,8 @@ namespace collection
 
     std::string DefaultFolder()
     {
-        std::string folder = "Collection";
-        if (char* data = SDL_GetPrefPath("", "Skylanders"))
-        {
-            folder = data + folder;
-            SDL_free(data);
-        }
-        return folder;
+        std::filesystem::path folder = datadir::Root();
+        return folder.empty() ? std::string("Collection") : datadir::Text(folder / "Collection");
     }
 
     std::string Folder()
@@ -1328,13 +1324,9 @@ namespace collection
             return from;
         if (getenv("SSA_COLLECTION") != nullptr || getenv("SSA_FIGURES") != nullptr)
             return {};
-        std::string folder;
-        if (char* data = SDL_GetPrefPath("", "SSARecomp"))
-        {
-            folder = std::string(data) + "figures";
-            SDL_free(data);
-        }
-        return folder;
+        // Where the game's own figures folder is now; the datadir migration moved it there from SSARecomp/figures.
+        std::filesystem::path folder = datadir::Game("ssa");
+        return folder.empty() ? std::string() : datadir::Text(folder / "figures");
     }
 
     Migration Migrate(const std::string& from)

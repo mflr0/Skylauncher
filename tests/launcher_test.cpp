@@ -140,7 +140,7 @@ namespace
         RecordInstalledGame(config, "abc", (scratch / "missing").string(), "1");
         EXPECT(FindInstalledGame(config, "abc").runtime.empty()); // the built game is gone
         EXPECT(FindInstalledGame(config, "abc").kitVersion == "1");
-        EXPECT(GameInstallFolder("abc").filename() == "abc" && GameInstallFolder("abc").parent_path().filename() == "games");
+        EXPECT(GameInstallFolder("abc").filename() == "SSA" && GameInstallFolder("abc") == GameInstallFolder("def"));
 
         config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
         std::optional<InstallKit> kit = FindInstallKit(config);
@@ -160,11 +160,48 @@ namespace
         InstallProgress failed = run("shaders");
         EXPECT(failed.state == InstallProgress::State::Failed && failed.error.find("didn't compile") != std::string::npos);
         EXPECT(failed.steps.size() == 4 && failed.runtime.empty());
+        // The housekeeping after a successful build: the work folder goes, its logs stay, the log before is kept.
+        std::filesystem::create_directories(scratch / "game" / "ssabuild-work" / "obj");
+        { std::ofstream(scratch / "game" / "ssabuild-work" / "obj" / "big.o") << "object"; }
+        std::filesystem::create_directories(scratch / "game" / "ssabuild-work" / "logs");
+        { std::ofstream(scratch / "game" / "ssabuild-work" / "logs" / "link.log") << "link ok"; }
         InstallProgress done = run(nullptr);
+        EXPECT(!std::filesystem::exists(scratch / "game" / "ssabuild-work") && std::filesystem::exists(scratch / "game" / "install.prev.log"));
+        EXPECT(std::filesystem::exists(scratch / "game" / "install-logs" / "link.log"));
         EXPECT(done.state == InstallProgress::State::Done && done.steps.size() == 10);
         EXPECT(std::filesystem::path(done.runtime).filename().string().starts_with("SSARecomp"));
         EXPECT(std::filesystem::exists(scratch / "game" / "install.log"));
         printf("  fake kit: failure at step %zu, then built %s\n", failed.steps.size(), done.runtime.c_str());
+
+        // After a failed build nothing is cleaned.
+        std::filesystem::create_directories(scratch / "game" / "ssabuild-work");
+        run("shaders");
+        EXPECT(std::filesystem::exists(scratch / "game" / "ssabuild-work"));
+        std::filesystem::remove_all(scratch / "game" / "ssabuild-work");
+
+        // Older kits and extracted compiler archives, in a scratch data folder.
+        {
+            namespace fs = std::filesystem;
+            fs::path data = scratch / "data";
+            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA", data.string().c_str(), true);
+            for (const char* tag : { "v0.2.0", "v0.3.0", "v0.10.0", "notes", ".download" })
+            {
+                fs::create_directories(data / "kit" / tag);
+                std::ofstream(data / "kit" / tag / "SSABuild") << tag;
+            }
+            fs::create_directories(data / "toolchains" / "llvm-mingw-x");
+            std::ofstream(data / "toolchains" / "llvm-mingw-x" / "ssabuild-ready.txt") << "ok";
+            std::ofstream(data / "toolchains" / "llvm-mingw-x.zip") << "zip";
+            std::ofstream(data / "toolchains" / "other.zip") << "not extracted";
+            CleanAfterInstall(data / "SSA", data / "kit" / "v0.3.0");
+            EXPECT(!fs::exists(data / "kit" / "v0.2.0") && fs::exists(data / "kit" / "v0.3.0") && fs::exists(data / "kit" / "v0.10.0"));
+            EXPECT(fs::exists(data / "kit" / "notes") && fs::exists(data / "kit" / ".download")); // not release tags: kept
+            EXPECT(!fs::exists(data / "toolchains" / "llvm-mingw-x.zip") && fs::exists(data / "toolchains" / "other.zip"));
+            // A kit that is not a downloaded one (next to the launcher) leaves them all alone.
+            CleanAfterInstall(data / "SSA", scratch / "elsewhere" / "v9.0.0");
+            EXPECT(fs::exists(data / "kit" / "v0.3.0") && fs::exists(data / "kit" / "v0.10.0"));
+            SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA");
+        }
 
         // Cancel stops the fake SSABuild, slowed down so it is still running.
         SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.2", true);

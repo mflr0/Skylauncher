@@ -1,8 +1,8 @@
 # Settings file
 
-The launcher and the game runtime share one settings file, `launcher.ini`, in the SDL preferences folder of the app
-`SSARecomp` (`~/Library/Application Support/SSARecomp/` on macOS, `%APPDATA%\SSARecomp\` on Windows,
-`~/.local/share/SSARecomp/` on Linux). Lines are `[section]`, `key=value` or `# comment`.
+The launcher and the game runtime share one settings file, `launcher.ini`, at the root of the "Skylanders" data folder
+(`~/Library/Application Support/Skylanders/` on macOS, `%APPDATA%\Skylanders\` on Windows, `~/.local/share/Skylanders/` on
+Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 
 "Runtime" says whether the game runtime applies the key (checked against SSARecomp's `docs/settings.md`; the game's own log is in `docs/support.md`). Keys it does not know are kept and ignored.
 

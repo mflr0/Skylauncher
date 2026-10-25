@@ -24,8 +24,9 @@ struct InstallKit
     std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
 };
 
-// Where Skylauncher keeps what it makes: SKYLAUNCHER_DATA (tests), else %LOCALAPPDATA%\Skylauncher on Windows, ~/Library/Application
-// Support/Skylauncher on macOS, ~/.local/share/Skylauncher on Linux. The built games are in games/, the downloaded kits in kit/.
+// Where Skylauncher keeps what it makes: the "Skylanders" data folder shared with the games (datadir.h: SKYLANDERS_DATA, else
+// %APPDATA%\Skylanders on Windows, ~/Library/Application Support/Skylanders on macOS, ~/.local/share/Skylanders on Linux), or
+// SKYLAUNCHER_DATA (tests). The built games are in <game>/ (SSA/), the downloaded kits in kit/, the compiler in toolchains/.
 std::filesystem::path LauncherDataFolder();
 std::filesystem::path DownloadedKitsFolder(); // kit/<release tag>/ folders, each holding SSABuild
 
@@ -42,8 +43,7 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config);
 // `overrideOnly` keeps only SKYLAUNCHER_RUNTIME, which wins over an installed game.
 std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly = false);
 
-// Where a disc's game is built: <data>/games/<sha256>, <data> being %LOCALAPPDATA%\Skylauncher on Windows,
-// ~/Library/Application Support/Skylauncher on macOS, ~/.local/share/Skylauncher on Linux. Never next to the ISO.
+// Where a disc's game is built: <data>/SSA, which also holds the game's saves, settings and log. Never next to the ISO.
 std::filesystem::path GameInstallFolder(const std::string& xexSha256);
 
 // The game built for a disc, from "[install.<sha256>] runtime= kit=". Empty runtime when none was built or it is gone.
@@ -54,6 +54,11 @@ struct InstalledGame
 };
 InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string& xexSha256);
 void RecordInstalledGame(LauncherConfig& config, const std::string& xexSha256, const std::string& runtime, const std::string& kitVersion);
+
+// After a successful install (docs/install.md, "Housekeeping"): the build's work folder (2-3 GB) goes but its logs stay in
+// <game>/install-logs, the kits older than `kitFolder` (a downloaded kit, kit/<release tag>/) go, and so do compiler
+// archives that are already extracted. Never touches a kit that is not under DownloadedKitsFolder().
+void CleanAfterInstall(const std::filesystem::path& gameFolder, const std::filesystem::path& kitFolder);
 
 // Rough figures shown before installing.
 inline constexpr int InstallMinutes = 15;
@@ -115,4 +120,5 @@ private:
     std::atomic<uint32_t> m_pid{ 0 };
     void* m_job = nullptr; // Windows job object holding SSABuild and its compilers
     std::filesystem::path m_logFile;
+    std::filesystem::path m_out, m_kitFolder; // the game folder being built and the kit building it
 };

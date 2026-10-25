@@ -16,7 +16,7 @@ same jobs.
 ## Where they disagree (what a player would notice)
 
 1. **Folder.** Skylauncher reads `<SSARecomp prefs>/figures` (`App::FiguresFolder`). The game now uses
-   `<prefs of "Skylanders">/Collection` (`%APPDATA%\Skylanders\Collection` on Windows) and only *copies* the old
+   `<Skylanders data folder>/Collection` (`%APPDATA%\Skylanders\Collection` on Windows) and only *copies* the old
    folder into it at start. So a figure made in the launcher reaches the game once, and what the game writes
    (experience, gold) never shows in the launcher.
 2. **Locks.** Skylauncher writes and reads `<dump>.lock` as a bare process id; the game now writes JSON
