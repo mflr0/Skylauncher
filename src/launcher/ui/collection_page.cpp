@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstring>
 #include <fmt/format.h>
+#include <imgui_internal.h> // ImGui::FocusItem
 
 namespace launcher_ui
 {
@@ -120,7 +121,7 @@ namespace launcher_ui
         const char* end = strstr(label, "##");
         ImVec2 text = ImGui::CalcTextSize(label, end);
         ImVec2 size(text.x + 26, text.y + 14);
-        bool pressed = ImGui::InvisibleButton(label, size);
+        bool pressed = ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
         bool hovered = ImGui::IsItemHovered();
         ImDrawList* draw = ImGui::GetWindowDrawList();
         unsigned fill = selected ? color : hovered ? PanelRaisedHover : PanelRaised;
@@ -132,6 +133,7 @@ namespace launcher_ui
             AddBoldText(draw, ImVec2(at.x + 13, at.y + 7), ink, std::string(label, end != nullptr ? end : label + strlen(label)).c_str());
         else
             draw->AddText(ImVec2(at.x + 13, at.y + 7), ink, label, end);
+        FocusRing(size.y / 2);
         return pressed;
     }
 
@@ -441,15 +443,15 @@ namespace launcher_ui
         float available = ImGui::GetContentRegionAvail().x;
         float width = std::min(available, 1180.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        ImGui::BeginChild("##collectioncolumn", ImVec2(width, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##collectioncolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         DrawHeader(width);
 
         constexpr float SeatsW = 236, Gap = 16;
-        ImGui::BeginChild("##seats", ImVec2(SeatsW, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##seats", ImVec2(SeatsW, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         DrawSeats();
         ImGui::EndChild();
         ImGui::SameLine(0, Gap);
-        ImGui::BeginChild("##mylist", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##mylist", ImVec2(0, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         DrawList();
         ImGui::EndChild();
         // A figure dragged off a seat and dropped on the list leaves the seat.
@@ -488,13 +490,24 @@ namespace launcher_ui
             m_created.clear();
             m_addGame = m_model.gameId;
         }
+        m_app.TakeFocus(FocusTo::Page);
         ImGui::SameLine(0, 10);
         if (m_app.PillButton("Manage", false, 120, true))
             m_overlay = Overlay::Manage;
         ImGui::SameLine(0, 10);
         ImVec2 viewAt = ImGui::GetCursorScreenPos();
         if (m_app.PillButton("View", m_viewMenu, 110, true))
+        {
             m_viewMenu = !m_viewMenu;
+            m_viewFocus = true;
+        }
+        if (m_viewFocus && !m_viewMenu)
+        {
+            // The menu closed: the focus comes back to its button.
+            ImGui::SetWindowFocus();
+            ImGui::FocusItem();
+            m_viewFocus = false;
+        }
         ImGui::SetCursorScreenPos(ImVec2(after.x, after.y + 8));
         if (m_viewMenu)
             DrawViewMenu(ImVec2(viewAt.x + 110, viewAt.y + 46));
@@ -504,6 +517,11 @@ namespace launcher_ui
     {
         ImGui::SetNextWindowPos(anchor, ImGuiCond_Always, ImVec2(1, 0));
         ImGui::SetNextWindowSize(ImVec2(470, 0));
+        if (m_viewFocus)
+        {
+            ImGui::SetNextWindowFocus(); // the pad can use it as soon as it opens (Y)
+            m_viewFocus = false;
+        }
         ImGui::PushStyleColor(ImGuiCol_WindowBg, Rgb(Panel, 252));
         ImGui::PushStyleColor(ImGuiCol_Border, Rgb(BorderBright));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18, 16));
@@ -582,7 +600,10 @@ namespace launcher_ui
         bool inside = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByPopup);
         if (ImGui::IsKeyPressed(ImGuiKey_Escape) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight) ||
             (ImGui::IsMouseClicked(0) && !inside && !ImGui::IsMouseHoveringRect(ImVec2(anchor.x - 110, anchor.y - 46), ImVec2(anchor.x, anchor.y))))
+        {
             m_viewMenu = false;
+            m_viewFocus = true;
+        }
         ImGui::End();
     }
 
@@ -658,13 +679,20 @@ namespace launcher_ui
             ImVec2 at = ImGui::GetCursorScreenPos();
             float w = ImGui::GetContentRegionAvail().x;
             ImGui::PushID(int(i));
-            if (ImGui::InvisibleButton("##seat", ImVec2(w, H)))
+            if (ImGui::InvisibleButton("##seat", ImVec2(w, H), ImGuiButtonFlags_EnableNav))
             {
                 m_seat = i;
                 m_generation++;
             }
+            if (m_focusSeat == int(i))
+            {
+                ImGui::FocusItem();
+                ImGui::SetNavCursorVisible(true);
+                m_focusSeat = -1;
+            }
             bool hovered = ImGui::IsItemHovered();
             bool nav = ImGui::IsItemFocused();
+            m_app.FocusRing(Radius);
             // Dropping a card on a seat puts the figure there.
             if (ImGui::BeginDragDropTarget())
             {
@@ -725,7 +753,7 @@ namespace launcher_ui
                     ImVec2 cross(at.x + w - 20, at.y + 18);
                     ImGui::SetCursorScreenPos(ImVec2(cross.x - 12, cross.y - 12));
                     ImGui::PushID(int(i) + 100);
-                    bool off = ImGui::InvisibleButton("##off", ImVec2(24, 24));
+                    bool off = ImGui::InvisibleButton("##off", ImVec2(24, 24)); // the pad takes it off with X on the seat
                     bool over = ImGui::IsItemHovered();
                     ImGui::PopID();
                     ImU32 ink = Rgb(over ? Text : TextDim);
@@ -780,8 +808,15 @@ namespace launcher_ui
         ImVec2 at = ImGui::GetCursorScreenPos();
         float height = width + 44;
         ImGui::PushID(figure.path.c_str());
-        bool pressed = ImGui::InvisibleButton("##figure", ImVec2(width, height));
+        bool pressed = ImGui::InvisibleButton("##figure", ImVec2(width, height), ImGuiButtonFlags_EnableNav);
+        if (m_focusCard)
+        {
+            ImGui::FocusItem();
+            ImGui::SetNavCursorVisible(true);
+            m_focusCard = false;
+        }
         bool hovered = ImGui::IsItemHovered(), focused = ImGui::IsItemFocused();
+        m_app.FocusRing(Radius);
         bool doubleClick = hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
         bool rightClick = ImGui::IsItemClicked(ImGuiMouseButton_Right);
         if (hovered || focused)
@@ -804,6 +839,8 @@ namespace launcher_ui
             PutOn(m_seat, figure.path);
         if (rightClick)
             OpenFigure(figure.path);
+        if (!ImGui::IsItemVisible()) // scrolled out of view: a big collection draws only what shows
+            return pressed;
 
         ImDrawList* draw = ImGui::GetWindowDrawList();
         ImVec2 end(at.x + width, at.y + height);
@@ -887,8 +924,9 @@ namespace launcher_ui
         }
         ImGui::Dummy(ImVec2(0, 4));
 
-        ImGui::BeginChild("##sections", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##sections", ImVec2(0, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         m_hovered.clear();
+        m_navEdgeCard = false;
         if (m_list.empty())
         {
             ImGui::Dummy(ImVec2(0, 30));
@@ -944,12 +982,16 @@ namespace launcher_ui
             else
                 m_app.BoldText(title.c_str(), section.kind == Section::Kind::Portal ? Accent : TextSecondary);
             ImGui::Dummy(ImVec2(0, 2));
+            ImGui::PushID(int(s)); // a figure can be in two sections (On the portal, Recent): one ID per card
             for (size_t i = 0; i < section.items.size(); i++)
             {
                 if (i % columns != 0)
                     ImGui::SameLine(0, Gap);
                 DrawCard(m_list[section.items[i]], Cell, foreign);
+                if (i % columns == 0 && ImGui::IsItemFocused())
+                    m_navEdgeCard = true;
             }
+            ImGui::PopID();
             ImGui::Dummy(ImVec2(0, 12));
         }
         // The section the list is scrolled to.
@@ -977,6 +1019,11 @@ namespace launcher_ui
             TakeOff(size_t(m_hoverSeat));
             return;
         }
+        // Left and right cross between the seats and the list (ImGui's nav, by distance, misses the gap between them).
+        if (m_navSeat >= 0 && pressed(ImGuiKey_GamepadDpadRight, ImGuiKey_RightArrow) && !m_list.empty())
+            m_focusCard = true;
+        if (m_navEdgeCard && pressed(ImGuiKey_GamepadDpadLeft, ImGuiKey_LeftArrow))
+            m_focusSeat = int(m_seat);
         if (m_sections.empty())
             return;
         int count = int(m_sections.size());
@@ -985,14 +1032,17 @@ namespace launcher_ui
         if (pressed(ImGuiKey_GamepadR1, ImGuiKey_PageDown))
             m_jumpTo = std::min(count - 1, m_currentSection + 1);
         if (pressed(ImGuiKey_GamepadFaceUp, ImGuiKey_F3))
+        {
             m_viewMenu = !m_viewMenu;
+            m_viewFocus = true;
+        }
         if (pressed(ImGuiKey_GamepadFaceLeft, ImGuiKey_F2))
         {
             const std::string& path = !m_hovered.empty() ? m_hovered : m_selected;
             if (!path.empty() && m_model.Find(path) != nullptr)
                 OpenFigure(path);
         }
-        if (ImGui::IsKeyPressed(ImGuiKey_Escape, false) && m_search[0] != 0)
+        if (pressed(ImGuiKey_Escape, ImGuiKey_GamepadFaceRight) && m_search[0] != 0)
             m_search[0] = 0;
     }
 }

@@ -11,6 +11,7 @@
 #include "launcher/portal_status.h"
 #include "launcher/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
+#include "launcher/ui/hold_confirm.h"
 #include "shared/collection/save_backup.h"
 #include <SDL3/SDL.h>
 #include <atomic>
@@ -115,6 +116,7 @@ namespace launcher_ui
         std::string stage;
         GameSourceCheck check;
         TitleMetadata meta;
+        LauncherAssets::Provider assets; // the disc's art and figure pictures, cached here too (4 s on the UI thread before)
 
         ~VerifyJob() { Join(); }
         void Join() { if (thread.joinable()) thread.join(); }
@@ -144,6 +146,8 @@ namespace launcher_ui
     enum class Page { Home, Play, Collection, Settings };
     enum class SettingsTab { Graphics, Controls, Language, GameData, About };
     enum class DiscState { None, Verifying, Ready, Failed };
+    // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
+    enum class FocusTo { None, Sidebar, Page };
 
     class App
     {
@@ -159,6 +163,7 @@ namespace launcher_ui
         void Shutdown();
         bool LoadFonts();
         void HandleEvent(const SDL_Event& event);
+        int IdleWait(); // how long the loop may sleep before the next frame, in ms (0: draw now)
         void Frame();
         void DrawBackdrop();
         void DrawSidebar();
@@ -183,7 +188,14 @@ namespace launcher_ui
         void OpenProblemReport();
         void DrawProblemReport();
         void DrawToast();
-        void DrawLanguageMenu();
+        void DrawQuitPrompt();
+
+        // Pages and focus. The sidebar and the page are separate windows, which the D-pad doesn't cross: B / Escape
+        // moves the focus to the sidebar (or leaves Settings and Collection), A on a row moves it into the page.
+        void GoTo(Page page);
+        void Back();
+        void TakeFocus(FocusTo where); // after the item that takes the focus when `where` is asked for
+        void RequestFocus(FocusTo where) { m_focusTo = where; m_focusShow = ImGui::GetIO().NavVisible; }
 
         // The collection (collection_page.h): its page draws with the widgets below.
         friend class CollectionPage;
@@ -194,6 +206,11 @@ namespace launcher_ui
             unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive);
         void BoldText(const char* text, unsigned color);
         bool Toggle(const char* id, bool* value);
+        // Acts once held for a second (HoldConfirm); `hint` is its tooltip, which says so. Red: for what deletes or overwrites.
+        bool HoldButton(const char* label, float width, const char* hint);
+        // The keyboard and pad focus around the last item, for the widgets drawn over an InvisibleButton; `gap` < 0 draws
+        // it inside (rows that touch the window's edges).
+        void FocusRing(float rounding, float gap = 4);
         template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
         bool BeginSettingsTable(const char* id);
@@ -222,8 +239,9 @@ namespace launcher_ui
         void StartVerify(const std::string& path);
         void FinishVerify();
         void Browse();
+        bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
-        void Toast(std::string text) { m_toast = std::move(text); m_toastUntil = SDL_GetTicks() + 2500; }
+        void Toast(std::string text);
         void RefreshGamepads();
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
         std::string CurrentDevice() const;
@@ -233,6 +251,7 @@ namespace launcher_ui
         void TestScript();
         void TestInstallScript(uint64_t now);
         void TestUpdateScript(uint64_t now);
+        void TestNavScript(uint64_t now);
 
         const GameInfo& m_game;
         std::string m_configPath;
@@ -240,6 +259,8 @@ namespace launcher_ui
         std::string m_chosen;
         std::string m_chosenRuntime; // the game built for the chosen disc, if any
         bool m_running = true;
+        bool m_quitPrompt = false; // a quit asked during an install: confirm it
+        int m_busyFrames = 0; // frames still drawn after an input, while ImGui settles (hover, focus, menus)
 
         SDL_Window* m_window = nullptr;
         float m_uiScale = 1.0f; // launcher points per window unit (UpdateUiScale)
@@ -251,6 +272,10 @@ namespace launcher_ui
         ImFont* m_boldFont = nullptr; // Outfit SemiBold
 
         Page m_page = Page::Home; // the launcher opens on its menu; the player picks a game in the sidebar
+        Page m_backPage = Page::Home; // where Settings and Collection go back to
+        FocusTo m_focusTo = FocusTo::Sidebar;
+        bool m_focusShow = false;    // the focus request came from the keyboard or the pad: show the ring
+        bool m_backTaken = false;    // last frame, something else answered B / Escape (a menu, a dialog, a field)
         SettingsTab m_tab = SettingsTab::Graphics;
         DiscState m_disc = DiscState::None;
         std::string m_discPath;
@@ -298,12 +323,15 @@ namespace launcher_ui
         bool m_installLog = false;   // "Show details"
         InstallProgress m_installPast; // an install of an earlier launcher session, read back from its install.log
         uint32_t m_installPastPid = 0; // its SSABuild, if that one may still be running
+        uint64_t m_installPastCheck = 0; // when to look again whether it still runs
 
         std::vector<SDL_JoystickID> m_gamepads;
         const KeyAction* m_capturing = nullptr;
 
         // The collection page and its state.
         std::unique_ptr<CollectionPage> m_collection = std::make_unique<CollectionPage>(*this);
+
+        HoldConfirm m_hold;
 
         std::string m_toast;
         uint64_t m_toastUntil = 0;
@@ -315,6 +343,8 @@ namespace launcher_ui
         bool m_testReal = false;    // SSA_LAUNCHER_TEST_INSTALL=real: the real kit, a screenshot every SSA_LAUNCHER_TEST_EVERY seconds
         bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
         bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
+        bool m_testNav = false;        // SSA_LAUNCHER_TEST_NAV: keyboard and pad navigation, keys sent to ImGui
+        bool m_testControllers = false; // open the controller menu (its screenshot)
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };

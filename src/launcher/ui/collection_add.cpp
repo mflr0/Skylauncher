@@ -75,7 +75,7 @@ namespace launcher_ui
 
         constexpr float PanelW = 270;
         float listH = size.y - ImGui::GetCursorPosY() - Pad - 56;
-        ImGui::BeginChild("##addtoys", ImVec2(size.x - 2 * Pad - PanelW - 14, listH), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##addtoys", ImVec2(size.x - 2 * Pad - PanelW - 14, listH), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         constexpr float Cell = 104, Gap = 10;
         int columns = std::max(1, int((ImGui::GetContentRegionAvail().x + Gap) / (Cell + Gap)));
         const Toy* chosen = nullptr;
@@ -97,7 +97,7 @@ namespace launcher_ui
                     ImGui::SameLine(0, Gap);
                 ImVec2 at = ImGui::GetCursorScreenPos();
                 ImGui::PushID(toy.type);
-                if (ImGui::InvisibleButton("##toy", ImVec2(Cell, Cell + 38)))
+                if (ImGui::InvisibleButton("##toy", ImVec2(Cell, Cell + 38), ImGuiButtonFlags_EnableNav))
                 {
                     m_addToy = toy.type;
                     m_addVersion = 0;
@@ -105,6 +105,7 @@ namespace launcher_ui
                     m_addLabel[0] = 0;
                 }
                 bool hovered = ImGui::IsItemHovered();
+                m_app.FocusRing(Radius);
                 ImGui::PopID();
                 bool selected = m_addToy == toy.type;
                 if (selected)
@@ -130,7 +131,7 @@ namespace launcher_ui
 
         // The versions of the chosen toy, then Create.
         ImGui::SameLine(0, 14);
-        ImGui::BeginChild("##addversions", ImVec2(PanelW, listH), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##addversions", ImVec2(PanelW, listH), ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         if (chosen == nullptr)
             ImGui::TextColored(ImColor(Rgb(TextDim)), "Choose a figure to see its versions.");
         else
@@ -174,8 +175,8 @@ namespace launcher_ui
                 {
                     if (variant != nullptr && variant->sameTag)
                         collection::SetEdition(path, variant->name, variant->kind);
-                    if (m_addLabel[0] != 0)
-                        collection::SetLabel(path, m_addLabel);
+                    if (std::string label = Trimmed(m_addLabel); !label.empty())
+                        collection::SetLabel(path, label);
                     m_created = path;
                     m_addLabel[0] = 0;
                     Reload();

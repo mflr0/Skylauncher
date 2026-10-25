@@ -61,46 +61,20 @@ namespace launcher_ui
         ImGui::EndPopup();
     }
 
-    // A button that acts after being held for a second (reset, delete): the mouse button or A. The fill shows the time.
-    bool CollectionPage::HoldButton(const char* label, float width)
-    {
-        constexpr uint64_t HoldMs = 1000;
-        ImGui::PushStyleColor(ImGuiCol_Button, Rgb(Danger, 70));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(Danger, 110));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(Danger, 150));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Text));
-        ImGui::Button(label, ImVec2(width, 40));
-        ImGui::PopStyleColor(4);
-        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        ImVec2 text = ImGui::CalcTextSize(label);
-        ImGui::GetWindowDrawList()->AddText(ImVec2((min.x + max.x - text.x) / 2 + BoldOffset, (min.y + max.y - text.y) / 2), Rgb(Text), label);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Hold to confirm");
-        bool done = false;
-        if (ImGui::IsItemActive())
-        {
-            uint64_t now = SDL_GetTicks();
-            if (m_hold != label)
-            {
-                m_hold = label;
-                m_holdSince = now;
-            }
-            float t = std::min(1.0f, float(now - m_holdSince) / HoldMs);
-            ImGui::GetWindowDrawList()->AddRectFilled(min, ImVec2(min.x + (max.x - min.x) * t, max.y), Rgb(Danger, 190), Radius);
-            ImGui::GetWindowDrawList()->AddText(ImVec2((min.x + max.x - text.x) / 2, (min.y + max.y - text.y) / 2), Rgb(Text), label);
-            if (t >= 1.0f && !m_holdFired)
-                done = m_holdFired = true; // once per press: keeping the button down does not repeat the action
-        }
-        else if (m_hold == label)
-        {
-            m_hold.clear();
-            m_holdFired = false;
-        }
-        return done;
-    }
-
     namespace
     {
+        // The Figure page's words that changed in the polish pass (the rest are still inline, for #4).
+        namespace strings
+        {
+            constexpr const char* Reset = "Reset";
+            constexpr const char* ResetHint = "Hold to reset it to new. A backup is kept.";
+            constexpr const char* Delete = "Delete";
+            constexpr const char* DeleteHint = "Hold to move it to the trash. Manage > Trash puts it back.";
+            constexpr const char* Release = "Mark as not in use";
+            constexpr const char* ReleaseHint = "Hold if the game that took it has closed or crashed.";
+            constexpr const char* Locked = "On the portal in %s. Read-only until the game lets it go.";
+        }
+
         constexpr uint32_t MaxExperience = 33000; // the title's ceiling for a figure
         std::string BackupLabel(const std::string& backup)
         {
@@ -109,6 +83,34 @@ namespace launcher_ui
                 return fmt::format("{} {}:{}", stem.substr(0, 10), stem.substr(11, 2), stem.substr(13, 2));
             return stem;
         }
+    }
+
+    void CollectionPage::RefreshDisk()
+    {
+        if (m_diskGeneration == m_generation)
+            return;
+        m_diskGeneration = m_generation;
+        m_trash = collection::Trash();
+        m_starters = size_t(std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return collection::UntouchedStarter(f); }));
+        m_backups.clear();
+    }
+
+    const std::vector<CollectionPage::BackupRow>& CollectionPage::Backups(const std::string& figure)
+    {
+        RefreshDisk();
+        auto found = m_backups.find(figure);
+        if (found != m_backups.end())
+            return found->second;
+        std::vector<BackupRow> rows;
+        for (const std::string& backup : collection::Backups(figure))
+        {
+            Figure old;
+            std::string label = BackupLabel(backup);
+            if (collection::Read(backup, old) && HasProgress(old) && old.state == figures::AreaState::Valid)
+                label += fmt::format("   level {} · {} gold", old.level, old.stats.gold);
+            rows.push_back({ backup, label });
+        }
+        return m_backups[figure] = std::move(rows);
     }
 
     void CollectionPage::DrawStats(const Figure& f, float width)
@@ -223,7 +225,7 @@ namespace launcher_ui
         {
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
             ImGui::PushTextWrapPos(right + textW);
-            ImGui::TextWrapped("On the portal in %s (pid %lld). Read-only until the game lets it go.", LiveGame(f).c_str(), (long long)f.lock.pid);
+            ImGui::TextWrapped(strings::Locked, LiveGame(f).c_str());
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
         }
@@ -244,7 +246,7 @@ namespace launcher_ui
             ImGui::SameLine(0, 8);
             if (m_app.PillButton("Save the name", true, 160, true) || enter)
             {
-                collection::SetLabel(path, m_label);
+                collection::SetLabel(path, Trimmed(m_label));
                 m_renaming = false;
                 Reload();
             }
@@ -294,7 +296,7 @@ namespace launcher_ui
         ImGui::BeginDisabled(!writable || !HasProgress(f) || f.state == figures::AreaState::Damaged);
         if (m_app.PillButton("Edit stats", false, 130, true))
         {
-            m_edit = f.stats;
+            m_edit = m_editBase = f.stats;
             snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(f.stats).c_str());
             m_editing = true;
         }
@@ -323,9 +325,10 @@ namespace launcher_ui
         {
             std::string backup = collection::Backup(path);
             Toast(backup.empty() ? "Couldn't back it up" : "Backed up");
+            m_generation++; // Restore... lists it
         }
         ImGui::SameLine(0, 8);
-        std::vector<std::string> backups = collection::Backups(path);
+        const std::vector<BackupRow>& backups = Backups(path);
         ImGui::BeginDisabled(backups.empty());
         if (m_app.PillButton(backups.empty() ? "Restore (no backup)" : "Restore...", false, 170, true))
             ImGui::OpenPopup("##backups");
@@ -333,26 +336,20 @@ namespace launcher_ui
         if (ImGui::BeginPopup("##backups"))
         {
             ImGui::TextColored(ImColor(Rgb(TextDim)), "Put back the copy from");
-            for (const std::string& backup : backups)
-            {
-                Figure old;
-                std::string text = BackupLabel(backup);
-                if (collection::Read(backup, old) && HasProgress(old) && old.state == figures::AreaState::Valid)
-                    text += fmt::format("   level {} · {} gold", old.level, old.stats.gold);
-                if (ImGui::Selectable((text + "##" + backup).c_str()))
-                    m_confirm = "restore:" + backup;
-            }
+            for (const BackupRow& backup : backups)
+                if (ImGui::Selectable((backup.label + "##" + backup.path).c_str()))
+                    m_confirm = "restore:" + backup.path;
             ImGui::EndPopup();
         }
         ImGui::SameLine(0, 8);
-        if (HoldButton("Reset (hold)", 140))
+        if (m_app.HoldButton(strings::Reset, 140, strings::ResetHint))
         {
             std::string error;
             Toast(collection::ResetToNew(path, &error) ? "Reset to new (a backup was kept)" : "Couldn't reset it: " + error);
             Reload();
         }
         ImGui::SameLine(0, 8);
-        bool deleteIt = HoldButton("Delete (hold)", 140);
+        bool deleteIt = m_app.HoldButton(strings::Delete, 140, strings::DeleteHint);
         ImGui::EndDisabled();
         if (deleteIt) // after EndDisabled: the page is gone once it is deleted
         {
@@ -371,7 +368,7 @@ namespace launcher_ui
         if (f.lock.Busy())
         {
             ImGui::SetCursorScreenPos(ImVec2(right, row1 - 56));
-            if (HoldButton("It is not in use any more (hold)", 330))
+            if (m_app.HoldButton(strings::Release, 240, strings::ReleaseHint))
             {
                 collection::BreakLock(path);
                 Reload();
@@ -444,8 +441,10 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 14));
         if (m_app.PillButton("Save", true, 140, true))
         {
-            figures::FigureStats stats = m_edit;
-            figures::SetNicknameUtf8(stats, m_nickname);
+            // The figure as it is now (a game may have played it since the editor opened), with only the fields changed here.
+            Figure now;
+            figures::FigureStats current = collection::Read(f.path, now) && now.state == figures::AreaState::Valid ? now.stats : m_editBase;
+            figures::FigureStats stats = MergeEditedStats(current, m_editBase, m_edit, figures::NicknameUtf8(m_editBase), m_nickname);
             std::string error;
             if (collection::WriteStats(f.path, stats, &error))
             {

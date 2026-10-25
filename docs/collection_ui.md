@@ -48,7 +48,7 @@ At the first visit to the page (`CollectionPage::Open`):
   held by a game, an unaccepted toy or a toy of a later game is refused with a message.
 - Live: figures a game holds (JSON lock of a live process) show "LIVE", "ON PORTAL" and "On the portal in Spyro's
   Adventure"; the seats are read-only then and Edit/Rename-the-dump/Reset/Delete are disabled (metadata such as
-  favourites stays editable). "It is not in use any more" (hold) breaks a stale lock.
+  favourites stays editable). "Mark as not in use" (held) breaks a stale lock.
 - Refresh: every 1.5 s the model compares a signature of the folder (names, sizes, times of dumps, locks,
   `collection.json`, the session file) and whether each lock's process still runs; any change reloads the list, so a
   game that wrote a dump, took a figure or quit shows at once. Note the launcher window closes when the game starts
@@ -68,15 +68,20 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Figure page** (click a card, right click, X, F2): stats from the dump, level bar, last played, where it plays; Put
   on a seat, Edit stats (level, XP, gold, hero points, nickname: refused for unreadable dumps), Rename (the label; the
   nickname is in Edit stats), Favourite, Duplicate, Back up now, Restore (list with level and gold, confirmation),
-  Reset and Delete (hold 1 s; backed up first, Delete goes to the trash), Folder.
+  Reset and Delete (held 1 s, the instruction in their tooltip; backed up first, Delete goes to the trash), Folder.
+  Edit stats' Save re-reads the figure and writes only the fields changed in the editor (a game may have played it
+  meanwhile); names are trimmed.
 - **Add a figure**: a game selector (the six games), category chips, search; one card per character, "owned x2";
   the toys the game reads first, then "Later games" labelled "needs Giants". A side panel lists the versions
   (standard, variants, same-tag editions); name (optional) and Create; "Put it on Player 1" afterwards.
-- **Manage**: Trash (put back, delete for good (hold); 30 days), Backups (per figure, restore), Import and export
+- **Manage**: Trash (put back, delete for good (held); 30 days), Backups (per figure, restore), Import and export
   (files, a folder, drop files or a folder on the window; export everything; show in folder), Unknown toys (name one:
   `catalogue.json` of the collection, applied at the next start), Tidy (the starters).
-- **Gamepad**: the same verbs as the Toy Box: d-pad moves (ImGui navigation), A chooses (puts on the seat), B goes
-  back (closes the overlay, one step), X opens the Figure page, Y the View menu, LB/RB the previous/next section.
+- **Gamepad**: the same verbs as the Toy Box: d-pad moves (ImGui navigation; left and right cross between the seats and
+  the list), A chooses (puts on the seat), B goes back (closes the overlay, one step; then out of the page), X opens the
+  Figure page (on a seat: takes its figure off), Y the View menu (focused as it opens), LB/RB the previous/next section.
+  Every card has its own ID (a figure shows twice when it is on the portal). Manage and the Figure page read the trash
+  and the backups once per change of the collection, not every frame; cards scrolled out of view aren't drawn.
 
 ## Files
 

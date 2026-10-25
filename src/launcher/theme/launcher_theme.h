@@ -71,7 +71,6 @@ namespace LauncherTheme
     inline constexpr float BottomBarH = 150; // the band with the main button, under the game art
     inline constexpr float GameRowH = 54, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
     inline constexpr float TabUnderlineH = 3, TabGap = 34; // settings tabs: the line under the selected one, the space between them
-    inline constexpr float LanguageMenuW = 140; // the launcher's language menu, top right
     inline constexpr float ControllerW = 190, ControllerGap = 40; // the controller picker, and its space before the main button
     inline constexpr float GameBadgeR = 17;     // the game's icon (or initial) in a sidebar row
     inline constexpr float GearButton = 30;  // the settings icon at the bottom of the sidebar

@@ -113,6 +113,8 @@ namespace launcher_ui
 
     void App::StartInstall()
     {
+        if (!DiscStillThere())
+            return;
         RefreshInstall();
         m_installSha = m_check.xexSha256;
         m_installKitVersion = m_kit ? m_kit->version : std::string();
@@ -182,8 +184,12 @@ namespace launcher_ui
     void App::PollInstall()
     {
         // An SSABuild left running by an earlier launcher: wait for it to stop before offering to resume.
-        if (m_installPastPid != 0 && SDL_GetTicks() % 1000 < 20 && !PlatformProcessAlive(m_installPastPid))
-            m_installPastPid = 0;
+        if (m_installPastPid != 0 && SDL_GetTicks() >= m_installPastCheck)
+        {
+            m_installPastCheck = SDL_GetTicks() + 1000;
+            if (!PlatformProcessAlive(m_installPastPid))
+                m_installPastPid = 0;
+        }
         if (m_kitUsed && m_kitError.empty() && m_installView && !m_installer.Running() && m_kitStep.endedAt == 0)
         {
             KitDownloader::Snapshot_ kit = m_kitDownload.Snapshot();
@@ -255,13 +261,14 @@ namespace launcher_ui
             constexpr float CloseSize = 30;
             ImVec2 closeAt(left + width - CloseSize, titleAt.y - 4);
             ImGui::SetCursorScreenPos(closeAt);
-            if (ImGui::InvisibleButton("##closeinstall", ImVec2(CloseSize, CloseSize)))
+            if (ImGui::InvisibleButton("##closeinstall", ImVec2(CloseSize, CloseSize), ImGuiButtonFlags_EnableNav))
             {
                 m_installView = m_kitUsed = false;
                 SetInstallState(m_installSha, nullptr);
                 m_installPast = {};
             }
             bool hovered = ImGui::IsItemHovered();
+            FocusRing(CloseSize / 2);
             if (hovered)
                 ImGui::SetTooltip("Close");
             ImVec2 c(closeAt.x + CloseSize / 2, closeAt.y + CloseSize / 2);
@@ -570,10 +577,15 @@ namespace launcher_ui
                 m_testAt = now + 300;
             break;
         case 2:
+            // Closing the window now asks first.
             if ((progress.steps.size() >= 5 && progress.done >= 30) || progress.state != InstallProgress::State::Running)
+            {
+                m_quitPrompt = Installing();
                 m_testAt = now + 100;
+            }
             break;
         case 3:
+            m_quitPrompt = false;
             m_installLog = true;
             m_testAt = now + 300;
             break;

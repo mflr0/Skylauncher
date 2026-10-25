@@ -189,6 +189,8 @@ namespace launcher_ui
         }
         else
             BoldText(shown.c_str(), Text);
+        if (shown != text && ImGui::IsItemHovered()) // cut to fit: the whole message under the pointer
+            ImGui::SetTooltip("%s", text.c_str());
 
         float x = Pad + contentW - buttonsW + gap;
         int pressed = None;
@@ -263,7 +265,7 @@ namespace launcher_ui
             if (PillButton("Release page", false, 160) && !state.launcher.pageUrl.empty())
                 SDL_OpenURL(state.launcher.pageUrl.c_str());
             ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 2 * 140 - ImGui::GetStyle().ItemSpacing.x);
-            if (PillButton("Close", false, 140))
+            if (PillButton("Close", false, 140) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
                 m_whatsNewOpen = false;
                 ImGui::CloseCurrentPopup();

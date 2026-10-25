@@ -44,6 +44,8 @@ namespace launcher_ui
         // A dropped file or folder: figure dumps join the collection. False if it holds none (a disc image).
         bool Drop(const std::string& path);
         std::string Folder() const;
+        // B / Escape belongs to the page: an overlay, the View menu or a search is open.
+        bool TakesBack() const { return m_overlay != Overlay::None || m_viewMenu || m_search[0] != 0; }
 
         // Screenshot test (SSA_LAUNCHER_TEST_COLLECTION): every screen, in a scratch collection.
         void Seed();
@@ -77,11 +79,20 @@ namespace launcher_ui
         void DrawUnknown();
         void DrawTidy();
         void HandleShortcuts();
-        bool HoldButton(const char* label, float width);
         void DrawIcon(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, ImVec2 at, float size, bool large);
         const FigureIconTexture& Icon(const collection::Toy* toy, collection::VariantKind kind, bool large);
         void CloseOverlay();
         void Toast(const std::string& text);
+
+        // What Manage and the Figure page show from disk, read again only once the collection changed (m_generation):
+        // drawn every frame, they read and decrypted every dump and backup at the display's rate.
+        struct BackupRow
+        {
+            std::string path;
+            std::string label; // "2026-10-24 10:15   level 6 · 2400 gold"
+        };
+        void RefreshDisk();
+        const std::vector<BackupRow>& Backups(const std::string& figure);
 
         void PutOn(size_t seat, const std::string& path);
         void OpenFigure(const std::string& path);
@@ -108,6 +119,9 @@ namespace launcher_ui
         size_t m_seat = 0;              // the focused seat: the list shows what goes there
         int m_navSeat = -1;             // the seat with the keyboard or pad focus this frame, -1: none
         int m_hoverSeat = -1;           // the seat under the mouse this frame
+        bool m_navEdgeCard = false;     // the focused card is the first of its row (Left goes to the seats)
+        int m_focusSeat = -1;           // the D-pad crosses between the columns: focus this seat next frame,
+        bool m_focusCard = false;       // or the list's first card
         int m_seatMenu = -1;            // the seat whose right-click menu is open
         std::string m_selected;         // the card with the focus (double click or Enter: put on the seat)
         std::string m_hovered;          // the card under the mouse or the focus (X: its Figure page)
@@ -118,19 +132,18 @@ namespace launcher_ui
         int m_currentSection = 0;
         std::vector<float> m_sectionY;  // where each section starts in the list (last frame)
         bool m_viewMenu = false;
+        bool m_viewFocus = false;       // the View menu just opened (focus it) or closed (focus its button)
 
         // The overlays.
         Overlay m_overlay = Overlay::None;
         std::string m_figure;           // the Figure page's dump
         bool m_editing = false;
         figures::FigureStats m_edit;
-        char m_nickname[48] = {};
+        figures::FigureStats m_editBase; // as read when Edit stats opened: Save writes back only what changed since
+        char m_nickname[64] = {};        // 16 characters of up to 3 bytes, and the terminator
         char m_label[64] = {};
         bool m_renaming = false;
         std::string m_confirm;          // "restore:<backup>"
-        std::string m_hold;             // the hold button being held, and since when
-        uint64_t m_holdSince = 0;
-        bool m_holdFired = false;       // the held button already acted: it waits for the release
         std::string m_addGame = "ssa";
         uint16_t m_addToy = 0xFFFF;
         int m_addVersion = 0;           // 0: standard, else 1 + an index in the toy's variants
@@ -138,6 +151,10 @@ namespace launcher_ui
         char m_addSearch[64] = {};
         char m_addLabel[64] = {};
         std::string m_created;          // the figure Add a figure just made
+        int m_diskGeneration = -1;
+        std::vector<collection::TrashEntry> m_trash;
+        size_t m_starters = 0;          // untouched starters (Manage > Tidy)
+        std::map<std::string, std::vector<BackupRow>> m_backups; // per figure, filled as asked
         int m_manageTab = 0;
         std::string m_backupsOf;
         uint16_t m_unknownType = 0xFFFF;

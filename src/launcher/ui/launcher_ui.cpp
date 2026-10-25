@@ -20,6 +20,7 @@
 #include <fmt/format.h>
 #include <fstream>
 #include <imgui.h>
+#include <imgui_internal.h> // ImGui::FocusItem
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <mutex>
@@ -31,6 +32,37 @@
 namespace launcher_ui
 {
     ImFont* g_boldFont = nullptr; // Outfit SemiBold, for AddBoldText (set by App::LoadFonts)
+
+    namespace
+    {
+        // The window's words that changed in the polish pass (the rest are still inline, for #4).
+        namespace strings
+        {
+            constexpr const char* ChooseDisc = "Choose disc";
+            constexpr const char* PlayWith = "PLAY WITH";
+            constexpr const char* DiscGone = "\"{}\" isn't there any more. Was it moved, renamed, or is its drive disconnected? Choose it again.";
+            constexpr const char* GameText = "Game text";
+            constexpr const char* GameTextHint = "The game's menus, subtitles and on-screen text. Skylauncher itself is in English.";
+            constexpr const char* GameVoices = "Game voices";
+            constexpr const char* GameVoicesHint = "The game's spoken lines and cutscenes. They can differ from the text.";
+            constexpr const char* ResetKeys = "Reset to defaults";
+            constexpr const char* ResetKeysHint = "Hold to put every key back to its default.";
+            constexpr const char* Reinstall = "Reinstall the game";
+            constexpr const char* ReinstallHint = "Hold to build the game again from your disc.";
+            constexpr const char* RestoreSaves = "Restore";
+            constexpr const char* RestoreSavesHint = "Hold to restore this backup. The saves you have now are backed up first.";
+            constexpr const char* OpenFigures = "Open figures folder";
+            constexpr const char* NoGamepad = "No gamepad connected.";
+            constexpr const char* OneGamepad = "1 gamepad connected.";
+            constexpr const char* Gamepads = "{} gamepads connected.";
+            constexpr const char* PortalTip = "Without a real portal the game uses the virtual portal (its Toy Box).\n"
+                                              "Settings > Controls > Test the portal checks that the game sees it.";
+            constexpr const char* QuitTitle = "The game is still installing";
+            constexpr const char* QuitText = "If you quit now, the install stops. It carries on from this step next time.";
+            constexpr const char* KeepInstalling = "Keep installing";
+            constexpr const char* Quit = "Quit";
+        }
+    }
 
     // ---- Settings file ------------------------------------------------------------------------------------------
 
@@ -198,7 +230,7 @@ namespace launcher_ui
         Join();
         done = false;
         progress = 0;
-        { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; }
+        { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; assets = {}; }
         thread = std::thread([this, image, &game] {
             auto report = [this](float fraction, std::string_view text) {
                 progress = fraction;
@@ -207,15 +239,23 @@ namespace launcher_ui
             };
             GameSourceCheck result = CheckGameSource(image, game, report);
             TitleMetadata metadata;
+            LauncherAssets::Provider art;
             if (result.status == GameSourceStatus::Ok)
             {
-                report(0.98f, "Reading the title and icon");
+                report(0.96f, "Reading the title and icon");
                 DiscFileSystem disc;
                 if (disc.Open(image.c_str()))
+                {
                     if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
                         metadata = ReadTitleMetadata(xex);
+                    // The game's own art, decoded from the player's disc into the local cache (never shipped).
+                    report(0.98f, "Reading the game's pictures");
+                    art.Init(image, metadata.titleId);
+                    art.ExtractFromDisc(disc, metadata);
+                    art.ExtractFigurePortraits(disc);
+                }
             }
-            { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); }
+            { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); assets = std::move(art); }
             progress = 1;
             done = true;
         });
@@ -334,6 +374,7 @@ namespace launcher_ui
             m_testReal = m_testInstall && std::string_view(SDL_getenv("SSA_LAUNCHER_TEST_INSTALL")) == "real";
             m_testUpdate = SDL_getenv("SSA_LAUNCHER_TEST_UPDATE") != nullptr;
             m_testCollection = SDL_getenv("SSA_LAUNCHER_TEST_COLLECTION") != nullptr;
+            m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -384,6 +425,10 @@ namespace launcher_ui
         while (m_running)
         {
             SDL_Event event;
+            // Nothing moves on screen: sleep until an input comes, or the wait ends (jobs, the portal and the collection
+            // are polled then). The launcher doesn't redraw at the display's rate for nothing.
+            if (int wait = IdleWait(); wait > 0 && SDL_WaitEventTimeout(&event, wait))
+                HandleEvent(event);
             while (SDL_PollEvent(&event))
                 HandleEvent(event);
             if (m_disc == DiscState::Verifying && m_verify.done)
@@ -398,8 +443,33 @@ namespace launcher_ui
 
     // ---- Events and actions --------------------------------------------------------------------------------------
 
+    int App::IdleWait()
+    {
+        if (!m_shots.empty()) // the screenshot test runs flat out
+            return 0;
+        if (m_busyFrames > 0)
+        {
+            m_busyFrames--;
+            return 0;
+        }
+        // Something moves: a check, an install's spinner, an update's bar, a held button, a text cursor, a drag.
+        if (m_disc == DiscState::Verifying || Installing() || m_updates.Busy() || ImGui::IsAnyItemActive())
+            return 0;
+        constexpr int Idle = 500;
+        int wait = Idle;
+        uint64_t now = SDL_GetTicks();
+        if (!m_toast.empty() && m_toastUntil > now) // wake to take it down
+            wait = std::min<int>(wait, int(m_toastUntil - now) + 1);
+        // The night sky's stars twinkle, at 30 fps, while the window is seen.
+        bool seen = !(SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_OCCLUDED | SDL_WINDOW_HIDDEN));
+        if (seen && m_page == Page::Play && m_background == nullptr)
+            wait = std::min(wait, 33);
+        return wait;
+    }
+
     void App::HandleEvent(const SDL_Event& event)
     {
+        m_busyFrames = 3;
         // A key binding being captured takes the next key press for itself.
         if (m_capturing != nullptr && event.type == SDL_EVENT_KEY_DOWN)
         {
@@ -437,7 +507,11 @@ namespace launcher_ui
             break;
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            m_running = false;
+            // Cmd+Q, Alt+F4, the window's close: during an install, ask first (it would stop the build).
+            if (Installing())
+                m_quitPrompt = true;
+            else
+                m_running = false;
             break;
         case SDL_EVENT_DROP_BEGIN:
         case SDL_EVENT_DROP_POSITION:
@@ -473,7 +547,7 @@ namespace launcher_ui
     void App::UpdateUiScale(bool resize)
     {
         float scale = std::strtof(SettingGet(m_config, "launcher", "ui_scale", "auto").c_str(), nullptr);
-        if (scale <= 0)
+        if (!std::isfinite(scale) || scale <= 0) // "auto", or nonsense such as nan
         {
             float density = SDL_GetWindowPixelDensity(m_window), display = SDL_GetWindowDisplayScale(m_window);
             scale = density > 0 && display > 0 ? display / density : 1.0f;
@@ -538,14 +612,7 @@ namespace launcher_ui
         m_meta = m_verify.meta;
         if (!m_meta.iconPng.empty())
             m_icon = LoadPng(m_renderer, m_meta.iconPng);
-        // The game's own art, decoded from the player's disc into the local cache (never shipped).
-        m_assets.Init(m_discPath, m_meta.titleId);
-        DiscFileSystem disc;
-        if (disc.Open(m_discPath.c_str()))
-        {
-            m_assets.ExtractFromDisc(disc, m_meta);
-            m_assets.ExtractFigurePortraits(disc);
-        }
+        m_assets = m_verify.assets; // the worker cached the disc's art
         m_collection->ClearIcons(); // the collection's pictures now come from the disc
         if (LauncherAssets::Asset logo = m_assets.Get(LauncherAssets::Role::Logo); logo.valid)
             m_logo = LoadPngFile(m_renderer, logo.path);
@@ -554,6 +621,20 @@ namespace launcher_ui
         Set(m_game.id, "iso", m_discPath); // remembered even if the player quits without playing
         m_disc = DiscState::Ready;
         RefreshInstall();
+    }
+
+    // PLAY and INSTALL check the image first: it may have been moved, or its drive unplugged, since it was verified.
+    bool App::DiscStillThere()
+    {
+        SDL_PathInfo info;
+        if (SDL_GetPathInfo(m_discPath.c_str(), &info) && info.type == SDL_PATHTYPE_FILE)
+            return true;
+        m_disc = DiscState::Failed;
+        m_check.status = GameSourceStatus::NotFound;
+        m_check.message = fmt::format(fmt::runtime(strings::DiscGone), m_discPath);
+        m_installView = m_kitUsed = false;
+        m_page = Page::Play;
+        return false;
     }
 
     void App::Browse()
@@ -677,7 +758,7 @@ namespace launcher_ui
     {
         ImVec2 position = ImGui::GetCursorScreenPos();
         ImGui::BeginDisabled(!enabled);
-        bool pressed = ImGui::InvisibleButton(label, size);
+        bool pressed = ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
         bool hovered = ImGui::IsItemHovered(), held = ImGui::IsItemActive();
         ImGui::EndDisabled();
         ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -693,6 +774,7 @@ namespace launcher_ui
         ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
         draw->AddText(ImVec2(position.x + (size.x - text.x) / 2, position.y + (size.y - 6 - text.y) / 2 + lift), Rgb(ink, alpha), label, labelEnd);
         ImGui::PopFont();
+        FocusRing(Radius);
         return pressed && enabled;
     }
 
@@ -715,15 +797,57 @@ namespace launcher_ui
     {
         ImVec2 position = ImGui::GetCursorScreenPos();
         ImVec2 size(54, 30);
-        bool pressed = ImGui::InvisibleButton(id, size);
+        bool pressed = ImGui::InvisibleButton(id, size, ImGuiButtonFlags_EnableNav);
         if (pressed)
             *value = !*value;
+        bool hovered = ImGui::IsItemHovered();
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? Accent : Field), size.y / 2);
-        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? AccentDark : Border), size.y / 2, 2.0f);
+        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? (hovered ? AccentHover : Accent) : hovered ? FieldHover : Field), size.y / 2);
+        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? AccentDark : hovered ? BorderBright : Border), size.y / 2, 2.0f);
         float knob = *value ? position.x + size.x - size.y / 2 : position.x + size.y / 2;
         draw->AddCircleFilled(ImVec2(knob, position.y + size.y / 2), size.y / 2 - 5, Rgb(*value ? AccentInk : TextSecondary));
+        FocusRing(size.y / 2);
         return pressed;
+    }
+
+    void App::FocusRing(float rounding, float gap)
+    {
+        if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
+            return;
+        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+        ImGui::GetWindowDrawList()->AddRect(ImVec2(min.x - gap, min.y - gap), ImVec2(max.x + gap, max.y + gap), Rgb(Accent),
+            std::max(0.0f, rounding + gap), 0, 2.0f);
+    }
+
+    bool App::HoldButton(const char* label, float width, const char* hint)
+    {
+        ImVec2 at = ImGui::GetCursorScreenPos(), size(width, 40);
+        ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
+        // Held: pressed and, for the mouse, still under the pointer (leaving cancels). Space, Enter and the pad's A hold it too.
+        bool mouse = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+        bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
+        bool held = active && (!mouse || hovered);
+        bool inputDown = mouse || ImGui::IsKeyDown(ImGuiKey_Space) || ImGui::IsKeyDown(ImGuiKey_Enter) ||
+            ImGui::IsKeyDown(ImGuiKey_KeypadEnter) || ImGui::IsKeyDown(ImGuiKey_GamepadFaceDown);
+        bool done = false;
+        float fill = m_hold.Update(ImGui::GetItemID(), held, inputDown, SDL_GetTicks(), done);
+
+        // Colours through GetColorU32: they fade with the rest under BeginDisabled.
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        float rounding = ImGui::GetStyle().FrameRounding;
+        ImVec2 end(at.x + size.x, at.y + size.y);
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(Rgb(Danger, held ? 150 : hovered ? 110 : 70)), rounding);
+        if (fill > 0)
+            draw->AddRectFilled(at, ImVec2(at.x + size.x * fill, end.y), ImGui::GetColorU32(Rgb(Danger, 200)), rounding);
+        const char* labelEnd = std::strstr(label, "##"); // "Delete##trash" shows "Delete"
+        ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
+        ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
+        draw->AddText(ImVec2(at.x + (size.x - text.x) / 2, at.y + (size.y - text.y) / 2), ImGui::GetColorU32(Rgb(Text)), label, labelEnd);
+        ImGui::PopFont();
+        FocusRing(rounding);
+        if (hovered && hint != nullptr)
+            ImGui::SetTooltip("%s", hint);
+        return done;
     }
 
     void App::SettingRow(const char* label, const char* hint)
@@ -793,7 +917,7 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Panel, 235));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusLarge);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
-        ImGui::BeginChild(id, size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | flags);
+        ImGui::BeginChild(id, size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_NavFlattened | flags);
     }
 
     void App::EndCard()
@@ -856,23 +980,30 @@ namespace launcher_ui
             at = ImVec2(0, ImGui::GetCursorScreenPos().y);
             ImGui::SetCursorScreenPos(at);
             ImGui::BeginDisabled(!enabled);
-            bool pressed = ImGui::InvisibleButton(id, ImVec2(rowW, height)) && enabled;
+            bool pressed = ImGui::InvisibleButton(id, ImVec2(rowW, height), ImGuiButtonFlags_EnableNav) && enabled;
             bool hovered = ImGui::IsItemHovered();
             ImGui::EndDisabled();
             if (selected || hovered)
                 draw->AddRectFilled(at, ImVec2(rowW, at.y + height), Rgb(selected ? SidebarSelected : SidebarHover));
             if (selected)
                 draw->AddRectFilled(at, ImVec2(SidebarBarW, at.y + height), Rgb(SidebarBar));
+            FocusRing(0, -2);
             return pressed;
         };
 
-        Title("SKYLAUNCHER", TitleSize + 4, SidebarInk);
-        if (ImGui::IsItemHovered())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-        if (ImGui::IsItemClicked())
+        // The title is the Home button.
         {
-            m_page = Page::Home;
-            m_capturing = nullptr;
+            ImVec2 titleAt = ImGui::GetCursorScreenPos();
+            ImGui::PushFont(m_titleFont, TitleSize + 4);
+            ImVec2 titleSize = ImGui::CalcTextSize("SKYLAUNCHER");
+            ImGui::PopFont();
+            if (ImGui::InvisibleButton("##home", titleSize, ImGuiButtonFlags_EnableNav))
+                GoTo(Page::Home);
+            if (ImGui::IsItemHovered())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            FocusRing(RadiusSmall);
+            ImGui::SetCursorScreenPos(titleAt);
+            Title("SKYLAUNCHER", TitleSize + 4, SidebarInk);
         }
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(SidebarInkDim));
         ImGui::PushFont(nullptr, SidebarTextSize);
@@ -895,7 +1026,9 @@ namespace launcher_ui
             // Selected only once the player has picked it: Play is that game's page.
             bool selected = m_page == Page::Play && std::string_view(entry.id) == m_game.id;
             if (row("game", GameRowH, selected, entry.enabled, position))
-                m_page = Page::Play;
+                GoTo(Page::Play);
+            if (std::string_view(entry.id) == m_game.id && (m_page == Page::Play || m_page == Page::Home))
+                TakeFocus(FocusTo::Sidebar);
             // The game's icon from the player's disc once it is verified, else its initial on its colour.
             ImVec2 badge(position.x + 34, position.y + GameRowH / 2);
             if (m_icon != nullptr && std::string_view(entry.id) == m_game.id)
@@ -931,10 +1064,9 @@ namespace launcher_ui
         ImVec2 at;
         bool collection = m_page == Page::Collection;
         if (row("##collection", GameRowH, collection, true, at))
-        {
-            m_page = collection ? Page::Play : Page::Collection;
-            m_capturing = nullptr;
-        }
+            GoTo(collection ? m_backPage : Page::Collection);
+        if (collection)
+            TakeFocus(FocusTo::Sidebar);
         {
             // Three figure cards fanned out.
             ImVec2 center(at.x + 34, at.y + GameRowH / 2);
@@ -951,10 +1083,9 @@ namespace launcher_ui
         }
         bool open = m_page == Page::Settings;
         if (row("##settings", GameRowH, open, true, at))
-        {
-            m_page = open ? Page::Play : Page::Settings;
-            m_capturing = nullptr;
-        }
+            GoTo(open ? m_backPage : Page::Settings);
+        if (open)
+            TakeFocus(FocusTo::Sidebar);
         ImGui::PopStyleVar();
         ImVec2 center(at.x + 34, at.y + GameRowH / 2);
         draw->AddCircleFilled(center, GearButton / 2, Rgb(SidebarInk), 32);
@@ -980,12 +1111,14 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(ImVec2(iconAt.x - 14 - ReportW, iconAt.y));
         if (PillButton("Report a bug", false, ReportW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
             SDL_OpenURL((std::string(Project) + "/issues/new").c_str());
+        TakeFocus(FocusTo::Page);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Opens a new issue on GitHub");
 
         ImGui::SetCursorScreenPos(iconAt);
-        if (ImGui::InvisibleButton("##github", ImVec2(Icon, Icon)))
+        if (ImGui::InvisibleButton("##github", ImVec2(Icon, Icon), ImGuiButtonFlags_EnableNav))
             SDL_OpenURL(Project);
+        FocusRing(Icon / 2);
         bool hovered = ImGui::IsItemHovered();
         if (hovered)
         {
@@ -1119,32 +1252,38 @@ namespace launcher_ui
 
         bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying, installing = Installing();
         bool install = ready && NeedsInstall();
-        const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : "Upload Iso";
-        float mainX = bar.x + (available.x - PlayButtonW) / 2, buttonY = middle - PlayButtonH / 2 + 3;
+        const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : strings::ChooseDisc;
+        // Centred, unless the controller picker on its left would reach the sidebar (a narrow window).
+        constexpr float MinGap = 16;
+        float mainX = std::max(bar.x + (available.x - PlayButtonW) / 2, bar.x + Pad + ControllerW + MinGap), buttonY = middle - PlayButtonH / 2 + 3;
         ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY));
         if (BigButton(label, ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, !verifying && !installing))
         {
-            if (install)
-                StartInstall();
-            else if (ready)
+            if (!ready)
+                Browse();
+            else if (install)
+                StartInstall(); // which checks first that the image is still there
+            else if (DiscStillThere())
             {
                 m_chosen = m_discPath;
                 m_chosenRuntime = m_installed.runtime;
                 Set(m_game.id, "iso", m_chosen);
                 m_running = false;
             }
-            else
-                Browse();
         }
+        TakeFocus(FocusTo::Page);
 
         // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
-        ImVec2 controllerAt(mainX - ControllerGap - ControllerW, buttonY), controllerSize(ControllerW, PlayButtonH - 6);
+        float controllerGap = std::clamp(mainX - (bar.x + Pad) - ControllerW, MinGap, ControllerGap);
+        ImVec2 controllerAt(mainX - controllerGap - ControllerW, buttonY), controllerSize(ControllerW, PlayButtonH - 6);
         ImGui::SetCursorScreenPos(controllerAt);
-        if (ImGui::InvisibleButton("##controller", controllerSize))
+        if (ImGui::InvisibleButton("##controller", controllerSize, ImGuiButtonFlags_EnableNav) || m_testControllers)
         {
+            m_testControllers = false;
             RefreshGamepads();
             ImGui::OpenPopup("##controllers");
         }
+        FocusRing(Radius);
         bool pickerHovered = ImGui::IsItemHovered(), pickerOpen = ImGui::IsPopupOpen("##controllers");
         ImVec2 controllerEnd(controllerAt.x + controllerSize.x, controllerAt.y + controllerSize.y);
         draw->AddRectFilled(controllerAt, controllerEnd, Rgb(pickerHovered || pickerOpen ? BottomBarRaisedHover : BottomBarRaised), Radius);
@@ -1163,39 +1302,57 @@ namespace launcher_ui
         if (pickerHovered && !pickerOpen)
             ImGui::SetTooltip("Controller: %s", DeviceLabel().c_str());
 
+        // PLAY WITH, above the picker: rows of one height, the radio and its label centred on the row, the heading on the
+        // labels' column; an opaque surface with a border over the art behind it.
         ImGui::SetNextWindowPos(ImVec2(controllerAt.x, controllerAt.y - 8), ImGuiCond_Always, ImVec2(0, 1));
         ImGui::SetNextWindowSizeConstraints(ImVec2(ControllerW, 0), ImVec2(FLT_MAX, FLT_MAX));
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(BottomBarRaised, 250));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(8, 10));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(BottomBarRaised));
+        ImGui::PushStyleColor(ImGuiCol_Border, Rgb(BottomBarBorder));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(6, 10));
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));
+        ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
         if (ImGui::BeginPopup("##controllers"))
         {
+            constexpr float RowH = 38, Dot = 6, DotX = 12 + Dot, LabelX = DotX + Dot + 12;
+            std::vector<std::pair<std::string, std::string>> options = DeviceOptions();
+            float labelsW = ImGui::CalcTextSize(strings::PlayWith).x;
+            for (const auto& [value, name] : options)
+                labelsW = std::max(labelsW, ImGui::CalcTextSize(name.c_str()).x);
+            float rowW = std::max(ControllerW - 12, LabelX + labelsW + 16);
             ImGui::PushFont(nullptr, SmallSize);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "  PLAY WITH");
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + LabelX);
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", strings::PlayWith);
             ImGui::PopFont();
-            for (const auto& [value, name] : DeviceOptions())
+            ImGui::Dummy(ImVec2(0, 2));
+            ImDrawList* popup = ImGui::GetWindowDrawList();
+            for (const auto& [value, name] : options)
             {
                 bool current = value == device;
                 ImVec2 at = ImGui::GetCursorScreenPos();
-                if (ImGui::Selectable(("      " + name).c_str(), current, 0, ImVec2(0, 30)))
+                ImGui::PushID(value.c_str());
+                if (ImGui::Selectable("##device", current, 0, ImVec2(rowW, RowH)))
                     SetDevice(value);
-                ImDrawList* popup = ImGui::GetWindowDrawList();
-                ImVec2 dot(at.x + 14, at.y + 15);
-                popup->AddCircle(dot, 6, Rgb(current ? Accent : TextDim), 16, 2.0f);
+                ImGui::PopID();
+                float mid = at.y + RowH / 2;
+                popup->AddCircle(ImVec2(at.x + DotX, mid), Dot, Rgb(current ? Accent : TextDim), 16, 2.0f);
                 if (current)
-                    popup->AddCircleFilled(dot, 3, Rgb(Accent), 12);
+                    popup->AddCircleFilled(ImVec2(at.x + DotX, mid), Dot - 3, Rgb(Accent), 12);
+                popup->AddText(ImVec2(at.x + LabelX, mid - ImGui::GetTextLineHeight() / 2), Rgb(Text), name.c_str());
             }
             ImGui::EndPopup();
         }
-        ImGui::PopStyleVar();
-        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor(2);
 
-        // The portal's state, centred just above the band.
+        // The portal's state, small, under the main button (above the band it ran into the disc's lines).
         {
             std::string line = m_portal.Current().Line();
             if (!line.empty())
             {
-                ImGui::SetCursorScreenPos(ImVec2(bar.x + (available.x - ImGui::CalcTextSize(line.c_str()).x) / 2, bar.y - 28));
+                ImGui::PushFont(nullptr, SmallSize);
+                ImGui::SetCursorScreenPos(ImVec2(mainX + (PlayButtonW - ImGui::CalcTextSize(line.c_str()).x) / 2, buttonY + PlayButtonH + 4));
                 DrawPortalStatus();
+                ImGui::PopFont();
             }
         }
 
@@ -1218,7 +1375,7 @@ namespace launcher_ui
             return;
         ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", line.c_str());
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Without a real portal the game uses the emulated one (Toy Box).\nSettings > Controls > Test the portal checks that the game sees it.");
+            ImGui::SetTooltip("%s", strings::PortalTip);
     }
 
     void App::DrawGraphics()
@@ -1293,7 +1450,9 @@ namespace launcher_ui
             ImGui::EndCombo();
         }
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::Text("%d gamepad(s) connected. Xbox, PlayStation, Switch and most other controllers work.", int(m_gamepads.size()));
+        size_t gamepads = m_gamepads.size();
+        std::string connected = gamepads == 0 ? strings::NoGamepad : gamepads == 1 ? strings::OneGamepad : fmt::format(fmt::runtime(strings::Gamepads), gamepads);
+        ImGui::Text("%s Xbox, PlayStation, Switch and most other controllers work.", connected.c_str());
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 12));
 
@@ -1318,7 +1477,7 @@ namespace launcher_ui
         // Keyboard bindings, two columns of actions.
         Title("Keyboard", TitleSize, Text);
         ImGui::SameLine(0, 24);
-        if (PillButton("Reset to defaults", false, 200))
+        if (HoldButton(strings::ResetKeys, 200, strings::ResetKeysHint))
         {
             for (const KeyAction& action : KeyActions)
                 m_config["input"].erase(std::string("key_") + action.id);
@@ -1372,9 +1531,9 @@ namespace launcher_ui
     {
         if (!BeginSettingsTable("##language"))
             return;
-        SettingRow("Text", "Menus, subtitles and on-screen text.");
+        SettingRow(strings::GameText, strings::GameTextHint);
         Combo("##text", m_game.id, "language", LanguageChoices, 0);
-        SettingRow("Voices", "Spoken lines and cutscenes. They can differ from the text.");
+        SettingRow(strings::GameVoices, strings::GameVoicesHint);
         Combo("##voice", m_game.id, "voice_language", LanguageChoices, 0);
         EndSettingsTable();
     }
@@ -1396,7 +1555,7 @@ namespace launcher_ui
             OpenFolder(LauncherDataFolder()); // the "Skylanders" folder: settings, saves, figures, the game, logs
         }
         ImGui::SameLine();
-        if (PillButton("Figures", false, 260))
+        if (PillButton(strings::OpenFigures, false, 260))
         {
             SDL_CreateDirectory(m_collection->Folder().c_str());
             { std::string folder = m_collection->Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
@@ -1411,7 +1570,7 @@ namespace launcher_ui
         if (!m_installed.runtime.empty())
         {
             ImGui::TextWrapped("Built on this computer for this disc: %s", m_installed.runtime.c_str());
-            if (PillButton("Reinstall the game", false, 260) && !Installing())
+            if (HoldButton(strings::Reinstall, 260, strings::ReinstallHint) && !Installing())
                 StartInstall();
             ImGui::SameLine();
             if (PillButton("Open the game folder", false, 260))
@@ -1465,7 +1624,7 @@ namespace launcher_ui
         }
 
         // Ten rows at a time; the newest first.
-        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(300.0f, 44.0f * float(m_saveBackups.size()))), ImGuiChildFlags_None);
+        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(300.0f, 44.0f * float(m_saveBackups.size()))), ImGuiChildFlags_NavFlattened);
         if (ImGui::BeginTable("##savebackups", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
         {
             ImGui::TableSetupColumn("when");
@@ -1489,7 +1648,7 @@ namespace launcher_ui
                 ImGui::TableSetColumnIndex(2);
                 ImGui::BeginDisabled(running);
                 ImGui::PushID(backup.stamp.c_str());
-                if (PillButton("Restore", false, 112))
+                if (HoldButton(strings::RestoreSaves, 112, strings::RestoreSavesHint))
                     RestoreSaveBackup(backup.stamp);
                 ImGui::PopID();
                 ImGui::EndDisabled();
@@ -1505,7 +1664,7 @@ namespace launcher_ui
         float available = ImGui::GetContentRegionAvail().x;
         float width = std::min(available, 940.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
 
         constexpr std::pair<SettingsTab, const char*> Tabs[] = { { SettingsTab::Graphics, "Graphics" }, { SettingsTab::Controls, "Controls" },
             { SettingsTab::Language, "Language" }, { SettingsTab::GameData, "Game data" },
@@ -1513,19 +1672,35 @@ namespace launcher_ui
         Title("SETTINGS", HeadlineSize, Text);
         ImGui::Dummy(ImVec2(0, 4));
         // The tabs: words on one line, an accent line under the selected one (like the sidebar's bar).
+        // LB / RB change tab, as in the console launchers.
+        if (!ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) && !ImGui::IsAnyItemActive())
+        {
+            int index = int(m_tab), count = int(std::size(Tabs));
+            int step = ImGui::IsKeyPressed(ImGuiKey_GamepadL1, false) ? -1 : ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false) ? 1 : 0;
+            if (step != 0)
+            {
+                m_tab = Tabs[std::clamp(index + step, 0, count - 1)].first;
+                m_capturing = nullptr;
+                m_saveBackupsLoaded = false;
+                RequestFocus(FocusTo::Page); // the ring follows to the new tab
+            }
+        }
         ImGui::PushFont(nullptr, SidebarTextSize);
         for (const auto& [tab, label] : Tabs)
         {
             bool active = m_tab == tab;
             ImVec2 at = ImGui::GetCursorScreenPos(), text = ImGui::CalcTextSize(label);
             ImVec2 size(text.x + BoldOffset, text.y + 10 + TabUnderlineH);
-            if (ImGui::InvisibleButton(label, size))
+            if (ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav))
             {
                 m_tab = tab;
                 m_capturing = nullptr;
                 m_saveBackupsLoaded = false; // the saves may have changed since the tab was last open
             }
             bool hovered = ImGui::IsItemHovered();
+            FocusRing(RadiusSmall);
+            if (active)
+                TakeFocus(FocusTo::Page);
             ImDrawList* draw = ImGui::GetWindowDrawList();
             unsigned color = active || hovered ? Text : TextDim;
             if (active)
@@ -1553,50 +1728,100 @@ namespace launcher_ui
         ImGui::EndChild();
     }
 
-    // The game's text language, top right of Home and Play (Settings > Language has it with the voices). The launcher's own
-    // text is English for now.
-    void App::DrawLanguageMenu()
+    void App::GoTo(Page page)
     {
-        ImVec2 at(ImGui::GetIO().DisplaySize.x - Pad - LanguageMenuW, Pad + m_bannerH);
-        ImVec2 padding(12, 6);
-        int selected = ChoiceIndex(LanguageChoices, SettingGet(m_config, m_game.id, "language"), 0);
-        const char* current = LanguageChoices[selected].label;
-        ImGui::PushFont(nullptr, TextSize + 1);
-        // The frame has no fill, so the bold copy of the current language can go under it.
-        ImGui::GetWindowDrawList()->AddText(ImVec2(at.x + padding.x + BoldOffset, at.y + padding.y), IM_COL32_WHITE, current);
-        ImGui::SetCursorScreenPos(at);
-        ImGui::SetNextItemWidth(LanguageMenuW);
-        // See-through: white outline and text, no fill.
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, padding);
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.5f);
-        ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32_WHITE);
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32_WHITE);
-        for (ImGuiCol fill : { ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_Button, ImGuiCol_ButtonHovered })
-            ImGui::PushStyleColor(fill, IM_COL32(255, 255, 255, fill == ImGuiCol_FrameBgHovered || fill == ImGuiCol_ButtonHovered ? 30 : 0));
-        bool open = ImGui::BeginCombo("##uilanguage", current);
-        ImGui::PopStyleColor(6);
-        ImGui::PopStyleVar(2);
-        if (open)
-        {
-            for (int i = 0; i < int(std::size(LanguageChoices)); i++)
-                if (ImGui::Selectable(LanguageChoices[i].label, i == selected))
-                    Set(m_game.id, "language", LanguageChoices[i].value);
-            ImGui::EndCombo();
-        }
-        ImGui::PopFont();
+        if ((page == Page::Settings || page == Page::Collection) && (m_page == Page::Home || m_page == Page::Play))
+            m_backPage = m_page;
+        m_page = page;
+        m_capturing = nullptr;
+        RequestFocus(FocusTo::Page);
+    }
+
+    // B / Escape when nothing else took it: out of Settings and Collection, else to the sidebar.
+    void App::Back()
+    {
+        if (m_page == Page::Settings || m_page == Page::Collection)
+            GoTo(m_backPage);
+        else
+            RequestFocus(FocusTo::Sidebar);
+        m_focusShow = true;
+    }
+
+    void App::TakeFocus(FocusTo where)
+    {
+        if (m_focusTo != where)
+            return;
+        ImGui::SetWindowFocus();
+        ImGui::FocusItem();
+        if (m_focusShow)
+            ImGui::SetNavCursorVisible(true);
+        m_focusTo = FocusTo::None;
+    }
+
+    void App::Toast(std::string text)
+    {
+        // Long enough to read: 2.5 s, and more for a long message (an error and its reason), up to 6 s.
+        uint64_t readMs = std::clamp<uint64_t>(2500 + 45 * (text.size() > 40 ? text.size() - 40 : 0), 2500, 6000);
+        m_toast = std::move(text);
+        m_toastUntil = SDL_GetTicks() + readMs;
     }
 
     void App::DrawToast()
     {
         if (m_toast.empty() || SDL_GetTicks() > m_toastUntil)
             return;
+        // Bottom right, at most 560 points wide (a long one wraps, never over the sidebar).
         ImVec2 size = ImGui::GetIO().DisplaySize;
-        ImVec2 text = ImGui::CalcTextSize(m_toast.c_str());
-        ImVec2 position(size.x - text.x - 64, size.y - 72);
+        float wrap = std::min(560.0f, size.x - SidebarW - 2 * Pad - 40);
+        ImVec2 text = ImGui::CalcTextSize(m_toast.c_str(), nullptr, false, wrap);
+        ImVec2 end(size.x - 24, size.y - 28), position(end.x - text.x - 40, end.y - text.y - 24);
         ImDrawList* draw = ImGui::GetForegroundDrawList();
-        draw->AddRectFilled(position, ImVec2(size.x - 24, size.y - 28), Rgb(PanelRaised, 245), Radius);
-        draw->AddRect(position, ImVec2(size.x - 24, size.y - 28), Rgb(Accent, 200), Radius, 2.0f);
-        draw->AddText(ImVec2(position.x + 20, position.y + 12), Rgb(Text), m_toast.c_str());
+        draw->AddRectFilled(position, end, Rgb(PanelRaised, 245), Radius);
+        draw->AddRect(position, end, Rgb(Accent, 200), Radius, 2.0f);
+        draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(position.x + 20, position.y + 12), Rgb(Text), m_toast.c_str(), nullptr, wrap);
+    }
+
+    // Quitting during an install: keep installing (the default, B / Escape) or quit.
+    void App::DrawQuitPrompt()
+    {
+        if (!m_quitPrompt)
+            return;
+        if (!Installing()) // it ended meanwhile: nothing to lose any more
+        {
+            m_running = false;
+            return;
+        }
+        if (!ImGui::IsPopupOpen("##quit"))
+            ImGui::OpenPopup("##quit");
+        ImVec2 display = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowSize(ImVec2(std::min(520.0f, display.x - 80), 0));
+        ImGui::SetNextWindowPos(ImVec2(display.x / 2, display.y / 2), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(Panel, 250));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, RadiusLarge);
+        if (ImGui::BeginPopupModal("##quit", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+        {
+            Title(strings::QuitTitle, TitleSize, Text);
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+            ImGui::TextWrapped("%s", strings::QuitText);
+            ImGui::PopStyleColor();
+            ImGui::Dummy(ImVec2(0, 8));
+            bool keep = PillButton(strings::KeepInstalling, true, 200, true);
+            if (ImGui::IsWindowAppearing())
+                ImGui::SetItemDefaultFocus();
+            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
+            bool quit = PillButton(strings::Quit, false, 120, true);
+            if (keep || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
+            {
+                m_quitPrompt = false;
+                ImGui::CloseCurrentPopup();
+            }
+            else if (quit)
+                m_running = false;
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
     }
 
     void App::Frame()
@@ -1609,7 +1834,11 @@ namespace launcher_ui
         frameIo.DisplayFramebufferScale = ImVec2(frameIo.DisplayFramebufferScale.x * m_uiScale, frameIo.DisplayFramebufferScale.y * m_uiScale);
         if (SDL_GetMouseFocus() == nullptr) // the backend's outside-the-window position is in unscaled window units
             frameIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+        if (m_testNav)
+            frameIo.BackendFlags |= ImGuiBackendFlags_HasGamepad; // the test's pad keys count with no pad plugged in
         ImGui::NewFrame();
+        if (!m_backTaken && (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false)))
+            Back();
         DrawBackdrop();
         DrawSidebar();
 
@@ -1630,13 +1859,16 @@ namespace launcher_ui
         case Page::Collection: m_collection->Draw(); break;
         case Page::Settings: DrawSettings(); break;
         }
-        if (m_page == Page::Home || m_page == Page::Play) // Settings has its own Language tab, the collection its buttons there
-            DrawLanguageMenu();
         ImGui::End();
         ImGui::PopStyleVar();
         DrawWhatsNew();
         DrawProblemReport();
+        DrawQuitPrompt();
         DrawToast();
+        // Who answers B / Escape next frame: an open menu or dialog, a field being edited, the collection's search or View.
+        m_backTaken = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) || ImGui::IsAnyItemActive() ||
+            m_reportOpen || m_whatsNewOpen || m_quitPrompt || (m_page == Page::Collection && m_collection->TakesBack());
+        m_focusTo = FocusTo::None; // a request no page answered (its item wasn't drawn) is dropped
 
         ImGui::Render();
         // ImGui works in window points: scale them to the output's pixels (Retina and other high-density displays).
@@ -1648,11 +1880,16 @@ namespace launcher_ui
         if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
         {
             static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-collection", "06-home",
-                "07-figure-sheet", "08-new-figure" };
-            static const char* const InstallNames[] = { "10-install", "11-installing", "12-installing-compile", "13-install-details",
+                "07-figure-sheet", "08-new-figure", "09-play-with", "10-language", "11-disc-gone" };
+            static const char* const InstallNames[] = { "10-install", "11-installing", "12-quit-while-installing", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
-            if (m_testCollection)
+            static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-view-menu",
+                "45-nav-view-closed", "46-nav-card", "47-nav-figure-page", "48-nav-delete-hint", "49-nav-delete-held",
+                "50-nav-back-to-play", "51-nav-settings-controls", "52-nav-settings-back" };
+            if (m_testNav)
+                Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
+            else if (m_testCollection)
                 Screenshot(CollectionPage::TestShotName(m_testStep));
             else if (m_testReal)
                 Screenshot(fmt::format("30-real-{:02}", m_testStep).c_str());
@@ -1683,6 +1920,57 @@ namespace launcher_ui
         SDL_DestroySurface(surface);
     }
 
+    // Keyboard and pad navigation (SSA_LAUNCHER_TEST_NAV): keys go to ImGui as a player's would, a shot after each group.
+    void App::TestNavScript(uint64_t now)
+    {
+        // A key is pressed and released, unless Hold (down only) or Release (up only) wraps it.
+        constexpr int Hold = 0x10000, Release = 0x20000;
+        static const std::vector<int> Steps[] = {
+            {},                                                        // 40: the launcher opens, the focus in the sidebar
+            { ImGuiKey_Escape },                                       // 41: B: the ring on the game's row
+            { ImGuiKey_DownArrow },                                    // 42: down: past the games coming later
+            { ImGuiKey_Space },                                        // 43: A: Collection, the ring on Add a figure
+            { ImGuiKey_GamepadFaceUp, ImGuiKey_DownArrow },            // 44: Y: the View menu, focused
+            { ImGuiKey_GamepadFaceRight },                             // 45: B: closed, the ring back on View
+            { ImGuiKey_LeftArrow, ImGuiKey_LeftArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow,
+              ImGuiKey_RightArrow },                                   // 46: a seat, then right: the list's first card
+            { ImGuiKey_GamepadFaceLeft },                              // 47: X: its Figure page
+            { ImGuiKey_DownArrow, ImGuiKey_RightArrow, ImGuiKey_RightArrow, ImGuiKey_RightArrow }, // 48: on Delete, its hint
+            { Hold | ImGuiKey_Space },                                 // 49: held for 1.5 s: in the trash, back to the list
+            { Release | ImGuiKey_Space, ImGuiKey_GamepadFaceRight },   // 50: B: back to Play, on the main button
+            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_GamepadR1 }, // 51: Settings > Controls
+            { ImGuiKey_Escape },                                       // 52: Escape: back to Play
+        };
+        if (m_testStep >= int(std::size(Steps)))
+        {
+            m_running = false;
+            return;
+        }
+        if (m_testStep == 0)
+        {
+            m_page = Page::Play;
+            m_collection->Seed();
+            if (m_disc == DiscState::None && !m_testDrop.empty())
+                StartVerify(m_testDrop);
+            if (m_disc == DiscState::Ready || m_disc == DiscState::Failed || m_testDrop.empty())
+                m_testAt = now + 500;
+            return;
+        }
+        // ImGui's input queue spreads the events over frames, in order.
+        ImGuiIO& io = ImGui::GetIO();
+        bool holding = false;
+        for (int step : Steps[m_testStep])
+        {
+            ImGuiKey key = ImGuiKey(step & 0xFFFF);
+            if (!(step & Release))
+                io.AddKeyEvent(key, true);
+            if (!(step & Hold))
+                io.AddKeyEvent(key, false);
+            holding = holding || (step & Hold) != 0;
+        }
+        m_testAt = now + (holding ? 1500 : 600);
+    }
+
     // Screens of the screenshot test, each captured once it has settled.
     void App::TestScript()
     {
@@ -1697,6 +1985,11 @@ namespace launcher_ui
         if (m_testUpdate)
         {
             TestUpdateScript(now);
+            return;
+        }
+        if (m_testNav)
+        {
+            TestNavScript(now);
             return;
         }
         if (m_testCollection)
@@ -1755,6 +2048,26 @@ namespace launcher_ui
         case 7:
             m_collection->TestScreen(6);
             m_testAt = now + 600;
+            break;
+        case 8:
+            m_page = Page::Play;
+            m_testControllers = true;
+            m_testAt = now + 500;
+            break;
+        case 9:
+            m_page = Page::Settings;
+            m_tab = SettingsTab::Language;
+            m_testAt = now + 400;
+            break;
+        case 10:
+            // The verified image moved away: INSTALL says so instead of failing later.
+            m_page = Page::Play;
+            if (m_disc == DiscState::Ready)
+            {
+                m_discPath += ".moved";
+                StartInstall();
+            }
+            m_testAt = now + 400;
             break;
         default:
             m_running = false;

@@ -17,6 +17,13 @@ namespace launcher_ui
 
     namespace
     {
+        // Manage's words that changed in the polish pass (the rest are still inline, for #4).
+        namespace strings
+        {
+            constexpr const char* DeleteForGood = "Delete for good";
+            constexpr const char* DeleteForGoodHint = "Hold to delete it for good. This can't be undone.";
+        }
+
         struct DialogResult
         {
             std::atomic<bool> done{ false };
@@ -81,11 +88,10 @@ namespace launcher_ui
     void CollectionPage::DrawManage(ImVec2 size)
     {
         m_app.Title("MANAGE", HeadlineSize - 6, Text);
-        std::vector<collection::TrashEntry> trash = collection::Trash();
+        RefreshDisk();
         size_t unknown = std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return f.toy == nullptr; });
-        size_t starters = collection::UntouchedStarters().size();
-        const std::string tabs[] = { fmt::format("Trash  {}", trash.size()), "Backups", "Import and export", fmt::format("Unknown toys  {}", unknown),
-            fmt::format("Tidy  {}", starters) };
+        const std::string tabs[] = { fmt::format("Trash  {}", m_trash.size()), "Backups", "Import and export", fmt::format("Unknown toys  {}", unknown),
+            fmt::format("Tidy  {}", m_starters) };
         for (int i = 0; i < 5; i++)
         {
             if (i > 0)
@@ -94,7 +100,7 @@ namespace launcher_ui
                 m_manageTab = i;
         }
         ImGui::Dummy(ImVec2(0, 6));
-        ImGui::BeginChild("##managebody", ImVec2(0, size.y - ImGui::GetCursorPosY() - Pad - 50), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
+        ImGui::BeginChild("##managebody", ImVec2(0, size.y - ImGui::GetCursorPosY() - Pad - 50), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         switch (m_manageTab)
         {
         case 0: DrawTrash(); break;
@@ -111,7 +117,7 @@ namespace launcher_ui
 
     void CollectionPage::DrawTrash()
     {
-        std::vector<collection::TrashEntry> trash = collection::Trash();
+        const std::vector<collection::TrashEntry> trash = m_trash; // a copy: the buttons below reload it
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Deleted figures stay here for 30 days. Their stats and name come back with them.");
         ImGui::Dummy(ImVec2(0, 6));
         if (trash.empty())
@@ -128,7 +134,7 @@ namespace launcher_ui
                 Reload();
             }
             ImGui::SameLine(0, 8);
-            if (HoldButton("Delete for good (hold)", 230))
+            if (m_app.HoldButton(strings::DeleteForGood, 200, strings::DeleteForGoodHint))
             {
                 collection::DeleteForGood(entry.id);
                 Reload();
@@ -142,33 +148,30 @@ namespace launcher_ui
     {
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Every change makes a backup; the newest 10 of each figure are kept.");
         ImGui::Dummy(ImVec2(0, 6));
+        bool any = false;
         for (const Figure& figure : m_model.figures)
         {
-            std::vector<std::string> backups = collection::Backups(figure.path);
+            const std::vector<BackupRow> backups = Backups(figure.path); // a copy: Restore below reloads them
             if (backups.empty())
                 continue;
+            any = true;
             ImGui::PushID(figure.path.c_str());
             if (m_app.Chip(fmt::format("{}  {}##b", Name(figure), backups.size()).c_str(), m_backupsOf == figure.path))
                 m_backupsOf = m_backupsOf == figure.path ? std::string() : figure.path;
             ImGui::PopID();
             if (m_backupsOf != figure.path)
                 continue;
-            for (const std::string& backup : backups)
+            for (const BackupRow& backup : backups)
             {
-                Figure old;
-                std::string stem = fs::path(backup).stem().string();
-                std::string text = stem.size() >= 16 ? fmt::format("{} {}:{}", stem.substr(0, 10), stem.substr(11, 2), stem.substr(13, 2)) : stem;
-                if (collection::Read(backup, old) && HasProgress(old) && old.state == figures::AreaState::Valid)
-                    text += fmt::format("   level {} · {} gold", old.level, old.stats.gold);
-                ImGui::PushID(backup.c_str());
+                ImGui::PushID(backup.path.c_str());
                 ImGui::Indent(20);
-                ImGui::TextUnformatted(text.c_str());
+                ImGui::TextUnformatted(backup.label.c_str());
                 ImGui::SameLine(0, 14);
                 ImGui::BeginDisabled(!Writable(figure));
                 if (m_app.PillButton("Restore", false, 100, true))
                 {
                     std::string error;
-                    Toast(collection::Restore(figure.path, backup, &error) ? "Backup restored" : "Couldn't restore it: " + error);
+                    Toast(collection::Restore(figure.path, backup.path, &error) ? "Backup restored" : "Couldn't restore it: " + error);
                     Reload();
                 }
                 ImGui::EndDisabled();
@@ -176,6 +179,8 @@ namespace launcher_ui
                 ImGui::PopID();
             }
         }
+        if (!any)
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "No backups yet.");
     }
 
     void CollectionPage::DrawImportExport()
@@ -250,13 +255,13 @@ namespace launcher_ui
 
     void CollectionPage::DrawTidy()
     {
-        std::vector<std::string> starters = collection::UntouchedStarters();
+        RefreshDisk();
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Older versions of the game made one never-played figure of every character at each start. They are not yours, so My Skylanders hides them. Tidy moves them to the trash (30 days, recoverable).");
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
-        ImGui::BeginDisabled(starters.empty());
-        if (m_app.PillButton(fmt::format("Move {} to the trash", starters.size()).c_str(), true, 260, true))
+        ImGui::BeginDisabled(m_starters == 0);
+        if (m_app.PillButton(fmt::format("Move {} to the trash", m_starters).c_str(), true, 260, true))
         {
             int moved = collection::Tidy();
             Toast(fmt::format("{} figure{} moved to the trash", moved, moved == 1 ? "" : "s"));
@@ -315,7 +320,7 @@ namespace launcher_ui
         std::string sidekick = make(505, 0, 0, 0, "");
         std::string dark = make(28, 0, 0, 0, "");
         make(14, 0, 700, 90, ""); // a second Gill Grunt: "owned x2"
-        std::string doomed = make(12, 0, 0, 0, "");
+        std::string doomed = make(12, 0, 0, 0, ""), doomed2 = make(10, 0, 0, 0, ""); // two in the trash: one hold button each
         collection::SetLabel(gill, "Gilou's");
         collection::SetFavourite(gill, true);
         collection::SetFavourite(spyro, true);
@@ -337,6 +342,7 @@ namespace launcher_ui
                 break;
             }
         collection::Delete(doomed);
+        collection::Delete(doomed2);
         (void)chop; (void)item; (void)pack; (void)sidekick; (void)dark;
         if (getenv("SSA_SAVE_DIR") != nullptr)
             if (const collection::Game* game = m_model.Game())
@@ -370,7 +376,7 @@ namespace launcher_ui
             OpenFigure(figureOf(14));
             if (const Figure* figure = m_model.Find(m_figure))
             {
-                m_edit = figure->stats;
+                m_edit = m_editBase = figure->stats;
                 snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(figure->stats).c_str());
                 m_editing = true;
             }

@@ -6,6 +6,7 @@
 #include "assets/launcher_assets.h"
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/ui/collection_model.h"
+#include "launcher/ui/hold_confirm.h"
 #include "shared/figures/figure_icons.h"
 #include "shared/vfs.h"
 #include <algorithm>
@@ -437,6 +438,99 @@ static void PortalChecks()
     printf("Portal status: table and status line checked\n");
 }
 
+// Hold to confirm (HoldConfirm): the timing, a release or the pointer leaving cancels, one action per press, buttons
+// told apart by their ID even when their labels are the same.
+void HoldChecks()
+{
+    using launcher_ui::HoldConfirm;
+    bool done = false;
+    {
+        // Timing: full after a second, acts once, not again while still held.
+        HoldConfirm hold;
+        EXPECT(hold.Update(7, true, true, 1000, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, true, true, 1500, done) == 0.5f && !done);
+        EXPECT(hold.Update(7, true, true, 1999, done) < 1.0f && !done);
+        EXPECT(hold.Update(7, true, true, 2000, done) == 1.0f && done);
+        EXPECT(hold.Update(7, true, true, 2016, done) == 1.0f && !done);
+        EXPECT(hold.Update(7, true, true, 5000, done) == 1.0f && !done);
+        // Released, then pressed again: a new hold, which acts once more.
+        EXPECT(hold.Update(7, false, false, 5100, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, true, true, 6000, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, true, true, 7000, done) == 1.0f && done);
+    }
+    {
+        // Released early: nothing happens, and the next press starts from empty.
+        HoldConfirm hold;
+        hold.Update(7, true, true, 0, done);
+        EXPECT(hold.Update(7, true, true, 600, done) == 0.6f && !done);
+        EXPECT(hold.Update(7, false, false, 650, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, true, true, 700, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, true, true, 1600, done) == 0.9f && !done);
+        EXPECT(hold.Update(7, true, true, 1700, done) == 1.0f && done);
+    }
+    {
+        // The pointer leaves while pressing: cancelled, and coming back while still pressed does not resume it.
+        HoldConfirm hold;
+        hold.Update(7, true, true, 0, done);
+        EXPECT(hold.Update(7, false, true, 500, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, true, true, 600, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, true, true, 3000, done) == 0.0f && !done);
+        EXPECT(hold.Update(7, false, false, 3100, done) == 0.0f && !done);
+        hold.Update(7, true, true, 3200, done);
+        EXPECT(hold.Update(7, true, true, 4200, done) == 1.0f && done);
+    }
+    {
+        // Identity: two "Delete for good" buttons (one per trash entry) are drawn every frame; only the held one fills,
+        // and the other one, drawn before or after it, doesn't reset it. This is what never completed before.
+        HoldConfirm hold;
+        for (uint64_t now = 0; now < 1000; now += 16)
+        {
+            EXPECT(hold.Update(1, false, true, now, done) == 0.0f && !done);
+            EXPECT(hold.Update(2, true, true, now, done) == float(now) / 1000.0f && !done);
+            EXPECT(hold.Update(3, false, true, now, done) == 0.0f && !done);
+        }
+        hold.Update(1, false, true, 1000, done);
+        EXPECT(hold.Update(2, true, true, 1000, done) == 1.0f && done);
+        // Its entry is gone; the one now under the pointer is not active (ImGui wants a new click), and nothing else acts
+        // until the input is released, even an activate key held on the next button.
+        EXPECT(hold.Update(3, true, true, 3000, done) == 0.0f && !done);
+        EXPECT(hold.Update(3, false, false, 3016, done) == 0.0f && !done);
+        hold.Update(3, true, true, 3100, done);
+        EXPECT(hold.Update(3, true, true, 4100, done) == 1.0f && done);
+    }
+    printf("Hold to confirm: timing, cancel and identity checked\n");
+}
+
+// Edit stats and names (#9 S-11, S-17): Save keeps what a game changed meanwhile, a name of spaces is no name.
+void EditChecks()
+{
+    using launcher_ui::MergeEditedStats;
+    figures::FigureStats base{};
+    base.experience = 9000;
+    base.gold = 2400;
+    base.heroPoints = 3;
+    base.playSeconds = 600;
+    figures::SetNicknameUtf8(base, "Gilou");
+    // The game played it while the editor was open: more time, more gold.
+    figures::FigureStats now = base;
+    now.playSeconds = 4200;
+    now.gold = 2600;
+    // The player changed the experience only: the game's gold and time stay.
+    figures::FigureStats edited = base;
+    edited.experience = 12000;
+    figures::FigureStats saved = MergeEditedStats(now, base, edited, "Gilou", "Gilou");
+    EXPECT(saved.experience == 12000 && saved.gold == 2600 && saved.playSeconds == 4200 && saved.heroPoints == 3);
+    EXPECT(figures::NicknameUtf8(saved) == "Gilou");
+    // The gold and the nickname changed here: they win over the game's.
+    edited.gold = 100;
+    saved = MergeEditedStats(now, base, edited, "Gilou", "Gill");
+    EXPECT(saved.gold == 100 && saved.playSeconds == 4200 && figures::NicknameUtf8(saved) == "Gill");
+
+    using launcher_ui::Trimmed;
+    EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Gilou's  ") == "Gilou's" && Trimmed("A b") == "A b");
+    printf("Edit stats and names: merge and trim checked\n");
+}
+
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 
 int main(int argc, char** argv)
@@ -458,6 +552,8 @@ int main(int argc, char** argv)
     };
 
     CollectionChecks(scratch);
+    HoldChecks();
+    EditChecks();
     PortalChecks();
     InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);
