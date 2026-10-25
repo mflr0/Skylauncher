@@ -1250,6 +1250,12 @@ namespace launcher_ui
 
         Title("Portal of Power", TitleSize, Text);
         Combo("##portal", "portal", "mode", PortalChoices, 0, 440);
+        bool autoOpen = ParseBool(SettingGet(m_config, "portal", "toybox_auto_open", "1"));
+        if (Toggle("##toyboxautoopen", &autoOpen))
+            Set("portal", "toybox_auto_open", autoOpen ? "1" : "0");
+        ImGui::SameLine(0, 14);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Open the Toy Box when the game asks for a figure");
         DrawPortalTest();
         ImGui::Dummy(ImVec2(0, 12));
 

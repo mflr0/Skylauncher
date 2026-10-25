@@ -38,7 +38,9 @@ and reads its stdout, at most 15 s:
 Transport lines (`{"transport":"usb","available":false,"status":"error: ..."}`) become a note under the result. One flat JSON object per line (`kind` `hid` or `usb`, `opened`, `status` `ok` or `error: <why>`; `name` is read as `product`
 too), then the `done` line; anything else on stdout is ignored. The card lists each portal ("Found" / "Found, not usable"
 with the reason) and says what the game will do given the mode: real portal, virtual portal, or waiting for one. No
-portal: "No portal found: the game will use the virtual portal". A runtime without `--portal-probe` exits with code 2: "This
+portal: "No portal found: the game will use the virtual portal". Each portal line of a newer runtime also carries `id`, `model`, `verdict` and `verdict_reason` (the portal's answer to the game's
+reset command: "Model: Spyro's Adventure portal (Xbox 360) (id 01 28)", then "Spyro's Adventure accepts this portal." or, in red, why
+the game would reject or warn about it; the contract is the runtime's `docs/portal_probe.md`). A runtime without `--portal-probe` exits with code 2: "This
 version of the game doesn't have the portal test yet". Parser and tests: `ParsePortalProbe`, `tests/shell_test.cpp`.
 
 Portal mode is `[portal] mode` = `auto`, `emulated` (Virtual) or `real`; the launcher passes it as `SSA_PORTAL`. Older

@@ -57,6 +57,18 @@ namespace launcher_ui
             ImGui::TextColored(ImColor(Rgb(entry.opened ? Ok : Danger)), "%s", entry.opened ? "Found" : "Found, not usable");
             ImGui::SameLine(0, 8);
             ImGui::Text("%s (%s %s:%s)", name.c_str(), entry.kind == "usb" ? "USB" : "HID", entry.vid.c_str(), entry.pid.c_str());
+            if (!entry.model.empty())
+            {
+                // The model from the id the portal answered to the game's reset, and what the game thinks of it.
+                ImGui::PushFont(nullptr, SmallSize);
+                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Model: %s (id %s)", entry.model.c_str(), entry.id.c_str());
+                if (entry.verdict == "works")
+                    ImGui::TextColored(ImColor(Rgb(Ok)), "Spyro's Adventure accepts this portal.");
+                else if (entry.verdict == "warns" || entry.verdict == "rejected")
+                    ImGui::TextColored(ImColor(Rgb(Danger)), "Spyro's Adventure %s this portal: %s.", entry.verdict == "rejected" ? "rejects" : "warns about",
+                        entry.verdictReason.c_str());
+                ImGui::PopFont();
+            }
             if (!entry.opened)
             {
                 std::string why = entry.status.starts_with("error: ") ? entry.status.substr(7) : entry.status;
