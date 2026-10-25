@@ -262,6 +262,7 @@ namespace launcher_ui
                 m_installPast = {};
             }
             bool hovered = ImGui::IsItemHovered();
+            FocusRing(CloseSize / 2);
             if (hovered)
                 ImGui::SetTooltip("Close");
             ImVec2 c(closeAt.x + CloseSize / 2, closeAt.y + CloseSize / 2);

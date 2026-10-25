@@ -693,6 +693,7 @@ namespace launcher_ui
         ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
         draw->AddText(ImVec2(position.x + (size.x - text.x) / 2, position.y + (size.y - 6 - text.y) / 2 + lift), Rgb(ink, alpha), label, labelEnd);
         ImGui::PopFont();
+        FocusRing(Radius);
         return pressed && enabled;
     }
 
@@ -728,13 +729,13 @@ namespace launcher_ui
         return pressed;
     }
 
-    void App::FocusRing(float rounding)
+    void App::FocusRing(float rounding, float gap)
     {
         if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
             return;
-        constexpr float Gap = 4;
         ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        ImGui::GetWindowDrawList()->AddRect(ImVec2(min.x - Gap, min.y - Gap), ImVec2(max.x + Gap, max.y + Gap), Rgb(Accent), rounding + Gap, 0, 2.0f);
+        ImGui::GetWindowDrawList()->AddRect(ImVec2(min.x - gap, min.y - gap), ImVec2(max.x + gap, max.y + gap), Rgb(Accent),
+            std::max(0.0f, rounding + gap), 0, 2.0f);
     }
 
     bool App::HoldButton(const char* label, float width, const char* hint)
@@ -905,16 +906,26 @@ namespace launcher_ui
                 draw->AddRectFilled(at, ImVec2(rowW, at.y + height), Rgb(selected ? SidebarSelected : SidebarHover));
             if (selected)
                 draw->AddRectFilled(at, ImVec2(SidebarBarW, at.y + height), Rgb(SidebarBar));
+            FocusRing(0, -2);
             return pressed;
         };
 
-        Title("SKYLAUNCHER", TitleSize + 4, SidebarInk);
-        if (ImGui::IsItemHovered())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-        if (ImGui::IsItemClicked())
+        // The title is the Home button.
         {
-            m_page = Page::Home;
-            m_capturing = nullptr;
+            ImVec2 titleAt = ImGui::GetCursorScreenPos();
+            ImGui::PushFont(m_titleFont, TitleSize + 4);
+            ImVec2 titleSize = ImGui::CalcTextSize("SKYLAUNCHER");
+            ImGui::PopFont();
+            if (ImGui::InvisibleButton("##home", titleSize))
+            {
+                m_page = Page::Home;
+                m_capturing = nullptr;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            FocusRing(RadiusSmall);
+            ImGui::SetCursorScreenPos(titleAt);
+            Title("SKYLAUNCHER", TitleSize + 4, SidebarInk);
         }
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(SidebarInkDim));
         ImGui::PushFont(nullptr, SidebarTextSize);
@@ -1028,6 +1039,7 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(iconAt);
         if (ImGui::InvisibleButton("##github", ImVec2(Icon, Icon)))
             SDL_OpenURL(Project);
+        FocusRing(Icon / 2);
         bool hovered = ImGui::IsItemHovered();
         if (hovered)
         {
@@ -1187,6 +1199,7 @@ namespace launcher_ui
             RefreshGamepads();
             ImGui::OpenPopup("##controllers");
         }
+        FocusRing(Radius);
         bool pickerHovered = ImGui::IsItemHovered(), pickerOpen = ImGui::IsPopupOpen("##controllers");
         ImVec2 controllerEnd(controllerAt.x + controllerSize.x, controllerAt.y + controllerSize.y);
         draw->AddRectFilled(controllerAt, controllerEnd, Rgb(pickerHovered || pickerOpen ? BottomBarRaisedHover : BottomBarRaised), Radius);
@@ -1568,6 +1581,7 @@ namespace launcher_ui
                 m_saveBackupsLoaded = false; // the saves may have changed since the tab was last open
             }
             bool hovered = ImGui::IsItemHovered();
+            FocusRing(RadiusSmall);
             ImDrawList* draw = ImGui::GetWindowDrawList();
             unsigned color = active || hovered ? Text : TextDim;
             if (active)

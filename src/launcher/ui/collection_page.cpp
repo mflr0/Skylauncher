@@ -132,6 +132,7 @@ namespace launcher_ui
             AddBoldText(draw, ImVec2(at.x + 13, at.y + 7), ink, std::string(label, end != nullptr ? end : label + strlen(label)).c_str());
         else
             draw->AddText(ImVec2(at.x + 13, at.y + 7), ink, label, end);
+        FocusRing(size.y / 2);
         return pressed;
     }
 
@@ -665,6 +666,7 @@ namespace launcher_ui
             }
             bool hovered = ImGui::IsItemHovered();
             bool nav = ImGui::IsItemFocused();
+            m_app.FocusRing(Radius);
             // Dropping a card on a seat puts the figure there.
             if (ImGui::BeginDragDropTarget())
             {
@@ -727,6 +729,7 @@ namespace launcher_ui
                     ImGui::PushID(int(i) + 100);
                     bool off = ImGui::InvisibleButton("##off", ImVec2(24, 24));
                     bool over = ImGui::IsItemHovered();
+                    m_app.FocusRing(12, 0);
                     ImGui::PopID();
                     ImU32 ink = Rgb(over ? Text : TextDim);
                     draw->AddLine(ImVec2(cross.x - 5, cross.y - 5), ImVec2(cross.x + 5, cross.y + 5), ink, 2);
@@ -782,6 +785,7 @@ namespace launcher_ui
         ImGui::PushID(figure.path.c_str());
         bool pressed = ImGui::InvisibleButton("##figure", ImVec2(width, height));
         bool hovered = ImGui::IsItemHovered(), focused = ImGui::IsItemFocused();
+        m_app.FocusRing(Radius);
         bool doubleClick = hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
         bool rightClick = ImGui::IsItemClicked(ImGuiMouseButton_Right);
         if (hovered || focused)

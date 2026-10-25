@@ -105,6 +105,7 @@ namespace launcher_ui
                     m_addLabel[0] = 0;
                 }
                 bool hovered = ImGui::IsItemHovered();
+                m_app.FocusRing(Radius);
                 ImGui::PopID();
                 bool selected = m_addToy == toy.type;
                 if (selected)
