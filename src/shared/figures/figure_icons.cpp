@@ -149,11 +149,4 @@ namespace figures
             }
         return rgba;
     }
-
-    std::string PortraitLargeImageName(const ToyInfo& toy)
-    {
-        std::string name = toy.portrait != nullptr ? std::string(toy.portrait) + "_vs" : std::string();
-        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return char(tolower(c)); });
-        return name;
-    }
 }

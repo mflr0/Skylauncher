@@ -1,6 +1,7 @@
 #pragma once
 
-// Every toy Spyro's Adventure recognises. The toy types are the ones its portal code accepts (sub_82643BE8 and
+// Every toy a game recognises (Spyro's Adventure's list below; Giants' is SSA's plus its own, from the catalogue).
+// Spyro's Adventure: The toy types are the ones its portal code accepts (sub_82643BE8 and
 // sub_82643DA0 map them to per-toy ids: 0-32, the legendaries 404/416/419/430, magic items 200-207, adventure packs
 // 300-304, and four Giants-era sidekicks); the order of characters 0-32 matches the title's internal name table
 // (sub_829BC850). Display names are the toys' retail names (public). The data is the shared catalogue's
@@ -24,8 +25,10 @@ namespace figures
         const char* image;    // another UI image of the title showing the toy ("potion"); null if none
     };
 
-    std::span<const ToyInfo> Catalog();
-    const ToyInfo* FindToy(uint16_t toyType);
+    // The toys a game reads, by its catalogue id: "ssa" (the default) is Spyro's Adventure's, "giants" adds the Giants
+    // and LightCore toys, its magic items and sidekicks on top of every SSA toy.
+    std::span<const ToyInfo> Catalog(const std::string& game = "ssa");
+    const ToyInfo* FindToy(uint16_t toyType, const std::string& game = "ssa");
 
     // Characters keep progress (experience, gold, upgrades...); items and adventure packs don't.
     inline bool HasProgress(const ToyInfo& toy) { return toy.kind == ToyKind::Character || toy.kind == ToyKind::Legendary || toy.kind == ToyKind::Sidekick; }

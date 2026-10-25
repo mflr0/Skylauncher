@@ -9,7 +9,7 @@ is easy to iterate without touching the game runtime.
 - `src/launcher/` - the launcher: `launcher.{h,cpp}` (disc checks, settings file), `launcher_games.cpp` (the game table),
   `game_install.{h,cpp}` (installing the game with the kit's SSABuild, `docs/install.md`),
   `ui/`, `theme/`.
-- `src/assets/` - the art read from the player's disc (`launcher_assets`).
+- `src/assets/` - the game's art for the window (`launcher_assets`): a thin layer over `src/shared/art/` (see "Disc art").
 - `src/launcher/ui/launcher_app.h` - the window's class (`App`) and helpers shared by the page files.
 - `src/launcher/ui/launcher_ui.{h,cpp}` - the window (Dear ImGui on SDL_Renderer): backdrop, sidebar, the Home, Play and Settings
   pages, the launcher's widgets (`BigButton`, `PillButton`, `Toggle`, `BeginCard`, `Chip`), disc verification and the screenshot test.
@@ -18,7 +18,10 @@ is easy to iterate without touching the game runtime.
   `updater.{h,cpp}`, `ui/update_page.cpp` - updates, the banner and About (docs/updates.md);
   `shared/mini_json.{h,cpp}` - the JSON reader for GitHub's answer.
 - `src/launcher/ui/collection_*.{h,cpp}` - the collection page on the shared library: seats, sections, View, Figure page, Add a figure, Manage (`docs/collection_ui.md`).
-- `src/assets/launcher_assets.{h,cpp}` - reads frontend art from the player's disc, decodes it and caches it.
+- `src/launcher/ui/game_look.cpp` - the game page in each game's own look: `GameButton`, `GameSettingsButton`, the logo's
+  arrival (`LogoDrop`, `DrawHeroLogo`), the disc's pictures as textures (`LoadArt`, `CachedArt`), `SystemReducesMotion`.
+- `src/shared/art/` - SSARecomp's disc picture readers and per-game provider (`game_art`), copied by its
+  `tools/sync_skylauncher.sh`: Xenos textures, SSA's `strm`/APKF, Giants' IGA/IGZ.
 - `src/shared/` - what isn't the launcher's alone: the disc reader (`vfs`), the platform layer, `stb_impl.cpp`, the embedded fonts
   and the figure engine.
 - `src/shared/collection/` and `src/shared/figures/` - SSARecomp's collection library (copied by `tools/sync_collection.sh`:
@@ -28,20 +31,68 @@ is easy to iterate without touching the game runtime.
 - `docs/settings.md` - the settings file the launcher writes and the game reads.
 
 ## Layout
-The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
-GitHub issue) and the GitHub link bottom right. The top right is kept for the launcher's own language (#4): the game's text
-and voice languages are in Settings > Language ("Game text", "Game voices"). The game shown last is selected in the sidebar
-(`[launcher] game=`); the other is one click away.
-1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
-   SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
-   and disc state ("Open" until the game is first shown, then "Checking your disc", "Needs your disc" or "Ready to play"); the
-   selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
-2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
-   (current device, PLAY WITH: a menu of the others), the main button (CHOOSE DISC, INSTALL, then PLAY) with the portal's
-   line under it and, on the right, "Change disc...". PLAY and INSTALL check that the image is still there first.
+The launcher opens on **Home**, the menu page (the SKYLAUNCHER title goes back to it): the **library**, a card per
+playable game (its painting from the disc behind its logo, its name and state; the game's colours before its disc was
+ever read), then the games **coming later** as quiet chips in their colours; "Report a bug" (a new GitHub issue) and the
+GitHub link bottom right. A card opens its game's page. The top right is kept for the launcher's own language (#4): the
+game's text and voice languages are in Settings > Language ("Game text", "Game voices"). The game shown last is selected
+in the sidebar (`[launcher] game=`); the other is one click away.
+1. **Left sidebar** (grey, fixed width).
+   - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.3.1`, from
+     `SKYLAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" and YOUR GAMES.
+   - The seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later", SuperChargers
+     Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
+     art with "Skylanders" on it, in the row's left column (`GameLogoW` x `GameLogoH`); before that, and for the games
+     coming later (no disc, so never any game art), a neutral badge: the initial on the game's colour.
+   - The name (shrunk to fit), then the disc's state with a dot ("Open" until the game is first shown, then "Checking your
+     disc", "Needs your disc" or "Ready to play"). The selected game's row has the orange bar while its Play page is open.
+   - COLLECTION and the Settings gear at the bottom, their icons in the logos' column and their labels in the names'.
+   - Rows are reachable with the keyboard and the pad like the others.
+2. **Play** (the game page, no tabs).
+   - The backdrop is the game's own painting from the disc (SSA: the painted Skylands sky; Giants: the main menu's sky),
+     cropped to fill the page and shaded (`DrawBackdrop`: darker at the top, light behind the logo, dark towards the band,
+     a shadow along the sidebar) so the logo and white text read on any painting. Before any disc: the drawn night sky.
+   - The logo, large and centred, with a soft shadow, **falls in** on each arrival (see "The logo's arrival"). Before the
+     disc was ever read: the game's name.
+   - Bottom left of the hero, the disc's lines: the image's file name, "DISC IMAGE:" and its state, the install note;
+     "Change disc..." at the right of these lines once a disc is verified. (The small rounded app icon that sat here is
+     gone: the owner's request, 2026-10-25.)
+   - The band under it: the controller button (current device; PLAY WITH: a menu of the others), then the **main button**
+     (CHOOSE DISC, INSTALL, then PLAY) and the **game's settings button** (a gear) beside it, both in the game's own look
+     ("Each game's look"), with the portal's line under them. PLAY and INSTALL check that the image is still there first.
 3. Collection - see below.
 4. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About. Clicking a game
-   goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
+   goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from. The game page's settings
+   button opens it too, until each game has a settings page of its own (another branch).
+
+## Each game's look
+What belongs to the game on its page is drawn in **the game's own art direction**, taken from its menus and logo
+(`GameStyle` in `launcher_theme.h`, `StyleOf(id)`):
+
+| Game | Look | Tokens |
+|---|---|---|
+| Spyro's Adventure | the logo's sky-blue-to-white letters in a navy outline: a soft stone bevel, a gradient from sky blue to deep blue, a light upper part, a darker lip | `SpyrosAdventureStyle` |
+| Giants | the menus' glossy "gel" buttons (the yes/no buttons of `global.bld`): a bright top half, a hard split at the middle, a darker bottom half, a glint, a dark rim; in the logo's gold and orange | `GiantsStyle` |
+| any other | the launcher's own blue | |
+
+- `App::GameButton(label, size, style)`: the main button. A 3 px dark rim, the face (`gel` or bevel), the label in the
+  title font as the logos letter it (white with a dark rim), a glow in the game's colour under the pointer, a 2 px sink
+  when pressed, dimmed when disabled.
+- `App::GameSettingsButton(id, size)`: **the game's settings entry**, a square button with a gear in the shown game's
+  style (its tooltip: "<game> settings"). It is the one to call for the per-game settings page: it only draws and
+  returns the click.
+- Everything else (the sidebar, the band, Settings, Collection) keeps the launcher's neutral look: the games' styles
+  never mix.
+- A new game: add its `GameStyle` and a line in `StyleOf`.
+
+## The logo's arrival
+On each arrival on a game's page (from another page, or switching games, or when the logo appears because the disc was
+just read), the logo **falls in**: `LogoDropMs` (300 ms) from `LogoDropDistance` (44 points) above, eased out with a
+short landing (`EaseOutBack`, most of the way in the first third), fading in over the first 40 %. Once per arrival; a page
+already shown doesn't move. `App::IdleWait` draws every frame only while it falls.
+**Reduced motion:** with the system's setting (macOS: Accessibility > Display > Reduce motion; Windows: Accessibility >
+Visual effects > Animation effects off), or `[launcher] reduce_motion=1`, the logo is simply there. `reduce_motion=0`
+always animates (`docs/settings.md`).
 
 ## Interaction rules
 - **Focus.** Every control takes the keyboard and pad focus and shows it: ImGui's buttons draw it, the widgets drawn by
@@ -60,33 +111,41 @@ and voice languages are in Settings > Language ("Game text", "Game voices"). The
 - **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
 - **Toasts.** One at a time, bottom right, at most 560 points wide; 2.5 s, longer for a long message (up to 6 s).
 - **Idle.** The loop sleeps in `SDL_WaitEventTimeout` (`App::IdleWait`): every frame only while something moves (a disc
-  check, an install, an update, a held button, a text cursor) and for three frames after an input; 30 fps for the night
+  check, an install, an update, a held button, a text cursor, the logo's fall) and for three frames after an input; 30 fps for the night
   sky's stars; else it wakes every 0.5 s to poll the jobs, the portal and the collection.
 - **Copy.** New and changed sentences sit at the top of their file (`namespace strings`), ready for #4.
 
 ## Collection
 See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favourites, backups
 and six-game catalogue) with the Toy Box's organisation: the seats of the next session, My Skylanders in sections, the
-View menu, the Figure page, Add a figure and Manage. The icons are the disc's portraits when cached, else the generated
-ones (`figures::IconStyle`).
+View menu, the Figure page, Add a figure and Manage. The icons are the shown game's portraits from its disc, else the other
+game's, else the generated ones (`figures::IconStyle`): "Disc art" below.
 
 ## Disc art
-The launcher never ships Skylanders artwork. After an ISO is verified it:
-1. reads the title icon from `default.xex` (XDBF image resource);
-2. reads the STRM containers it needs (`ui/eng/startmenu.str`, `uiimage.str`), inflates the zlib stream at offset `0x14`;
-3. finds APKF packages by their original asset path;
-4. decodes the BC3/DXT5 payload at `APKF+0x1000` after undoing the Xbox 360 32x32-block tiling;
-5. caches PNGs in `SDL_GetPrefPath("", "SSARecomp")/launcher-cache/<titleid>/`.
+The launcher never ships Skylanders artwork. After a disc is verified, the check's worker thread calls the shared
+provider (`src/shared/art/game_art.h`, the same code as the game's Toy Box; SSARecomp's `docs/runtime/host/game_art.md`):
+`LauncherAssets::Provider::ExtractFromDisc` = `art::Extract(game, disc, titleIcon)`. One flow for every game; what
+differs per game is the provider's table.
 
-Current role mapping:
-| Role | Disc asset | Size |
-| --- | --- | --- |
-| `logo.png` | `...\startmenu\skylanderslogo.dds` | 1024x512 |
-| `hero_bg.png` | `fullscreen_000` in `uiimage.str` (the painted Skylands sky) | 512x512 (the Play page's backdrop, replacing the drawn sky and stars; the other pages use a plain gradient) |
-| `title_icon.png` | `default.xex` XDBF resource | as stored |
+| Role | Spyro's Adventure | Giants | File |
+| --- | --- | --- | --- |
+| Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 987x424) | `<data>/<Game>/launcher-cache/logo.png` |
+| Background (game page, Home) | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | `.../background.png` |
+| Title icon | `default.xex` XDBF resource | the same | `.../title_icon.png` |
+| Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px) of `uigameimage.str`: 78 | the collection screen's 123 portraits (256 px) | `<data>/<Game>/portraits/` |
 
-`manifest.ini` in the cache records the title ID and where each role came from. The cached files are
-local only and are ignored by git; deleting the cache is always safe.
+- Already cached pictures are kept (a second check reads nothing); `manifest.ini` records the reader's version and what
+  was found. Deleting the folders is always safe. The cache of older launchers (`SSA/launcher-cache/<title id>/`, for every
+  game) is removed at the next check.
+- The window loads them as textures through `App::CachedArt(game, role, maxWidth)` (also for games not opened this
+  session: the sidebar and Home show any game whose disc was read once). Logos are cropped to their opaque part
+  (`LoadArt`); art drawn much smaller than its size (the sidebar's logos, Home's cards) is averaged down on the CPU first,
+  since the renderer has no mipmaps.
+- **Textures at most 1024 px wide for the backdrop** (`BackdropArtW`): SDL's software renderer (the offscreen screenshot
+  test, and the fallback when no GPU renderer opens) drops one triangle of an image wider than that (seen with Giants'
+  1600 px painting).
+- The toys' pictures follow one rule (`collection::PortraitPath`): the shown game's, else the other game's, else the
+  generated icon (see `docs/collection_ui.md`).
 
 ## Legibility
 - Outfit was loaded from its variable file at the font's default axis, **Thin (100)**, and "bold" was that thin text drawn twice.
@@ -111,7 +170,8 @@ It follows `SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED`; Ctrl (Cmd) + / - / 0 zoom a
 The Windows executable declares per-monitor v2 DPI awareness in its manifest (`resources/windows/`).
 
 ## How to change the look
-- Colours: edit the constants in `launcher_theme.h`; ImGui's own widget colours are set in `LauncherTheme::Apply`.
+- Colours: edit the constants in `launcher_theme.h`; ImGui's own widget colours are set in `LauncherTheme::Apply`. Each
+  game's own look (its main and settings buttons) is its `GameStyle` there.
 - Spacing and sizes: `SidebarW`, `Pad`, `Radius*`, `PlayButtonW/H` and the font sizes in the same file.
 - Fonts: put an OFL- or Apache-licensed font in `resources/fonts/` and load it in `App::LoadFonts`
   (`SSA_LAUNCHER_FONT_DIR` overrides the folder while trying fonts).
@@ -130,8 +190,8 @@ SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ./build/Skylauncher.app/Contents/MacOS/Skylauncher
 ```
 It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
-`07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png` and `11-disc-gone.png`
-(INSTALL on an image that moved) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
+`07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-disc-gone.png`
+(INSTALL on an image that moved) and `12-logo-drop.png` (the logo early in its fall) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
 With `SSA_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `52-`): B to the sidebar, A into Collection, Y for
 View, the D-pad to a seat and a card, X for its Figure page, Space held on Delete, B back, RB in Settings.
 With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
@@ -154,7 +214,8 @@ repository's working copy (its own HOME, the offscreen driver).
   folders in place), so an install goes on while the other game is shown; closing the window asks first if any game is
   installing. The last game shown is written to `[launcher] game=` and opens at the next start. PLAY returns the shown game
   and its own build, and `main()` runs that game's runtime (SSARecomp or SGRecomp) with its language settings. The settings
-  pages (language, game data, reinstall) follow the shown game. No animation or colour was added.
+  pages (language, game data, reinstall) follow the shown game. Since 0.4 the game page arrives with its logo's fall and
+  its own look ("Each game's look").
 - `SSA_LAUNCHER_TEST_SWITCH=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=` in
   the config) runs the switch script: SSA and Giants checked, an install of each with the fake SSABuild (SSA shown while
   Giants builds), a switch back and forth with each state kept, and PLAY on each returning its game and build. It is run by

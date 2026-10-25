@@ -125,8 +125,9 @@ rebuilds it with the new kit and ends this.
 
 After a **successful** install: `ssabuild-work/` (2-3 GB) is deleted and its `logs/` kept as `install-logs/` (an update
 therefore rebuilds everything); the kits in `kit/` older than the one that built the game are deleted; a compiler archive
-(`toolchains/*.zip`) whose extracted copy is ready is deleted. Each log keeps one previous run (`.prev.log`), and the art
-cache `SSA/launcher-cache` is trimmed to 256 MB (oldest files first) when a game starts.
+(`toolchains/*.zip`) whose extracted copy is ready is deleted. Each log keeps one previous run (`.prev.log`). The art
+cache `<Game>/launcher-cache` holds three pictures (logo, background, title icon; `docs/launcher_ui.md`, "Disc art") and
+needs no trimming; the per-title folders of older launchers in it are removed at the next disc check.
 
 ## Linux
 

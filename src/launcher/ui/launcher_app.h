@@ -151,6 +151,27 @@ namespace launcher_ui
 
     class App;
 
+    // A picture from the disc and the part of it that is drawn (a logo's opaque bounds: the disc's logos have wide empty
+    // margins), possibly made smaller once on the CPU: the renderer has no mipmaps, so art drawn much smaller than its
+    // size would shimmer.
+    struct ArtTexture
+    {
+        SDL_Texture* texture = nullptr;
+        ImVec2 uv0{ 0, 0 }, uv1{ 1, 1 };
+        float aspect = 2; // width / height of that part
+
+        explicit operator bool() const { return texture != nullptr; }
+        void Destroy() { if (texture != nullptr) SDL_DestroyTexture(texture); texture = nullptr; }
+    };
+    // Loads a PNG; `crop`: to its opaque bounds; `maxWidth` > 0: averaged down to at most that many pixels wide. Empty if
+    // the file can't be read.
+    ArtTexture LoadArt(SDL_Renderer* renderer, const std::string& path, bool crop, int maxWidth = 0);
+    // A rounded rectangle filled with a vertical gradient, alpha included (`flags`: which corners are rounded).
+    void GradientRect(ImDrawList* draw, ImVec2 min, ImVec2 max, ImU32 top, ImU32 bottom, float rounding, ImDrawFlags flags = 0);
+    // Whether the system asks for less motion (macOS: Reduce motion; Windows: animations off). [launcher] reduce_motion
+    // = 1 / 0 overrides it.
+    bool SystemReducesMotion();
+
     // One game's state in the window: its disc and install, its art, its saves' backups, its collection page. Each game
     // the player opens keeps one for the session, so going back to it is instant; its jobs go on in the background.
     struct GameSlot
@@ -168,8 +189,7 @@ namespace launcher_ui
         TitleMetadata meta;
         LauncherAssets::Provider assets;
         SDL_Texture* icon = nullptr;
-        SDL_Texture* logo = nullptr;
-        SDL_Texture* background = nullptr; // the window's backdrop, from the player's disc once verified
+        ArtTexture logo;                   // the game's logo, cropped, from the player's disc once verified (game page)
         // Install state for the verified disc.
         std::optional<InstallKit> kit;
         InstalledGame installed;
@@ -215,6 +235,7 @@ namespace launcher_ui
         void Frame();
         void DrawBackdrop();
         void DrawSidebar();
+        const char* SlotStatus(const GameSlot* slot, bool* ready) const;
         void DrawHome();
         void DrawPlay();
         void DrawSettings();
@@ -247,6 +268,23 @@ namespace launcher_ui
 
         // The collection (collection_page.h): its page draws with the widgets below.
         friend class CollectionPage;
+
+        // The game page in the game's own look (game_look.cpp, docs/launcher_ui.md "Each game's look").
+        // The main button, in the game's style (its label in the title font).
+        bool GameButton(const char* label, ImVec2 size, const GameStyle& style, bool enabled = true);
+        // The game's settings entry: a square button with a gear, in the shown game's style. Opens that game's settings.
+        bool GameSettingsButton(const char* id, float size);
+        // A logo inside `size` at `at` (centred, aspect kept), with a soft shadow; `alpha` 0..1.
+        void DrawLogo(ImDrawList* draw, const ArtTexture& logo, ImVec2 at, ImVec2 size, float alpha = 1, bool shadow = true);
+        // The logo's arrival on the game page: 0 when it starts falling, 1 once landed (always 1 with reduced motion).
+        float LogoDrop();
+        // The game page's logo inside `size` at `at`, falling in on arrival (LogoDrop), with its shadow.
+        void DrawHeroLogo(ImDrawList* draw, const ArtTexture& logo, ImVec2 at, ImVec2 size);
+        // A game's cached picture (its logo, cropped; its background), at most `maxWidth` pixels wide, loaded once; nullptr
+        // before the game's disc was ever read. The sidebar and Home use them for games not opened this session too.
+        const ArtTexture* CachedArt(const char* game, LauncherAssets::Role role, int maxWidth);
+        void ForgetCachedArt(const char* game); // its disc was read again
+        bool ReduceMotion() const;
 
         // Widgets in the launcher's style.
         bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
@@ -355,6 +393,13 @@ namespace launcher_ui
         GameSlot* m_s = nullptr;
 
         HoldConfirm m_hold;
+
+        // The game page's logo drop: when it began, and what was shown last frame (a new arrival starts it again).
+        uint64_t m_logoDropAt = 0;
+        const GameSlot* m_logoDropSlot = nullptr;
+        bool m_logoDropHad = false; // the logo was there (it may arrive after the page, once the disc is read)
+        Page m_lastPage = Page::Home;
+        std::map<std::string, ArtTexture> m_cachedArt; // CachedArt's, by "<game> <role> <width>"
 
         std::string m_toast;
         uint64_t m_toastUntil = 0;

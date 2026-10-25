@@ -12,7 +12,12 @@ dorydev's look; her colours, fonts and widgets are untouched (`launcher_theme.h`
   (`resources/collection/catalogue.json`) is built into the executable (`cmake/embed_file.cmake`).
 - `figures/figure_icons.*` is the launcher's: `IconStyle` (outline, fills, badge colours) draws the generated icons for any
   catalogue toy and variant kind; the library's own `collection/icons.*` is not used for drawing, only for
-  `DiscImagePath` (the game's cached portraits are a second source after the launcher's own cache).
+  `PortraitPath` (which disc picture a toy gets).
+- **Pictures.** A card shows the toy's picture from the disc of **the game being shown** (Giants' page: Giants'
+  portraits, its Series 2, LightCore, Legendary and alternate decos too), else from the other game's disc (Jet-Vac on
+  Spyro's Adventure's page), else the generated icon: `collection::PortraitPath(game, toy, VariantFor(toy, kind), large)`.
+  The pictures are those `shared/art` cached in `<data>/<Game>/portraits/` when the disc was checked (or the game's Toy
+  Box opened); SSARecomp's `docs/runtime/host/game_art.md` has the rule and the formats.
 - Removed: `figure_file.*` and `figure_collection.*` (the old engine), replaced by `figure_tag`/`figure_crypto`/
   `figure_data` and `collection`.
 - Folder: `collection::Folder()` (`%APPDATA%\Skylanders\Collection`, `~/Library/Application Support/Skylanders/Collection`).

@@ -4,28 +4,41 @@
 #include <cctype>
 #include <cstdio>
 #include <deque>
+#include <map>
+#include <mutex>
 #include <vector>
 
 namespace figures
 {
     namespace
     {
-        // The catalogue's toys that the title accepts, in its order; built once, never changed afterwards.
-        const std::vector<ToyInfo>& Toys()
+        // The catalogue's toys that a game accepts, in its order; built once per game, never changed afterwards.
+        const std::vector<ToyInfo>& Toys(const std::string& id)
         {
-            static const std::vector<ToyInfo> toys = [] {
+            static std::mutex mutex;
+            static std::map<std::string, std::vector<ToyInfo>> games;
+            std::lock_guard lock(mutex);
+            if (auto found = games.find(id); found != games.end())
+                return found->second;
+            {
                 static std::deque<std::string> strings; // the ToyInfo fields point into these
                 auto keep = [](const std::string& text) { return text.empty() ? nullptr : strings.emplace_back(text).c_str(); };
                 const collection::Catalogue& catalogue = collection::Catalogue::Get();
-                const collection::Game* game = catalogue.FindGame("ssa");
+                const collection::Game* game = catalogue.FindGame(id);
                 std::vector<ToyInfo> list;
-                for (const collection::Toy* toy : catalogue.Accepted("ssa"))
+                for (const collection::Toy* toy : catalogue.Accepted(id))
                 {
                     ToyInfo info{ toy->type, keep(toy->name), nullptr, Element::None, ToyKind::Character, nullptr };
-                    if (auto name = game->names.find(toy->type); name != game->names.end())
-                        info.portrait = keep(name->second);
-                    if (auto image = game->images.find(toy->type); image != game->images.end())
-                        info.image = keep(image->second);
+                    // The names and pictures are the game's own; a game that lists none (Giants') takes SSA's for the toys
+                    // it shares with it.
+                    const collection::Game* named = game != nullptr && !game->names.empty() ? game : catalogue.FindGame("ssa");
+                    if (named != nullptr)
+                    {
+                        if (auto name = named->names.find(toy->type); name != named->names.end())
+                            info.portrait = keep(name->second);
+                        if (auto image = named->images.find(toy->type); image != named->images.end())
+                            info.image = keep(image->second);
+                    }
                     // The title's eight elements; light, dark and none are None here.
                     info.element = toy->element <= collection::Element::Undead ? Element(toy->element) : Element::None;
                     info.kind = toy->category == collection::Category::MagicItem ? ToyKind::MagicItem
@@ -35,20 +48,19 @@ namespace figures
                                                                                  : ToyKind::Character;
                     list.push_back(info);
                 }
-                return list;
-            }();
-            return toys;
+                return games.emplace(id, std::move(list)).first->second;
+            }
         }
     }
 
-    std::span<const ToyInfo> Catalog()
+    std::span<const ToyInfo> Catalog(const std::string& game)
     {
-        return Toys();
+        return Toys(game);
     }
 
-    const ToyInfo* FindToy(uint16_t toyType)
+    const ToyInfo* FindToy(uint16_t toyType, const std::string& game)
     {
-        for (const ToyInfo& toy : Toys())
+        for (const ToyInfo& toy : Toys(game))
         {
             if (toy.toyType == toyType)
                 return &toy;

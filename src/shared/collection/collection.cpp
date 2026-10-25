@@ -395,7 +395,7 @@ namespace collection
             figure.toy = catalogue.Find(figure.type);
             figure.variantInfo = catalogue.Describe(figure.toy, figure.variant);
             figure.state = figures::ReadStats(tag, figure.stats);
-            figure.level = figures::LevelForExperience(figure.stats.experience);
+            figure.level = figures::LevelForExperience(figures::TotalExperience(figure.stats), figures::MaxLevelGiants);
             figure.lock = GetLock(path);
 
             const Json& entry = index["figures"][figure.file];

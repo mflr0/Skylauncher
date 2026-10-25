@@ -287,22 +287,37 @@ namespace collection
         Paint(image, x0, y0, extent, KindMark(kind), ink, ink, ink, 0);
     }
 
-    std::string DiscImagePath(const Toy& toy)
+    std::string GamePortraitPath(const std::string& gameId, const Toy& toy, uint16_t variant, bool large)
     {
-        for (const Game& game : Catalogue::Get().Games())
+        const Game* game = Catalogue::Get().FindGame(gameId);
+        if (game == nullptr)
+            return {};
+        // The game's names for its pictures: Giants lists a file per toy and deco; Spyro's Adventure names its characters
+        // ("toy_<name>_hud", 128 px; "<name>_vs", 512 px) and a few other pictures (items).
+        std::vector<std::string> names;
+        if (auto it = game->portraits.find(uint32_t(toy.type) << 16 | variant); variant != 0 && it != game->portraits.end())
+            names.push_back(it->second);
+        if (auto it = game->portraits.find(uint32_t(toy.type) << 16); it != game->portraits.end())
+            names.push_back(it->second);
+        if (auto it = game->names.find(toy.type); it != game->names.end())
         {
-            std::string name;
-            if (auto it = game.names.find(toy.type); it != game.names.end())
-                name = "toy_" + Lower(it->second) + "_hud";
-            else if (auto image = game.images.find(toy.type); image != game.images.end())
-                name = image->second;
-            if (name.empty() || game.runtime.empty())
-                continue;
-            std::string folder;
-            if (const char* portraits = getenv("SSA_PORTRAITS"))
-                folder = std::string(portraits) + "/";
-            else if (std::filesystem::path data = datadir::Game(game.id); !data.empty())
-                folder = datadir::Text(data / "portraits") + "/";
+            if (large)
+                names.push_back(Lower(it->second) + "_vs");
+            names.push_back("toy_" + Lower(it->second) + "_hud");
+        }
+        else if (auto image = game->images.find(toy.type); image != game->images.end())
+            names.push_back(image->second);
+        if (names.empty())
+            return {};
+        std::string folder;
+        if (const char* portraits = getenv("SSA_PORTRAITS"))
+            folder = std::string(portraits) + "/";
+        else if (std::filesystem::path data = datadir::Game(game->id); !data.empty())
+            folder = datadir::Text(data / "portraits") + "/";
+        else
+            return {};
+        for (const std::string& name : names)
+        {
             std::string path = folder + name + ".png";
             if (SDL_GetPathInfo(path.c_str(), nullptr))
                 return path;
@@ -310,12 +325,42 @@ namespace collection
         return {};
     }
 
-    Image Icon(const Toy* toy, VariantKind kind, int size, bool* fromDisc)
+    std::string PortraitPath(const std::string& gameId, const Toy& toy, uint16_t variant, bool large)
+    {
+        if (std::string path = GamePortraitPath(gameId, toy, variant, large); !path.empty())
+            return path;
+        for (const Game& game : Catalogue::Get().Games())
+            if (game.id != gameId)
+                if (std::string path = GamePortraitPath(game.id, toy, variant, large); !path.empty())
+                    return path;
+        return {};
+    }
+
+    uint16_t VariantFor(const Toy& toy, VariantKind kind)
+    {
+        if (kind == VariantKind::Base || kind == toy.edition)
+            return 0;
+        uint16_t variant = 0;
+        int count = 0;
+        for (const Variant& candidate : toy.variants)
+            if (candidate.kind == kind && candidate.id != 0)
+                variant = candidate.id, count++;
+        return count == 1 ? variant : 0;
+    }
+
+    std::string DiscImagePath(const Toy& toy)
+    {
+        return PortraitPath({}, toy);
+    }
+
+    Image Portrait(const std::string& gameId, const Toy* toy, VariantKind kind, int size, uint16_t variant, bool* fromDisc)
     {
         Image image;
         if (toy != nullptr)
         {
-            std::string path = DiscImagePath(*toy);
+            if (variant == 0)
+                variant = VariantFor(*toy, kind);
+            std::string path = PortraitPath(gameId, *toy, variant, size > 128);
             if (!path.empty())
                 image = LoadPng(path);
         }
@@ -324,6 +369,11 @@ namespace collection
         image = image.Empty() ? GeneratedIcon(toy, size) : Resize(image, size, size);
         AddBadge(image, kind);
         return image;
+    }
+
+    Image Icon(const Toy* toy, VariantKind kind, int size, bool* fromDisc)
+    {
+        return Portrait({}, toy, kind, size, 0, fromDisc);
     }
 
     Image LoadPng(const std::string& path)
