@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "game": "ssa",
+  "engine": "lux",
+  "about": "Where Spyro's Adventure keeps its pictures on the disc (docs/runtime/host/game_art.md). Names only: the pictures are read from the player's own disc.",
+  "logo": { "stream": "uiimage.str", "picture": "skylanderslogo" },
+  "background": { "stream": "uiimage.str", "picture": "fullscreen_000" },
+  "portraits": { "stream": "uigameimage.str", "pictures": ["toy_{name}_hud", "{name}_vs"], "images": true }
+}

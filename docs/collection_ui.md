@@ -73,7 +73,7 @@ At the first visit to the page (`CollectionPage::Open`):
   (Everything, Favourites, Played, Never played), foreign toys folded or hidden; saved per game in `collection.json`
   (`views.<game>.launcher`).
 - **Figure page** (click a card, right click, X, F2): stats from the dump, level bar, last played, where it plays; Put
-  on a seat, Edit stats (level, XP, gold, hero points, nickname: refused for unreadable dumps), Rename (the label; the
+  on a seat, Edit stats (level, XP, gold, hero points, nickname: refused for unreadable dumps; with the game selector's limits: in Spyro's Adventure level 1-10 on its own part of the experience, so a figure Giants took to level 15 keeps those levels; in Giants level 1-15 and a **hat picker** with the catalogue's 52 hat names), Rename (the label; the
   nickname is in Edit stats), Favourite, Duplicate, Back up now, Restore (list with level and gold, confirmation),
   Reset and Delete (held 1 s, the instruction in their tooltip; backed up first, Delete goes to the trash), Folder.
   Edit stats' Save re-reads the figure and writes only the fields changed in the editor (a game may have played it
@@ -103,8 +103,10 @@ polling, settings move, naming unknown toys). `launcher_app.h` only holds a `Col
   backups, restore, reset, duplicate, trash, import dedupe, JSON locks (live, stale), seats and `portal.txt`, live
   refresh, settings move, unknown toy naming, icons for every catalogue toy. Everything runs in a scratch folder
   (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
+- The Figure page shows the figure's real level (up to 15, total XP) and "level 10 in Spyro's Adventure" above 10;
+  the hat by name. Add a figure lists Giants' LightCore versions (create one: the variant `0x1206`, nothing else).
 - Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `30-after-delete` (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1` fakes a game's
+  refuses without it) and writes `20-collection` to `33-add-lightcore` (`31-giants-figure`, `32-giants-edit-stats`: a level-15 Eruptor with a hat in Giants; `33-add-lightcore`) (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1` fakes a game's
   locks for the last one).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the

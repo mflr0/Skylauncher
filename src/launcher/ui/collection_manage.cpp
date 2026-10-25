@@ -276,7 +276,8 @@ namespace launcher_ui
     {
         // Screens, in order (the step is the index).
         constexpr const char* Shots[] = { "20-collection", "21-view-menu", "22-by-category", "23-figure-page", "24-edit-stats", "25-add-a-figure",
-            "26-add-later-game", "27-manage-trash", "28-manage-backups", "29-live-portal", "30-after-delete" };
+            "26-add-later-game", "27-manage-trash", "28-manage-backups", "29-live-portal", "30-after-delete", "31-giants-figure",
+            "32-giants-edit-stats", "33-add-lightcore" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -341,6 +342,17 @@ namespace launcher_ui
                 collection::Create(toy.type);
                 break;
             }
+        // Level 15 and a hat (Giants' part of the figure): Giants shows 15, Spyro's Adventure 10.
+        std::string eruptor = collection::Create(9);
+        Figure high;
+        if (!eruptor.empty() && collection::Read(eruptor, high))
+        {
+            figures::SetTotalExperience(high.stats, figures::LevelExperience[figures::MaxLevelGiants - 1]);
+            high.stats.gold = 40000;
+            high.stats.hat = 6;
+            collection::WriteStats(eruptor, high.stats);
+            collection::Touch(eruptor, "giants");
+        }
         collection::Delete(doomed);
         collection::Delete(doomed2);
         (void)chop; (void)item; (void)pack; (void)sidekick; (void)dark;
@@ -427,6 +439,38 @@ namespace launcher_ui
             OpenFigure(figureOf(19));
             DeleteFigure(m_figure);
             break;
+        case 11: // Giants: a figure at level 15 with a hat, its page and its Edit stats (the hat picker)
+        case 12:
+        {
+            m_model.gameId = "giants";
+            m_view = collection::View{};
+            Reload();
+            std::string eruptor;
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 9 && figure.level == figures::MaxLevelGiants)
+                    eruptor = figure.path;
+            OpenFigure(eruptor);
+            if (const Figure* figure = step == 12 ? m_model.Find(m_figure) : nullptr)
+            {
+                m_edit = m_editBase = figure->stats;
+                snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(figure->stats).c_str());
+                m_editing = true;
+            }
+            break;
+        }
+        case 13: // Add a figure, Giants: Eruptor's versions, the LightCore chosen
+        {
+            m_overlay = Overlay::Add;
+            m_addGame = "giants";
+            m_addToy = 9;
+            m_addCategory = -1;
+            m_addVersion = 0;
+            if (const collection::Toy* toy = collection::Catalogue::Get().Find(9))
+                for (size_t i = 0; i < toy->variants.size(); i++)
+                    if (toy->variants[i].kind == collection::VariantKind::LightCore)
+                        m_addVersion = int(i) + 1;
+            break;
+        }
         default: break;
         }
         m_generation++;

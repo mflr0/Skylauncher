@@ -76,6 +76,17 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_catalogue.cpp
         -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_catalogue.cpp -P ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake
     DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake ${CMAKE_SOURCE_DIR}/resources/collection/catalogue.json
     COMMENT "Embedding the toy catalogue")
+# ...and where each game's pictures are on the disc: resources/games/<id>/art.json (synced too), joined into one array.
+file(GLOB SKYLAUNCHER_ART_MANIFESTS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/resources/games/*/art.json)
+list(SORT SKYLAUNCHER_ART_MANIFESTS)
+string(REPLACE ";" "|" SKYLAUNCHER_ART_MANIFEST_LIST "${SKYLAUNCHER_ART_MANIFESTS}")
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_art_manifests.cpp
+    COMMAND ${CMAKE_COMMAND} "-DINPUTS=${SKYLAUNCHER_ART_MANIFEST_LIST}" -DOUTPUT=${CMAKE_BINARY_DIR}/art_manifests.json
+        -P ${CMAKE_SOURCE_DIR}/cmake/join_json.cmake
+    COMMAND ${CMAKE_COMMAND} -DNAME=g_embeddedArtManifests -DINPUT=${CMAKE_BINARY_DIR}/art_manifests.json
+        -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_art_manifests.cpp -P ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/cmake/join_json.cmake ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake ${SKYLAUNCHER_ART_MANIFESTS}
+    COMMENT "Embedding the art manifests" VERBATIM)
 
 # Dear ImGui (MIT) with its SDL 3 platform and SDL_Renderer backends.
 set(IMGUI_ROOT ${CMAKE_SOURCE_DIR}/lib/imgui)
@@ -118,7 +129,8 @@ add_library(SkylauncherCore STATIC
     src/shared/platform/platform_process.cpp
     lib/miniz/miniz.c
     ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
-    ${CMAKE_BINARY_DIR}/embedded_catalogue.cpp)
+    ${CMAKE_BINARY_DIR}/embedded_catalogue.cpp
+    ${CMAKE_BINARY_DIR}/embedded_art_manifests.cpp)
 # The launcher shell: install progress, game runs and logs, updates, About (kept apart from the list above).
 target_sources(SkylauncherCore PRIVATE
     src/launcher/install_checklist.cpp

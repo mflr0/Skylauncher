@@ -1,8 +1,10 @@
 #pragma once
 
-// [Alchemy] IGA v8 archives (Giants' .arc and .bld files) and the IGZ v6 files inside them, as far as reading pictures
-// and shaders needs. Formats reverse-engineered from the disc: games/giants/docs/shaders.md (IGA, IGZ sections) and
-// games/giants/docs/art.md (IGZ objects and images). Shared by the runtime, SSABuild and Skylauncher.
+// [Alchemy] IGA archives (the .arc and .bld files) and the IGZ files inside them, as far as reading pictures and shaders
+// needs. One reader for every version, each a row of a table in the .cpp: IGA v8 and IGZ v6 (Giants) are verified on the
+// disc; IGA v10/v11 and IGZ v7-v9 (the later games) follow public format descriptions and were never seen here [?].
+// Formats: games/giants/docs/shaders.md (IGA, IGZ sections), games/giants/docs/art.md (IGZ objects and images),
+// docs/runtime/host/game_art.md (the versions). Shared by the runtime, SSABuild and Skylauncher.
 #include "xenos_texture.h"
 #include <cstddef>
 #include <cstdint>
@@ -20,11 +22,23 @@ namespace art::alchemy
     // early (missing bytes read as zero). Returns the bytes written; fewer than `size` means a corrupt stream.
     size_t LzmaDecodeRaw(const uint8_t* input, size_t inputSize, uint8_t* out, size_t size);
 
+    // A format version this reader knows; `verified`: read on a real disc, else from public descriptions only [?].
+    struct FormatVersion
+    {
+        uint32_t version;
+        bool verified;
+    };
+    std::vector<FormatVersion> IgaVersions();
+    std::vector<FormatVersion> IgzVersions();
+
     class IgaArchive
     {
     public:
-        // Reads the header and tables of an IGA v8 archive `length` bytes long. nullopt if it is not one.
+        // Reads the header and tables of an IGA archive `length` bytes long, of a version IgaVersions() lists. nullopt if
+        // it is not one.
         static std::optional<IgaArchive> Open(Reader reader, uint64_t length);
+        uint32_t Version() const { return m_version; }
+        bool Verified() const { return m_verified; }
 
         size_t Count() const { return m_entries.size(); }
         // The entry's source path as the name table stores it ("C:/tfb/build/360/levels/.../mainmenu.png/0x....igz").
@@ -44,14 +58,19 @@ namespace art::alchemy
         };
         Reader m_reader;
         uint64_t m_length = 0;
+        uint32_t m_version = 0;
+        bool m_verified = false;
         std::vector<Entry> m_entries;
     };
 
-    // An IGZ v6 file (big-endian), parsed far enough to list and decode its pictures (igImage2 objects).
+    // An IGZ file (big-endian, a version IgzVersions() lists), parsed far enough to list and decode its pictures
+    // (igImage2 objects).
     class IgzFile
     {
     public:
         static std::optional<IgzFile> Parse(std::vector<uint8_t> bytes);
+        uint32_t Version() const;
+        bool Verified() const;
 
         struct Picture
         {
@@ -76,8 +95,9 @@ namespace art::alchemy
         std::optional<uint64_t> Pointer(uint32_t value) const;
         std::string String(uint64_t at) const;
         const Fixup* FindFixup(uint32_t type) const;
-        std::vector<uint64_t> Objects() const;
+        std::vector<uint64_t> ObjectOffsets() const;
 
+        size_t m_layout = 0; // the version's row in the .cpp's table
         std::vector<uint8_t> m_bytes;
         std::vector<uint64_t> m_pools; // file offsets of sections 1.. (a pointer's pool n is section n + 1)
         std::vector<std::pair<uint32_t, Fixup>> m_fixups;

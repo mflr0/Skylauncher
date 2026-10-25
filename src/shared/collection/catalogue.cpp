@@ -159,6 +159,7 @@ namespace collection
             }
             ReadMap(item["names"], game.names);
             ReadMap(item["images"], game.images);
+            ReadMap(item["hats"], game.hats);
             for (const auto& [key, value] : item["portraits"].Members())
             {
                 // "<type>" or "<type>:<variant id>"

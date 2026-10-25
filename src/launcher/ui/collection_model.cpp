@@ -307,6 +307,10 @@ namespace launcher_ui
         figures::FigureStats stats = now;
         if (edited.experience != base.experience)
             stats.experience = edited.experience;
+        if (edited.giantsExperience != base.giantsExperience)
+            stats.giantsExperience = edited.giantsExperience;
+        if (edited.hat != base.hat)
+            stats.hat = edited.hat;
         if (edited.gold != base.gold)
             stats.gold = edited.gold;
         if (edited.heroPoints != base.heroPoints)

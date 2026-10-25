@@ -44,8 +44,13 @@ namespace figures
         uint8_t sequence = 0;          // 0x09, which area is newer
         uint16_t upgrades = 0;         // 0x10, bit field of bought upgrades and the chosen path
         uint8_t platforms = 0;         // 0x13, consoles the figure was used on (2 = Xbox 360)
-        uint16_t hat = 0;              // the hat's number: extra area +0x05 (Giants) if set, else 0x14 (hats exist from Giants on)
+        uint16_t ssaHat = 0;           // 0x14, the first area's hat: Spyro's Adventure's own (it has hats too); kept as it is
+                                       // unless a caller changes it
+        uint16_t hat = 0;              // the hat Giants shows: extra area +0x05 if set, else ssaHat. Changing it writes the
+                                       // extra area only, so Spyro's Adventure keeps its own hat
         uint8_t extraSequence = 0;     // the extra area's sequence number (0 without one)
+        uint32_t swapForceExperience = 0; // extra area +0x08 (LE32): Swap Force's part (levels 16-20) [?]; read and kept,
+                                       // never counted by Spyro's Adventure or Giants
         std::array<uint8_t, 8> owner{}; // 0x18, the first owner's id, written by the title
         std::u16string nickname;       // 0x20 and 0x40, 16 UTF-16 code units, zero padded
         Date lastPlaced;               // 0x50
@@ -78,9 +83,14 @@ namespace figures
     // The level cap of a game by its catalogue id ("ssa": 10, "giants" and later: 15).
     int LevelCap(const std::string& game);
 
-    // All the experience a figure has, and setting it (the first 33000 go to the first area, the rest to Giants' part).
+    // All the experience a figure has for Giants, and setting it (the first 33000 go to the first area, the rest to
+    // Giants' part). Swap Force's part is not in it: no game we run counts it.
     uint32_t TotalExperience(const FigureStats& stats);
     void SetTotalExperience(FigureStats& stats, uint32_t total);
+    // The experience a game with level cap `cap` counts (10: Spyro's Adventure reads the first area only), and setting
+    // it as that game would: with cap 10 only the first area's part changes, so Giants' levels 11-15 stay.
+    uint32_t ExperienceFor(const FigureStats& stats, int cap);
+    void SetExperienceFor(FigureStats& stats, int cap, uint32_t experience);
 
     constexpr uint16_t MaxGold = 65000;
 
