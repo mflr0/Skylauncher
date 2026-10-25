@@ -1026,7 +1026,16 @@ namespace launcher_ui
             // Selected only once the player has picked it: Play is that game's page.
             bool selected = m_page == Page::Play && std::string_view(entry.id) == m_game.id;
             if (row("game", GameRowH, selected, entry.enabled, position))
-                GoTo(Page::Play);
+            {
+                if (std::string_view(entry.id) == m_game.id)
+                    GoTo(Page::Play);
+                else
+                {
+                    m_switchTo = entry.id; // main() reopens the window for that game
+                    Set("launcher", "game", m_switchTo);
+                    m_running = false;
+                }
+            }
             if (std::string_view(entry.id) == m_game.id && (m_page == Page::Play || m_page == Page::Home))
                 TakeFocus(FocusTo::Sidebar);
             // The game's icon from the player's disc once it is verified, else its initial on its colour.
@@ -1047,11 +1056,12 @@ namespace launcher_ui
             AddBoldText(draw, ImVec2(position.x + 62, position.y + 6), Rgb(entry.enabled ? SidebarInk : SidebarInkDim), entry.name);
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SidebarSmallSize);
-            const char* status = !entry.enabled ? "Coming later" : m_disc == DiscState::Ready ? "Ready to play" : "Needs your disc";
+            bool current = std::string_view(entry.id) == m_game.id; // the disc state below is this game's only
+            const char* status = !entry.enabled ? "Coming later" : !current ? "Open" : m_disc == DiscState::Ready ? "Ready to play" : "Needs your disc";
             float statusX = position.x + 62;
             if (entry.enabled)
             {
-                draw->AddCircleFilled(ImVec2(statusX + 4, position.y + 40), 4, Rgb(m_disc == DiscState::Ready ? Ready : Accent));
+                draw->AddCircleFilled(ImVec2(statusX + 4, position.y + 40), 4, Rgb(current && m_disc == DiscState::Ready ? Ready : Accent));
                 statusX += 14;
             }
             draw->AddText(ImVec2(statusX, position.y + 30), Rgb(SidebarInkDim), status);
@@ -1214,7 +1224,7 @@ namespace launcher_ui
                     ImGui::PushTextWrapPos(available.x - 40); // window coordinates
                     ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
                     ImGui::TextWrapped("Install builds the game on your PC from your disc: about %d minutes and %d GB, internet needed "
-                        "once for the compiler.", InstallMinutes, InstallGigabytes);
+                        "once for the compiler.", InstallMinutesFor(m_game.id), InstallGigabytes);
                     ImGui::PopStyleColor();
                     ImGui::PopTextWrapPos();
                 }
@@ -2131,7 +2141,7 @@ std::span<const LauncherGameEntry> LauncherGameCatalog()
 {
     static const LauncherGameEntry catalog[] = {
         { "ssa", "Spyro's Adventure", "Spyro's Adventure", 0x6BBAFF, true },
-        { "giants", "Giants", "Giants", 0xFFC65C, false },
+        { "giants", "Giants", "Giants", 0xFFC65C, true },
         { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, false },
         { "trapteam", "Trap Team", "Trap Team", 0x6DF0B4, false },
         { "superchargers", "SuperChargers", "SuperChargers", 0xFF8A5C, false },
@@ -2201,7 +2211,7 @@ std::string LauncherDisplayName(std::string_view xdbfName, const GameInfo& game)
 }
 
 std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const std::string& previous,
-    std::string* installed)
+    std::string* installed, std::string* switchTo)
 {
     if (!previous.empty())
         config[game.id]["iso"] = previous;
@@ -2209,5 +2219,7 @@ std::string RunLauncherWindow(const GameInfo& game, const std::string& configPat
     std::string chosen = app.Run();
     if (installed != nullptr)
         *installed = app.ChosenRuntime();
+    if (switchTo != nullptr)
+        *switchTo = app.SwitchTo();
     return chosen;
 }

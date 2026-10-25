@@ -55,14 +55,30 @@ int main(int argc, char** argv)
     (void)argc;
     (void)argv;
     datadir::MigrateOnce(); // the older folders into <data root> (docs/install.md), before any path is used
-    const GameInfo* game = FindGame("ssa");
-    if (game == nullptr)
-        return 1;
-
     std::string configPath = LauncherConfigPath();
     LauncherConfig config = LoadLauncherConfig(configPath);
+
+    // The game last shown ([launcher] game=), else Spyro's Adventure. Picking another game in the sidebar closes the
+    // window and opens it again for that game (the window's state is one game's).
+    std::string id = config["launcher"]["game"];
+    const GameInfo* game = FindGame(id);
+    if (game == nullptr)
+        game = FindGame("ssa");
+    if (game == nullptr)
+        return 1;
     std::string installed;
-    std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed);
+    std::string chosen;
+    for (;;)
+    {
+        SetActiveGame(game->id);
+        std::string switchTo;
+        installed.clear();
+        chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed, &switchTo);
+        const GameInfo* next = switchTo.empty() ? nullptr : FindGame(switchTo);
+        if (next == nullptr)
+            break;
+        game = next;
+    }
     if (chosen.empty())
         return 0;
 

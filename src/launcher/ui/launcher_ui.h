@@ -23,9 +23,11 @@ std::span<const LauncherGameEntry> LauncherGameCatalog();
 // Shows the launcher window until the player starts a verified disc image, quits, or the screenshot
 // test script finishes. Returns the chosen image path (empty when nothing was chosen).
 // `config` is updated for settings, and `[<game>] iso=` is written when a valid image is chosen. `installed`, when set,
-// receives the game the launcher built for the chosen disc (empty when there is none).
+// receives the game the launcher built for the chosen disc (empty when there is none). When the player picks another
+// enabled game in the sidebar the window closes, nothing is chosen and `switchTo` receives that game's id: the caller
+// opens the window again for it.
 std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config,
-    const std::string& previous, std::string* installed = nullptr);
+    const std::string& previous, std::string* installed = nullptr, std::string* switchTo = nullptr);
 
 // Small pure helpers, also used by SSALauncherTest.
 std::string LauncherLanguageLabel(const LauncherConfig& config, const GameInfo& game);

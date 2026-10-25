@@ -40,6 +40,27 @@ Cancel stops only the process the launcher started: SIGTERM then SIGKILL after 3
 SSABuild runs in a job object, so the compilers it started stop with it (also when the launcher is closed).
 SSABuild's output is also written to `install.log` in the game folder. `SKYLAUNCHER_BUILD_JOBS=N` passes `--jobs N`.
 
+## Two games: Spyro's Adventure and Giants (kit 0.5.0)
+
+The sidebar lists both games as playable. Each has its own folder in the data folder (`SSA/`, `Giants/`), its own remembered
+disc (`[ssa] iso=`, `[giants] iso=`), its own built game and its own install log; **one kit builds both** (`kit.txt`
+`games=ssa,giants`).
+
+- Clicking the other game closes the window and opens it again for that game (the window holds one game's state); the choice
+  is kept as `[launcher] game=` so the launcher starts on the game last shown. Code: `main.cpp` (the loop),
+  `RunLauncherWindow(..., switchTo)`, `SetActiveGame()` in `game_install.cpp` (the folder helpers answer for that game).
+- The disc check is per game: the table in `src/launcher/launcher_games.cpp` (title ID, SHA-256 of `default.xex`). A Giants
+  disc dropped on Spyro's Adventure says it is another game, and the other way round. The name and icon on the game page come
+  from the disc's own XDBF, as for SSA.
+- INSTALL runs the same SSABuild with the disc; **SSABuild finds the game itself** from `default.xex`'s SHA-256
+  (workshop `docs/release/launcher/kit_contract.md`, "Several games in one kit"). The built game is `SSARecomp` for Spyro's
+  Adventure and **`SGRecomp`** (`SGRecomp.app`, `SGRecomp.exe`) for Giants, `GameInfo::runtime` in the game table. Both log to
+  `SSARecomp.log` in their own folder.
+- The Giants install is about 25 minutes (4394 shaders to translate instead of 1118): `InstallMinutesFor()`.
+- The shared figure collection serves both games (the catalogue already holds all six games' toys).
+- Verify: `SkylauncherTest <spyro iso> <scratch>` checks the table and folders; with `SKYLAUNCHER_TEST_GIANTS_ISO=<giants iso>` it
+  also checks that each disc is accepted by its own game and refused by the other. End to end: see "Testing without the kit".
+
 ## Where things are
 
 | What | Where |
@@ -70,7 +91,7 @@ The launcher, the game and SSABuild keep everything under one root per OS, chose
 | `kit/<release tag>/` | the kits the launcher downloaded |
 | `toolchains/` | the compiler SSABuild downloads (Windows) |
 | `logs/` | `skylauncher-game.log` (+ `.prev.log`) and `migration.log` |
-| `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `saves-backup/`, `pipelines.bin`, `portal.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Another game (Giants) gets its own folder. |
+| `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `saves-backup/`, `pipelines.bin`, `portal.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Giants has its own folder, `Giants/`, with the same layout (`SGRecomp.app` / `SGRecomp.exe`). |
 
 `SKYLANDERS_DATA` replaces the root (tests, portable use). `SKYLAUNCHER_DATA` still replaces the launcher's part of it
 (the game folder, the kits, the logs). Settings > Game data > **Open data folder** opens the root.

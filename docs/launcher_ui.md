@@ -143,5 +143,5 @@ repository's working copy (its own HOME, the offscreen driver).
 ## Notes
 - Drag & drop ISO is supported through `SDL_EVENT_DROP_FILE`.
 - Verification progress is saved to `launcher.ini`; the SSA title/icon come from the player's own XEX.
-- The game catalog lives in `LauncherGameCatalog()`; only SSA is enabled for now.
+- The game catalog lives in `LauncherGameCatalog()`; SSA and Giants are enabled; the sidebar row of the other enabled game reopens the window on it.
 - `SkylauncherTest` checks verification, settings, font/text helpers and the disc texture decoder.

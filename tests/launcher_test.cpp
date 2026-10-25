@@ -143,6 +143,11 @@ namespace
         EXPECT(FindInstalledGame(config, "abc").runtime.empty()); // the built game is gone
         EXPECT(FindInstalledGame(config, "abc").kitVersion == "1");
         EXPECT(GameInstallFolder("abc").filename() == "SSA" && GameInstallFolder("abc") == GameInstallFolder("def"));
+        SetActiveGame("giants"); // one folder per game, side by side in the data folder
+        EXPECT(GameInstallFolder("abc").filename() == "Giants");
+        EXPECT(GameInstallFolder("abc") != GameInstallFolder("def").parent_path() / "SSA");
+        SetActiveGame("ssa");
+        EXPECT(GameInstallFolder("abc").filename() == "SSA");
 
         config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
         std::optional<InstallKit> kit = FindInstallKit(config);
@@ -567,6 +572,9 @@ int main(int argc, char** argv)
 
     printf("Game table: %zu game(s); \"ssa\" = %s, %zu release(s)\n", g_games.size(), game.name, game.releases.size());
     EXPECT(FindGame("unknown") == nullptr);
+    const GameInfo* giants = FindGame("giants");
+    EXPECT(g_games.size() == 2 && giants != nullptr && std::string(giants->runtime) == "SGRecomp" && giants->releases.size() == 1);
+    EXPECT(giants != nullptr && giants->releases[0].titleId == 0x415608DA && std::string(giants->releases[0].defaultXexSha256).size() == 64);
 
     printf("Player's disc image:\n");
     auto start = Clock::now();
@@ -646,6 +654,15 @@ int main(int argc, char** argv)
         EXPECT(status != GameSourceStatus::Ok);
     }
 
+    // The Giants disc (optional: SKYLAUNCHER_TEST_GIANTS_ISO): its own game accepts it, Spyro's Adventure says it is another game.
+    if (const char* giantsIso = getenv("SKYLAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr && giants != nullptr)
+    {
+        printf("Giants disc image:\n");
+        GameSourceCheck own = CheckGameSource(giantsIso, *giants);
+        EXPECT(own.status == GameSourceStatus::Ok && own.xexSha256 == giants->releases[0].defaultXexSha256);
+        EXPECT(CheckGameSource(giantsIso, game).status == GameSourceStatus::WrongGame);
+        EXPECT(CheckGameSource(iso.string(), *giants).status == GameSourceStatus::WrongGame);
+    }
     printf("Command line without UI:\n");
     EXPECT(ResolveHeadless({ iso.string() }) == iso.string());
     EXPECT(ResolveHeadless({ "--select-iso", iso.string() }) == iso.string());
