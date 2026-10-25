@@ -337,11 +337,13 @@ namespace launcher_ui
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
+        m_portal.Start();
         return true;
     }
 
     void App::Shutdown()
     {
+        m_portal.Stop();
         m_verify.Join();
         if (ImGui::GetCurrentContext() != nullptr)
         {
@@ -1187,6 +1189,16 @@ namespace launcher_ui
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
 
+        // The portal's state, centred just above the band.
+        {
+            std::string line = m_portal.Current().Line();
+            if (!line.empty())
+            {
+                ImGui::SetCursorScreenPos(ImVec2(bar.x + (available.x - ImGui::CalcTextSize(line.c_str()).x) / 2, bar.y - 28));
+                DrawPortalStatus();
+            }
+        }
+
         // "Change disc...", right-aligned and centred in the band once a disc is verified; styled like the controller picker.
         if (ready && !installing)
         {
@@ -1197,6 +1209,16 @@ namespace launcher_ui
                 Browse();
             ImGui::PopStyleVar();
         }
+    }
+
+    void App::DrawPortalStatus()
+    {
+        std::string line = m_portal.Current().Line();
+        if (line.empty())
+            return;
+        ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", line.c_str());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Without a real portal the game uses the emulated one (Toy Box).\nSettings > Controls > Test the portal checks that the game sees it.");
     }
 
     void App::DrawGraphics()

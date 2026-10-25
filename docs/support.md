@@ -46,6 +46,16 @@ If the runtime exits with a non-zero code a dialog says **The game stopped unexp
 folder, and three buttons: **Report** (copies the log, opens a new GitHub issue with a template; paste the log into it),
 **Copy log**, **Close**. Nothing is sent by the launcher.
 
+## Portal status
+
+Next to PLAY and under COLLECTION's title the launcher shows "Portal: <model>" (for example "Portal: Portal of Power") or
+"Portal: not detected"; the tooltip says that without a real portal the game uses the emulated one (Toy Box) and points to
+"Test the portal" below. It is read with SDL's HID API (`SDL_hid_enumerate(0x1430, 0)`, Activision's vendor id) by a
+worker thread (`src/launcher/portal_status.{h,cpp}`) that scans once at start, then only when `SDL_hid_device_change_count()`
+changes, at most every 2 s, so the UI never waits. Models by product id: `0150` Portal of Power, `1F17` Xbox 360 portal
+(only where the OS exposes it as HID), any other Activision id "Skylanders portal (1430:XXXX)". If SDL's HID can't start,
+nothing is shown. Checks: `PortalChecks` in `tests/launcher_test.cpp`, with fake enumerators.
+
 ## Test the portal
 
 Settings > Controls > Portal of Power. The button runs `<runtime> --portal-probe` (the game, so it needs to be installed)

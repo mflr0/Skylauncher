@@ -475,6 +475,8 @@ namespace launcher_ui
         if (m_hiddenStarters > 0)
             summary += fmt::format(" · {} untouched starters hidden (Manage)", m_hiddenStarters);
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", summary.c_str());
+        ImGui::SameLine(0, 16);
+        m_app.DrawPortalStatus();
         ImVec2 after = ImGui::GetCursorScreenPos();
 
         float buttonsW = 190 + 120 + 110 + 2 * 10;
