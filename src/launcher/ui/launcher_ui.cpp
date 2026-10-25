@@ -45,6 +45,22 @@ namespace launcher_ui
             constexpr const char* GameTextHint = "The game's menus, subtitles and on-screen text. Skylauncher itself is in English.";
             constexpr const char* GameVoices = "Game voices";
             constexpr const char* GameVoicesHint = "The game's spoken lines and cutscenes. They can differ from the text.";
+            constexpr const char* ResetKeys = "Reset to defaults";
+            constexpr const char* ResetKeysHint = "Hold to put every key back to its default.";
+            constexpr const char* Reinstall = "Reinstall the game";
+            constexpr const char* ReinstallHint = "Hold to build the game again from your disc (about 15 minutes).";
+            constexpr const char* RestoreSaves = "Restore";
+            constexpr const char* RestoreSavesHint = "Hold to restore this backup. The saves you have now are backed up first.";
+            constexpr const char* OpenFigures = "Open figures folder";
+            constexpr const char* NoGamepad = "No gamepad connected.";
+            constexpr const char* OneGamepad = "1 gamepad connected.";
+            constexpr const char* Gamepads = "{} gamepads connected.";
+            constexpr const char* PortalTip = "Without a real portal the game uses the virtual portal (its Toy Box).\n"
+                                              "Settings > Controls > Test the portal checks that the game sees it.";
+            constexpr const char* QuitTitle = "The game is still installing";
+            constexpr const char* QuitText = "If you quit now, the install stops. It carries on from this step next time.";
+            constexpr const char* KeepInstalling = "Keep installing";
+            constexpr const char* Quit = "Quit";
         }
     }
 
@@ -483,7 +499,11 @@ namespace launcher_ui
             break;
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-            m_running = false;
+            // Cmd+Q, Alt+F4, the window's close: during an install, ask first (it would stop the build).
+            if (Installing())
+                m_quitPrompt = true;
+            else
+                m_running = false;
             break;
         case SDL_EVENT_DROP_BEGIN:
         case SDL_EVENT_DROP_POSITION:
@@ -519,7 +539,7 @@ namespace launcher_ui
     void App::UpdateUiScale(bool resize)
     {
         float scale = std::strtof(SettingGet(m_config, "launcher", "ui_scale", "auto").c_str(), nullptr);
-        if (scale <= 0)
+        if (!std::isfinite(scale) || scale <= 0) // "auto", or nonsense such as nan
         {
             float density = SDL_GetWindowPixelDensity(m_window), display = SDL_GetWindowDisplayScale(m_window);
             scale = density > 0 && display > 0 ? display / density : 1.0f;
@@ -1354,7 +1374,7 @@ namespace launcher_ui
             return;
         ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", line.c_str());
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Without a real portal the game uses the emulated one (Toy Box).\nSettings > Controls > Test the portal checks that the game sees it.");
+            ImGui::SetTooltip("%s", strings::PortalTip);
     }
 
     void App::DrawGraphics()
@@ -1429,7 +1449,9 @@ namespace launcher_ui
             ImGui::EndCombo();
         }
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::Text("%d gamepad(s) connected. Xbox, PlayStation, Switch and most other controllers work.", int(m_gamepads.size()));
+        size_t gamepads = m_gamepads.size();
+        std::string connected = gamepads == 0 ? strings::NoGamepad : gamepads == 1 ? strings::OneGamepad : fmt::format(fmt::runtime(strings::Gamepads), gamepads);
+        ImGui::Text("%s Xbox, PlayStation, Switch and most other controllers work.", connected.c_str());
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 12));
 
@@ -1454,7 +1476,7 @@ namespace launcher_ui
         // Keyboard bindings, two columns of actions.
         Title("Keyboard", TitleSize, Text);
         ImGui::SameLine(0, 24);
-        if (PillButton("Reset to defaults", false, 200))
+        if (HoldButton(strings::ResetKeys, 200, strings::ResetKeysHint))
         {
             for (const KeyAction& action : KeyActions)
                 m_config["input"].erase(std::string("key_") + action.id);
@@ -1532,7 +1554,7 @@ namespace launcher_ui
             OpenFolder(LauncherDataFolder()); // the "Skylanders" folder: settings, saves, figures, the game, logs
         }
         ImGui::SameLine();
-        if (PillButton("Figures", false, 260))
+        if (PillButton(strings::OpenFigures, false, 260))
         {
             SDL_CreateDirectory(m_collection->Folder().c_str());
             { std::string folder = m_collection->Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
@@ -1547,7 +1569,7 @@ namespace launcher_ui
         if (!m_installed.runtime.empty())
         {
             ImGui::TextWrapped("Built on this computer for this disc: %s", m_installed.runtime.c_str());
-            if (PillButton("Reinstall the game", false, 260) && !Installing())
+            if (HoldButton(strings::Reinstall, 260, strings::ReinstallHint) && !Installing())
                 StartInstall();
             ImGui::SameLine();
             if (PillButton("Open the game folder", false, 260))
@@ -1625,7 +1647,7 @@ namespace launcher_ui
                 ImGui::TableSetColumnIndex(2);
                 ImGui::BeginDisabled(running);
                 ImGui::PushID(backup.stamp.c_str());
-                if (PillButton("Restore", false, 112))
+                if (HoldButton(strings::RestoreSaves, 112, strings::RestoreSavesHint))
                     RestoreSaveBackup(backup.stamp);
                 ImGui::PopID();
                 ImGui::EndDisabled();
@@ -1735,17 +1757,70 @@ namespace launcher_ui
         m_focusTo = FocusTo::None;
     }
 
+    void App::Toast(std::string text)
+    {
+        // Long enough to read: 2.5 s, and more for a long message (an error and its reason), up to 6 s.
+        uint64_t readMs = std::clamp<uint64_t>(2500 + 45 * (text.size() > 40 ? text.size() - 40 : 0), 2500, 6000);
+        m_toast = std::move(text);
+        m_toastUntil = SDL_GetTicks() + readMs;
+    }
+
     void App::DrawToast()
     {
         if (m_toast.empty() || SDL_GetTicks() > m_toastUntil)
             return;
+        // Bottom right, at most 560 points wide (a long one wraps, never over the sidebar).
         ImVec2 size = ImGui::GetIO().DisplaySize;
-        ImVec2 text = ImGui::CalcTextSize(m_toast.c_str());
-        ImVec2 position(size.x - text.x - 64, size.y - 72);
+        float wrap = std::min(560.0f, size.x - SidebarW - 2 * Pad - 40);
+        ImVec2 text = ImGui::CalcTextSize(m_toast.c_str(), nullptr, false, wrap);
+        ImVec2 end(size.x - 24, size.y - 28), position(end.x - text.x - 40, end.y - text.y - 24);
         ImDrawList* draw = ImGui::GetForegroundDrawList();
-        draw->AddRectFilled(position, ImVec2(size.x - 24, size.y - 28), Rgb(PanelRaised, 245), Radius);
-        draw->AddRect(position, ImVec2(size.x - 24, size.y - 28), Rgb(Accent, 200), Radius, 2.0f);
-        draw->AddText(ImVec2(position.x + 20, position.y + 12), Rgb(Text), m_toast.c_str());
+        draw->AddRectFilled(position, end, Rgb(PanelRaised, 245), Radius);
+        draw->AddRect(position, end, Rgb(Accent, 200), Radius, 2.0f);
+        draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(position.x + 20, position.y + 12), Rgb(Text), m_toast.c_str(), nullptr, wrap);
+    }
+
+    // Quitting during an install: keep installing (the default, B / Escape) or quit.
+    void App::DrawQuitPrompt()
+    {
+        if (!m_quitPrompt)
+            return;
+        if (!Installing()) // it ended meanwhile: nothing to lose any more
+        {
+            m_running = false;
+            return;
+        }
+        if (!ImGui::IsPopupOpen("##quit"))
+            ImGui::OpenPopup("##quit");
+        ImVec2 display = ImGui::GetIO().DisplaySize;
+        ImGui::SetNextWindowSize(ImVec2(std::min(520.0f, display.x - 80), 0));
+        ImGui::SetNextWindowPos(ImVec2(display.x / 2, display.y / 2), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(Panel, 250));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, RadiusLarge);
+        if (ImGui::BeginPopupModal("##quit", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+        {
+            Title(strings::QuitTitle, TitleSize, Text);
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+            ImGui::TextWrapped("%s", strings::QuitText);
+            ImGui::PopStyleColor();
+            ImGui::Dummy(ImVec2(0, 8));
+            bool keep = PillButton(strings::KeepInstalling, true, 200, true);
+            if (ImGui::IsWindowAppearing())
+                ImGui::SetItemDefaultFocus();
+            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
+            bool quit = PillButton(strings::Quit, false, 120, true);
+            if (keep || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
+            {
+                m_quitPrompt = false;
+                ImGui::CloseCurrentPopup();
+            }
+            else if (quit)
+                m_running = false;
+            ImGui::EndPopup();
+        }
+        ImGui::PopStyleVar(2);
+        ImGui::PopStyleColor();
     }
 
     void App::Frame()
@@ -1787,10 +1862,11 @@ namespace launcher_ui
         ImGui::PopStyleVar();
         DrawWhatsNew();
         DrawProblemReport();
+        DrawQuitPrompt();
         DrawToast();
         // Who answers B / Escape next frame: an open menu or dialog, a field being edited, the collection's search or View.
         m_backTaken = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) || ImGui::IsAnyItemActive() ||
-            m_reportOpen || m_whatsNewOpen || (m_page == Page::Collection && m_collection->TakesBack());
+            m_reportOpen || m_whatsNewOpen || m_quitPrompt || (m_page == Page::Collection && m_collection->TakesBack());
         m_focusTo = FocusTo::None; // a request no page answered (its item wasn't drawn) is dropped
 
         ImGui::Render();
@@ -1804,7 +1880,7 @@ namespace launcher_ui
         {
             static const char* const Names[] = { "01-no-iso", "02-verified", "03-graphics", "04-controls", "05-collection", "06-home",
                 "07-figure-sheet", "08-new-figure", "09-play-with", "10-language", "11-disc-gone" };
-            static const char* const InstallNames[] = { "10-install", "11-installing", "12-installing-compile", "13-install-details",
+            static const char* const InstallNames[] = { "10-install", "11-installing", "12-quit-while-installing", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
             static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-view-menu",

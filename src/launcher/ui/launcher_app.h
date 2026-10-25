@@ -187,6 +187,7 @@ namespace launcher_ui
         void OpenProblemReport();
         void DrawProblemReport();
         void DrawToast();
+        void DrawQuitPrompt();
 
         // Pages and focus. The sidebar and the page are separate windows, which the D-pad doesn't cross: B / Escape
         // moves the focus to the sidebar (or leaves Settings and Collection), A on a row moves it into the page.
@@ -239,7 +240,7 @@ namespace launcher_ui
         void Browse();
         bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
-        void Toast(std::string text) { m_toast = std::move(text); m_toastUntil = SDL_GetTicks() + 2500; }
+        void Toast(std::string text);
         void RefreshGamepads();
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
         std::string CurrentDevice() const;
@@ -257,6 +258,7 @@ namespace launcher_ui
         std::string m_chosen;
         std::string m_chosenRuntime; // the game built for the chosen disc, if any
         bool m_running = true;
+        bool m_quitPrompt = false; // a quit asked during an install: confirm it
         int m_busyFrames = 0; // frames still drawn after an input, while ImGui settles (hover, focus, menus)
 
         SDL_Window* m_window = nullptr;

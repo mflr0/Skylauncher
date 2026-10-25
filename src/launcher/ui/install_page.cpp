@@ -577,10 +577,15 @@ namespace launcher_ui
                 m_testAt = now + 300;
             break;
         case 2:
+            // Closing the window now asks first.
             if ((progress.steps.size() >= 5 && progress.done >= 30) || progress.state != InstallProgress::State::Running)
+            {
+                m_quitPrompt = Installing();
                 m_testAt = now + 100;
+            }
             break;
         case 3:
+            m_quitPrompt = false;
             m_installLog = true;
             m_testAt = now + 300;
             break;
