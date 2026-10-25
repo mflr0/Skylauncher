@@ -106,6 +106,7 @@ add_library(SkylauncherCore STATIC
     src/shared/collection/datadir.cpp
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
+    src/shared/collection/save_backup.cpp
     src/shared/stb_impl.cpp
     src/shared/vfs.cpp
     src/shared/platform/platform_file.cpp

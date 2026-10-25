@@ -1347,6 +1347,8 @@ namespace launcher_ui
             { std::string folder = m_collection->Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
         }
         ImGui::Dummy(ImVec2(0, 16));
+        DrawSaveBackups();
+        ImGui::Dummy(ImVec2(0, 16));
         Title("Support", TitleSize, Text);
         DrawLogs();
         ImGui::Dummy(ImVec2(0, 16));
@@ -1363,6 +1365,83 @@ namespace launcher_ui
         }
         ImGui::TextWrapped("Skylauncher starts the game it built for the disc, else the game runtime (%s) next to it, or the one set as "
             "runtime= in the [launcher] section of %s.", m_game.runtime, m_configPath.c_str());
+    }
+
+    // The game's save backups (save_backup.h): one row per backup (date, time, size) and the button that puts it back.
+    // The game keeps them itself before it overwrites a save; restoring one first keeps the saves the player has now.
+    void App::RefreshSaveBackups()
+    {
+        m_saveBackups = savebackup::List(savebackup::Root(m_game.id));
+        m_saveBackupsLoaded = true;
+    }
+
+    void App::RestoreSaveBackup(const std::string& stamp)
+    {
+        const savebackup::Restore restore = savebackup::RestoreBackup(savebackup::Root(m_game.id), stamp);
+        m_saveBackupsLoaded = false; // the restore made a backup of its own
+        if (restore.ok)
+            Toast("Saves restored from " + stamp.substr(0, 4) + "-" + stamp.substr(4, 2) + "-" + stamp.substr(6, 2) + " " +
+                stamp.substr(9, 2) + ":" + stamp.substr(11, 2) + ".");
+        else if (restore.error == "the game is running")
+            Toast("Quit the game before restoring a backup.");
+        else
+            Toast("The backup could not be restored: " + restore.error + ".");
+    }
+
+    void App::DrawSaveBackups()
+    {
+        Title("Save backups", TitleSize, Text);
+        if (!m_saveBackupsLoaded)
+            RefreshSaveBackups();
+        const bool running = savebackup::GameRunning(savebackup::Root(m_game.id));
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
+        ImGui::TextWrapped(running ? "The game is running: quit it to restore a backup."
+            : "The game keeps the previous version of a save here before it overwrites it. Restoring one keeps the saves you have now "
+              "first.");
+        ImGui::PopTextWrapPos();
+        ImGui::PopStyleColor();
+        if (m_saveBackups.empty())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+            ImGui::TextUnformatted("No backups yet.");
+            ImGui::PopStyleColor();
+            return;
+        }
+
+        // Ten rows at a time; the newest first.
+        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(300.0f, 44.0f * float(m_saveBackups.size()))), ImGuiChildFlags_None);
+        if (ImGui::BeginTable("##savebackups", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
+        {
+            ImGui::TableSetupColumn("when");
+            ImGui::TableSetupColumn("size", ImGuiTableColumnFlags_WidthFixed, 110);
+            ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthFixed, 128);
+            for (const savebackup::Entry& backup : m_saveBackups)
+            {
+                ImGui::TableNextRow(ImGuiTableRowFlags_None, 40);
+                ImGui::TableSetColumnIndex(0);
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted(backup.date.c_str());
+                ImGui::SameLine();
+                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+                ImGui::TextUnformatted(backup.time.c_str());
+                ImGui::PopStyleColor();
+                if (backup.files == 1 && ImGui::IsItemHovered())
+                    ImGui::SetTooltip("One file");
+                ImGui::TableSetColumnIndex(1);
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted(LauncherFormatSize(backup.bytes).c_str());
+                ImGui::TableSetColumnIndex(2);
+                ImGui::BeginDisabled(running);
+                ImGui::PushID(backup.stamp.c_str());
+                if (PillButton("Restore", false, 112))
+                    RestoreSaveBackup(backup.stamp);
+                ImGui::PopID();
+                ImGui::EndDisabled();
+            }
+            ImGui::EndTable();
+        }
+        ImGui::EndChild();
     }
 
     void App::DrawSettings()
@@ -1389,6 +1468,7 @@ namespace launcher_ui
             {
                 m_tab = tab;
                 m_capturing = nullptr;
+                m_saveBackupsLoaded = false; // the saves may have changed since the tab was last open
             }
             bool hovered = ImGui::IsItemHovered();
             ImDrawList* draw = ImGui::GetWindowDrawList();

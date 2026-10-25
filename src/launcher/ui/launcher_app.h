@@ -10,6 +10,7 @@
 #include "launcher/launcher.h"
 #include "launcher/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
+#include "shared/collection/save_backup.h"
 #include <SDL3/SDL.h>
 #include <atomic>
 #include <filesystem>
@@ -165,6 +166,9 @@ namespace launcher_ui
         void DrawControls();
         void DrawLanguage();
         void DrawGameData();
+        void DrawSaveBackups();
+        void RefreshSaveBackups();
+        void RestoreSaveBackup(const std::string& stamp);
         void DrawAbout();        // update_page.cpp: About, and the update banner
         void StartUpdateCheck(bool manual);
         void PollUpdates();
@@ -248,6 +252,10 @@ namespace launcher_ui
         uint64_t m_discSize = 0;
         VerifyJob m_verify;
         ProbeJob m_probe;
+
+        // Settings > Game data: the saves' backups (save_backup.h), read when the tab opens and after a restore.
+        std::vector<savebackup::Entry> m_saveBackups;
+        bool m_saveBackupsLoaded = false;
 
         // Updates (update_page.cpp).
         UpdateManager m_updates;

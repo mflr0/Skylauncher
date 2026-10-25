@@ -5,6 +5,7 @@
 #include "launcher/install_checklist.h"
 #include "launcher/launcher.h"
 #include "launcher/updater.h"
+#include "shared/collection/save_backup.h"
 #include "shared/mini_json.h"
 #include <miniz.h>
 #include <SDL3/SDL.h>
@@ -381,6 +382,36 @@ namespace
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL");
         printf("Updater: versions, release JSON, SHA-256 check, swap with rollback, kit zip and the manager checked\n");
     }
+
+    // Settings > Game data: the game's save backups, listed and restored; a restore is refused while the game runs.
+    void SaveBackupChecks(const std::filesystem::path& scratch)
+    {
+        const std::filesystem::path saves = scratch / "save-backup" / "saves";
+        const std::filesystem::path save = saves / "00000002" / "Skylanders - Global Data" / "GLOBAL.DAT";
+        savebackup::SetGameRunning(false, saves);
+        WriteBytes(save, "the save as the game left it");
+
+        // A backup the game made before overwriting the save.
+        savebackup::Backup backup = savebackup::BackupFile(saves, save, "20261025-093000");
+        SHELL_EXPECT(backup.ok && backup.copied && backup.stamp == "20261025-093000");
+        std::vector<savebackup::Entry> entries = savebackup::List(saves);
+        SHELL_EXPECT(entries.size() == 1 && entries.front().date == "2026-10-25" && entries.front().time == "09:30:00");
+        SHELL_EXPECT(entries.front().bytes == std::string("the save as the game left it").size());
+
+        // A newer save on top of it; a running game refuses the restore and leaves both alone.
+        WriteBytes(save, "the new save");
+        savebackup::SetGameRunning(true, saves);
+        savebackup::Restore refused = savebackup::RestoreBackup(saves, "20261025-093000");
+        SHELL_EXPECT(!refused.ok && refused.error == "the game is running" && ReadBytes(save) == "the new save");
+        savebackup::SetGameRunning(false, saves);
+
+        // Restored byte for byte, with the new save kept as a backup of its own.
+        savebackup::Restore restored = savebackup::RestoreBackup(saves, "20261025-093000");
+        SHELL_EXPECT(restored.ok && restored.files == 1 && ReadBytes(save) == "the save as the game left it");
+        SHELL_EXPECT(savebackup::List(saves).size() == 2); // the restore's own safety copy and the restored one
+        SHELL_EXPECT(!savebackup::RestoreBackup(saves, "20260101-000000").ok);
+        printf("Save backups: listed, refused while the game runs, restored byte for byte\n");
+    }
 }
 
 int ShellChecks(const std::filesystem::path& scratch)
@@ -388,5 +419,6 @@ int ShellChecks(const std::filesystem::path& scratch)
     ChecklistChecks(scratch);
     GameRunChecks(scratch);
     UpdaterChecks(scratch);
+    SaveBackupChecks(scratch);
     return g_shellFailures;
 }
