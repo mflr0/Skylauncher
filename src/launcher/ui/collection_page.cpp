@@ -452,6 +452,13 @@ namespace launcher_ui
         ImGui::BeginChild("##mylist", ImVec2(0, 0), ImGuiChildFlags_None, ImGuiWindowFlags_NoBackground);
         DrawList();
         ImGui::EndChild();
+        // A figure dragged off a seat and dropped on the list leaves the seat.
+        if (ImGui::BeginDragDropTarget())
+        {
+            if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SKYSEAT"))
+                TakeOff(*static_cast<const size_t*>(payload->Data));
+            ImGui::EndDragDropTarget();
+        }
         ImGui::EndChild();
 
         HandleShortcuts();
@@ -577,6 +584,43 @@ namespace launcher_ui
         ImGui::End();
     }
 
+    // Empties a seat: the figure leaves the next session's portal (and stays in the collection).
+    void CollectionPage::TakeOff(size_t seat)
+    {
+        const collection::Game* game = m_model.Game();
+        if (game == nullptr || seat >= game->seats.size() || m_model.seats[seat].empty())
+            return;
+        std::string what = m_model.seats[seat];
+        const Figure* figure = m_model.Find(what);
+        if (!m_model.CanEditSeats())
+            Toast("The game is running: the seats change from its Toy Box");
+        else if (m_model.SetSeat(seat, ""))
+        {
+            m_generation++;
+            Toast(fmt::format("{}: {} taken off", SeatName(seat), figure != nullptr ? Name(*figure) : std::string("figure")));
+        }
+        else
+            Toast("Couldn't write the next session's seats");
+    }
+
+    void CollectionPage::DrawSeatMenu()
+    {
+        if (!ImGui::BeginPopup("##seatmenu"))
+            return;
+        size_t seat = size_t(m_seatMenu);
+        const Figure* figure = seat < m_model.seats.size() && !m_model.seats[seat].empty() ? m_model.Find(m_model.seats[seat]) : nullptr;
+        if (seat >= m_model.seats.size() || m_model.seats[seat].empty())
+            ImGui::CloseCurrentPopup();
+        else
+        {
+            if (ImGui::MenuItem("Take it off the seat", "Delete", false, m_model.CanEditSeats()))
+                TakeOff(seat);
+            if (ImGui::MenuItem("Figure page", nullptr, false, figure != nullptr))
+                OpenFigure(figure->path);
+        }
+        ImGui::EndPopup();
+    }
+
     void CollectionPage::DrawSeats()
     {
         const collection::Game* game = m_model.Game();
@@ -605,6 +649,7 @@ namespace launcher_ui
 
         std::string live = m_model.RunningGame();
         bool editable = m_model.CanEditSeats();
+        m_navSeat = m_hoverSeat = -1;
         for (size_t i = 0; i < game->seats.size(); i++)
         {
             constexpr float H = 78;
@@ -626,23 +671,52 @@ namespace launcher_ui
                 ImGui::EndDragDropTarget();
             }
             const Figure* figure = m_model.seats[i].empty() ? nullptr : m_model.Find(m_model.seats[i]);
-            if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && figure != nullptr)
-                OpenFigure(figure->path);
+            bool occupied = !m_model.seats[i].empty();
+            if (nav)
+                m_navSeat = int(i);
+            if (hovered)
+                m_hoverSeat = int(i);
+            // Dragging a figure off its seat, onto the list, takes it off.
+            if (occupied && editable && ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+            {
+                size_t index = i;
+                ImGui::SetDragDropPayload("SKYSEAT", &index, sizeof(index));
+                ImGui::TextUnformatted(figure != nullptr ? Name(*figure).c_str() : "Take it off the seat");
+                ImGui::EndDragDropSource();
+            }
+            bool menu = ImGui::IsItemClicked(ImGuiMouseButton_Right) && occupied;
             ImGui::PopID();
+            if (menu) // outside the seat's ID scope: the popup is drawn by DrawSeatMenu at the page's level
+            {
+                m_seatMenu = int(i);
+                ImGui::OpenPopup("##seatmenu");
+            }
             bool focused = m_seat == i;
             draw->AddRectFilled(at, ImVec2(at.x + w, at.y + H), Rgb(hovered || nav ? PanelRaised : Panel, 240), Radius);
             draw->AddRect(at, ImVec2(at.x + w, at.y + H), Rgb(focused ? Accent : hovered ? BorderBright : Border), Radius, 0, focused ? 2.5f : 1.0f);
             ImGui::PushFont(nullptr, SmallSize - 1);
             draw->AddText(ImVec2(at.x + 76, at.y + 9), Rgb(focused ? Accent : TextDim), Lower(SeatName(i)).c_str());
             ImGui::PopFont();
-            if (figure != nullptr)
+            if (occupied)
             {
-                DrawIcon(draw, figure->toy, figure->Kind(), ImVec2(at.x + 10, at.y + 10), 58, false);
-                AddBoldText(draw, ImVec2(at.x + 76, at.y + 28), Rgb(Text), LauncherMiddleEllipsis(Name(*figure), 15).c_str());
-                ImGui::PushFont(nullptr, SmallSize);
-                draw->AddText(ImVec2(at.x + 76, at.y + 52), Rgb(TextDim), Detail(*figure).c_str());
-                ImGui::PopFont();
-                if (figure->lock.Busy())
+                if (figure != nullptr)
+                {
+                    DrawIcon(draw, figure->toy, figure->Kind(), ImVec2(at.x + 10, at.y + 10), 58, false);
+                    AddBoldText(draw, ImVec2(at.x + 76, at.y + 28), Rgb(Text), LauncherMiddleEllipsis(Name(*figure), 15).c_str());
+                    ImGui::PushFont(nullptr, SmallSize);
+                    draw->AddText(ImVec2(at.x + 76, at.y + 52), Rgb(TextDim), Detail(*figure).c_str());
+                    ImGui::PopFont();
+                }
+                else
+                {
+                    // A figure the collection no longer has (deleted, moved): the seat can still be emptied.
+                    draw->AddRectFilled(ImVec2(at.x + 10, at.y + 10), ImVec2(at.x + 68, at.y + 68), Rgb(Field), Radius);
+                    AddBoldText(draw, ImVec2(at.x + 76, at.y + 28), Rgb(Text), "Missing figure");
+                    ImGui::PushFont(nullptr, SmallSize);
+                    draw->AddText(ImVec2(at.x + 76, at.y + 52), Rgb(TextDim), LauncherMiddleEllipsis(m_model.seats[i].substr(m_model.seats[i].find_last_of("/\\") + 1), 18).c_str());
+                    ImGui::PopFont();
+                }
+                if (figure != nullptr && figure->lock.Busy())
                     m_app.Badge(draw, ImVec2(at.x + w - 62, at.y + 6), "LIVE", Ok, AccentInk);
                 else if (editable)
                 {
@@ -657,8 +731,8 @@ namespace launcher_ui
                     draw->AddLine(ImVec2(cross.x - 5, cross.y + 5), ImVec2(cross.x + 5, cross.y - 5), ink, 2);
                     if (over)
                         ImGui::SetTooltip("Take it off the seat");
-                    if (off && m_model.SetSeat(i, ""))
-                        m_generation++;
+                    if (off)
+                        TakeOff(i);
                 }
             }
             else
@@ -672,6 +746,21 @@ namespace launcher_ui
             ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + H + 8));
         }
 
+        DrawSeatMenu();
+
+        // The portal at a glance: every occupied seat with its figure.
+        std::vector<std::string> names(m_model.seats.size());
+        for (size_t i = 0; i < names.size(); i++)
+            if (const Figure* f = m_model.seats[i].empty() ? nullptr : m_model.Find(m_model.seats[i]))
+                names[i] = Name(*f);
+        std::string overview = collection::PortalOverviewLine(collection::PortalOverview(*game, m_model.seats, names), "Nothing on the portal");
+        ImGui::PushFont(nullptr, SmallSize);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+        ImGui::TextWrapped("%s", overview.c_str());
+        ImGui::PopStyleColor();
+        ImGui::PopFont();
+        ImGui::Dummy(ImVec2(0, 4));
+
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(live.empty() ? TextDim : Ok));
         if (!live.empty())
@@ -679,7 +768,7 @@ namespace launcher_ui
         else if (SessionFile(*game).empty())
             ImGui::TextWrapped("%s has no runtime yet: its seats can't be prepared.", ShortGameName(game->id).c_str());
         else
-            ImGui::TextWrapped("Drag a figure onto a seat, or double-click it. The game starts with these.");
+            ImGui::TextWrapped("Drag a figure onto a seat, or double-click it. Take one off with its cross, Delete, X, or by dragging it out. The game starts with these.");
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
@@ -870,9 +959,24 @@ namespace launcher_ui
 
     void CollectionPage::HandleShortcuts()
     {
-        if (m_overlay != Overlay::None || ImGui::IsAnyItemActive() || m_sections.empty())
+        if (m_overlay != Overlay::None || ImGui::IsAnyItemActive())
             return;
         auto pressed = [](ImGuiKey a, ImGuiKey b) { return ImGui::IsKeyPressed(a, false) || ImGui::IsKeyPressed(b, false); };
+        // A seat with the focus (or under the mouse): Delete, and the pad's X, take its figure off.
+        if (ImGui::IsPopupOpen("##seatmenu"))
+            return;
+        if (m_navSeat >= 0 && pressed(ImGuiKey_GamepadFaceLeft, ImGuiKey_Delete))
+        {
+            TakeOff(size_t(m_navSeat));
+            return;
+        }
+        if (m_hoverSeat >= 0 && ImGui::IsKeyPressed(ImGuiKey_Delete, false))
+        {
+            TakeOff(size_t(m_hoverSeat));
+            return;
+        }
+        if (m_sections.empty())
+            return;
         int count = int(m_sections.size());
         if (pressed(ImGuiKey_GamepadL1, ImGuiKey_PageUp))
             m_jumpTo = std::max(0, m_currentSection - 1);

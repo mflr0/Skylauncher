@@ -1404,3 +1404,60 @@ namespace collection
         return target.IsString() && Exists(PathOf(target.AsString())) ? PathOf(target.AsString()) : path;
     }
 }
+
+namespace collection
+{
+    std::string SeatTag(const Seat& seat, bool french)
+    {
+        if (seat.id.size() == 2 && seat.id[0] == 'p')
+            return (french ? "J" : "P") + seat.id.substr(1);
+        if (seat.id.rfind("vehicle", 0) == 0)
+            return "V" + seat.id.substr(7);
+        if (seat.id == "item")
+            return french ? "Objet" : "Item";
+        if (seat.id == "adventure")
+            return french ? "Aventure" : "Adventure";
+        if (seat.id == "trap")
+            return french ? "Piège" : "Trap";
+        return seat.id;
+    }
+
+    std::string SeatName(const Seat& seat, bool french)
+    {
+        if (seat.id.size() == 2 && seat.id[0] == 'p')
+            return (french ? "Joueur " : "Player ") + seat.id.substr(1);
+        if (seat.id.rfind("vehicle", 0) == 0)
+            return (french ? "Véhicule " : "Vehicle ") + seat.id.substr(7);
+        if (seat.id == "item")
+            return french ? "Objet magique" : "Magic item";
+        return SeatTag(seat, french);
+    }
+
+    std::vector<PortalEntry> PortalOverview(const Game& game, const std::vector<std::string>& paths,
+        const std::vector<std::string>& names, const std::vector<int>& slots, bool french)
+    {
+        std::vector<PortalEntry> entries;
+        for (size_t i = 0; i < game.seats.size() && i < paths.size(); i++)
+        {
+            if (paths[i].empty())
+                continue;
+            PortalEntry entry;
+            entry.seat = i;
+            entry.slot = i < slots.size() ? slots[i] : -1;
+            entry.tag = SeatTag(game.seats[i], french);
+            entry.seatName = SeatName(game.seats[i], french);
+            entry.path = paths[i];
+            entry.name = i < names.size() && !names[i].empty() ? names[i] : paths[i].substr(paths[i].find_last_of("/\\") + 1);
+            entries.push_back(std::move(entry));
+        }
+        return entries;
+    }
+
+    std::string PortalOverviewLine(const std::vector<PortalEntry>& entries, const std::string& emptyText)
+    {
+        std::string line;
+        for (const PortalEntry& entry : entries)
+            line += (line.empty() ? "" : " \xC2\xB7 ") + entry.tag + " " + entry.name;
+        return line.empty() ? emptyText : line;
+    }
+}
