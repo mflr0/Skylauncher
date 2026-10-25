@@ -3,6 +3,7 @@
 // Every choice is written to launcher.ini, which the game runtime reads (docs/settings.md lists the keys).
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/ui/launcher_app.h"
+#include "shared/collection/datadir.h"
 #include "shared/embedded_fonts.h"
 #include "assets/launcher_assets.h"
 #include "launcher/theme/launcher_theme.h"
@@ -375,6 +376,7 @@ namespace launcher_ui
             m_testUpdate = SDL_getenv("SSA_LAUNCHER_TEST_UPDATE") != nullptr;
             m_testCollection = SDL_getenv("SSA_LAUNCHER_TEST_COLLECTION") != nullptr;
             m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
+            m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -382,21 +384,95 @@ namespace launcher_ui
         return true;
     }
 
+    App::App(const GameInfo& game, const std::string& configPath, LauncherConfig& config) : m_configPath(configPath), m_config(config)
+    {
+        m_s = &SlotFor(game);
+        SetActiveGame(game.id);
+    }
+
+    // The slot of `game`, made the first time it is asked for.
+    GameSlot& App::SlotFor(const GameInfo& game)
+    {
+        for (auto& slot : m_slots)
+            if (&slot->game == &game)
+                return *slot;
+        m_slots.push_back(std::make_unique<GameSlot>(game, *this));
+        m_slots.back()->collection->SelectGame(game.id);
+        return *m_slots.back();
+    }
+
+    // The sidebar's switch. Nothing closes: the pages now draw this game's state. Its disc check starts on the first
+    // visit and runs in the background; a game seen before is shown as it was left.
+    void App::SelectGame(const GameInfo& game)
+    {
+        m_s = &SlotFor(game);
+        SetActiveGame(game.id);
+        Set("launcher", "game", game.id);
+        if (!m_s->started)
+        {
+            m_s->started = true;
+            if (std::string previous = SettingGet(m_config, game.id, "iso"); !previous.empty())
+                StartVerify(previous);
+        }
+        m_s->saveBackupsLoaded = false;
+        m_busyFrames = 2;
+    }
+
+    bool App::AnyInstalling() const
+    {
+        for (const auto& slot : m_slots)
+            if (slot->installer.Running() || slot->kitDownload.Running())
+                return true;
+        return false;
+    }
+
+    bool App::AnyVerifying() const
+    {
+        for (const auto& slot : m_slots)
+            if (slot->disc == DiscState::Verifying)
+                return true;
+        return false;
+    }
+
+    // Every opened game's jobs go on while another is shown: each is polled with its own slot (and its game's folders)
+    // in place, then the shown one comes back.
+    void App::PollSlots()
+    {
+        GameSlot* shown = m_s;
+        for (auto& slot : m_slots)
+        {
+            m_s = slot.get();
+            SetActiveGame(m_s->game.id);
+            if (m_s->disc == DiscState::Verifying && m_s->verify.done)
+                FinishVerify();
+            PollInstall();
+        }
+        m_s = shown;
+        SetActiveGame(m_s->game.id);
+    }
+
     void App::Shutdown()
     {
         m_portal.Stop();
-        m_verify.Join();
+        for (auto& slot : m_slots)
+            slot->verify.Join();
         if (ImGui::GetCurrentContext() != nullptr)
         {
             ImGui_ImplSDLRenderer3_Shutdown();
             ImGui_ImplSDL3_Shutdown();
             ImGui::DestroyContext();
         }
-        m_collection->ClearIcons();
-        for (SDL_Texture* texture : { m_icon, m_logo, m_background, m_github })
-            if (texture != nullptr)
-                SDL_DestroyTexture(texture);
-        m_icon = m_logo = m_background = m_github = nullptr;
+        for (auto& slot : m_slots)
+        {
+            slot->collection->ClearIcons();
+            for (SDL_Texture* texture : { slot->icon, slot->logo, slot->background })
+                if (texture != nullptr)
+                    SDL_DestroyTexture(texture);
+            slot->icon = slot->logo = slot->background = nullptr;
+        }
+        if (m_github != nullptr)
+            SDL_DestroyTexture(m_github);
+        m_github = nullptr;
         if (m_renderer != nullptr)
             SDL_DestroyRenderer(m_renderer);
         if (m_window != nullptr)
@@ -412,8 +488,11 @@ namespace launcher_ui
             fprintf(stderr, "launcher: cannot open the window: %s\n", SDL_GetError());
             return {};
         }
-        if (std::string previous = SettingGet(m_config, m_game.id, "iso"); !previous.empty() && m_shots.empty())
+        if (std::string previous = SettingGet(m_config, m_s->game.id, "iso"); !previous.empty() && m_shots.empty())
+        {
+            m_s->started = true;
             StartVerify(previous);
+        }
         if (m_shots.empty() && SDL_getenv("SKYLAUNCHER_NO_UPDATE_CHECK") == nullptr)
         {
             CleanupOldUpdate(LauncherSelf()); // the .old a previous update left
@@ -431,14 +510,12 @@ namespace launcher_ui
                 HandleEvent(event);
             while (SDL_PollEvent(&event))
                 HandleEvent(event);
-            if (m_disc == DiscState::Verifying && m_verify.done)
-                FinishVerify();
-            PollInstall();
+            PollSlots();
             PollUpdates();
             Frame();
             TestScript();
         }
-        return m_chosen;
+        return m_s->chosen;
     }
 
     // ---- Events and actions --------------------------------------------------------------------------------------
@@ -453,7 +530,7 @@ namespace launcher_ui
             return 0;
         }
         // Something moves: a check, an install's spinner, an update's bar, a held button, a text cursor, a drag.
-        if (m_disc == DiscState::Verifying || Installing() || m_updates.Busy() || ImGui::IsAnyItemActive())
+        if (AnyVerifying() || AnyInstalling() || m_updates.Busy() || ImGui::IsAnyItemActive())
             return 0;
         constexpr int Idle = 500;
         int wait = Idle;
@@ -462,7 +539,7 @@ namespace launcher_ui
             wait = std::min<int>(wait, int(m_toastUntil - now) + 1);
         // The night sky's stars twinkle, at 30 fps, while the window is seen.
         bool seen = !(SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_OCCLUDED | SDL_WINDOW_HIDDEN));
-        if (seen && m_page == Page::Play && m_background == nullptr)
+        if (seen && m_page == Page::Play && m_s->background == nullptr)
             wait = std::min(wait, 33);
         return wait;
     }
@@ -508,7 +585,7 @@ namespace launcher_ui
         case SDL_EVENT_QUIT:
         case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
             // Cmd+Q, Alt+F4, the window's close: during an install, ask first (it would stop the build).
-            if (Installing())
+            if (AnyInstalling())
                 m_quitPrompt = true;
             else
                 m_running = false;
@@ -524,7 +601,7 @@ namespace launcher_ui
             m_dragOver = false;
             // Figure dumps (or, on the collection page, folders of them) join the collection.
             if (event.drop.data != nullptr && (collection::IsDumpName(std::filesystem::path(event.drop.data).filename().string()) ||
-                (m_page == Page::Collection && std::filesystem::is_directory(event.drop.data))) && m_collection->Drop(event.drop.data))
+                (m_page == Page::Collection && std::filesystem::is_directory(event.drop.data))) && m_s->collection->Drop(event.drop.data))
                 m_page = Page::Collection;
             else if (event.drop.data != nullptr && Installing())
                 Toast("Wait for the installation to finish");
@@ -585,41 +662,41 @@ namespace launcher_ui
 
     void App::StartVerify(const std::string& path)
     {
-        m_disc = DiscState::Verifying;
-        m_discPath = path;
-        m_discSize = 0;
+        m_s->disc = DiscState::Verifying;
+        m_s->discPath = path;
+        m_s->discSize = 0;
         SDL_PathInfo info;
         if (SDL_GetPathInfo(path.c_str(), &info))
-            m_discSize = info.size;
-        for (SDL_Texture** texture : { &m_icon, &m_logo, &m_background })
+            m_s->discSize = info.size;
+        for (SDL_Texture** texture : { &m_s->icon, &m_s->logo, &m_s->background })
             if (*texture != nullptr)
             {
                 SDL_DestroyTexture(*texture);
                 *texture = nullptr;
             }
-        m_verify.Start(path, m_game);
+        m_s->verify.Start(path, m_s->game);
     }
 
     void App::FinishVerify()
     {
-        m_verify.Join();
-        m_check = m_verify.check;
-        if (m_check.status != GameSourceStatus::Ok)
+        m_s->verify.Join();
+        m_s->check = m_s->verify.check;
+        if (m_s->check.status != GameSourceStatus::Ok)
         {
-            m_disc = DiscState::Failed;
+            m_s->disc = DiscState::Failed;
             return;
         }
-        m_meta = m_verify.meta;
-        if (!m_meta.iconPng.empty())
-            m_icon = LoadPng(m_renderer, m_meta.iconPng);
-        m_assets = m_verify.assets; // the worker cached the disc's art
-        m_collection->ClearIcons(); // the collection's pictures now come from the disc
-        if (LauncherAssets::Asset logo = m_assets.Get(LauncherAssets::Role::Logo); logo.valid)
-            m_logo = LoadPngFile(m_renderer, logo.path);
-        if (LauncherAssets::Asset background = m_assets.Get(LauncherAssets::Role::HeroBackground); background.valid)
-            m_background = LoadPngFile(m_renderer, background.path);
-        Set(m_game.id, "iso", m_discPath); // remembered even if the player quits without playing
-        m_disc = DiscState::Ready;
+        m_s->meta = m_s->verify.meta;
+        if (!m_s->meta.iconPng.empty())
+            m_s->icon = LoadPng(m_renderer, m_s->meta.iconPng);
+        m_s->assets = m_s->verify.assets; // the worker cached the disc's art
+        m_s->collection->ClearIcons(); // the collection's pictures now come from the disc
+        if (LauncherAssets::Asset logo = m_s->assets.Get(LauncherAssets::Role::Logo); logo.valid)
+            m_s->logo = LoadPngFile(m_renderer, logo.path);
+        if (LauncherAssets::Asset background = m_s->assets.Get(LauncherAssets::Role::HeroBackground); background.valid)
+            m_s->background = LoadPngFile(m_renderer, background.path);
+        Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
+        m_s->disc = DiscState::Ready;
         RefreshInstall();
     }
 
@@ -627,19 +704,29 @@ namespace launcher_ui
     bool App::DiscStillThere()
     {
         SDL_PathInfo info;
-        if (SDL_GetPathInfo(m_discPath.c_str(), &info) && info.type == SDL_PATHTYPE_FILE)
+        if (SDL_GetPathInfo(m_s->discPath.c_str(), &info) && info.type == SDL_PATHTYPE_FILE)
             return true;
-        m_disc = DiscState::Failed;
-        m_check.status = GameSourceStatus::NotFound;
-        m_check.message = fmt::format(fmt::runtime(strings::DiscGone), m_discPath);
-        m_installView = m_kitUsed = false;
+        m_s->disc = DiscState::Failed;
+        m_s->check.status = GameSourceStatus::NotFound;
+        m_s->check.message = fmt::format(fmt::runtime(strings::DiscGone), m_s->discPath);
+        m_s->installView = m_s->kitUsed = false;
         m_page = Page::Play;
         return false;
     }
 
+    void App::PlayNow()
+    {
+        if (!DiscStillThere())
+            return;
+        m_s->chosen = m_s->discPath;
+        m_s->chosenRuntime = m_s->installed.runtime;
+        Set(m_s->game.id, "iso", m_s->chosen);
+        m_running = false;
+    }
+
     void App::Browse()
     {
-        std::string path = ChooseIsoDialog(m_window, m_game, m_discPath.empty() ? SettingGet(m_config, m_game.id, "iso") : m_discPath);
+        std::string path = ChooseIsoDialog(m_window, m_s->game, m_s->discPath.empty() ? SettingGet(m_config, m_s->game.id, "iso") : m_s->discPath);
         if (!path.empty())
             StartVerify(path);
     }
@@ -941,12 +1028,12 @@ namespace launcher_ui
         }
         draw->AddRectFilledMultiColor(ImVec2(0, 0), size, Rgb(SkyTop), Rgb(SkyTop), Rgb(SkyBottom), Rgb(SkyBottom));
         // Once a disc is verified: the game's painted Skylands sky, cropped to fill, instead of the drawn stars.
-        if (m_background != nullptr)
+        if (m_s->background != nullptr)
         {
             float w, h;
-            SDL_GetTextureSize(m_background, &w, &h);
+            SDL_GetTextureSize(m_s->background, &w, &h);
             float scale = std::max(size.x / w, size.y / h), u = size.x / (w * scale), v = size.y / (h * scale);
-            draw->AddImage(Ref(m_background), ImVec2(0, 0), size, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2));
+            draw->AddImage(Ref(m_s->background), ImVec2(0, 0), size, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2));
             draw->AddRectFilled(ImVec2(0, 0), size, Rgb(SkyTop, BackdropShade)); // keeps white text readable on the bright sky
             return;
         }
@@ -1023,25 +1110,25 @@ namespace launcher_ui
         {
             ImGui::PushID(entry.id);
             ImVec2 position;
+            // The game already opened this session has its slot: its icon and disc state show here, not just the shown one's.
+            const GameSlot* slot = nullptr;
+            for (const auto& opened : m_slots)
+                if (std::string_view(opened->game.id) == entry.id)
+                    slot = opened.get();
             // Selected only once the player has picked it: Play is that game's page.
-            bool selected = m_page == Page::Play && std::string_view(entry.id) == m_game.id;
+            bool selected = m_page == Page::Play && std::string_view(entry.id) == m_s->game.id;
             if (row("game", GameRowH, selected, entry.enabled, position))
             {
-                if (std::string_view(entry.id) == m_game.id)
-                    GoTo(Page::Play);
-                else
-                {
-                    m_switchTo = entry.id; // main() reopens the window for that game
-                    Set("launcher", "game", m_switchTo);
-                    m_running = false;
-                }
+                if (std::string_view(entry.id) != m_s->game.id)
+                    SelectGame(*FindGame(entry.id));
+                GoTo(Page::Play);
             }
-            if (std::string_view(entry.id) == m_game.id && (m_page == Page::Play || m_page == Page::Home))
+            if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home))
                 TakeFocus(FocusTo::Sidebar);
             // The game's icon from the player's disc once it is verified, else its initial on its colour.
             ImVec2 badge(position.x + 34, position.y + GameRowH / 2);
-            if (m_icon != nullptr && std::string_view(entry.id) == m_game.id)
-                draw->AddImageRounded(Ref(m_icon), ImVec2(badge.x - GameBadgeR, badge.y - GameBadgeR), ImVec2(badge.x + GameBadgeR, badge.y + GameBadgeR),
+            if (slot != nullptr && slot->icon != nullptr)
+                draw->AddImageRounded(Ref(slot->icon), ImVec2(badge.x - GameBadgeR, badge.y - GameBadgeR), ImVec2(badge.x + GameBadgeR, badge.y + GameBadgeR),
                     ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, GameBadgeR);
             else
             {
@@ -1056,12 +1143,13 @@ namespace launcher_ui
             AddBoldText(draw, ImVec2(position.x + 62, position.y + 6), Rgb(entry.enabled ? SidebarInk : SidebarInkDim), entry.name);
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SidebarSmallSize);
-            bool current = std::string_view(entry.id) == m_game.id; // the disc state below is this game's only
-            const char* status = !entry.enabled ? "Coming later" : !current ? "Open" : m_disc == DiscState::Ready ? "Ready to play" : "Needs your disc";
+            const bool ready = slot != nullptr && slot->disc == DiscState::Ready;
+            const char* status = !entry.enabled ? "Coming later" : slot == nullptr ? "Open" : ready ? "Ready to play" :
+                slot->disc == DiscState::Verifying ? "Checking your disc" : "Needs your disc";
             float statusX = position.x + 62;
             if (entry.enabled)
             {
-                draw->AddCircleFilled(ImVec2(statusX + 4, position.y + 40), 4, Rgb(current && m_disc == DiscState::Ready ? Ready : Accent));
+                draw->AddCircleFilled(ImVec2(statusX + 4, position.y + 40), 4, Rgb(ready ? Ready : Accent));
                 statusX += 14;
             }
             draw->AddText(ImVec2(statusX, position.y + 30), Rgb(SidebarInkDim), status);
@@ -1157,30 +1245,30 @@ namespace launcher_ui
 
         // The logo (else the game's name), as large as fits and centred between the language menu and the disc status.
         float areaTop = position.y + Pad * 3, areaBottom = end.y - 120, areaH = areaBottom - areaTop;
-        if (m_installView)
+        if (m_s->installView)
         {
             float cardW = std::min(available.x - 80, 680.0f);
             DrawInstall(ImVec2(position.x + (available.x - cardW) / 2, areaTop), ImVec2(cardW, end.y - Pad - areaTop));
         }
-        else if (m_logo != nullptr)
+        else if (m_s->logo != nullptr)
         {
             float w, h;
-            SDL_GetTextureSize(m_logo, &w, &h);
+            SDL_GetTextureSize(m_s->logo, &w, &h);
             float scale = std::min(available.x * 0.85f / w, areaH / h);
             ImVec2 logoSize(w * scale, h * scale);
             ImVec2 logoAt(position.x + (available.x - logoSize.x) / 2, areaTop + (areaH - logoSize.y) / 2);
-            draw->AddImage(Ref(m_logo), logoAt, ImVec2(logoAt.x + logoSize.x, logoAt.y + logoSize.y));
+            draw->AddImage(Ref(m_s->logo), logoAt, ImVec2(logoAt.x + logoSize.x, logoAt.y + logoSize.y));
         }
         else
         {
             ImGui::PushFont(m_titleFont, HeroSize);
             float wrap = available.x - 96;
-            ImVec2 text = ImGui::CalcTextSize(m_game.name, nullptr, false, wrap);
+            ImVec2 text = ImGui::CalcTextSize(m_s->game.name, nullptr, false, wrap);
             ImVec2 at(position.x + (available.x - text.x) / 2, areaTop + (areaH - text.y) / 2);
             ImGui::SetCursorScreenPos(at);
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Text));
             ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap); // window coordinates, not the screen's
-            ImGui::TextUnformatted(m_game.name);
+            ImGui::TextUnformatted(m_s->game.name);
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
             ImGui::PopFont();
@@ -1189,42 +1277,42 @@ namespace launcher_ui
         // The disc, bottom left of the hero: the game's icon (rounded), the image's file name, its status under it.
         ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 120));
         ImGui::BeginGroup();
-        if (!m_installView) // the progress card takes the whole hero
+        if (!m_s->installView) // the progress card takes the whole hero
         {
-            if (m_icon != nullptr)
+            if (m_s->icon != nullptr)
             {
                 ImVec2 at = ImGui::GetCursorScreenPos();
                 ImGui::Dummy(ImVec2(64, 64));
-                draw->AddImageRounded(Ref(m_icon), at, ImVec2(at.x + 64, at.y + 64), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, Radius);
+                draw->AddImageRounded(Ref(m_s->icon), at, ImVec2(at.x + 64, at.y + 64), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, Radius);
                 ImGui::SameLine(0, 16);
             }
             ImGui::BeginGroup();
             // The file name on top, then "DISC IMAGE:" and the status on the line below.
-            std::string file = m_discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_discPath).filename().string(), 40);
+            std::string file = m_s->discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
             ImGui::PushFont(nullptr, TitleSize);
             BoldText(file.c_str(), Text);
             ImGui::PopFont();
-            if (!m_discPath.empty() && ImGui::IsItemHovered())
-                ImGui::SetTooltip("%s", m_discPath.c_str());
+            if (!m_s->discPath.empty() && ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", m_s->discPath.c_str());
             BoldText("DISC IMAGE:", TextDim);
             ImGui::SameLine(0, 6);
-            switch (m_disc)
+            switch (m_s->disc)
             {
             case DiscState::None:
                 ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop your disc image (.iso) here, or choose it below.");
                 break;
             case DiscState::Verifying:
-                ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_verify.Stage().c_str());
-                ImGui::ProgressBar(m_verify.progress, ImVec2(360, 8), "");
+                ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_s->verify.Stage().c_str());
+                ImGui::ProgressBar(m_s->verify.progress, ImVec2(360, 8), "");
                 break;
             case DiscState::Ready:
-                ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_discSize).c_str());
+                ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_s->discSize).c_str());
                 if (NeedsInstall())
                 {
                     ImGui::PushTextWrapPos(available.x - 40); // window coordinates
                     ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
                     ImGui::TextWrapped("Install builds the game on your PC from your disc: about %d minutes and %d GB, internet needed "
-                        "once for the compiler.", InstallMinutesFor(m_game.id), InstallGigabytes);
+                        "once for the compiler.", InstallMinutesFor(m_s->game.id), InstallGigabytes);
                     ImGui::PopStyleColor();
                     ImGui::PopTextWrapPos();
                 }
@@ -1246,7 +1334,7 @@ namespace launcher_ui
             case DiscState::Failed:
                 ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
                 ImGui::PushTextWrapPos(available.x - 40);
-                ImGui::TextWrapped("%s", m_check.message.c_str());
+                ImGui::TextWrapped("%s", m_s->check.message.c_str());
                 ImGui::PopTextWrapPos();
                 ImGui::PopStyleColor();
                 break;
@@ -1260,7 +1348,7 @@ namespace launcher_ui
         draw->AddRectFilled(bar, barEnd, Rgb(BottomBar));
         float middle = bar.y + BottomBarH / 2;
 
-        bool ready = m_disc == DiscState::Ready, verifying = m_disc == DiscState::Verifying, installing = Installing();
+        bool ready = m_s->disc == DiscState::Ready, verifying = m_s->disc == DiscState::Verifying, installing = Installing();
         bool install = ready && NeedsInstall();
         const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : strings::ChooseDisc;
         // Centred, unless the controller picker on its left would reach the sidebar (a narrow window).
@@ -1273,13 +1361,8 @@ namespace launcher_ui
                 Browse();
             else if (install)
                 StartInstall(); // which checks first that the image is still there
-            else if (DiscStillThere())
-            {
-                m_chosen = m_discPath;
-                m_chosenRuntime = m_installed.runtime;
-                Set(m_game.id, "iso", m_chosen);
-                m_running = false;
-            }
+            else
+                PlayNow();
         }
         TakeFocus(FocusTo::Page);
 
@@ -1542,18 +1625,18 @@ namespace launcher_ui
         if (!BeginSettingsTable("##language"))
             return;
         SettingRow(strings::GameText, strings::GameTextHint);
-        Combo("##text", m_game.id, "language", LanguageChoices, 0);
+        Combo("##text", m_s->game.id, "language", LanguageChoices, 0);
         SettingRow(strings::GameVoices, strings::GameVoicesHint);
-        Combo("##voice", m_game.id, "voice_language", LanguageChoices, 0);
+        Combo("##voice", m_s->game.id, "voice_language", LanguageChoices, 0);
         EndSettingsTable();
     }
 
     void App::DrawGameData()
     {
         Title("Disc image", TitleSize, Text);
-        ImGui::TextWrapped("%s", m_discPath.empty() ? "None chosen yet." : m_discPath.c_str());
-        if (m_disc == DiscState::Ready)
-            ImGui::TextColored(ImColor(Rgb(Ok)), "Verified, %s", LauncherFormatSize(m_discSize).c_str());
+        ImGui::TextWrapped("%s", m_s->discPath.empty() ? "None chosen yet." : m_s->discPath.c_str());
+        if (m_s->disc == DiscState::Ready)
+            ImGui::TextColored(ImColor(Rgb(Ok)), "Verified, %s", LauncherFormatSize(m_s->discSize).c_str());
         if (PillButton("Change disc...", true, 200))
             Browse();
         ImGui::Dummy(ImVec2(0, 16));
@@ -1567,8 +1650,8 @@ namespace launcher_ui
         ImGui::SameLine();
         if (PillButton(strings::OpenFigures, false, 260))
         {
-            SDL_CreateDirectory(m_collection->Folder().c_str());
-            { std::string folder = m_collection->Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
+            SDL_CreateDirectory(m_s->collection->Folder().c_str());
+            { std::string folder = m_s->collection->Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
         }
         ImGui::Dummy(ImVec2(0, 16));
         DrawSaveBackups();
@@ -1577,32 +1660,32 @@ namespace launcher_ui
         DrawLogs();
         ImGui::Dummy(ImVec2(0, 16));
         Title("Game runtime", TitleSize, Text);
-        if (!m_installed.runtime.empty())
+        if (!m_s->installed.runtime.empty())
         {
-            ImGui::TextWrapped("Built on this computer for this disc: %s", m_installed.runtime.c_str());
+            ImGui::TextWrapped("Built on this computer for this disc: %s", m_s->installed.runtime.c_str());
             if (HoldButton(strings::Reinstall, 260, strings::ReinstallHint) && !Installing())
                 StartInstall();
             ImGui::SameLine();
             if (PillButton("Open the game folder", false, 260))
-                OpenFolder(GameInstallFolder(m_check.xexSha256));
+                OpenFolder(GameInstallFolder(m_s->check.xexSha256));
             ImGui::Dummy(ImVec2(0, 8));
         }
         ImGui::TextWrapped("Skylauncher starts the game it built for the disc, else the game runtime (%s) next to it, or the one set as "
-            "runtime= in the [launcher] section of %s.", m_game.runtime, m_configPath.c_str());
+            "runtime= in the [launcher] section of %s.", m_s->game.runtime, m_configPath.c_str());
     }
 
     // The game's save backups (save_backup.h): one row per backup (date, time, size) and the button that puts it back.
     // The game keeps them itself before it overwrites a save; restoring one first keeps the saves the player has now.
     void App::RefreshSaveBackups()
     {
-        m_saveBackups = savebackup::List(savebackup::Root(m_game.id));
-        m_saveBackupsLoaded = true;
+        m_s->saveBackups = savebackup::List(savebackup::Root(m_s->game.id));
+        m_s->saveBackupsLoaded = true;
     }
 
     void App::RestoreSaveBackup(const std::string& stamp)
     {
-        const savebackup::Restore restore = savebackup::RestoreBackup(savebackup::Root(m_game.id), stamp);
-        m_saveBackupsLoaded = false; // the restore made a backup of its own
+        const savebackup::Restore restore = savebackup::RestoreBackup(savebackup::Root(m_s->game.id), stamp);
+        m_s->saveBackupsLoaded = false; // the restore made a backup of its own
         if (restore.ok)
             Toast("Saves restored from " + stamp.substr(0, 4) + "-" + stamp.substr(4, 2) + "-" + stamp.substr(6, 2) + " " +
                 stamp.substr(9, 2) + ":" + stamp.substr(11, 2) + ".");
@@ -1615,9 +1698,9 @@ namespace launcher_ui
     void App::DrawSaveBackups()
     {
         Title("Save backups", TitleSize, Text);
-        if (!m_saveBackupsLoaded)
+        if (!m_s->saveBackupsLoaded)
             RefreshSaveBackups();
-        const bool running = savebackup::GameRunning(savebackup::Root(m_game.id));
+        const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id));
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
         ImGui::TextWrapped(running ? "The game is running: quit it to restore a backup."
@@ -1625,7 +1708,7 @@ namespace launcher_ui
               "first.");
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
-        if (m_saveBackups.empty())
+        if (m_s->saveBackups.empty())
         {
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
             ImGui::TextUnformatted("No backups yet.");
@@ -1634,13 +1717,13 @@ namespace launcher_ui
         }
 
         // Ten rows at a time; the newest first.
-        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(300.0f, 44.0f * float(m_saveBackups.size()))), ImGuiChildFlags_NavFlattened);
+        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(300.0f, 44.0f * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
         if (ImGui::BeginTable("##savebackups", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
         {
             ImGui::TableSetupColumn("when");
             ImGui::TableSetupColumn("size", ImGuiTableColumnFlags_WidthFixed, 110);
             ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthFixed, 128);
-            for (const savebackup::Entry& backup : m_saveBackups)
+            for (const savebackup::Entry& backup : m_s->saveBackups)
             {
                 ImGui::TableNextRow(ImGuiTableRowFlags_None, 40);
                 ImGui::TableSetColumnIndex(0);
@@ -1691,7 +1774,7 @@ namespace launcher_ui
             {
                 m_tab = Tabs[std::clamp(index + step, 0, count - 1)].first;
                 m_capturing = nullptr;
-                m_saveBackupsLoaded = false;
+                m_s->saveBackupsLoaded = false;
                 RequestFocus(FocusTo::Page); // the ring follows to the new tab
             }
         }
@@ -1705,7 +1788,7 @@ namespace launcher_ui
             {
                 m_tab = tab;
                 m_capturing = nullptr;
-                m_saveBackupsLoaded = false; // the saves may have changed since the tab was last open
+                m_s->saveBackupsLoaded = false; // the saves may have changed since the tab was last open
             }
             bool hovered = ImGui::IsItemHovered();
             FocusRing(RadiusSmall);
@@ -1796,7 +1879,7 @@ namespace launcher_ui
     {
         if (!m_quitPrompt)
             return;
-        if (!Installing()) // it ended meanwhile: nothing to lose any more
+        if (!AnyInstalling()) // it ended meanwhile: nothing to lose any more
         {
             m_running = false;
             return;
@@ -1866,7 +1949,7 @@ namespace launcher_ui
         {
         case Page::Home: DrawHome(); break;
         case Page::Play: DrawPlay(); break;
-        case Page::Collection: m_collection->Draw(); break;
+        case Page::Collection: m_s->collection->Draw(); break;
         case Page::Settings: DrawSettings(); break;
         }
         ImGui::End();
@@ -1877,7 +1960,7 @@ namespace launcher_ui
         DrawToast();
         // Who answers B / Escape next frame: an open menu or dialog, a field being edited, the collection's search or View.
         m_backTaken = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) || ImGui::IsAnyItemActive() ||
-            m_reportOpen || m_whatsNewOpen || m_quitPrompt || (m_page == Page::Collection && m_collection->TakesBack());
+            m_reportOpen || m_whatsNewOpen || m_quitPrompt || (m_page == Page::Collection && m_s->collection->TakesBack());
         m_focusTo = FocusTo::None; // a request no page answered (its item wasn't drawn) is dropped
 
         ImGui::Render();
@@ -1931,6 +2014,102 @@ namespace launcher_ui
     }
 
     // Keyboard and pad navigation (SSA_LAUNCHER_TEST_NAV): keys go to ImGui as a player's would, a shot after each group.
+    // Switching games in place: both games' discs are checked and their builds made (the fake kit) while the window
+    // stays, the state of each is kept, and PLAY returns the shown game and its own build.
+    void App::TestSwitchScript(uint64_t now)
+    {
+        const GameInfo& ssa = *FindGame("ssa");
+        const GameInfo& giants = *FindGame("giants");
+        GameSlot& a = SlotFor(ssa);
+        GameSlot& g = SlotFor(giants);
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL switch step %d: %s\n", m_testStep, what);
+                m_testFailures++;
+            }
+        };
+        auto folderOf = [](const std::string& runtime) { return std::filesystem::path(runtime).parent_path().filename().string(); };
+        if (m_testBegan == 0)
+            m_testBegan = now;
+        if (now - m_testBegan > 300000)
+        {
+            expect(false, "timeout");
+            m_running = false;
+            return;
+        }
+        switch (m_testStep)
+        {
+        case 0: // Spyro's Adventure first: its disc is checked in the background
+            if (m_testBegan == now)
+            {
+                SelectGame(ssa);
+                expect(a.started && m_s == &a && a.disc == DiscState::Verifying, "SSA's check started");
+                return;
+            }
+            if (a.disc == DiscState::Verifying)
+                return;
+            expect(a.disc == DiscState::Ready && !a.check.xexSha256.empty(), "SSA's disc is ready");
+            m_testSha = a.check.xexSha256;
+            m_testPath = a.discPath;
+            m_testStep++;
+            break;
+        case 1: // Giants: the window stays, its content is Giants', SSA's state is untouched
+            SelectGame(giants);
+            expect(m_s == &g && g.disc == DiscState::Verifying, "Giants shown at once, its check running");
+            expect(a.disc == DiscState::Ready && a.check.xexSha256 == m_testSha && a.discPath == m_testPath, "SSA's state kept");
+            expect(SettingGet(m_config, "launcher", "game") == "giants" && ActiveGame() == "giants", "Giants remembered");
+            m_testStep++;
+            break;
+        case 2:
+            if (g.disc == DiscState::Verifying)
+                return;
+            expect(g.disc == DiscState::Ready && !g.check.xexSha256.empty() && g.check.xexSha256 != m_testSha, "Giants' disc is its own");
+            expect(g.discPath != m_testPath && a.assets.Get(LauncherAssets::Role::Logo).path != g.assets.Get(LauncherAssets::Role::Logo).path,
+                "each game keeps its own disc and art");
+            expect(NeedsInstall(), "Giants needs its install");
+            StartInstall(); // Giants' build, in the background
+            expect(Installing(), "Giants installing");
+            m_testStep++;
+            break;
+        case 3: // back to SSA while Giants installs: SSA is not installing, its state is as left
+            SelectGame(ssa);
+            expect(m_s == &a && a.disc == DiscState::Ready && a.check.xexSha256 == m_testSha, "SSA back, as it was");
+            expect(!Installing() && AnyInstalling() && NeedsInstall(), "the install belongs to Giants");
+            m_testStep++;
+            break;
+        case 4: // (the progress card goes once the poll has recorded the build)
+            if (AnyInstalling() || g.installView)
+                return;
+            expect(!g.installed.runtime.empty() && a.installed.runtime.empty(), "Giants built, SSA not");
+            m_testRuntime[1] = g.installed.runtime;
+            StartInstall(); // SSA's build
+            m_testStep++;
+            break;
+        case 5:
+            if (AnyInstalling() || a.installView)
+                return;
+            expect(!a.installed.runtime.empty() && a.installed.runtime != g.installed.runtime, "SSA built, in its own place");
+            expect(folderOf(a.installed.runtime) == datadir::GameFolderName("ssa") && folderOf(g.installed.runtime) == datadir::GameFolderName("giants"),
+                "each build is in its game's folder");
+            m_testRuntime[0] = a.installed.runtime;
+            m_testStep++;
+            break;
+        case 6: // PLAY on each game: its disc, its build, its id
+            SelectGame(ssa);
+            expect(!NeedsInstall() && !Installing(), "SSA ready to play");
+            PlayNow();
+            expect(!m_running && &ChosenGame() == &ssa && ChosenRuntime() == m_testRuntime[0] && a.chosen == m_testPath, "PLAY on SSA runs SSA");
+            m_running = true;
+            SelectGame(giants);
+            PlayNow();
+            expect(!m_running && &ChosenGame() == &giants && ChosenRuntime() == m_testRuntime[1] && g.chosen == g.discPath, "PLAY on Giants runs Giants");
+            expect(a.chosen == m_testPath && a.chosenRuntime == m_testRuntime[0], "SSA's choice kept");
+            m_testStep++;
+            break;
+        }
+    }
+
     void App::TestNavScript(uint64_t now)
     {
         // A key is pressed and released, unless Hold (down only) or Release (up only) wraps it.
@@ -1959,10 +2138,10 @@ namespace launcher_ui
         if (m_testStep == 0)
         {
             m_page = Page::Play;
-            m_collection->Seed();
-            if (m_disc == DiscState::None && !m_testDrop.empty())
+            m_s->collection->Seed();
+            if (m_s->disc == DiscState::None && !m_testDrop.empty())
                 StartVerify(m_testDrop);
-            if (m_disc == DiscState::Ready || m_disc == DiscState::Failed || m_testDrop.empty())
+            if (m_s->disc == DiscState::Ready || m_s->disc == DiscState::Failed || m_testDrop.empty())
                 m_testAt = now + 500;
             return;
         }
@@ -2002,6 +2181,11 @@ namespace launcher_ui
             TestNavScript(now);
             return;
         }
+        if (m_testSwitch)
+        {
+            TestSwitchScript(now);
+            return;
+        }
         if (m_testCollection)
         {
             // The collection's screens, in the scratch collection SSA_COLLECTION names.
@@ -2010,9 +2194,9 @@ namespace launcher_ui
             else
             {
                 if (m_testStep == 0)
-                    m_collection->Seed();
+                    m_s->collection->Seed();
                 m_page = Page::Collection;
-                m_collection->TestScreen(m_testStep);
+                m_s->collection->TestScreen(m_testStep);
                 m_testAt = now + 700;
             }
             return;
@@ -2024,9 +2208,9 @@ namespace launcher_ui
             m_testAt = now + 600;
             break;
         case 1:
-            if (m_disc == DiscState::None && !m_testDrop.empty())
+            if (m_s->disc == DiscState::None && !m_testDrop.empty())
                 StartVerify(m_testDrop);
-            if (m_disc == DiscState::Ready || m_disc == DiscState::Failed || m_testDrop.empty())
+            if (m_s->disc == DiscState::Ready || m_s->disc == DiscState::Failed || m_testDrop.empty())
                 m_testAt = now + 400;
             break;
         case 2:
@@ -2041,9 +2225,9 @@ namespace launcher_ui
         case 4:
             // A few figures to show, in the test's own collection: characters, a legendary, a sidekick, an item and an
             // adventure pack; some sit on the next session's seats.
-            m_collection->Seed();
+            m_s->collection->Seed();
             m_page = Page::Collection;
-            m_collection->TestScreen(0);
+            m_s->collection->TestScreen(0);
             m_testAt = now + 600;
             break;
         case 5:
@@ -2052,11 +2236,11 @@ namespace launcher_ui
             break;
         case 6:
             m_page = Page::Collection;
-            m_collection->TestScreen(3);
+            m_s->collection->TestScreen(3);
             m_testAt = now + 600;
             break;
         case 7:
-            m_collection->TestScreen(6);
+            m_s->collection->TestScreen(6);
             m_testAt = now + 600;
             break;
         case 8:
@@ -2072,9 +2256,9 @@ namespace launcher_ui
         case 10:
             // The verified image moved away: INSTALL says so instead of failing later.
             m_page = Page::Play;
-            if (m_disc == DiscState::Ready)
+            if (m_s->disc == DiscState::Ready)
             {
-                m_discPath += ".moved";
+                m_s->discPath += ".moved";
                 StartInstall();
             }
             m_testAt = now + 400;
@@ -2211,7 +2395,7 @@ std::string LauncherDisplayName(std::string_view xdbfName, const GameInfo& game)
 }
 
 std::string RunLauncherWindow(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const std::string& previous,
-    std::string* installed, std::string* switchTo)
+    std::string* installed, const GameInfo** played)
 {
     if (!previous.empty())
         config[game.id]["iso"] = previous;
@@ -2219,7 +2403,7 @@ std::string RunLauncherWindow(const GameInfo& game, const std::string& configPat
     std::string chosen = app.Run();
     if (installed != nullptr)
         *installed = app.ChosenRuntime();
-    if (switchTo != nullptr)
-        *switchTo = app.SwitchTo();
+    if (played != nullptr)
+        *played = &app.ChosenGame();
     return chosen;
 }

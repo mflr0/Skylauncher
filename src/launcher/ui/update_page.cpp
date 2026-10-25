@@ -60,11 +60,11 @@ namespace launcher_ui
         UpdateManager::Settings settings;
         settings.repo = SettingGet(m_config, "update", "repo", "mflr0/Skylauncher");
         settings.kitRepo = SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher");
-        settings.kitInstalled = SettingGet(m_config, "update", "kit_tag", m_kit ? m_kit->release : std::string());
+        settings.kitInstalled = SettingGet(m_config, "update", "kit_tag", m_s->kit ? m_s->kit->release : std::string());
         settings.kitRoot = DownloadedKitsFolder();
         // A kit next to the launcher (development, offline) is updated in place; a downloaded one gets its own kit/<tag>/.
-        if (m_kit && m_kit->folder.parent_path() != settings.kitRoot)
-            settings.kitFolder = m_kit->folder;
+        if (m_s->kit && m_s->kit->folder.parent_path() != settings.kitRoot)
+            settings.kitFolder = m_s->kit->folder;
         m_updateWasBusy = true;
         m_updates.Check(settings);
     }
@@ -89,7 +89,7 @@ namespace launcher_ui
             {
                 Set("update", "kit_tag", state.kit.tag);
                 RefreshInstall();
-                if (m_disc == DiscState::Ready && !Installing())
+                if (m_s->disc == DiscState::Ready && !Installing())
                     StartInstall(); // the new kit builds the game
             }
         }
@@ -100,7 +100,7 @@ namespace launcher_ui
         UpdateManager::State state = m_updates.Snapshot();
         using Phase = UpdateManager::Phase;
         bool progress = state.phase == Phase::Downloading || state.phase == Phase::Verifying || state.phase == Phase::Installing;
-        bool offer = (state.launcherNewer && !m_updateLater) || (state.kitNewer && !m_kitLater && m_disc == DiscState::Ready);
+        bool offer = (state.launcherNewer && !m_updateLater) || (state.kitNewer && !m_kitLater && m_s->disc == DiscState::Ready);
         bool shown = progress || state.restartNeeded || (state.phase == Phase::Failed && !state.error.empty()) || offer ||
             (state.phase == Phase::Done && !state.note.empty());
         return shown ? BannerH : 0;

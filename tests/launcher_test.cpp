@@ -4,6 +4,7 @@
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "assets/launcher_assets.h"
+#include "launcher/ui/launcher_app.h"
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/ui/collection_model.h"
 #include "launcher/ui/hold_confirm.h"
@@ -538,6 +539,37 @@ void EditChecks()
 
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 
+// The launcher window switching games in place (App::TestSwitchScript, in an offscreen window): both discs checked, a
+// build of each made by the fake kit, the state of each kept across switches, PLAY returning the shown game's runtime.
+static void SwitchChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso)
+{
+    auto set = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
+    std::filesystem::create_directories(scratch / "shots");
+    set("SDL_VIDEO_DRIVER", "offscreen");
+    set("SDL_AUDIO_DRIVER", "dummy");
+    set("SKYLANDERS_DATA", (scratch / "data").string());
+    set("SKYLAUNCHER_DATA", (scratch / "launcher_data").string());
+    set("SSA_COLLECTION", (scratch / "collection").string());
+    set("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
+    set("FAKE_SSABUILD_DELAY", "0.01"); // long enough that Giants is still building when SSA is shown again
+    set("SSA_LAUNCHER_SHOTS", (scratch / "shots").string());
+    set("SSA_LAUNCHER_TEST_SWITCH", "1");
+    std::string ini = (scratch / "switch.ini").string();
+    set("SSA_LAUNCHER_INI", ini);
+    LauncherConfig config;
+    config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
+    config["ssa"]["iso"] = ssaIso;
+    config["giants"]["iso"] = giantsIso;
+    launcher_ui::App app(*FindGame("ssa"), ini, config);
+    std::string chosen = app.Run();
+    EXPECT(app.TestFailures() == 0);
+    EXPECT(&app.ChosenGame() == FindGame("giants") && chosen == giantsIso); // the last PLAY of the script
+    EXPECT(config["launcher"]["game"] == "giants"); // remembered for the next start
+    EXPECT(config["ssa"]["iso"] == ssaIso && config["giants"]["iso"] == giantsIso);
+    SetActiveGame("ssa");
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 3)
@@ -662,6 +694,8 @@ int main(int argc, char** argv)
         EXPECT(own.status == GameSourceStatus::Ok && own.xexSha256 == giants->releases[0].defaultXexSha256);
         EXPECT(CheckGameSource(giantsIso, game).status == GameSourceStatus::WrongGame);
         EXPECT(CheckGameSource(iso.string(), *giants).status == GameSourceStatus::WrongGame);
+        printf("Switching games in the window:\n");
+        SwitchChecks(scratch, iso.string(), giantsIso);
     }
     printf("Command line without UI:\n");
     EXPECT(ResolveHeadless({ iso.string() }) == iso.string());

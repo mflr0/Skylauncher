@@ -58,27 +58,15 @@ int main(int argc, char** argv)
     std::string configPath = LauncherConfigPath();
     LauncherConfig config = LoadLauncherConfig(configPath);
 
-    // The game last shown ([launcher] game=), else Spyro's Adventure. Picking another game in the sidebar closes the
-    // window and opens it again for that game (the window's state is one game's).
-    std::string id = config["launcher"]["game"];
-    const GameInfo* game = FindGame(id);
+    // The game last shown ([launcher] game=), else Spyro's Adventure. Picking another game in the sidebar switches the
+    // window to it in place; the game that was shown when PLAY was pressed is the one that runs.
+    const GameInfo* game = FindGame(config["launcher"]["game"]);
     if (game == nullptr)
         game = FindGame("ssa");
     if (game == nullptr)
         return 1;
     std::string installed;
-    std::string chosen;
-    for (;;)
-    {
-        SetActiveGame(game->id);
-        std::string switchTo;
-        installed.clear();
-        chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed, &switchTo);
-        const GameInfo* next = switchTo.empty() ? nullptr : FindGame(switchTo);
-        if (next == nullptr)
-            break;
-        game = next;
-    }
+    std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed, &game);
     if (chosen.empty())
         return 0;
 

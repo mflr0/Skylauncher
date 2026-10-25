@@ -67,8 +67,8 @@ namespace launcher_ui
         sources.runtimeFolder = RuntimeLogFolder();
         sources.logFolder = GameLogFolder();
         sources.settingsFile = std::filesystem::path(std::u8string(m_configPath.begin(), m_configPath.end()));
-        sources.iso = m_discPath;
-        std::string kit = m_installed.kitVersion;
+        sources.iso = m_s->discPath;
+        std::string kit = m_s->installed.kitVersion;
         if (kit.empty())
             if (std::optional<InstallKit> found = FindInstallKit(m_config))
                 kit = found->version;
@@ -161,7 +161,7 @@ namespace launcher_ui
 
     void App::DrawPortalTest()
     {
-        std::string runtime = !m_installed.runtime.empty() ? m_installed.runtime : m_ownRuntime;
+        std::string runtime = !m_s->installed.runtime.empty() ? m_s->installed.runtime : m_s->ownRuntime;
         bool testing = !m_probe.done;
         ImGui::BeginDisabled(testing || runtime.empty());
         if (PillButton(testing ? "Testing..." : "Test the portal", false, 200))

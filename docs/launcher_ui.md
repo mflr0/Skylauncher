@@ -30,10 +30,12 @@ is easy to iterate without touching the game runtime.
 ## Layout
 The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
 GitHub issue) and the GitHub link bottom right. The top right is kept for the launcher's own language (#4): the game's text
-and voice languages are in Settings > Language ("Game text", "Game voices"). No game is selected until the player clicks
-one in the sidebar.
-1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure enabled, the others "Coming later",
-   SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom.
+and voice languages are in Settings > Language ("Game text", "Game voices"). The game shown last is selected in the sidebar
+(`[launcher] game=`); the other is one click away.
+1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
+   SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
+   and disc state ("Open" until the game is first shown, then "Checking your disc", "Needs your disc" or "Ready to play"); the
+   selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
 2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
    (current device, PLAY WITH: a menu of the others), the main button (CHOOSE DISC, INSTALL, then PLAY) with the portal's
    line under it and, on the right, "Change disc...". PLAY and INSTALL check that the image is still there first.
@@ -143,5 +145,19 @@ repository's working copy (its own HOME, the offscreen driver).
 ## Notes
 - Drag & drop ISO is supported through `SDL_EVENT_DROP_FILE`.
 - Verification progress is saved to `launcher.ini`; the SSA title/icon come from the player's own XEX.
-- The game catalog lives in `LauncherGameCatalog()`; SSA and Giants are enabled; the sidebar row of the other enabled game reopens the window on it.
-- `SkylauncherTest` checks verification, settings, font/text helpers and the disc texture decoder.
+- The game catalog lives in `LauncherGameCatalog()`; SSA and Giants are enabled.
+- **Switching games is in place.** Choosing the other game in the sidebar keeps the window: the pages draw that game's state
+  (`App::SelectGame`). Each game the player opens has a `GameSlot` for the session: its disc and check, art and icon, install
+  (progress, kit download, built game), save backups and collection page (the collection's game filter starts on that game).
+  The first time a game is shown its remembered disc is checked on a worker thread (art extraction included), as at start; a
+  game seen before is shown as it was left, instantly. Every slot's checks and installs are polled each frame (with that game's
+  folders in place), so an install goes on while the other game is shown; closing the window asks first if any game is
+  installing. The last game shown is written to `[launcher] game=` and opens at the next start. PLAY returns the shown game
+  and its own build, and `main()` runs that game's runtime (SSARecomp or SGRecomp) with its language settings. The settings
+  pages (language, game data, reinstall) follow the shown game. No animation or colour was added.
+- `SSA_LAUNCHER_TEST_SWITCH=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=` in
+  the config) runs the switch script: SSA and Giants checked, an install of each with the fake SSABuild (SSA shown while
+  Giants builds), a switch back and forth with each state kept, and PLAY on each returning its game and build. It is run by
+  `SkylauncherTest` when `SKYLAUNCHER_TEST_GIANTS_ISO` is set.
+- `SkylauncherTest` checks verification, settings, font/text helpers, the disc texture decoder and the in-place game switch
+  (build it with `--target SkylauncherTest FakeSSABuild`).
