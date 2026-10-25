@@ -1233,7 +1233,29 @@ namespace launcher_ui
 
         SettingRow("Texture filtering", "Anisotropic filtering keeps ground textures sharp at an angle.");
         Combo("##filter", "video", "anisotropy", FilterChoices, 0);
+
+        SettingRow("Widescreen", "Auto shows more to the sides on a window wider than 16:9. 16:9 keeps the game's picture, with bars.");
+        Combo("##aspect", "video", "aspect", AspectChoices, 0);
+
+        SettingRow("HD texture packs", "Replaces the game's textures with the files of the textures folder.");
+        bool texturePacks = ParseBool(SettingGet(m_config, "video", "texture_packs", "1"));
+        if (Toggle("##texturepacks", &texturePacks))
+            Set("video", "texture_packs", texturePacks ? "1" : "0");
+        if (PillButton("Open texture packs folder", false, 300))
+        {
+            if (!OpenFolder(GameInstallFolder({}) / "textures"))
+                Toast("Couldn't open the folder");
+        }
         EndSettingsTable();
+
+        if (ImGui::CollapsingHeader("Advanced") && BeginSettingsTable("##graphicsadvanced"))
+        {
+            SettingRow("Dump textures (for pack makers)", "Writes the game's textures as DDS files into the textures folder, to make a pack from.");
+            bool textureDump = ParseBool(SettingGet(m_config, "video", "texture_dump", "0"));
+            if (Toggle("##texturedump", &textureDump))
+                Set("video", "texture_dump", textureDump ? "1" : "0");
+            EndSettingsTable();
+        }
     }
 
     void App::DrawControls()
