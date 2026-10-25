@@ -2372,7 +2372,7 @@ namespace launcher_ui
             }
             m_testAt = now + 400;
             break;
-        case 11:
+        case 15:
             // The logo falling in, early in its fall (it eases out: most of the way is done in the first third): the disc put
             // back, the page entered again.
             if (m_s->discPath.ends_with(".moved"))
