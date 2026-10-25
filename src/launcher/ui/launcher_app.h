@@ -150,6 +150,12 @@ namespace launcher_ui
     enum class SettingsTab { Controls, Launcher, Support, About };
     enum class GameTab { Video, Language, Disc, Saves, Game };
     enum class DiscState { None, Verifying, Ready, Failed };
+    // Everything a game can be in, read from its slot by App::SlotStatus: the one place that decides (docs/launcher_ui.md).
+    enum class SlotState
+    {
+        Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame,
+        DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready
+    };
     // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
     enum class FocusTo { None, Sidebar, Page };
 
@@ -238,6 +244,9 @@ namespace launcher_ui
             std::string text;
             unsigned dot;
             float progress = -1;
+            SlotState state = SlotState::Closed;
+            const char* button = "";   // the game page's main button: its label
+            bool buttonEnabled = true; // and whether it can be pressed
         };
         SlotLine SlotStatus(GameSlot* slot);
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
@@ -371,7 +380,7 @@ namespace launcher_ui
         void Browse();
         bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
-        void Toast(std::string text);
+        void Toast(std::string text, bool error = false); // an error stays until it is closed; the rest go by themselves
         void RefreshGamepads();
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
         std::string CurrentDevice() const;
@@ -447,8 +456,12 @@ namespace launcher_ui
         Page m_lastPage = Page::Home;
         std::map<std::string, ArtTexture> m_cachedArt; // CachedArt's, by "<game> <role> <width>"
 
-        std::string m_toast;
-        uint64_t m_toastUntil = 0;
+        struct ToastItem
+        {
+            std::string text;
+            uint64_t until; // 0: an error, kept until closed
+        };
+        std::vector<ToastItem> m_toasts; // newest last; drawn from the top right, down
         std::vector<ImVec4> m_stars; // x, y (0..1), radius, phase
 
         // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
@@ -459,6 +472,8 @@ namespace launcher_ui
         bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
         bool m_testSeatX = false;      // SSA_LAUNCHER_TEST_SEATX: the X on every seat, by mouse, keyboard and pad
         std::vector<std::string> m_testSeats; // the seats the SEATX script restores before each try
+        std::string m_testBuilt;                    // the sidebar test's built game, put back between the states it sets by hand
+        std::map<std::string, std::string> m_drawn; // while testing: what the sidebar, Home and the main button drew ("sidebar:ssa", "home:ssa", "button")
         bool m_testSidebar = false;    // SSA_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
         bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
         int m_testFailures = 0;
