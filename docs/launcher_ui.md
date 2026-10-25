@@ -125,6 +125,26 @@ What belongs to the game on its page is drawn in **the game's own art direction*
   never mix.
 - A new game: add its `GameStyle` and a line in `StyleOf`.
 
+## Button styles (dev only, being chosen)
+The band's action area (the main button: PLAY, INSTALL, CHOOSE DISC, and the game's settings entry beside it) has three
+candidate styles, picked at start by `[launcher] button_style=1|2|3` in `launcher.ini` (unset or 0: the `GameButton` and
+`GameSettingsButton` above). `App::DrawMainAction` draws them (`game_look.cpp`); each keeps the game's colours.
+
+| Style | Look |
+|---|---|
+| 1, flat and crisp | one split button in the game's colour (a light gradient, `Radius` corners, no outline), Bungee label in white or the game's dark ink (whichever reads at 3:1 on the fill), the gear in its own segment behind a hairline |
+| 2, the game's finish refined | SSA's stone and Giants' gold kept, but a 2 pt rim, a soft sheen, a crisp light line and a dark lip instead of the glossy gel; white Bungee with a thin rim and a drop shadow; the gear a square button in the same finish |
+| 3, big launcher | one wide button (340 pt) in the game's colour, an icon (PLAY's triangle, INSTALL's arrow) and a spaced Outfit SemiBold label; the gear a quiet icon button in the band's grey |
+
+Every style: hover, pressed, the focus ring (the launcher's accent, one ring, ImGui's own hidden), disabled, and busy
+(checking the disc, installing): a dark face tinted in the game's colour up to the progress, a bar along its bottom edge
+and the percentage in the label. The controller picker takes the buttons' height.
+
+`SSA_LAUNCHER_TEST_BUTTONS=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=`)
+shoots the states for the style in the ini: for each game `00-install`, `01-hover`, `02-pressed`, `03-focused`,
+`04-settings-hover`, `05-disabled`, `06-installing`, `07-play`, `08-play-hover`, then `09-small` (1024x680),
+`10-scale150` and `11-scale200`, named `<game>-<nn>-<state>.png`.
+
 ## The logo's arrival
 On each arrival on a game's page (from another page, or switching games, or when the logo appears because the disc was
 just read), the logo **falls in**: `LogoDropMs` (300 ms) from `LogoDropDistance` (44 points) above, eased out with a

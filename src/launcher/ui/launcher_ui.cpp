@@ -2,6 +2,7 @@
 // launcher's widgets. The collection's pages are in collection_page.cpp; the class is declared in launcher_app.h.
 // Every choice is written to launcher.ini, which the game runtime reads (docs/settings.md lists the keys).
 #include "launcher/ui/launcher_ui.h"
+#include "launcher/install_checklist.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/collection/datadir.h"
 #include "shared/embedded_fonts.h"
@@ -373,7 +374,9 @@ namespace launcher_ui
             m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
             m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
+            m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
         }
+        m_buttonStyle = std::clamp(SettingInt(m_config, "launcher", "button_style", 0), 0, 3);
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
         m_portal.Start();
@@ -642,6 +645,8 @@ namespace launcher_ui
         bool bounded = SDL_GetDisplayUsableBounds(SDL_GetDisplayForWindow(m_window), &usable) && usable.w > 0 && usable.h > 40;
         if (bounded)
             scale = std::min({ scale, usable.w / WindowMinW, (usable.h - 40) / WindowMinH });
+        if (m_testUiScale > 0) // the button test's 150 % and 200 % (the offscreen display is small)
+            scale = m_testUiScale;
         float previous = m_uiScale;
         m_uiScale = std::clamp(scale, MinUiScale, MaxUiScale);
         if (m_uiScale != previous || !m_uiScaleLogged) // once, then only when it changes
@@ -920,13 +925,13 @@ namespace launcher_ui
         return pressed;
     }
 
-    void App::FocusRing(float rounding, float gap)
+    void App::FocusRing(float rounding, float gap, ImDrawFlags flags)
     {
         if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
             return;
         ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
         ImGui::GetWindowDrawList()->AddRect(ImVec2(min.x - gap, min.y - gap), ImVec2(max.x + gap, max.y + gap), Rgb(Accent),
-            std::max(0.0f, rounding + gap), 0, 2.0f);
+            std::max(0.0f, rounding + gap), flags, 2.0f);
     }
 
     bool App::HoldButton(const char* label, float width, const char* hint)
@@ -1476,27 +1481,35 @@ namespace launcher_ui
         const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : strings::ChooseDisc;
         // The main button and the game's settings beside it, in the game's own look, centred together, unless the
         // controller picker on their left would reach the sidebar (a narrow window).
-        constexpr float MinGap = 16, SettingsGap = 12;
-        const float groupW = PlayButtonW + SettingsGap + PlayButtonH;
-        float mainX = std::max(bar.x + (available.x - groupW) / 2, bar.x + Pad + ControllerW + MinGap), buttonY = middle - PlayButtonH / 2;
-        ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY));
-        if (GameButton(label, ImVec2(PlayButtonW, PlayButtonH), StyleOf(m_s->game.id), !verifying && !installing))
+        constexpr float MinGap = 16;
+        MainActionLayout layout = MainActionLayoutOf(m_buttonStyle);
+        float mainX = std::max(bar.x + (available.x - layout.Width()) / 2, bar.x + Pad + ControllerW + MinGap), buttonY = middle - layout.height / 2;
+        MainAction action{ label, !verifying && !installing && !m_testButtonsOff };
+        if (installing)
+            action.progress = MakeInstallChecklist(InstallSnapshot(), SDL_GetTicks()).overall;
+        else if (verifying)
+            action.progress = m_s->verify.progress;
+        switch (DrawMainAction(ImVec2(mainX, buttonY), action))
         {
+        case MainActionHit::Main:
             if (!ready)
                 Browse();
             else if (install)
                 StartInstall(); // which checks first that the image is still there
             else
                 PlayNow();
-        }
-        TakeFocus(FocusTo::Page);
-        ImGui::SetCursorScreenPos(ImVec2(mainX + PlayButtonW + SettingsGap, buttonY));
-        if (GameSettingsButton("##gamesettings", PlayButtonH))
+            break;
+        case MainActionHit::Settings:
             GoTo(Page::GameSettings);
+            break;
+        case MainActionHit::None:
+            break;
+        }
 
-        // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
+        // Controller picker, left of the main button: what the game listens to, a menu of the choices above it (as tall
+        // as the buttons in the button styles).
         float controllerGap = std::clamp(mainX - (bar.x + Pad) - ControllerW, MinGap, ControllerGap);
-        ImVec2 controllerAt(mainX - controllerGap - ControllerW, buttonY), controllerSize(ControllerW, PlayButtonH - 6);
+        ImVec2 controllerAt(mainX - controllerGap - ControllerW, buttonY), controllerSize(ControllerW, m_buttonStyle == 0 ? PlayButtonH - 6 : layout.height);
         ImGui::SetCursorScreenPos(controllerAt);
         if (ImGui::InvisibleButton("##controller", controllerSize, ImGuiButtonFlags_EnableNav) || m_testControllers)
         {
@@ -1571,7 +1584,7 @@ namespace launcher_ui
             if (!line.empty())
             {
                 ImGui::PushFont(nullptr, SmallSize);
-                ImGui::SetCursorScreenPos(ImVec2(mainX + (PlayButtonW - ImGui::CalcTextSize(line.c_str()).x) / 2, buttonY + PlayButtonH + 4));
+                ImGui::SetCursorScreenPos(ImVec2(mainX + (layout.mainW - ImGui::CalcTextSize(line.c_str()).x) / 2, buttonY + layout.height + 4));
                 DrawPortalStatus();
                 ImGui::PopFont();
             }
@@ -1981,7 +1994,9 @@ namespace launcher_ui
             static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-view-menu",
                 "45-nav-view-closed", "46-nav-card", "47-nav-figure-page", "48-nav-delete-hint", "49-nav-delete-held",
                 "50-nav-back-to-play", "51-nav-settings-controls", "52-nav-settings-back" };
-            if (m_testNav)
+            if (m_testButtons)
+                Screenshot(m_testShot.c_str());
+            else if (m_testNav)
                 Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
             else if (m_testSeatX)
                 Screenshot(fmt::format("60-seat-x-{:02}", m_testStep).c_str());
@@ -2246,6 +2261,102 @@ namespace launcher_ui
         m_testAt = now + (holding ? 1500 : 600);
     }
 
+    // The action area's states, to compare the button styles (SSA_LAUNCHER_TEST_BUTTONS, with a [launcher] kit= that is the
+    // fake kit and both games' iso=): for each game INSTALL, under the pointer, pressed, focused, the settings under the
+    // pointer, disabled, installing, then PLAY and PLAY under the pointer; then each game in the smallest window, at 150 %
+    // and at 200 %. Shots "<game>-<step>-<state>".
+    void App::TestButtonsScript(uint64_t now)
+    {
+        static const char* const Games[] = { "ssa", "giants" };
+        constexpr int PerGame = 9, Extras = 3;
+        ImGuiIO& io = ImGui::GetIO();
+        int game = m_testStep / PerGame, step = m_testStep % PerGame;
+        if (m_testStep >= 2 * PerGame)
+        {
+            // The window's extremes, PLAY on each game.
+            int extra = (m_testStep - 2 * PerGame) / 2;
+            game = (m_testStep - 2 * PerGame) % 2;
+            if (extra >= Extras)
+            {
+                m_running = false;
+                return;
+            }
+            static const char* const Names[] = { "small", "scale150", "scale200" };
+            static const float Scales[] = { 1, 1.5f, 2 };
+            SelectGame(*FindGame(Games[game]));
+            io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
+            m_testUiScale = m_uiScale = Scales[extra];
+            float w = extra == 0 ? WindowMinW : WindowW, h = extra == 0 ? WindowMinH : WindowH;
+            SDL_SetWindowSize(m_window, int(w * m_uiScale), int(h * m_uiScale));
+            m_testShot = fmt::format("{}-{:02}-{}", Games[game], PerGame + extra, Names[extra]);
+            m_testAt = now + 1500;
+            return;
+        }
+        GameSlot& slot = SlotFor(*FindGame(Games[game]));
+        auto shoot = [&](const char* name, uint64_t wait = 300) {
+            m_testShot = fmt::format("{}-{:02}-{}", Games[game], step, name);
+            m_testAt = now + wait;
+        };
+        auto pointAt = [&](ImVec2 at) { io.AddMousePosEvent(at.x, at.y); };
+        auto pointAway = [&] { io.AddMousePosEvent(-FLT_MAX, -FLT_MAX); };
+        switch (step)
+        {
+        case 0:
+            if (m_s != &slot || !slot.started)
+                SelectGame(slot.game); // its remembered disc checked
+            m_page = Page::Play;
+            pointAway();
+            if (slot.disc == DiscState::Ready && !Installing() && !slot.installView)
+                shoot("install", 600);
+            break;
+        case 1:
+            pointAt(m_testMainAt);
+            shoot("hover");
+            break;
+        case 2:
+            io.AddMouseButtonEvent(ImGuiMouseButton_Left, true);
+            shoot("pressed");
+            break;
+        case 3:
+            // Released away from the button (no click), then the focus as the keyboard or the pad puts it.
+            pointAway();
+            io.AddMouseButtonEvent(ImGuiMouseButton_Left, false);
+            m_focusTo = FocusTo::Page;
+            m_focusShow = true;
+            shoot("focused");
+            break;
+        case 4:
+            ImGui::SetNavCursorVisible(false); // as the mouse hides it
+            pointAt(m_testGearAt);
+            shoot("settings-hover");
+            break;
+        case 5:
+            pointAway();
+            m_testButtonsOff = true;
+            shoot("disabled");
+            break;
+        case 6:
+            m_testButtonsOff = false;
+            if (!Installing() && !slot.installView)
+            {
+                SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.03", true);
+                StartInstall();
+            }
+            else if (Installing() && MakeInstallChecklist(InstallSnapshot(), now).overall >= 0.4f)
+                shoot("installing", 50);
+            break;
+        case 7:
+            if (!Installing() && !slot.installView)
+                shoot("play", 4000); // after the "installed" toast
+            break;
+        case 8:
+            pointAt(m_testMainAt);
+            shoot("play-hover");
+            m_testAt = now + 300;
+            break;
+        }
+    }
+
     // Screens of the screenshot test, each captured once it has settled.
     void App::TestScript()
     {
@@ -2260,6 +2371,11 @@ namespace launcher_ui
         if (m_testUpdate)
         {
             TestUpdateScript(now);
+            return;
+        }
+        if (m_testButtons)
+        {
+            TestButtonsScript(now);
             return;
         }
         if (m_testNav)
