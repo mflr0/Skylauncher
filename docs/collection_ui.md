@@ -92,7 +92,7 @@ polling, settings move, naming unknown toys). `launcher_app.h` only holds a `Col
   refresh, settings move, unknown toy naming, icons for every catalogue toy. Everything runs in a scratch folder
   (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
 - Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `29-live-portal` (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1` fakes a game's
+  refuses without it) and writes `20-collection` to `30-after-delete` (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1` fakes a game's
   locks for the last one).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the
@@ -105,3 +105,17 @@ polling, settings move, naming unknown toys). `launcher_app.h` only holds a `Col
 - Real-portal copies ("Save a copy") are a Toy Box action; the launcher shows them as `origin: portal` figures.
 - The launcher quits when the game starts, so live refresh is for a launcher opened next to a running game.
 - The Toy Box's wheel pins (`GetWheel`) and pad glyph hints are not drawn in the launcher.
+
+## Deleting a figure (issue #13)
+
+What was wrong:
+- The Delete button returned from the Figure page between `BeginDisabled` and `EndDisabled`. The disabled state leaked
+  into the rest of the frame: the page went grey and the launcher stayed unusable.
+- A hold button fired again every second while the mouse stayed down, so a refused action repeated its toast.
+- `collection::Delete` moved the dump first and ignored the index write. When `collection.json` did not load (the S-03
+  guard refuses writes), the file sat in `trash/` with no entry: it was lost to Manage > Trash.
+
+Now: the index is written first and the move undone if it fails, so a refusal changes nothing and comes back as one
+toast with its reason. A hold button acts once per press. After a delete the page returns to the list, the focus on the
+next figure (`CollectionPage::DeleteFigure`, `CollectionModel::Delete`). Tested by `CollectionChecks` and screenshot
+`30-after-delete`.

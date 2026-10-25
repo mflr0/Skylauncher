@@ -57,6 +57,9 @@ namespace launcher_ui
         // the session file. False when the seats cannot be changed now.
         bool SetSeat(size_t seat, const std::string& path);
         int SeatOf(const std::string& path) const; // -1 if on no seat
+        // Moves the figure to the trash (collection::Delete), takes it off its seat and reloads. False, with the reason,
+        // when the trash refuses it: then nothing has changed.
+        bool Delete(const std::string& path, std::string* error);
         std::vector<std::string> OnPortal() const; // the seated paths
 
     private:

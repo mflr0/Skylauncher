@@ -817,26 +817,44 @@ namespace collection
         std::string id = stamp + " " + FileName(path);
         for (int n = 2; Exists(folder + "/" + id); n++)
             id = stamp + "-" + std::to_string(n) + " " + FileName(path);
+        // The index first: when it cannot be written (collection.json unreadable or bad) nothing has moved, so the file and
+        // its metadata never disagree; when the move fails the entry is taken back out.
+        auto record = [&](bool inTrash) {
+            return UpdateIndex([&](Json& index) {
+                Json entries = index["figures"].IsObject() ? index["figures"] : Json::Object();
+                Json trash = index["trash"].IsObject() ? index["trash"] : Json::Object();
+                if (inTrash)
+                {
+                    Json item = Json::Object();
+                    item.Set("file", FileName(path));
+                    item.Set("deleted", Now());
+                    item.Set("reason", reason);
+                    if (entries.Has(FileName(path)))
+                    {
+                        item.Set("metadata", entries[FileName(path)]);
+                        entries.Erase(FileName(path));
+                    }
+                    trash.Set(id, std::move(item));
+                }
+                else
+                {
+                    if (trash[id]["metadata"].IsObject())
+                        entries.Set(FileName(path), trash[id]["metadata"]);
+                    trash.Erase(id);
+                }
+                index.Set("figures", std::move(entries));
+                index.Set("trash", std::move(trash));
+            });
+        };
+        if (!record(true))
+            return Refuse(error, "collection.json cannot be updated (unreadable, or kept as .bad-*)");
         if (!SDL_RenamePath(path.c_str(), (folder + "/" + id).c_str()))
+        {
+            record(false);
             return Refuse(error, "cannot move the file to the trash");
+        }
         if (lock.locked)
             BreakLock(path);
-        UpdateIndex([&](Json& index) {
-            Json entries = index["figures"];
-            Json trash = index["trash"].IsObject() ? index["trash"] : Json::Object();
-            Json item = Json::Object();
-            item.Set("file", FileName(path));
-            item.Set("deleted", Now());
-            item.Set("reason", reason);
-            if (entries.Has(FileName(path)))
-            {
-                item.Set("metadata", entries[FileName(path)]);
-                entries.Erase(FileName(path));
-                index.Set("figures", std::move(entries));
-            }
-            trash.Set(id, std::move(item));
-            index.Set("trash", std::move(trash));
-        });
         return true;
     }
 

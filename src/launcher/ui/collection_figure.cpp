@@ -88,14 +88,14 @@ namespace launcher_ui
             float t = std::min(1.0f, float(now - m_holdSince) / HoldMs);
             ImGui::GetWindowDrawList()->AddRectFilled(min, ImVec2(min.x + (max.x - min.x) * t, max.y), Rgb(Danger, 190), Radius);
             ImGui::GetWindowDrawList()->AddText(ImVec2((min.x + max.x - text.x) / 2, (min.y + max.y - text.y) / 2), Rgb(Text), label);
-            if (t >= 1.0f)
-            {
-                done = true;
-                m_hold.clear();
-            }
+            if (t >= 1.0f && !m_holdFired)
+                done = m_holdFired = true; // once per press: keeping the button down does not repeat the action
         }
         else if (m_hold == label)
+        {
             m_hold.clear();
+            m_holdFired = false;
+        }
         return done;
     }
 
@@ -352,21 +352,13 @@ namespace launcher_ui
             Reload();
         }
         ImGui::SameLine(0, 8);
-        if (HoldButton("Delete (hold)", 140))
-        {
-            std::string error;
-            if (collection::Delete(path, "deleted", &error))
-            {
-                if (int seat = m_model.SeatOf(path); seat >= 0)
-                    m_model.SetSeat(size_t(seat), "");
-                Toast("Moved to the trash (Manage > Trash)");
-                Reload();
-                CloseOverlay();
-                return;
-            }
-            Toast("Couldn't delete it: " + error);
-        }
+        bool deleteIt = HoldButton("Delete (hold)", 140);
         ImGui::EndDisabled();
+        if (deleteIt) // after EndDisabled: the page is gone once it is deleted
+        {
+            DeleteFigure(path);
+            return;
+        }
         ImGui::SameLine(0, 8);
         if (m_app.PillButton("Folder", false, 90, true))
             { std::string folder = collection::Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
@@ -385,6 +377,33 @@ namespace launcher_ui
                 Reload();
             }
         }
+    }
+
+    // Moves the figure to the trash, empties its seat and goes back to the list, focused on the next figure. A refusal is
+    // reported once, with its reason, and the page stays.
+    void CollectionPage::DeleteFigure(const std::string& path)
+    {
+        std::string next;
+        for (size_t i = 0; i < m_list.size(); i++)
+            if (m_list[i].path == path)
+            {
+                if (i + 1 < m_list.size())
+                    next = m_list[i + 1].path;
+                else if (i > 0)
+                    next = m_list[i - 1].path;
+                break;
+            }
+        std::string error;
+        if (!m_model.Delete(path, &error))
+        {
+            Toast("Couldn't delete it: " + error);
+            return;
+        }
+        m_selected = next;
+        m_figure.clear();
+        Toast("Moved to the trash (Manage > Trash)");
+        m_generation++;
+        CloseOverlay();
     }
 
     void CollectionPage::DrawEditStats(const Figure& f)
