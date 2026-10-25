@@ -48,7 +48,7 @@ namespace launcher_ui
             constexpr const char* ResetKeys = "Reset to defaults";
             constexpr const char* ResetKeysHint = "Hold to put every key back to its default.";
             constexpr const char* Reinstall = "Reinstall the game";
-            constexpr const char* ReinstallHint = "Hold to build the game again from your disc (about 15 minutes).";
+            constexpr const char* ReinstallHint = "Hold to build the game again from your disc.";
             constexpr const char* RestoreSaves = "Restore";
             constexpr const char* RestoreSavesHint = "Hold to restore this backup. The saves you have now are backed up first.";
             constexpr const char* OpenFigures = "Open figures folder";
