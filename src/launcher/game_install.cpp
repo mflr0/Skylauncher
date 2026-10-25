@@ -312,6 +312,20 @@ void CleanAfterInstall(const std::filesystem::path& gameFolder, const std::files
             fs::remove(entry.path(), error);
 }
 
+void MarkGameLayout(const std::filesystem::path& gameFolder)
+{
+    std::ofstream(gameFolder / "layout.txt", std::ios::binary | std::ios::trunc) << "data=skylanders\n";
+}
+
+bool IsOlderLayoutBuild(const std::filesystem::path& runtime, const std::filesystem::path& gameFolder)
+{
+    std::error_code error;
+    std::filesystem::path relative = runtime.lexically_normal().lexically_relative(gameFolder.lexically_normal());
+    if (relative.empty() || *relative.begin() == "..")
+        return false; // not a game the launcher built: a runtime set up by the player
+    return !std::filesystem::exists(gameFolder / "layout.txt", error);
+}
+
 GameInstaller::~GameInstaller()
 {
     Cancel();
@@ -452,7 +466,10 @@ void GameInstaller::Read()
         succeeded = !m_cancelled && exitCode == 0 && !m_progress.runtime.empty();
     }
     if (succeeded)
+    {
         CleanAfterInstall(m_out, m_kitFolder);
+        MarkGameLayout(m_out);
+    }
 
     std::lock_guard lock(m_mutex);
     InstallProgress& progress = m_progress;

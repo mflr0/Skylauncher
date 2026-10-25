@@ -83,6 +83,13 @@ removed only once empty; `launcher.ini` paths into a moved folder are rewritten 
 in `logs/migration.log`. The full table and rules: SSARecomp's `docs/settings.md`. A run with `SKYLANDERS_DATA`,
 `SKYLAUNCHER_DATA`, `SSA_LAUNCHER_INI`, `SSA_SETTINGS`, `SSA_SAVE_DIR` or `SSA_COLLECTION` set never migrates.
 
+**Older builds.** A game built by a kit up to 0.3.0 still uses the older folders, which the migration emptied. Installs
+from 0.3.1 on leave `layout.txt` in the game folder. When PLAY starts a game under `SSA/` without it, the launcher points
+it at the new places through variables that build already reads: `SSA_LAUNCHER_INI` (the root's `launcher.ini`),
+`SSA_SAVE_DIR` (`SSA/saves`; that build also keeps `pipelines.bin` and `portal.txt` there), `SSA_LOG` and
+`SSA_PORTRAITS`. A `launcher-cache` it makes again in the old folder is dropped at the next start. "Update the game"
+rebuilds it with the new kit and ends this.
+
 ### Housekeeping
 
 After a **successful** install: `ssabuild-work/` (2-3 GB) is deleted and its `logs/` kept as `install-logs/` (an update

@@ -171,6 +171,12 @@ namespace
         EXPECT(done.state == InstallProgress::State::Done && done.steps.size() == 10);
         EXPECT(std::filesystem::path(done.runtime).filename().string().starts_with("SSARecomp"));
         EXPECT(std::filesystem::exists(scratch / "game" / "install.log"));
+        // A game built by this launcher is marked; one without the mark is an older build (kit 0.3.0 or before).
+        EXPECT(std::filesystem::exists(scratch / "game" / "layout.txt") && !IsOlderLayoutBuild(done.runtime, scratch / "game"));
+        std::filesystem::remove(scratch / "game" / "layout.txt");
+        EXPECT(IsOlderLayoutBuild(done.runtime, scratch / "game"));
+        EXPECT(!IsOlderLayoutBuild(scratch / "elsewhere" / "SSARecomp", scratch / "game")); // the player's own runtime
+        MarkGameLayout(scratch / "game");
         printf("  fake kit: failure at step %zu, then built %s\n", failed.steps.size(), done.runtime.c_str());
 
         // After a failed build nothing is cleaned.

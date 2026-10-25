@@ -316,6 +316,14 @@ namespace datadir
                 fs::path to = move.to;
                 if (fs::exists(fs::symlink_status(to, error)))
                 {
+                    if (move.from.filename() == "launcher-cache")
+                    {
+                        // A cache made again by a game built before this layout: the one in place wins.
+                        RemoveTree(move.from);
+                        Log("drop (a cache, already in place)", move.from, to);
+                        m_report.dropped++;
+                        return;
+                    }
                     if (Covered(move.from, to))
                     {
                         // An earlier run copied it and was stopped before deleting the original.

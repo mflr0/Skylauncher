@@ -92,6 +92,21 @@ int main(int argc, char** argv)
     pass("SSA_LANGUAGE", game->id, "language");
     pass("SSA_VOICE_LANGUAGE", game->id, "voice_language");
 
+    // A game built before the one data folder would look for its saves and settings in the older folders, which the
+    // migration emptied: point it at the new ones until "Update the game" rebuilds it (docs/install.md, "Older builds").
+    std::filesystem::path gameFolder = GameInstallFolder({});
+    if (IsOlderLayoutBuild(std::filesystem::path(std::u8string(runtime.begin(), runtime.end())), gameFolder))
+    {
+        auto set = [](const char* variable, const std::filesystem::path& path) {
+            std::u8string text = path.u8string();
+            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), variable, std::string(text.begin(), text.end()).c_str(), true);
+        };
+        set("SSA_LAUNCHER_INI", std::filesystem::path(std::u8string(configPath.begin(), configPath.end())));
+        set("SSA_SAVE_DIR", gameFolder / "saves");
+        set("SSA_LOG", gameFolder / "SSARecomp.log");
+        set("SSA_PORTRAITS", gameFolder / "portraits");
+    }
+
     // The launcher stays until the game ends: it keeps the game's output in skylauncher-game.log, and says so if the game
     // stops with an error (docs/support.md).
     GameRunResult run = RunGame(runtime, chosen);

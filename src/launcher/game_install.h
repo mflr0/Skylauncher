@@ -60,6 +60,12 @@ void RecordInstalledGame(LauncherConfig& config, const std::string& xexSha256, c
 // archives that are already extracted. Never touches a kit that is not under DownloadedKitsFolder().
 void CleanAfterInstall(const std::filesystem::path& gameFolder, const std::filesystem::path& kitFolder);
 
+// A game built by a kit up to 0.3.0 still uses the older folders (SSARecomp/...). Installs from 0.3.1 on leave
+// "layout.txt" in the game folder; a runtime under `gameFolder` without it is such an older build, and the launcher
+// then points it at the new places through the variables it already reads (docs/install.md, "Older builds").
+void MarkGameLayout(const std::filesystem::path& gameFolder);
+bool IsOlderLayoutBuild(const std::filesystem::path& runtime, const std::filesystem::path& gameFolder);
+
 // Rough figures shown before installing.
 inline constexpr int InstallMinutes = 15;
 inline constexpr int InstallGigabytes = 6;
