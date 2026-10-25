@@ -48,6 +48,12 @@ namespace launcher_ui
         // B / Escape belongs to the page: an overlay, the View menu or a search is open.
         bool TakesBack() const { return m_overlay != Overlay::None || m_viewMenu || m_search[0] != 0; }
 
+        // SSA_LAUNCHER_TEST_SEATX: the X of every seat, pressed by mouse, keyboard and pad (App::TestSeatXScript).
+        std::vector<std::string> TestSeats() const { return m_model.seats; }
+        void TestSetSeats(const std::vector<std::string>& seats); // the seats as given, written to the session file
+        void TestFocusSeat(size_t seat) { m_focusSeat = int(seat); }
+        ImVec2 TestCrossAt(size_t seat) const { return seat < m_crossAt.size() ? m_crossAt[seat] : ImVec2(-1, -1); }
+
         // Screenshot test (SSA_LAUNCHER_TEST_COLLECTION): every screen, in a scratch collection.
         void Seed();
         void TestScreen(int step);
@@ -118,6 +124,7 @@ namespace launcher_ui
         std::vector<collection::Section> m_sections;
         int m_hiddenStarters = 0;
         size_t m_seat = 0;              // the focused seat: the list shows what goes there
+        std::vector<ImVec2> m_crossAt;  // where each seat's X was drawn this frame (-1: none), for the test
         int m_navSeat = -1;             // the seat with the keyboard or pad focus this frame, -1: none
         int m_hoverSeat = -1;           // the seat under the mouse this frame
         bool m_navEdgeCard = false;     // the focused card is the first of its row (Left goes to the seats)
