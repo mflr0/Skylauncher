@@ -29,6 +29,9 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `video` | `skip_intro_movies` | `0`, `1` | Skip the start-up logos (legal, ATVI, XPEC, Toys for Bob); the story movies still play | yes |
 | `video` | `vsync` | `0`, `1` | Wait for the display's refresh | yes |
 | `video` | `anisotropy` | `1`, `2`, `4`, `8`, `16` | Texture filtering | yes |
+| `video` | `aspect` | `auto` (default), `16:9` | Widescreen: `auto` shows more to the sides on a window wider than 16:9, `16:9` keeps the game's picture with bars | yes |
+| `video` | `texture_packs` | `1` (default), `0` | Use the HD textures of the game's `textures/` folder (Settings > Graphics > Open texture packs folder) | yes |
+| `video` | `texture_dump` | `0` (default), `1` | Write the game's textures as DDS files, for pack makers (Settings > Graphics > Advanced) | yes |
 | `input` | `device` | `auto`, `keyboard`, `gamepad` | What the game listens to | yes |
 | `input` | `gamepad` | SDL GUID | The gamepad chosen when `device=gamepad` | yes |
 | `input` | `key_<action>` | SDL key name (`Space`, `Return`, `A`...) | Keyboard binding | yes |
