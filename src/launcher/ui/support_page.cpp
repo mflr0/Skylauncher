@@ -147,12 +147,8 @@ namespace launcher_ui
                 Toast("Report copied");
             }
             ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
-            if (PillButton("Close", false, 120) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
-            {
-                m_reportOpen = false;
-                ImGui::CloseCurrentPopup();
-            }
-            if (m_reportOpen && (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown, false)))
+            // B / Escape close it, as every dialog (A presses the focused button).
+            if (PillButton("Close", false, 120) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
                 m_reportOpen = false;
                 ImGui::CloseCurrentPopup();

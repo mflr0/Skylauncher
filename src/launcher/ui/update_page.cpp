@@ -263,7 +263,7 @@ namespace launcher_ui
             if (PillButton("Release page", false, 160) && !state.launcher.pageUrl.empty())
                 SDL_OpenURL(state.launcher.pageUrl.c_str());
             ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 2 * 140 - ImGui::GetStyle().ItemSpacing.x);
-            if (PillButton("Close", false, 140))
+            if (PillButton("Close", false, 140) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
                 m_whatsNewOpen = false;
                 ImGui::CloseCurrentPopup();
