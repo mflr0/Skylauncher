@@ -271,7 +271,7 @@ namespace launcher_ui
     {
         // Screens, in order (the step is the index).
         constexpr const char* Shots[] = { "20-collection", "21-view-menu", "22-by-category", "23-figure-page", "24-edit-stats", "25-add-a-figure",
-            "26-add-later-game", "27-manage-trash", "28-manage-backups", "29-live-portal" };
+            "26-add-later-game", "27-manage-trash", "28-manage-backups", "29-live-portal", "30-after-delete" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -417,6 +417,10 @@ namespace launcher_ui
 #endif
             break;
         }
+        case 10: // deleting a figure from its page: back to the list, on the next figure
+            OpenFigure(figureOf(19));
+            DeleteFigure(m_figure);
+            break;
         default: break;
         }
         m_generation++;

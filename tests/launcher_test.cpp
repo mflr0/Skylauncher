@@ -382,6 +382,34 @@ namespace
             EXPECT(icon.size() == 32 * 32 * 4 && icon[(16 * 32 + 16) * 4 + 3] > 0);
         }
         EXPECT(figures::GenerateIcon(nullptr, collection::VariantKind::Base, 32).size() == 32 * 32 * 4);
+        // Deleting a figure (issue #13): it leaves the seat and the list, lands in trash/ with its metadata, the index is
+        // rewritten in one go, and Undelete brings it all back. A collection.json that does not load refuses it, with a
+        // reason, and moves nothing.
+        std::string victim = collection::Create(4);
+        EXPECT(!victim.empty() && collection::SetLabel(victim, "Doomed") && collection::SetFavourite(victim, true));
+        model.Load();
+        EXPECT(model.SetSeat(1, victim) && model.SeatOf(victim) == 1);
+        size_t listed = model.figures.size(), trashed = collection::Trash().size();
+        std::string why;
+        EXPECT(model.Delete(victim, &why) && why.empty());
+        EXPECT(!fs::exists(victim) && model.Find(victim) == nullptr && model.figures.size() == listed - 1);
+        EXPECT(model.SeatOf(victim) < 0 && launcher_ui::ReadSeats(ssa, session)[1].empty());
+        EXPECT(collection::Trash().size() == trashed + 1 && fs::exists(folder / "trash" / collection::Trash().front().id));
+        std::vector<char> indexBytes = bytesOf(folder / "collection.json");
+        std::string indexText(indexBytes.begin(), indexBytes.end());
+        EXPECT(indexText.find("Doomed") != std::string::npos && indexText.find("\"figures\"") != std::string::npos);
+        collection::Figure gone;
+        EXPECT(!collection::Read(victim, gone));
+        std::string back = collection::Undelete(collection::Trash().front().id);
+        EXPECT(!back.empty() && collection::Read(back, gone) && gone.label == "Doomed" && gone.favourite);
+        // A bad collection.json: refused once, with the reason, and the figure stays where it is.
+        std::vector<char> goodIndex = bytesOf(folder / "collection.json");
+        { std::ofstream(folder / "collection.json", std::ios::binary) << "{ \"format\": 1, \"figures\": {"; }
+        trashed = collection::Trash().size();
+        why.clear();
+        EXPECT(!model.Delete(back, &why) && !why.empty() && fs::exists(back) && collection::Trash().size() == trashed);
+        { std::ofstream(folder / "collection.json", std::ios::binary).write(goodIndex.data(), std::streamsize(goodIndex.size())); }
+        EXPECT(model.Delete(back, &why) && !fs::exists(back));
         printf("Collection: library, migration, locks, seats, live refresh and icons checked\n");
     }
 }

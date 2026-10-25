@@ -276,6 +276,16 @@ namespace launcher_ui
         return -1;
     }
 
+    bool CollectionModel::Delete(const std::string& path, std::string* error)
+    {
+        if (!collection::Delete(path, "deleted", error))
+            return false;
+        if (int seat = SeatOf(path); seat >= 0)
+            SetSeat(size_t(seat), "");
+        Load();
+        return true;
+    }
+
     std::vector<std::string> CollectionModel::OnPortal() const
     {
         std::vector<std::string> paths;

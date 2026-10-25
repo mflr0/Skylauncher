@@ -68,6 +68,7 @@ namespace launcher_ui
         void DrawFigurePage(ImVec2 size);
         void DrawStats(const collection::Figure& figure, float width);
         void DrawEditStats(const collection::Figure& figure);
+        void DeleteFigure(const std::string& path);
         void DrawAdd(ImVec2 size);
         void DrawManage(ImVec2 size);
         void DrawTrash();
@@ -129,6 +130,7 @@ namespace launcher_ui
         std::string m_confirm;          // "restore:<backup>"
         std::string m_hold;             // the hold button being held, and since when
         uint64_t m_holdSince = 0;
+        bool m_holdFired = false;       // the held button already acted: it waits for the release
         std::string m_addGame = "ssa";
         uint16_t m_addToy = 0xFFFF;
         int m_addVersion = 0;           // 0: standard, else 1 + an index in the toy's variants
