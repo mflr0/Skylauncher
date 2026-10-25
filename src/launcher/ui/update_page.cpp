@@ -189,6 +189,8 @@ namespace launcher_ui
         }
         else
             BoldText(shown.c_str(), Text);
+        if (shown != text && ImGui::IsItemHovered()) // cut to fit: the whole message under the pointer
+            ImGui::SetTooltip("%s", text.c_str());
 
         float x = Pad + contentW - buttonsW + gap;
         int pressed = None;
