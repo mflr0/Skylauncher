@@ -258,6 +258,10 @@ PortalProbeResult ParsePortalProbe(const std::string& output)
             else if (!get("kind").empty())
             {
                 PortalProbeEntry entry{ get("kind"), get("vid"), get("pid"), get("product"), get("opened") == "true", get("status") };
+                entry.id = get("id");
+                entry.model = get("model");
+                entry.verdict = get("verdict");
+                entry.verdictReason = get("verdict_reason");
                 if (entry.product.empty())
                     entry.product = get("name"); // the first draft of the contract
                 if (entry.status.empty())

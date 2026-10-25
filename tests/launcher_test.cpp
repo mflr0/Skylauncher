@@ -337,6 +337,17 @@ namespace
         EXPECT(model.CanEditSeats() && model.SetSeat(1, gill) && model.SeatOf(gill) == 1);
         EXPECT(launcher_ui::ReadSeats(ssa, session)[1] == gill);
         EXPECT(model.SetSeat(1, "") && model.seats[1].empty());
+        // Every kind of seat can be emptied, the others stay (issue #9): player, magic item, adventure pack.
+        EXPECT(model.SetSeat(2, anvil) && model.seats[2] == anvil && model.seats[0] == spyro);
+        std::vector<std::string> names(4);
+        std::vector<collection::PortalEntry> overview = collection::PortalOverview(ssa, model.seats, names);
+        EXPECT(overview.size() == 2 && overview[0].tag == "P1" && overview[1].tag == "Item" && overview[1].name == "200 Anvil Rain.sky");
+        EXPECT(collection::PortalOverviewLine(overview, "none") == "P1 016 Spyro.sky \xC2\xB7 Item 200 Anvil Rain.sky");
+        EXPECT(model.SetSeat(2, "") && model.seats[2].empty() && launcher_ui::ReadSeats(ssa, session)[2].empty());
+        EXPECT(model.seats[0] == spyro && launcher_ui::ReadSeats(ssa, session)[0] == spyro);
+        EXPECT(model.SetSeat(0, "") && model.OnPortal().empty() && collection::PortalOverviewLine(collection::PortalOverview(ssa, model.seats, names), "none") == "none");
+        EXPECT(launcher_ui::ReadSeats(ssa, session) == std::vector<std::string>(4)); // the file names nothing
+        EXPECT(model.SetSeat(0, spyro) && model.SetSeat(2, anvil)); // as before, for the checks below
         EXPECT(model.Poll(1000000, 0) == false); // nothing changed since Load (SetSeat's own write is not a change)
         // While a game holds a figure: the seats are read-only. When its dump changes the model reloads.
         if (otherPid > 0)

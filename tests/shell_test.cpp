@@ -119,6 +119,15 @@ namespace
         SHELL_EXPECT(found.ran && found.portals.size() == 2);
         SHELL_EXPECT(found.portals[0].product == "Wii \"Portal\"" && found.portals[0].opened && found.portals[0].vid == "1430");
         SHELL_EXPECT(found.portals[1].product == "Xbox" && !found.portals[1].opened && found.portals[1].status == "error: access denied");
+        // A runtime that names the model: the id, the model, the verdict.
+        PortalProbeResult named = ParsePortalProbe("{\"kind\":\"usb\",\"vid\":\"1430\",\"pid\":\"1f17\",\"product\":\"Xbox 360 portal\",\"opened\":true,\"status\":\"ok\","
+            "\"id\":\"01 28\",\"model\":\"Spyro's Adventure portal (Xbox 360)\",\"verdict\":\"works\",\"verdict_reason\":\"\"}\n"
+            "{\"kind\":\"hid\",\"vid\":\"1430\",\"pid\":\"0150\",\"product\":\"\",\"opened\":true,\"status\":\"ok\",\"id\":\"00 90\",\"model\":\"unknown portal\","
+            "\"verdict\":\"rejected\",\"verdict_reason\":\"too old\"}\n{\"done\":true,\"count\":2}\n");
+        SHELL_EXPECT(named.ran && named.portals.size() == 2);
+        SHELL_EXPECT(named.portals[0].id == "01 28" && named.portals[0].model == "Spyro's Adventure portal (Xbox 360)" && named.portals[0].verdict == "works");
+        SHELL_EXPECT(named.portals[1].verdict == "rejected" && named.portals[1].verdictReason == "too old");
+        SHELL_EXPECT(found.portals[0].id.empty() && found.portals[0].verdict.empty()); // an older runtime names nothing
         PortalProbeResult transport = ParsePortalProbe("{\"transport\":\"usb\",\"available\":false,\"status\":\"error: libusb-1.0 not found\"}\n{\"done\":true,\"count\":0}\n");
         SHELL_EXPECT(transport.ran && transport.portals.empty() && transport.notes.size() == 1 && transport.notes[0].find("libusb-1.0 not found") != std::string::npos);
         SHELL_EXPECT(!ParsePortalProbe("{\"kind\":\"hid\"").ran && !ParsePortalProbe("").ran);

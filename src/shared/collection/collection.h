@@ -225,6 +225,28 @@ namespace collection
     std::vector<Section> Group(const std::vector<Figure>& list, GroupBy group, OrderBy order, const std::string& game,
         const std::vector<std::string>& onPortal);
 
+    // --- The portal at a glance ---------------------------------------------------------------------------------------
+
+    // "P1", "P2", "Item", "Adventure", "Trap", "V1" ("J1"/"J2" in French) for a seat; its long name ("Player 1",
+    // "Magic item", "Vehicle 1") with SeatName. Seats of a catalogue game: Game::seats.
+    std::string SeatTag(const Seat& seat, bool french = false);
+    std::string SeatName(const Seat& seat, bool french = false);
+
+    // One occupied place of the portal, in the seats' order.
+    struct PortalEntry
+    {
+        size_t seat = 0;     // index in the game's seats
+        int slot = -1;       // the portal's hardware slot, -1 if unknown
+        std::string tag, seatName;
+        std::string path, name;
+    };
+    // Every seat with a figure on it. `paths` and `names` hold one string per seat (empty: free); `slots` (optional)
+    // the hardware slot of each seat, else -1. A seat past the end of a vector counts as free.
+    std::vector<PortalEntry> PortalOverview(const Game& game, const std::vector<std::string>& paths,
+        const std::vector<std::string>& names, const std::vector<int>& slots = {}, bool french = false);
+    // "P1 Gill Grunt · P2 Spyro · Item Shield"; `emptyText` when nothing is on the portal.
+    std::string PortalOverviewLine(const std::vector<PortalEntry>& entries, const std::string& emptyText);
+
     // --- Migration from the per-game folders ---------------------------------------------------------------------------
 
     // Where an older build kept the figures: SSA_MIGRATE_FROM, else (only when neither SSA_COLLECTION nor SSA_FIGURES

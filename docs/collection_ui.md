@@ -40,7 +40,11 @@ At the first visit to the page (`CollectionPage::Open`):
   it fits, else to the first seat that takes it (as the Toy Box does). `[portal] place` / `SSA_PORTAL_PLACE` are no longer
   written. The seat file is per game (`catalogue.json` `games[].seats`); only games with a runtime (SSA today) can be
   prepared, the others show their seats read-only.
-- Drag a card onto a seat, or double-click it, Enter, A (it goes to the focused seat); the cross takes it off; a figure
+- Drag a card onto a seat, or double-click it, Enter, A (it goes to the focused seat); every way of taking it off a seat (issue #9; a player, the magic item and the adventure pack alike, the others stay):
+  the cross on the seat, Delete or the pad's X on the focused seat (or Delete with the mouse over it), the seat's right-click menu
+  ("Take it off the seat", "Figure page") and dragging it off the seat onto the list; a seat whose figure is gone from the
+  collection shows "Missing figure" and can be emptied the same way. The seats are read-only while the game runs.
+  Under the seats one line sums the portal up (`collection::PortalOverviewLine`: "P1 Gill Grunt · Item Anvil Rain"); a figure
   held by a game, an unaccepted toy or a toy of a later game is refused with a message.
 - Live: figures a game holds (JSON lock of a live process) show "LIVE", "ON PORTAL" and "On the portal in Spyro's
   Adventure"; the seats are read-only then and Edit/Rename-the-dump/Reset/Delete are disabled (metadata such as

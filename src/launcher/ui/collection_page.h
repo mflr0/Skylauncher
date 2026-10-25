@@ -59,6 +59,8 @@ namespace launcher_ui
         void Rebuild();
         void DrawHeader(float width);
         void DrawSeats();
+        void DrawSeatMenu();
+        void TakeOff(size_t seat);
         void DrawList();
         void DrawViewMenu(ImVec2 anchor);
         bool DrawCard(const collection::Figure& figure, float width, bool dim);
@@ -103,6 +105,9 @@ namespace launcher_ui
         std::vector<collection::Section> m_sections;
         int m_hiddenStarters = 0;
         size_t m_seat = 0;              // the focused seat: the list shows what goes there
+        int m_navSeat = -1;             // the seat with the keyboard or pad focus this frame, -1: none
+        int m_hoverSeat = -1;           // the seat under the mouse this frame
+        int m_seatMenu = -1;            // the seat whose right-click menu is open
         std::string m_selected;         // the card with the focus (double click or Enter: put on the seat)
         std::string m_hovered;          // the card under the mouse or the focus (X: its Figure page)
         char m_search[64] = {};

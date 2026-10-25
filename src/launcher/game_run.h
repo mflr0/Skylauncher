@@ -40,6 +40,9 @@ struct PortalProbeEntry
     std::string product;
     bool opened = false;
     std::string status;  // "ok" or "error: ..."
+    // What the portal answered to the game's reset (older runtimes: nothing): its id ("01 28"), the model's name, and what
+    // Spyro's Adventure makes of it: "works", "warns", "rejected" or "unknown", with the reason.
+    std::string id, model, verdict, verdictReason;
 };
 struct PortalProbeResult
 {
