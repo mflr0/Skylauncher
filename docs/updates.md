@@ -30,8 +30,8 @@ HTTPS is `curl` (`curl.exe` ships with Windows 10 and 11, as SSABuild already re
 
 ## The game kit
 
-The kit is an asset of the launcher's own release: `ssa-kit-windows-x64.zip` and `ssa-kit-macos-arm64.zip` (there is no Linux
-kit yet), listed in the release's `SHA256SUMS`. `[update] kit_repo=owner/name` says where (default `mflr0/Skylauncher`).
+The kit is an asset of the launcher's own release: `ssa-kit-windows-x64.zip`, `ssa-kit-macos-arm64.zip` and, since 0.3.1,
+`ssa-kit-linux-x64.zip`, listed in the release's `SHA256SUMS`. `[update] kit_repo=owner/name` says where (default `mflr0/Skylauncher`).
 
 - **First install**: with no kit, INSTALL starts with "Downloading the game tools" (docs/install.md): the release tagged
   `v<launcher version>`, else the latest one; the zip is checked against that release's `SHA256SUMS` (a mismatch or a missing line

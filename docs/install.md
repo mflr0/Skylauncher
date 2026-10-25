@@ -109,7 +109,7 @@ cache `SSA/launcher-cache` is trimmed to 256 MB (oldest files first) when a game
 ## Linux
 
 The kit's zip keeps the Unix modes of `SSABuild` and its `bin/` programs, and `InstallKitZip` restores them, so the
-AppImage runs the downloaded SSABuild directly. The game is built as `games/<sha256>/SSARecomp`; PLAY starts it and
+AppImage runs the downloaded SSABuild directly. The game is built in the data folder's `SSA/` (`~/.local/share/Skylanders/SSA/SSARecomp`); PLAY starts it and
 keeps its output in `skylauncher-game.log`, as on the other systems. SSABuild caches its compiler (zig) in the data folder's
 `toolchains/` (`~/.local/share/Skylanders/toolchains`).
 
