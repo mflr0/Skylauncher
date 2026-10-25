@@ -207,7 +207,7 @@ differs per game is the provider's table.
 
 | Role | Spyro's Adventure | Giants | File |
 | --- | --- | --- | --- |
-| Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 987x424) | `<data>/<Game>/launcher-cache/logo.png` |
+| Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 1033x541, with the plate and the medallions) | `<data>/<Game>/launcher-cache/logo.png` |
 | Background (game page, Home) | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | `.../background.png` |
 | Title icon | `default.xex` XDBF resource | the same | `.../title_icon.png` |
 | Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px) of `uigameimage.str`: 78 | the collection screen's 123 portraits (256 px) | `<data>/<Game>/portraits/` |
