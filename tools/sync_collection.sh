@@ -14,7 +14,7 @@ pairs=()
 for f in figure_catalog figure_crypto figure_data figure_tag; do
     pairs+=("SSARecomp/host/figures/$f.h:src/shared/figures/$f.h" "SSARecomp/host/figures/$f.cpp:src/shared/figures/$f.cpp")
 done
-for f in json catalogue collection icons datadir; do
+for f in json catalogue collection icons datadir save_backup; do
     pairs+=("SSARecomp/host/collection/$f.h:src/shared/collection/$f.h" "SSARecomp/host/collection/$f.cpp:src/shared/collection/$f.cpp")
 done
 pairs+=("resources/collection/catalogue.json:resources/collection/catalogue.json" "cmake/embed_file.cmake:cmake/embed_file.cmake")
