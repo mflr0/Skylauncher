@@ -5,7 +5,9 @@
 // - blocks 8-63 except the sector trailers are AES-128 encrypted, each with its own key:
 //   MD5(block 0 | block 1 | block number | " Copyright (C) 2010 Activision. All Rights Reserved. "); zero blocks stay zero;
 // - the progress is stored twice, in area A (blocks 8-16) and area B (blocks 36-44), 7 data blocks each; the title
-//   writes the area it did not read last, with the sequence number + 1, so a write cut short keeps the other one.
+//   writes the area it did not read last, with the sequence number + 1, so a write cut short keeps the other one;
+// - Giants and later add a second pair, the extra areas (blocks 17-21 and 45-49, 4 data blocks each, same A/B scheme):
+//   Giants' part of the experience (levels 11-15) and its hat. Spyro's Adventure never touches them.
 #include "figure_data.h"
 #include <array>
 #include <cstdint>
@@ -35,13 +37,15 @@ namespace figures
     // Progress fields of one area. Offsets are from the area's first block, trailers included.
     struct FigureStats
     {
-        uint32_t experience = 0;       // 0x00, 24 bits
+        uint32_t experience = 0;       // 0x00, 24 bits: Spyro's Adventure's part, up to 33000 (level 10)
+        uint32_t giantsExperience = 0; // extra area +0x03, 16 bits: Giants' part, up to 63500 (levels 11-15); 0 without an extra area
         uint16_t gold = 0;             // 0x03
         uint32_t playSeconds = 0;      // 0x05
         uint8_t sequence = 0;          // 0x09, which area is newer
         uint16_t upgrades = 0;         // 0x10, bit field of bought upgrades and the chosen path
         uint8_t platforms = 0;         // 0x13, consoles the figure was used on (2 = Xbox 360)
-        uint16_t hat = 0;              // 0x14 (hats exist from Giants on)
+        uint16_t hat = 0;              // the hat's number: extra area +0x05 (Giants) if set, else 0x14 (hats exist from Giants on)
+        uint8_t extraSequence = 0;     // the extra area's sequence number (0 without one)
         std::array<uint8_t, 8> owner{}; // 0x18, the first owner's id, written by the title
         std::u16string nickname;       // 0x20 and 0x40, 16 UTF-16 code units, zero padded
         Date lastPlaced;               // 0x50
@@ -52,17 +56,31 @@ namespace figures
 
     enum class AreaState { Blank, Valid, Damaged };
 
+    // What the extra areas of the figure are: Blank (none written: every figure Spyro's Adventure made), Valid, Damaged.
+    AreaState ReadExtraState(const FigureData& tag);
+
     // Reads the newest area whose checksums are right. Blank: never written (the title will initialise it).
     // Damaged: data present but no area passes its checksums.
     AreaState ReadStats(const FigureData& tag, FigureStats& stats);
 
-    // Writes `stats` into both areas (sequence numbers stats.sequence + 1 and + 2) with fresh checksums.
+    // Writes `stats` into both areas (sequence numbers stats.sequence + 1 and + 2) with fresh checksums. The extra
+    // areas are written only when the figure needs them (Giants' experience or a hat is set) or already has them, so
+    // a figure Spyro's Adventure made stays what that game expects. Experience is clamped to 33000 + 63500.
     void WriteStats(FigureData& tag, const FigureStats& stats);
 
-    // Experience needed for each level (index 0 = level 1); the title caps characters at level 10.
-    constexpr int MaxLevel = 10;
-    extern const uint32_t LevelExperience[MaxLevel];
-    int LevelForExperience(uint32_t experience);
+    // Experience needed for each level (index 0 = level 1). Spyro's Adventure caps characters at level 10, Giants at 15.
+    constexpr int MaxLevel = 10;          // Spyro's Adventure
+    constexpr int MaxLevelGiants = 15;    // Giants (and later games, up to 20 in Swap Force: not needed here)
+    constexpr uint32_t MaxBaseExperience = 33000;     // the first area's part (level 10)
+    constexpr uint32_t MaxGiantsExperience = 63500;   // the extra area's part (level 15 = 96500 in all)
+    extern const uint32_t LevelExperience[MaxLevelGiants];
+    int LevelForExperience(uint32_t experience, int maxLevel = MaxLevel);
+    // The level cap of a game by its catalogue id ("ssa": 10, "giants" and later: 15).
+    int LevelCap(const std::string& game);
+
+    // All the experience a figure has, and setting it (the first 33000 go to the first area, the rest to Giants' part).
+    uint32_t TotalExperience(const FigureStats& stats);
+    void SetTotalExperience(FigureStats& stats, uint32_t total);
 
     constexpr uint16_t MaxGold = 65000;
 

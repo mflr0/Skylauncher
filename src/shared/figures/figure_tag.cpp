@@ -10,6 +10,12 @@ namespace figures
         constexpr char KeyConstant[] = " Copyright (C) 2010 Activision. All Rights Reserved. ";
         constexpr size_t AreaBlocks[2] = { 0x08, 0x24 };
         constexpr size_t AreaSpan = 9 * FigureBlockSize; // 7 data blocks and the 2 trailers between them
+        // Giants' second pair: 4 data blocks and the trailer between them (blocks 17, 18, 20, 21 and 45, 46, 48, 49),
+        // kept as 64 bytes. Byte 0 is the checksum (LE16), byte 2 the sequence number.
+        constexpr size_t ExtraBlocks[2] = { 0x11, 0x2D };
+        constexpr size_t ExtraSpan = 5 * FigureBlockSize;
+        constexpr size_t ExtraSize = 4 * FigureBlockSize;
+        constexpr uint8_t ExtraMarker[2] = { 0x06, 0x01 }; // stands for the checksum while it is computed (05 00 in the first areas)
         constexpr uint8_t AccessReadOnly[4] = { 0x0F, 0x0F, 0x0F, 0x69 };
         constexpr uint8_t AccessReadWrite[4] = { 0x7F, 0x0F, 0x08, 0x69 };
 
@@ -100,6 +106,51 @@ namespace figures
             return true;
         }
 
+        // The extra area starting at block `start`, packed without its trailer.
+        void PackExtra(const FigureData& plain, size_t start, uint8_t* out)
+        {
+            for (size_t i = 0, packed = 0; i < ExtraSpan / FigureBlockSize; i++)
+            {
+                if (!IsTrailer(start + i))
+                    memcpy(out + packed++ * FigureBlockSize, plain.data() + (start + i) * FigureBlockSize, FigureBlockSize);
+            }
+        }
+
+        void UnpackExtra(FigureData& plain, size_t start, const uint8_t* in)
+        {
+            for (size_t i = 0, packed = 0; i < ExtraSpan / FigureBlockSize; i++)
+            {
+                if (!IsTrailer(start + i))
+                    memcpy(plain.data() + (start + i) * FigureBlockSize, in + packed++ * FigureBlockSize, FigureBlockSize);
+            }
+        }
+
+        // CRC-16/CCITT-FALSE of the 64 bytes with the checksum itself replaced by the marker.
+        uint16_t ExtraChecksum(const uint8_t* e)
+        {
+            uint8_t data[ExtraSize];
+            memcpy(data, e, sizeof(data));
+            memcpy(data, ExtraMarker, sizeof(ExtraMarker));
+            return FigureChecksum(data, sizeof(data));
+        }
+
+        bool ExtraValid(const uint8_t* e) { return Le16(e) == ExtraChecksum(e); }
+        bool ExtraBlank(const uint8_t* e) { return IsZero(e, ExtraSize); }
+        void SealExtra(uint8_t* e) { Put16(e, ExtraChecksum(e)); }
+
+        // Index of the extra area to read, or -1 if neither is valid.
+        int NewestExtra(const FigureData& plain, uint8_t out[ExtraSize])
+        {
+            uint8_t a[ExtraSize], b[ExtraSize];
+            PackExtra(plain, ExtraBlocks[0], a);
+            PackExtra(plain, ExtraBlocks[1], b);
+            bool validA = ExtraValid(a), validB = ExtraValid(b);
+            int which = validA && validB ? (uint8_t(a[2] + 1) == b[2] ? 1 : 0) : validA ? 0 : validB ? 1 : -1;
+            if (which >= 0)
+                memcpy(out, which == 0 ? a : b, ExtraSize);
+            return which;
+        }
+
         // Index of the area to read, or -1 if neither is valid.
         int NewestArea(const FigureData& plain)
         {
@@ -112,14 +163,27 @@ namespace figures
         }
     }
 
-    const uint32_t LevelExperience[MaxLevel] = { 0, 1000, 2200, 3800, 6000, 9000, 13000, 18200, 24800, 33000 };
+    // Levels 11-15 are Giants'; the last one is 33000 + 63500, the sum of the two parts.
+    const uint32_t LevelExperience[MaxLevelGiants] = { 0, 1000, 2200, 3800, 6000, 9000, 13000, 18200, 24800, 33000, 42700, 53900, 66600, 80800, 96500 };
 
-    int LevelForExperience(uint32_t experience)
+    int LevelForExperience(uint32_t experience, int maxLevel)
     {
+        maxLevel = std::clamp(maxLevel, 1, MaxLevelGiants);
         int level = 1;
-        while (level < MaxLevel && experience >= LevelExperience[level])
+        while (level < maxLevel && experience >= LevelExperience[level])
             level++;
         return level;
+    }
+
+    int LevelCap(const std::string& game) { return game == "ssa" ? MaxLevel : MaxLevelGiants; }
+
+    uint32_t TotalExperience(const FigureStats& stats) { return stats.experience + stats.giantsExperience; }
+
+    void SetTotalExperience(FigureStats& stats, uint32_t total)
+    {
+        total = std::min(total, MaxBaseExperience + MaxGiantsExperience);
+        stats.experience = std::min(total, MaxBaseExperience);
+        stats.giantsExperience = total - stats.experience;
     }
 
     FigureData Decrypt(const FigureData& tag)
@@ -138,9 +202,14 @@ namespace figures
     {
         // Every block of an area in use is encrypted, zero or not (the title does the same); other zero blocks are
         // left zero, as on a new figure.
-        bool areaUsed[2];
+        bool areaUsed[2], extraUsed[2];
         for (int i = 0; i < 2; i++)
+        {
             areaUsed[i] = !AreaBlank(plain.data() + AreaBlocks[i] * FigureBlockSize);
+            uint8_t extra[ExtraSize];
+            PackExtra(plain, ExtraBlocks[i], extra);
+            extraUsed[i] = !ExtraBlank(extra);
+        }
 
         FigureData tag = plain;
         for (size_t block = 8; block < FigureBlockCount; block++)
@@ -150,7 +219,10 @@ namespace figures
             uint8_t* data = tag.data() + block * FigureBlockSize;
             bool inUsedArea = false;
             for (int i = 0; i < 2; i++)
+            {
                 inUsedArea |= areaUsed[i] && block >= AreaBlocks[i] && block < AreaBlocks[i] + AreaSpan / FigureBlockSize;
+                inUsedArea |= extraUsed[i] && block >= ExtraBlocks[i] && block < ExtraBlocks[i] + ExtraSpan / FigureBlockSize;
+            }
             if (inUsedArea || !IsZero(data, FigureBlockSize))
                 BlockCipher(plain, block).Encrypt(data, data);
         }
@@ -209,7 +281,30 @@ namespace figures
         stats.heroicChallenges = Le32(a + 0x56);
         stats.heroPoints = Le16(a + 0x5A);
         stats.lastReset = ReadDate(a + 0x60);
+
+        // Giants' part: counted only when the first area says so (bit 0 of 0x16, set by the title on first use).
+        uint8_t extra[ExtraSize];
+        if (NewestExtra(plain, extra) >= 0)
+        {
+            stats.extraSequence = extra[2];
+            if (a[0x16] & 1)
+                stats.giantsExperience = Le16(extra + 3);
+            if (extra[5] != 0)
+                stats.hat = extra[5];
+        }
         return AreaState::Valid;
+    }
+
+    AreaState ReadExtraState(const FigureData& tag)
+    {
+        FigureData plain = Decrypt(tag);
+        uint8_t extra[ExtraSize];
+        if (NewestExtra(plain, extra) >= 0)
+            return AreaState::Valid;
+        uint8_t a[ExtraSize], b[ExtraSize];
+        PackExtra(plain, ExtraBlocks[0], a);
+        PackExtra(plain, ExtraBlocks[1], b);
+        return ExtraBlank(a) && ExtraBlank(b) ? AreaState::Blank : AreaState::Damaged;
     }
 
     // A date the title could have written: zero (never) or a real calendar field set.
@@ -224,9 +319,11 @@ namespace figures
 
     void WriteStats(FigureData& tag, const FigureStats& unchecked)
     {
-        // Whatever the caller passes, the figure never gets more than the game allows (level 10's experience, gold).
+        // Whatever the caller passes, the figure never gets more than the games allow (experience of level 10 in the
+        // first area, Giants' 63500 in the extra one, gold).
         FigureStats stats = unchecked;
-        stats.experience = std::min(stats.experience, LevelExperience[MaxLevel - 1]);
+        stats.experience = std::min(stats.experience, MaxBaseExperience);
+        stats.giantsExperience = std::min(stats.giantsExperience, MaxGiantsExperience);
         stats.gold = std::min(stats.gold, MaxGold);
         stats.nickname.resize(std::min<size_t>(stats.nickname.size(), 16));
         stats.lastPlaced = ClampDate(stats.lastPlaced);
@@ -238,6 +335,16 @@ namespace figures
         uint8_t area[AreaSpan] = {};
         if (newest >= 0)
             memcpy(area, plain.data() + AreaBlocks[newest] * FigureBlockSize, AreaSpan);
+
+        // The extra areas (Giants): written when the figure needs them or has them, so that a figure Spyro's Adventure
+        // made, and every edit that stays within its limits, keeps the bytes that game expects.
+        uint8_t extra[ExtraSize] = {};
+        int newestExtra = NewestExtra(plain, extra);
+        uint8_t extraA[ExtraSize], extraB[ExtraSize];
+        PackExtra(plain, ExtraBlocks[0], extraA);
+        PackExtra(plain, ExtraBlocks[1], extraB);
+        bool writeExtra = newestExtra >= 0 || !ExtraBlank(extraA) || !ExtraBlank(extraB) || stats.giantsExperience != 0 ||
+            stats.hat != 0;
 
         uint8_t* a = area;
         a[0] = uint8_t(stats.experience);
@@ -257,6 +364,8 @@ namespace figures
         Put32(a + 0x56, stats.heroicChallenges);
         Put16(a + 0x5A, stats.heroPoints);
         WriteDate(a + 0x60, stats.lastReset);
+        if (writeExtra)
+            a[0x16] |= 1; // the title adds the extra area's experience only then
 
         // Area A gets sequence + 1 and area B sequence + 2, so B is the newer copy and both hold the same data.
         for (int i = 0; i < 2; i++)
@@ -269,6 +378,19 @@ namespace figures
             }
             target[0x09] = uint8_t(stats.sequence + 1 + i);
             SealArea(target);
+        }
+
+        if (writeExtra)
+        {
+            Put16(extra + 3, stats.giantsExperience);
+            extra[5] = uint8_t(std::min<uint16_t>(stats.hat, 0xFF));
+            uint8_t sequence = newestExtra >= 0 ? extra[2] : stats.extraSequence;
+            for (int i = 0; i < 2; i++)
+            {
+                extra[2] = uint8_t(sequence + 1 + i);
+                SealExtra(extra);
+                UnpackExtra(plain, ExtraBlocks[i], extra);
+            }
         }
         tag = Encrypt(plain);
     }

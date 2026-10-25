@@ -95,6 +95,7 @@ add_library(SkylauncherCore STATIC
     src/launcher/ui/collection_add.cpp
     src/launcher/ui/collection_manage.cpp
     src/launcher/ui/collection_model.cpp
+    src/launcher/ui/game_look.cpp
     src/assets/launcher_assets.cpp
     src/shared/figures/figure_catalog.cpp
     src/shared/figures/figure_crypto.cpp
@@ -107,6 +108,10 @@ add_library(SkylauncherCore STATIC
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
     src/shared/collection/save_backup.cpp
+    src/shared/art/alchemy_archive.cpp
+    src/shared/art/game_art.cpp
+    src/shared/art/lux_images.cpp
+    src/shared/art/xenos_texture.cpp
     src/shared/stb_impl.cpp
     src/shared/vfs.cpp
     src/shared/platform/platform_file.cpp
@@ -132,7 +137,7 @@ target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz)
 target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
 target_compile_definitions(SkylauncherCore PRIVATE SKYLAUNCHER_VERSION_STRING="${SKYLAUNCHER_VERSION}" SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
 if(APPLE)
-    target_link_libraries(SkylauncherCore PUBLIC "-framework CoreGraphics")
+    target_link_libraries(SkylauncherCore PUBLIC "-framework CoreGraphics" "-framework CoreFoundation")
 endif()
 if(WIN32)
     target_link_libraries(SkylauncherCore PUBLIC ole32 uuid) # the desktop shortcut (IShellLink)

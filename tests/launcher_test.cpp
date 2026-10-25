@@ -4,6 +4,8 @@
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "assets/launcher_assets.h"
+#include "shared/art/game_art.h"
+#include "shared/collection/icons.h"
 #include "launcher/ui/launcher_app.h"
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/ui/collection_model.h"
@@ -661,24 +663,47 @@ int main(int argc, char** argv)
             metadata.name.c_str(), be32(16), be32(20), png.size(), milliseconds(start));
     }
 
-    printf("Disc frontend texture decoder:\n");
-    std::vector<uint8_t> startMenu = disc.ReadAll("ui/eng/startmenu.str");
-    std::vector<uint8_t> logo;
-    start = Clock::now();
-    EXPECT(!startMenu.empty());
-    EXPECT(LauncherAssets::DecodeFrontendTexture(startMenu, "skylanderslogo.dds", 1024, 512, logo));
-    EXPECT(logo.size() == 1024ull * 512 * 4);
-    size_t transparent = 0, opaque = 0;
-    for (size_t i = 3; i < logo.size(); i += 4)
+    // The game's pictures (shared/art/game_art.h), into a scratch data folder: logo, background, title icon, portraits.
+    auto artChecks = [&](const char* id, const std::string& image, int minimumPortraits) {
+        DiscFileSystem gameDisc;
+        EXPECT(gameDisc.Open(image.c_str()));
+        TitleMetadata meta = ReadTitleMetadata(gameDisc.ReadAll("default.xex"));
+        LauncherAssets::Provider provider;
+        provider.Init(id);
+        auto began = Clock::now();
+        provider.ExtractFromDisc(gameDisc, meta);
+        long long first = milliseconds(began);
+        art::Extraction found = art::Extract(id, art::ReadFrom(gameDisc), {}, art::Portraits);
+        printf("  %s: logo %s, background %s, title icon %s, %d portraits, read in %lld ms\n", id,
+            provider.Get(LauncherAssets::Role::Logo).valid ? "yes" : "NO", provider.Get(LauncherAssets::Role::HeroBackground).valid ? "yes" : "NO",
+            provider.Get(LauncherAssets::Role::TitleIcon).valid ? "yes" : "NO", found.portraits, first);
+        EXPECT(provider.Get(LauncherAssets::Role::Logo).valid && provider.Get(LauncherAssets::Role::HeroBackground).valid);
+        EXPECT(provider.Get(LauncherAssets::Role::TitleIcon).valid && LauncherAssets::Cached(id, LauncherAssets::Role::Logo).valid);
+        EXPECT(found.portraits >= minimumPortraits);
+    };
+    printf("Disc pictures:\n");
+    std::string dataBefore = getenv("SKYLANDERS_DATA") != nullptr ? getenv("SKYLANDERS_DATA") : "";
+    SDL_setenv_unsafe("SKYLANDERS_DATA", (scratch / "art-data").string().c_str(), 1);
+    artChecks("ssa", iso.string(), 70);
+    if (const char* giantsIso = getenv("SKYLAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
     {
-        transparent += logo[i] == 0 ? 1 : 0;
-        opaque += logo[i] > 200 ? 1 : 0;
+        artChecks("giants", giantsIso, 123);
+        // The rule for a toy: the shown game's picture, else the other game's (Jet-Vac has none on Spyro's Adventure).
+        const collection::Toy* eruptor = collection::Catalogue::Get().Find(9);
+        const collection::Toy* jetVac = collection::Catalogue::Get().Find(100);
+        EXPECT(eruptor != nullptr && jetVac != nullptr);
+        if (eruptor != nullptr && jetVac != nullptr)
+        {
+            EXPECT(collection::PortraitPath("ssa", *eruptor).find("toy_eruptor_hud") != std::string::npos);
+            EXPECT(collection::PortraitPath("giants", *eruptor).ends_with("eruptor.png"));
+            EXPECT(collection::PortraitPath("giants", *eruptor, 0x1206).ends_with("eruptor_lightcore.png"));
+            EXPECT(collection::PortraitPath("ssa", *jetVac).ends_with("eagle.png"));
+        }
     }
-    printf("  skylanderslogo.dds 1024x512, %zu transparent and %zu opaque texels, decoded in %lld ms\n",
-        transparent, opaque, milliseconds(start));
-    EXPECT(transparent > 1000);
-    EXPECT(opaque > 1000);
-    EXPECT(!LauncherAssets::DecodeFrontendTexture(startMenu, "missing.dds", 1024, 512, logo));
+    if (dataBefore.empty())
+        SDL_unsetenv_unsafe("SKYLANDERS_DATA");
+    else
+        SDL_setenv_unsafe("SKYLANDERS_DATA", dataBefore.c_str(), 1);
 
     printf("Wrong inputs:\n");
     EXPECT(Check(scratch / "missing.iso") == GameSourceStatus::NotFound);

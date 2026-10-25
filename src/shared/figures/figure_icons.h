@@ -2,7 +2,7 @@
 
 // An icon for every toy, for the figures the player's disc has no picture of (magic items, adventure packs, the later
 // games' toys, and any toy before a disc is verified): a shape for the category, the element's colour, a badge for the
-// variant. The disc's own portraits are preferred when they exist (see LauncherAssets). The toys are the shared
+// variant. The disc's own portraits are preferred when they exist (collection::PortraitPath). The toys are the shared
 // catalogue's (collection/catalogue.h); the look is the launcher's own.
 //
 // The look is all in IconStyle, so it can follow another visual identity without touching the drawing.
@@ -36,8 +36,4 @@ namespace figures
 
     // RGBA pixels (R first), `size` x `size`, transparent around the shape. `toy` null: an unknown toy.
     std::vector<uint8_t> GenerateIcon(const collection::Toy* toy, collection::VariantKind kind, int size, const IconStyle& style = {});
-
-    // Spyro's Adventure's pictures of a toy on its disc: its HUD portrait (PortraitImageName) and its 512 px "versus"
-    // picture ("<portrait>_vs"), empty if it has none.
-    std::string PortraitLargeImageName(const ToyInfo& toy);
 }

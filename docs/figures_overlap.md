@@ -11,7 +11,7 @@ same jobs.
 | Toy catalogue | `figure_catalog.*`: a C++ table, Spyro's Adventure's toys only | `collection/catalogue.*` + `catalogue.json`: six games, variants, which game accepts what |
 | Folder: import, new figure, backups, restore, delete | `figure_collection.*` | `collection/collection.*` (also rename, labels, editions, migration) |
 | Icons when the disc has no picture | `figure_icons.*` (`IconStyle`) | `collection/icons.*` (shape per category, variant badges) |
-| Disc portraits | the launcher extracts them (`launcher-cache/<titleid>/figures/`) | the game caches them (`<SSARecomp data>/portraits`) |
+| Disc portraits | one shared provider since 0.4 (`src/shared/art/`): both cache them in `<data>/<Game>/portraits/` | the same (`runtime/host/art/`) |
 
 ## Where they disagree (what a player would notice)
 

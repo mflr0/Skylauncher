@@ -158,22 +158,16 @@ namespace launcher_ui
 
     const FigureIconTexture& CollectionPage::Icon(const collection::Toy* toy, collection::VariantKind kind, bool large)
     {
-        const figures::ToyInfo* ssa = toy != nullptr ? figures::FindToy(toy->type) : nullptr;
-        std::string image = ssa == nullptr ? std::string() : large ? figures::PortraitLargeImageName(*ssa) : figures::PortraitImageName(*ssa);
-        if (image.empty() && ssa != nullptr)
-            image = figures::PortraitImageName(*ssa);
-        std::string key = image.empty() ? fmt::format("gen:{}:{}", toy != nullptr ? toy->type : 0xFFFF, int(kind)) : image;
+        // The picture of the game being shown, else the other game's, else a generated icon (shared/collection/icons.h).
+        std::string path = toy != nullptr ? collection::PortraitPath(m_app.m_s->game.id, *toy, collection::VariantFor(*toy, kind), large) : std::string();
+        std::string key = !path.empty() ? path : fmt::format("gen:{}:{}", toy != nullptr ? toy->type : 0xFFFF, int(kind));
         auto found = m_icons.find(key);
         if (found != m_icons.end())
             return found->second;
 
-        // The launcher's cache of the disc's pictures, else the game's (docs/collection.md), else a generated icon.
         FigureIconTexture icon;
-        if (std::string path = m_app.m_s->assets.FigurePortraitPath(image); !path.empty())
+        if (!path.empty())
             icon.texture = LoadPngFile(m_app.m_renderer, path);
-        if (icon.texture == nullptr && toy != nullptr)
-            if (std::string path = collection::DiscImagePath(*toy); !path.empty())
-                icon.texture = LoadPngFile(m_app.m_renderer, path);
         if (icon.texture == nullptr)
         {
             constexpr int Size = 128;

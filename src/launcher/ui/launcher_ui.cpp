@@ -244,11 +244,11 @@ namespace launcher_ui
                 {
                     if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
                         metadata = ReadTitleMetadata(xex);
-                    // The game's own art, decoded from the player's disc into the local cache (never shipped).
+                    // The game's own art and its toys' portraits, decoded from the player's disc into the game's data
+                    // folder (never shipped); a second time, only what is missing.
                     report(0.98f, "Reading the game's pictures");
-                    art.Init(image, metadata.titleId);
+                    art.Init(game.id);
                     art.ExtractFromDisc(disc, metadata);
-                    art.ExtractFigurePortraits(disc);
                 }
             }
             { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); assets = std::move(art); }
@@ -467,11 +467,14 @@ namespace launcher_ui
         for (auto& slot : m_slots)
         {
             slot->collection->ClearIcons();
-            for (SDL_Texture* texture : { slot->icon, slot->logo, slot->background })
-                if (texture != nullptr)
-                    SDL_DestroyTexture(texture);
-            slot->icon = slot->logo = slot->background = nullptr;
+            if (slot->icon != nullptr)
+                SDL_DestroyTexture(slot->icon);
+            slot->icon = nullptr;
+            slot->logo.Destroy();
         }
+        for (auto& [key, art] : m_cachedArt)
+            art.Destroy();
+        m_cachedArt.clear();
         if (m_github != nullptr)
             SDL_DestroyTexture(m_github);
         m_github = nullptr;
@@ -535,6 +538,8 @@ namespace launcher_ui
         // Something moves: a check, an install's spinner, an update's bar, a held button, a text cursor, a drag.
         if (AnyVerifying() || AnyInstalling() || m_updates.Busy() || ImGui::IsAnyItemActive())
             return 0;
+        if (m_page == Page::Play && m_logoDropAt != 0 && SDL_GetTicks() < m_logoDropAt + uint64_t(LogoDropMs) + 20) // the logo is falling
+            return 0;
         constexpr int Idle = 500;
         int wait = Idle;
         uint64_t now = SDL_GetTicks();
@@ -542,7 +547,7 @@ namespace launcher_ui
             wait = std::min<int>(wait, int(m_toastUntil - now) + 1);
         // The night sky's stars twinkle, at 30 fps, while the window is seen.
         bool seen = !(SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_OCCLUDED | SDL_WINDOW_HIDDEN));
-        if (seen && m_page == Page::Play && m_s->background == nullptr)
+        if (seen && m_page == Page::Play && CachedArt(m_s->game.id, LauncherAssets::Role::HeroBackground, BackdropArtW) == nullptr)
             wait = std::min(wait, 33);
         return wait;
     }
@@ -676,12 +681,10 @@ namespace launcher_ui
         SDL_PathInfo info;
         if (SDL_GetPathInfo(path.c_str(), &info))
             m_s->discSize = info.size;
-        for (SDL_Texture** texture : { &m_s->icon, &m_s->logo, &m_s->background })
-            if (*texture != nullptr)
-            {
-                SDL_DestroyTexture(*texture);
-                *texture = nullptr;
-            }
+        if (m_s->icon != nullptr)
+            SDL_DestroyTexture(m_s->icon);
+        m_s->icon = nullptr;
+        m_s->logo.Destroy();
         m_s->verify.Start(path, m_s->game);
     }
 
@@ -699,10 +702,9 @@ namespace launcher_ui
             m_s->icon = LoadPng(m_renderer, m_s->meta.iconPng);
         m_s->assets = m_s->verify.assets; // the worker cached the disc's art
         m_s->collection->ClearIcons(); // the collection's pictures now come from the disc
+        ForgetCachedArt(m_s->game.id);  // the sidebar's and Home's copies too
         if (LauncherAssets::Asset logo = m_s->assets.Get(LauncherAssets::Role::Logo); logo.valid)
-            m_s->logo = LoadPngFile(m_renderer, logo.path);
-        if (LauncherAssets::Asset background = m_s->assets.Get(LauncherAssets::Role::HeroBackground); background.valid)
-            m_s->background = LoadPngFile(m_renderer, background.path);
+            m_s->logo = LoadArt(m_renderer, logo.path, true);
         Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
         m_s->disc = DiscState::Ready;
         RefreshInstall();
@@ -1029,14 +1031,27 @@ namespace launcher_ui
             return;
         }
         draw->AddRectFilledMultiColor(ImVec2(0, 0), size, Rgb(SkyTop), Rgb(SkyTop), Rgb(SkyBottom), Rgb(SkyBottom));
-        // Once a disc is verified: the game's painted Skylands sky, cropped to fill, instead of the drawn stars.
-        if (m_s->background != nullptr)
+        // The game's own painting (its menus' backdrop, from the player's disc: this session's or an earlier one's),
+        // cropped to fill the page, instead of the drawn stars.
+        const ArtTexture* art = CachedArt(m_s->game.id, LauncherAssets::Role::HeroBackground, BackdropArtW);
+        SDL_Texture* background = art != nullptr ? art->texture : nullptr;
+        if (background != nullptr)
         {
             float w, h;
-            SDL_GetTextureSize(m_s->background, &w, &h);
-            float scale = std::max(size.x / w, size.y / h), u = size.x / (w * scale), v = size.y / (h * scale);
-            draw->AddImage(Ref(m_s->background), ImVec2(0, 0), size, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2));
-            draw->AddRectFilled(ImVec2(0, 0), size, Rgb(SkyTop, BackdropShade)); // keeps white text readable on the bright sky
+            SDL_GetTextureSize(background, &w, &h);
+            ImVec2 page(SidebarW, 0), pageSize(size.x - SidebarW, size.y);
+            float scale = std::max(pageSize.x / w, pageSize.y / h), u = pageSize.x / (w * scale), v = pageSize.y / (h * scale);
+            draw->AddImage(Ref(background), page, size, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2));
+            // Shading, so the logo and the white text read on any painting: darker at the top, lighter behind the logo,
+            // dark again towards the band; and a shadow the sidebar casts on its left edge.
+            float middle = size.y * 0.38f, low = size.y - BottomBarH;
+            draw->AddRectFilledMultiColor(page, ImVec2(size.x, middle), Rgb(SkyTop, BackdropTopShade), Rgb(SkyTop, BackdropTopShade),
+                Rgb(SkyTop, 40), Rgb(SkyTop, 40));
+            draw->AddRectFilledMultiColor(ImVec2(page.x, middle), ImVec2(size.x, low), Rgb(SkyTop, 40), Rgb(SkyTop, 40),
+                Rgb(SkyTop, BackdropBottomShade), Rgb(SkyTop, BackdropBottomShade));
+            draw->AddRectFilled(ImVec2(page.x, low), size, Rgb(SkyTop, BackdropBottomShade));
+            draw->AddRectFilledMultiColor(page, ImVec2(page.x + 120, size.y), IM_COL32(0, 0, 0, 90), IM_COL32(0, 0, 0, 0),
+                IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 90));
             return;
         }
         // The portal's glow, low on the right, and twinkling stars.
@@ -1049,6 +1064,13 @@ namespace launcher_ui
             float twinkle = 0.45f + 0.55f * (0.5f + 0.5f * std::sin(time * 1.3f + star.w));
             draw->AddCircleFilled(ImVec2(star.x * size.x, star.y * size.y * 0.85f), star.z, IM_COL32(255, 255, 255, int(150 * twinkle)), 8);
         }
+    }
+
+    // A game's state in a few words, for the sidebar and Home: its slot's disc (nullptr: not opened this session).
+    const char* App::SlotStatus(const GameSlot* slot, bool* ready) const
+    {
+        *ready = slot != nullptr && slot->disc == DiscState::Ready;
+        return slot == nullptr ? "Open" : *ready ? "Ready to play" : slot->disc == DiscState::Verifying ? "Checking your disc" : "Needs your disc";
     }
 
     void App::DrawSidebar()
@@ -1080,7 +1102,7 @@ namespace launcher_ui
             return pressed;
         };
 
-        // The title is the Home button.
+        // The title is the Home button; the launcher's version sits beside it, small and dim.
         {
             ImVec2 titleAt = ImGui::GetCursorScreenPos();
             ImGui::PushFont(m_titleFont, TitleSize + 4);
@@ -1088,23 +1110,26 @@ namespace launcher_ui
             ImGui::PopFont();
             if (ImGui::InvisibleButton("##home", titleSize, ImGuiButtonFlags_EnableNav))
                 GoTo(Page::Home);
-            if (ImGui::IsItemHovered())
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
             FocusRing(RadiusSmall);
             ImGui::SetCursorScreenPos(titleAt);
-            Title("SKYLAUNCHER", TitleSize + 4, SidebarInk);
+            Title("SKYLAUNCHER", TitleSize + 4, hovered ? 0xFFFFFF : SidebarInk);
+            std::string version = "v" + LauncherVersion();
+            ImGui::PushFont(m_boldFont, VersionSize);
+            ImVec2 versionSize = ImGui::CalcTextSize(version.c_str());
+            draw->AddText(ImVec2(titleAt.x + titleSize.x + 8, titleAt.y + titleSize.y - versionSize.y - 3), Rgb(TextDim, 200), version.c_str());
+            ImGui::PopFont();
         }
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(SidebarInkDim));
-        ImGui::PushFont(nullptr, SidebarTextSize);
-        BoldText("Native PC ports", SidebarInkDim);
-        ImGui::PopFont();
-        ImGui::PopStyleColor();
-        ImGui::Dummy(ImVec2(0, 14));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(SidebarInkDim));
         ImGui::PushFont(nullptr, SidebarSmallSize);
-        BoldText("YOUR GAMES", SidebarInkDim);
+        ImGui::TextColored(ImColor(Rgb(TextDim)), "Native PC ports");
         ImGui::PopFont();
-        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 16));
+        ImGui::PushFont(nullptr, CaptionSize + 1);
+        BoldText("YOUR GAMES", TextDim);
+        ImGui::PopFont();
+        ImGui::Dummy(ImVec2(0, 2));
 
         // The games: only those with a runtime can be selected.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(12, 0));
@@ -1127,13 +1152,15 @@ namespace launcher_ui
             }
             if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings))
                 TakeFocus(FocusTo::Sidebar);
-            // The game's icon from the player's disc once it is verified, else its initial on its colour.
-            ImVec2 badge(position.x + 34, position.y + GameRowH / 2);
-            if (slot != nullptr && slot->icon != nullptr)
-                draw->AddImageRounded(Ref(slot->icon), ImVec2(badge.x - GameBadgeR, badge.y - GameBadgeR), ImVec2(badge.x + GameBadgeR, badge.y + GameBadgeR),
-                    ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, GameBadgeR);
+            // The game's logo (with "Skylanders" on it) once its disc has been read, here or in an earlier session; a game
+            // that isn't out yet keeps its neutral badge: its initial on its colour.
+            ImVec2 box(position.x + 14, position.y + (GameRowH - GameLogoH) / 2);
+            const ArtTexture* logo = entry.enabled ? CachedArt(entry.id, LauncherAssets::Role::Logo, int(GameLogoW * 2.5f)) : nullptr;
+            if (logo != nullptr)
+                DrawLogo(draw, *logo, box, ImVec2(GameLogoW, GameLogoH), 1, false);
             else
             {
+                ImVec2 badge(box.x + GameLogoW / 2, box.y + GameLogoH / 2);
                 draw->AddCircleFilled(badge, GameBadgeR, Rgb(entry.accent, entry.enabled ? 255 : 90));
                 ImGui::PushFont(m_titleFont, GameBadgeR);
                 char letter[2] = { entry.name[0], 0 };
@@ -1141,20 +1168,26 @@ namespace launcher_ui
                 draw->AddText(ImVec2(badge.x - letterSize.x / 2, badge.y - letterSize.y / 2), Rgb(BadgeInk), letter);
                 ImGui::PopFont();
             }
-            ImGui::PushFont(nullptr, SidebarTextSize);
-            AddBoldText(draw, ImVec2(position.x + 62, position.y + 6), Rgb(entry.enabled ? SidebarInk : SidebarInkDim), entry.name);
+            // The name, as large as fits; the disc's state under it.
+            float nameX = position.x + GameTextX, nameW = rowW - GameTextX - 10, nameSize = SidebarTextSize - 1;
+            ImGui::PushFont(m_boldFont, nameSize);
+            while (nameSize > SidebarSmallSize && ImGui::CalcTextSize(entry.name).x > nameW)
+            {
+                ImGui::PopFont();
+                ImGui::PushFont(m_boldFont, --nameSize);
+            }
+            draw->AddText(ImVec2(nameX, position.y + 9), Rgb(entry.enabled ? SidebarInk : TextDim), entry.name);
             ImGui::PopFont();
-            ImGui::PushFont(nullptr, SidebarSmallSize);
-            const bool ready = slot != nullptr && slot->disc == DiscState::Ready;
-            const char* status = !entry.enabled ? "Coming later" : slot == nullptr ? "Open" : ready ? "Ready to play" :
-                slot->disc == DiscState::Verifying ? "Checking your disc" : "Needs your disc";
-            float statusX = position.x + 62;
+            ImGui::PushFont(nullptr, SidebarSmallSize - 2);
+            bool ready = false;
+            const char* status = entry.enabled ? SlotStatus(slot, &ready) : "Coming later";
+            float statusX = nameX, statusY = position.y + 32;
             if (entry.enabled)
             {
-                draw->AddCircleFilled(ImVec2(statusX + 4, position.y + 40), 4, Rgb(ready ? Ready : Accent));
-                statusX += 14;
+                draw->AddCircleFilled(ImVec2(statusX + 3.5f, statusY + ImGui::GetFontSize() / 2 + 1), 3.5f, Rgb(ready ? Ready : Accent));
+                statusX += 12;
             }
-            draw->AddText(ImVec2(statusX, position.y + 30), Rgb(SidebarInkDim), status);
+            draw->AddText(ImVec2(statusX, statusY), Rgb(entry.enabled ? TextSecondary : TextDim, entry.enabled ? 255 : 200), status);
             ImGui::PopFont();
             ImGui::PopID();
         }
@@ -1168,8 +1201,8 @@ namespace launcher_ui
         if (collection)
             TakeFocus(FocusTo::Sidebar);
         {
-            // Three figure cards fanned out.
-            ImVec2 center(at.x + 34, at.y + GameRowH / 2);
+            // Three figure cards fanned out, in the logos' column; the label in the names' column.
+            ImVec2 center(at.x + 14 + GameLogoW / 2, at.y + GameRowH / 2);
             for (int i = -1; i <= 1; i++)
             {
                 ImVec2 card(center.x + i * 7.0f, center.y + (i == 0 ? -3.0f : 0.0f));
@@ -1178,7 +1211,7 @@ namespace launcher_ui
             }
             ImGui::PushFont(m_titleFont, 19);
             ImVec2 label = ImGui::CalcTextSize("COLLECTION");
-            draw->AddText(ImVec2(at.x + 62, center.y - label.y / 2), Rgb(SidebarInk), "COLLECTION");
+            draw->AddText(ImVec2(at.x + GameTextX, center.y - label.y / 2), Rgb(SidebarInk), "COLLECTION");
             ImGui::PopFont();
         }
         bool open = m_page == Page::Settings;
@@ -1187,12 +1220,12 @@ namespace launcher_ui
         if (open)
             TakeFocus(FocusTo::Sidebar);
         ImGui::PopStyleVar();
-        ImVec2 center(at.x + 34, at.y + GameRowH / 2);
+        ImVec2 center(at.x + 14 + GameLogoW / 2, at.y + GameRowH / 2);
         draw->AddCircleFilled(center, GearButton / 2, Rgb(SidebarInk), 32);
         DrawGear(draw, center, GearButton * 0.32f, Rgb(Sidebar), Rgb(SidebarInk));
         ImGui::PushFont(m_titleFont, 19);
         ImVec2 label = ImGui::CalcTextSize("SETTINGS");
-        draw->AddText(ImVec2(at.x + 62, center.y - label.y / 2), Rgb(SidebarInk), "SETTINGS");
+        draw->AddText(ImVec2(at.x + GameTextX, center.y - label.y / 2), Rgb(SidebarInk), "SETTINGS");
         ImGui::PopFont();
 
         ImGui::End();
@@ -1200,18 +1233,120 @@ namespace launcher_ui
         ImGui::PopStyleColor();
     }
 
-    // The launcher's menu, opened by the SKYLAUNCHER title: empty for now, with the project's links bottom right.
+    // The launcher's menu, opened by the SKYLAUNCHER title: the games as a library (a card each, with its art from the
+    // player's disc), the games still to come under them, the project's links bottom right.
     void App::DrawHome()
     {
         constexpr const char* Project = "https://github.com/mflr0/Skylauncher";
-        constexpr float Icon = 40, ReportW = 190;
+        constexpr float Icon = 40, ReportW = 190, CardGap = 20, CardRadius = RadiusLarge;
         ImVec2 size = ImGui::GetIO().DisplaySize;
-        ImVec2 iconAt(size.x - Pad - Icon, size.y - Pad - Icon);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImVec2 origin = ImGui::GetCursorScreenPos();
+        float width = ImGui::GetContentRegionAvail().x;
 
+        Title("LIBRARY", HeadlineSize, Text);
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextUnformatted("Each game's art comes from your own disc, once it has been checked.");
+        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, 10));
+
+        // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
+        std::vector<const LauncherGameEntry*> playable, later;
+        for (const LauncherGameEntry& entry : LauncherGameCatalog())
+            (entry.enabled ? playable : later).push_back(&entry);
+        float cardW = (width - CardGap * float(playable.size() - 1)) / float(std::max<size_t>(playable.size(), 1));
+        float cardH = std::min(cardW * 0.6f, size.y - origin.y - 300);
+        ImVec2 row = ImGui::GetCursorScreenPos();
+        for (size_t i = 0; i < playable.size(); i++)
+        {
+            const LauncherGameEntry& entry = *playable[i];
+            ImVec2 at(row.x + float(i) * (cardW + CardGap), row.y), end(at.x + cardW, at.y + cardH);
+            ImGui::SetCursorScreenPos(at);
+            ImGui::PushID(entry.id);
+            if (ImGui::InvisibleButton("##card", ImVec2(cardW, cardH), ImGuiButtonFlags_EnableNav))
+            {
+                if (std::string_view(entry.id) != m_s->game.id)
+                    SelectGame(*FindGame(entry.id));
+                GoTo(Page::Play);
+            }
+            if (i == 0)
+                TakeFocus(FocusTo::Page);
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered)
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            ImGui::PopID();
+
+            const GameStyle& style = StyleOf(entry.id);
+            draw->AddRectFilled(ImVec2(at.x, at.y + 6), ImVec2(end.x, end.y + 6), IM_COL32(0, 0, 0, 70), CardRadius);
+            if (const ArtTexture* art = CachedArt(entry.id, LauncherAssets::Role::HeroBackground, 640))
+            {
+                float w, h;
+                SDL_GetTextureSize(art->texture, &w, &h);
+                float scale = std::max(cardW / w, cardH / h), u = cardW / (w * scale), v = cardH / (h * scale);
+                draw->AddImageRounded(Ref(art->texture), at, end, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2),
+                    IM_COL32(255, 255, 255, hovered ? 255 : 225), CardRadius);
+            }
+            else
+            {
+                // Not read yet: the game's colours, as its buttons have them.
+                GradientRect(draw, at, end, Rgb(style.bottom), Rgb(style.outline), CardRadius);
+            }
+            // The bottom fades to dark for the name; the logo sits in the upper part.
+            float fade = at.y + cardH * 0.45f;
+            GradientRect(draw, ImVec2(at.x, fade), end, Rgb(SkyTop, 0), Rgb(SkyTop, 235), CardRadius, ImDrawFlags_RoundCornersBottom);
+            if (const ArtTexture* logo = CachedArt(entry.id, LauncherAssets::Role::Logo, 640))
+                DrawLogo(draw, *logo, ImVec2(at.x + cardW * 0.12f, at.y + cardH * 0.08f), ImVec2(cardW * 0.76f, cardH * 0.56f));
+            else
+            {
+                ImGui::PushFont(m_titleFont, TitleSize + 6);
+                ImVec2 text = ImGui::CalcTextSize(entry.name);
+                draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, at.y + cardH * 0.36f - text.y / 2), Rgb(Text), entry.name);
+                ImGui::PopFont();
+            }
+            const GameSlot* slot = nullptr;
+            for (const auto& opened : m_slots)
+                if (std::string_view(opened->game.id) == entry.id)
+                    slot = opened.get();
+            bool ready = false;
+            const char* status = SlotStatus(slot, &ready);
+            ImGui::PushFont(m_boldFont, SidebarTextSize);
+            draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), FindGame(entry.id) != nullptr ? FindGame(entry.id)->name : entry.name);
+            ImGui::PopFont();
+            ImGui::PushFont(nullptr, SmallSize);
+            draw->AddCircleFilled(ImVec2(at.x + 24, end.y - 22), 4, Rgb(ready ? Ready : Accent));
+            draw->AddText(ImVec2(at.x + 34, end.y - 22 - ImGui::GetFontSize() / 2 - 1), Rgb(TextSecondary), status);
+            ImGui::PopFont();
+            // Under the pointer: the game's own colour around the card.
+            draw->AddRect(at, end, hovered ? Rgb(style.glow) : IM_COL32(255, 255, 255, 28), CardRadius, 0, hovered ? 2.5f : 1.0f);
+            FocusRing(CardRadius);
+        }
+        ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + cardH + 30));
+
+        // The games still to come: their names, in their colours, quietly.
+        ImGui::PushFont(nullptr, CaptionSize + 1);
+        BoldText("COMING LATER", TextDim);
+        ImGui::PopFont();
+        ImGui::Dummy(ImVec2(0, 4));
+        ImVec2 chip = ImGui::GetCursorScreenPos();
+        ImGui::PushFont(m_boldFont, SmallSize + 1);
+        for (const LauncherGameEntry* entry : later)
+        {
+            ImVec2 text = ImGui::CalcTextSize(entry->name);
+            float chipW = text.x + 46;
+            if (chip.x + chipW > origin.x + width)
+                chip = ImVec2(origin.x, chip.y + 46);
+            draw->AddRectFilled(chip, ImVec2(chip.x + chipW, chip.y + 36), Rgb(Panel, 220), 18);
+            draw->AddRect(chip, ImVec2(chip.x + chipW, chip.y + 36), Rgb(Border, 160), 18);
+            draw->AddCircleFilled(ImVec2(chip.x + 20, chip.y + 18), 6, Rgb(entry->accent, 200));
+            draw->AddText(ImVec2(chip.x + 34, chip.y + 18 - text.y / 2), Rgb(TextSecondary), entry->name);
+            chip.x += chipW + 10;
+        }
+        ImGui::PopFont();
+
+        ImVec2 iconAt(size.x - Pad - Icon, size.y - Pad - Icon);
         ImGui::SetCursorScreenPos(ImVec2(iconAt.x - 14 - ReportW, iconAt.y));
         if (PillButton("Report a bug", false, ReportW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
             SDL_OpenURL((std::string(Project) + "/issues/new").c_str());
-        TakeFocus(FocusTo::Page);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Opens a new issue on GitHub");
 
@@ -1239,28 +1374,20 @@ namespace launcher_ui
         ImVec2 end(position.x + available.x, position.y + available.y - BottomBarH);
         float heroH = end.y - position.y;
 
-        // Hero: the game's logo from the player's disc (drawn below) over the drawn sky; the disc's background art isn't used.
-        draw->AddRectFilledMultiColor(ImVec2(position.x, position.y + heroH * 0.55f), end, IM_COL32(11, 15, 46, 0), IM_COL32(11, 15, 46, 0),
-            IM_COL32(11, 15, 46, 230), IM_COL32(11, 15, 46, 230));
+        // Hero: the game's logo from the player's disc over its painting (DrawBackdrop shades it).
         if (m_dragOver)
             draw->AddRect(ImVec2(position.x + 6, position.y + 6), ImVec2(end.x - 6, end.y - 6), Rgb(AccentDark), RadiusLarge, 4.0f);
 
         // The logo (else the game's name), as large as fits and centred between the language menu and the disc status.
-        float areaTop = position.y + Pad * 3, areaBottom = end.y - 120, areaH = areaBottom - areaTop;
+        float areaTop = position.y + Pad * 2.5f, areaBottom = end.y - 128, areaH = areaBottom - areaTop;
+        const ArtTexture* logo = m_s->logo ? &m_s->logo : CachedArt(m_s->game.id, LauncherAssets::Role::Logo, 0);
         if (m_s->installView)
         {
             float cardW = std::min(available.x - 80, 680.0f);
             DrawInstall(ImVec2(position.x + (available.x - cardW) / 2, areaTop), ImVec2(cardW, end.y - Pad - areaTop));
         }
-        else if (m_s->logo != nullptr)
-        {
-            float w, h;
-            SDL_GetTextureSize(m_s->logo, &w, &h);
-            float scale = std::min(available.x * 0.85f / w, areaH / h);
-            ImVec2 logoSize(w * scale, h * scale);
-            ImVec2 logoAt(position.x + (available.x - logoSize.x) / 2, areaTop + (areaH - logoSize.y) / 2);
-            draw->AddImage(Ref(m_s->logo), logoAt, ImVec2(logoAt.x + logoSize.x, logoAt.y + logoSize.y));
-        }
+        else if (logo != nullptr)
+            DrawHeroLogo(draw, *logo, ImVec2(position.x + available.x * 0.14f, areaTop), ImVec2(available.x * 0.72f, areaH));
         else
         {
             ImGui::PushFont(m_titleFont, HeroSize);
@@ -1276,18 +1403,11 @@ namespace launcher_ui
             ImGui::PopFont();
         }
 
-        // The disc, bottom left of the hero: the game's icon (rounded), the image's file name, its status under it.
-        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 120));
+        // The disc, bottom left of the hero: the image's file name, its status under it ("Change disc..." on the right).
+        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 116));
         ImGui::BeginGroup();
         if (!m_s->installView) // the progress card takes the whole hero
         {
-            if (m_s->icon != nullptr)
-            {
-                ImVec2 at = ImGui::GetCursorScreenPos();
-                ImGui::Dummy(ImVec2(64, 64));
-                draw->AddImageRounded(Ref(m_s->icon), at, ImVec2(at.x + 64, at.y + 64), ImVec2(0, 0), ImVec2(1, 1), IM_COL32_WHITE, Radius);
-                ImGui::SameLine(0, 16);
-            }
             ImGui::BeginGroup();
             // The file name on top, then "DISC IMAGE:" and the status on the line below.
             std::string file = m_s->discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
@@ -1347,17 +1467,20 @@ namespace launcher_ui
 
         // Bottom band: the controller and the main button in the middle, "Change disc..." on the right.
         ImVec2 bar(position.x, end.y), barEnd(end.x, position.y + available.y);
-        draw->AddRectFilled(bar, barEnd, Rgb(BottomBar));
+        GradientRect(draw, bar, barEnd, Rgb(BottomBarTop), Rgb(BottomBar), 0);
+        draw->AddLine(bar, ImVec2(barEnd.x, bar.y), Rgb(0xFFFFFF, 26), 1.0f);
         float middle = bar.y + BottomBarH / 2;
 
         bool ready = m_s->disc == DiscState::Ready, verifying = m_s->disc == DiscState::Verifying, installing = Installing();
         bool install = ready && NeedsInstall();
         const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : strings::ChooseDisc;
-        // Centred, unless the controller picker on its left would reach the sidebar (a narrow window).
-        constexpr float MinGap = 16;
-        float mainX = std::max(bar.x + (available.x - PlayButtonW) / 2, bar.x + Pad + ControllerW + MinGap), buttonY = middle - PlayButtonH / 2 + 3;
+        // The main button and the game's settings beside it, in the game's own look, centred together, unless the
+        // controller picker on their left would reach the sidebar (a narrow window).
+        constexpr float MinGap = 16, SettingsGap = 12;
+        const float groupW = PlayButtonW + SettingsGap + PlayButtonH;
+        float mainX = std::max(bar.x + (available.x - groupW) / 2, bar.x + Pad + ControllerW + MinGap), buttonY = middle - PlayButtonH / 2;
         ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY));
-        if (BigButton(label, ImVec2(PlayButtonW, PlayButtonH), Play, PlayDark, PlayInk, !verifying && !installing))
+        if (GameButton(label, ImVec2(PlayButtonW, PlayButtonH), StyleOf(m_s->game.id), !verifying && !installing))
         {
             if (!ready)
                 Browse();
@@ -1367,6 +1490,9 @@ namespace launcher_ui
                 PlayNow();
         }
         TakeFocus(FocusTo::Page);
+        ImGui::SetCursorScreenPos(ImVec2(mainX + PlayButtonW + SettingsGap, buttonY));
+        if (GameSettingsButton("##gamesettings", PlayButtonH))
+            GoTo(Page::GameSettings);
 
         // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
         float controllerGap = std::clamp(mainX - (bar.x + Pad) - ControllerW, MinGap, ControllerGap);
@@ -1451,14 +1577,15 @@ namespace launcher_ui
             }
         }
 
-        // "Game settings", right-aligned and centred in the band, styled like the controller picker: this game's disc (change
-        // or remove it), video, languages, saves and data. A plain button for now; its look is the art direction's.
+        // "Change disc...", at the right of the disc's lines once a disc is verified; styled like the controller picker.
+        // The game's other settings (video, languages, saves, data) are behind the gear next to the main button.
+        if (ready && !installing && !m_s->installView)
         {
-            constexpr float GameSettingsW = 170;
-            ImGui::SetCursorScreenPos(ImVec2(barEnd.x - Pad - 8 - GameSettingsW, middle - 20));
+            constexpr float ChangeDiscW = 160;
+            ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
-            if (PillButton(strings::GameSettings, false, GameSettingsW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
-                GoTo(Page::GameSettings);
+            if (PillButton("Change disc...", false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+                Browse();
             ImGui::PopStyleVar();
         }
     }
@@ -1826,6 +1953,7 @@ namespace launcher_ui
         }
         ImGui::End();
         ImGui::PopStyleVar();
+        m_lastPage = m_page; // LogoDrop: a new arrival on the game page starts the logo's fall
         DrawWhatsNew();
         DrawProblemReport();
         DrawQuitPrompt();
@@ -1846,7 +1974,7 @@ namespace launcher_ui
         {
             static const char* const Names[] = { "01-no-iso", "02-verified", "03-game-video", "04-controls", "05-collection", "06-home",
                 "07-figure-sheet", "08-new-figure", "09-play-with", "10-language", "11-game-disc", "12-game-saves", "13-game-data",
-                "14-launcher-settings", "15-disc-gone" };
+                "14-launcher-settings", "15-disc-gone", "16-logo-drop" };
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-quit-while-installing", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
@@ -2243,6 +2371,19 @@ namespace launcher_ui
                 StartInstall();
             }
             m_testAt = now + 400;
+            break;
+        case 11:
+            // The logo falling in, early in its fall (it eases out: most of the way is done in the first third): the disc put
+            // back, the page entered again.
+            if (m_s->discPath.ends_with(".moved"))
+            {
+                m_s->discPath.resize(m_s->discPath.size() - 6);
+                m_s->disc = DiscState::Ready;
+                m_s->check.status = GameSourceStatus::Ok;
+            }
+            m_page = Page::Play;
+            m_lastPage = Page::Home;
+            m_testAt = now + uint64_t(LogoDropMs / 8);
             break;
         default:
             m_running = false;

@@ -16,7 +16,6 @@ namespace LauncherTheme
     inline constexpr unsigned SkyTop = 0x0B0F2E;
     inline constexpr unsigned SkyBottom = 0x2A1A5E;
     inline constexpr unsigned PortalGlow = 0x5B3FD0;
-    inline constexpr unsigned BackdropShade = 70; // alpha of the night tint laid over the game's sky backdrop
     // Every page but the game's (Home, Collection, Settings): a plain gradient in the sidebar's grey, top to bottom.
     inline constexpr unsigned PageTop = 0x32323C, PageBottom = 0x1E1E24;
 
@@ -29,7 +28,7 @@ namespace LauncherTheme
     inline constexpr unsigned Ready = 0x2EEA8F;     // green dot: the disc is verified
     // The band under the game art, one step lighter than the sidebar; its buttons sit a step darker than the band, lighten
     // under the mouse and darken when pressed. Every shade keeps the sidebar's hue (blue a little above red and green).
-    inline constexpr unsigned BottomBar = 0x3A3A44;
+    inline constexpr unsigned BottomBar = 0x3A3A44, BottomBarTop = 0x42424D; // a light gradient, top to bottom
     inline constexpr unsigned BottomBarRaised = 0x2C2C34, BottomBarRaisedHover = 0x34343E, BottomBarRaisedActive = 0x26262C;
     inline constexpr unsigned BottomBarBorder = 0x50505E;
     inline constexpr unsigned BottomBarInk = 0xF2F2F2;
@@ -69,7 +68,7 @@ namespace LauncherTheme
     inline constexpr float Radius = 14, RadiusSmall = 10, RadiusLarge = 22;
     inline constexpr float PlayButtonW = 300, PlayButtonH = 72;
     inline constexpr float BottomBarH = 150; // the band with the main button, under the game art
-    inline constexpr float GameRowH = 54, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
+    inline constexpr float GameRowH = 56, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
     inline constexpr float TabUnderlineH = 3, TabGap = 34; // settings tabs: the line under the selected one, the space between them
     inline constexpr float ControllerW = 190, ControllerGap = 40; // the controller picker, and its space before the main button
     inline constexpr float GameBadgeR = 17;     // the game's icon (or initial) in a sidebar row
@@ -81,6 +80,32 @@ namespace LauncherTheme
     inline constexpr float CaptionSize = 12;  // the smallest text there is, at 1x
     inline constexpr float BoldOffset = 0.6f; // extra copies of SemiBold text, this far apart, for what must read heavier (the chosen controller)
     inline constexpr int BolderPasses = 2;
+
+    // Each game's own look, for what belongs to the game on its page: the main button and the game's settings button
+    // (docs/launcher_ui.md, "Each game's look"). Taken from the game's own menus and logo:
+    // - Spyro's Adventure: the logo's sky-blue-to-white letters in a navy outline, soft stone bevels;
+    // - Giants: the menus' glossy "gel" buttons (a bright top half, a hard split, a darker bottom half, a dark outline)
+    //   in the logo's gold-to-orange.
+    struct GameStyle
+    {
+        unsigned top, bottom;  // the button's fill, top to bottom
+        unsigned outline;      // the dark rim around it
+        unsigned ink, inkRim;  // the label: white letters with a dark rim, as on the logos
+        unsigned glow;         // under the pointer
+        bool gel;              // a hard highlight split (Giants) instead of a soft bevel (SSA)
+    };
+    inline constexpr GameStyle SpyrosAdventureStyle = { 0x7CC8FF, 0x2C7FD8, 0x0C2A5C, 0xFFFFFF, 0x0C2A5C, 0x6BBAFF, false };
+    inline constexpr GameStyle GiantsStyle = { 0xFFD23C, 0xF06A10, 0x3A1404, 0xFFFFFF, 0x4A1A04, 0xFFB43A, true };
+    // The game's style by catalogue id; the launcher's own blue for a game without one.
+    const GameStyle& StyleOf(const char* game);
+
+    // The game page: how the logo arrives (once per visit, docs/launcher_ui.md), its shadow, the backdrop's shading.
+    inline constexpr float LogoDropMs = 300, LogoDropDistance = 44;
+    inline constexpr unsigned BackdropTopShade = 120, BackdropBottomShade = 235; // alpha of SkyTop over the game's painting
+    inline constexpr int BackdropArtW = 1024; // the painting's width as a texture (Giants' is 1600 px)
+    // The sidebar's game rows: the logo's box on the left, the name and status beside it.
+    inline constexpr float GameLogoW = 72, GameLogoH = 38, GameTextX = 98;
+    inline constexpr float VersionSize = 13; // "v0.3.1" beside the SKYLAUNCHER title
 
     // ImGui widget colours and shapes for the whole window.
     void Apply(ImGuiStyle& style);

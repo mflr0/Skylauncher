@@ -159,6 +159,15 @@ namespace collection
             }
             ReadMap(item["names"], game.names);
             ReadMap(item["images"], game.images);
+            for (const auto& [key, value] : item["portraits"].Members())
+            {
+                // "<type>" or "<type>:<variant id>"
+                char* end = nullptr;
+                uint32_t type = uint32_t(strtoul(key.c_str(), &end, 0)), variant = 0;
+                if (end != nullptr && *end == ':')
+                    variant = uint32_t(strtoul(end + 1, nullptr, 0));
+                game.portraits[(type & 0xFFFF) << 16 | (variant & 0xFFFF)] = value.AsString();
+            }
             games.push_back(std::move(game));
         }
 

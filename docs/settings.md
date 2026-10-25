@@ -10,6 +10,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | --- | --- | --- | --- | --- |
 | `launcher` | `fullscreen` | `0`, `1` | The launcher window itself | n/a |
 | `launcher` | `ui_scale` | `auto`, `0.75` to `3` | The launcher's size: `auto` follows the display's scale (Windows 150 %, 200 %...); Ctrl + / Ctrl - / Ctrl 0 change it | n/a |
+| `launcher` | `reduce_motion` | `auto`, `0`, `1` | The logo's fall on the game page (`docs/launcher_ui.md`): `auto` follows the system (macOS Reduce motion, Windows animation effects), `1` never animates, `0` always does | n/a |
 | `launcher` | `runtime` | path | The game runtime to start, if not next to the launcher | n/a |
 | `launcher` | `kit` | folder | The player kit that installs the game, if not next to the launcher (`docs/install.md`) | n/a |
 | `update` | `auto_check` | `0`, `1` | Look for a new Skylauncher once a day at start (default 1; `docs/updates.md`) | n/a |

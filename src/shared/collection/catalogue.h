@@ -73,6 +73,9 @@ namespace collection
         std::vector<std::string> acceptsGames;  // ...or every toy that first came with these games
         std::map<uint16_t, std::string> names;  // the game's internal character names (SSA: portraits)
         std::map<uint16_t, std::string> images; // other toys' pictures among the game's UI images
+        // The game's portrait of a toy (Giants: one per Skylander, deco and item), by type << 16 | variant id (0: the
+        // plain toy): the picture's file name in the game's portraits folder (art/game_art.h). JSON: "9", "9:0x1206".
+        std::map<uint32_t, std::string> portraits;
         std::string runtime;                    // the runtime's executable name ("SSARecomp"); its data is in datadir::Game(id)
         std::vector<Seat> seats;                // in the order the menus show them
     };
