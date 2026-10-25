@@ -230,7 +230,7 @@ namespace launcher_ui
         Join();
         done = false;
         progress = 0;
-        { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; }
+        { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; assets = {}; }
         thread = std::thread([this, image, &game] {
             auto report = [this](float fraction, std::string_view text) {
                 progress = fraction;
@@ -239,15 +239,23 @@ namespace launcher_ui
             };
             GameSourceCheck result = CheckGameSource(image, game, report);
             TitleMetadata metadata;
+            LauncherAssets::Provider art;
             if (result.status == GameSourceStatus::Ok)
             {
-                report(0.98f, "Reading the title and icon");
+                report(0.96f, "Reading the title and icon");
                 DiscFileSystem disc;
                 if (disc.Open(image.c_str()))
+                {
                     if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
                         metadata = ReadTitleMetadata(xex);
+                    // The game's own art, decoded from the player's disc into the local cache (never shipped).
+                    report(0.98f, "Reading the game's pictures");
+                    art.Init(image, metadata.titleId);
+                    art.ExtractFromDisc(disc, metadata);
+                    art.ExtractFigurePortraits(disc);
+                }
             }
-            { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); }
+            { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); assets = std::move(art); }
             progress = 1;
             done = true;
         });
@@ -604,14 +612,7 @@ namespace launcher_ui
         m_meta = m_verify.meta;
         if (!m_meta.iconPng.empty())
             m_icon = LoadPng(m_renderer, m_meta.iconPng);
-        // The game's own art, decoded from the player's disc into the local cache (never shipped).
-        m_assets.Init(m_discPath, m_meta.titleId);
-        DiscFileSystem disc;
-        if (disc.Open(m_discPath.c_str()))
-        {
-            m_assets.ExtractFromDisc(disc, m_meta);
-            m_assets.ExtractFigurePortraits(disc);
-        }
+        m_assets = m_verify.assets; // the worker cached the disc's art
         m_collection->ClearIcons(); // the collection's pictures now come from the disc
         if (LauncherAssets::Asset logo = m_assets.Get(LauncherAssets::Role::Logo); logo.valid)
             m_logo = LoadPngFile(m_renderer, logo.path);

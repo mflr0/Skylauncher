@@ -116,6 +116,7 @@ namespace launcher_ui
         std::string stage;
         GameSourceCheck check;
         TitleMetadata meta;
+        LauncherAssets::Provider assets; // the disc's art and figure pictures, cached here too (4 s on the UI thread before)
 
         ~VerifyJob() { Join(); }
         void Join() { if (thread.joinable()) thread.join(); }
