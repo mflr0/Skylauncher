@@ -88,12 +88,22 @@ namespace launcher_ui
 
     bool App::NeedsInstall() const
     {
-        return m_s->disc == DiscState::Ready && m_s->installed.runtime.empty() && m_s->ownRuntime.empty();
+        return NeedsInstall(*m_s);
+    }
+
+    bool App::NeedsInstall(const GameSlot& slot) const
+    {
+        return slot.disc == DiscState::Ready && slot.installed.runtime.empty() && slot.ownRuntime.empty();
     }
 
     bool App::UpdateAvailable() const
     {
-        return m_s->disc == DiscState::Ready && !m_s->installed.runtime.empty() && m_s->kit && m_s->kit->version != m_s->installed.kitVersion;
+        return UpdateAvailable(*m_s);
+    }
+
+    bool App::UpdateAvailable(const GameSlot& slot) const
+    {
+        return slot.disc == DiscState::Ready && !slot.installed.runtime.empty() && slot.kit && slot.kit->version != slot.installed.kitVersion;
     }
 
     void App::SetInstallState(const std::string& sha, const char* state)
@@ -152,30 +162,35 @@ namespace launcher_ui
 
     InstallProgress App::InstallSnapshot(size_t logTail)
     {
-        if (m_s->kitUsed)
+        return InstallSnapshot(*m_s, logTail);
+    }
+
+    InstallProgress App::InstallSnapshot(GameSlot& slot, size_t logTail)
+    {
+        if (slot.kitUsed)
         {
-            KitDownloader::Snapshot_ kit = m_s->kitDownload.Snapshot();
+            KitDownloader::Snapshot_ kit = slot.kitDownload.Snapshot();
             using Kit = KitDownloader::State;
             InstallProgress progress;
-            progress.steps.push_back(m_s->kitStep);
-            if (!m_s->kitError.empty() || kit.state != Kit::Done)
+            progress.steps.push_back(slot.kitStep);
+            if (!slot.kitError.empty() || kit.state != Kit::Done)
             {
-                progress.state = !m_s->kitError.empty() || kit.state == Kit::Failed ? InstallProgress::State::Failed
-                    : kit.state == Kit::Cancelled                               ? InstallProgress::State::Cancelled
-                                                                                : InstallProgress::State::Running;
-                progress.error = !m_s->kitError.empty() ? m_s->kitError : kit.error;
+                progress.state = !slot.kitError.empty() || kit.state == Kit::Failed ? InstallProgress::State::Failed
+                    : kit.state == Kit::Cancelled                            ? InstallProgress::State::Cancelled
+                                                                             : InstallProgress::State::Running;
+                progress.error = !slot.kitError.empty() ? slot.kitError : kit.error;
                 progress.done = kit.done >> 20; // MB
                 progress.total = kit.total >> 20;
                 return progress;
             }
             // Downloaded: the kit's step, done, then SSABuild's.
-            progress = m_s->installer.Snapshot(logTail);
-            progress.steps.insert(progress.steps.begin(), m_s->kitStep);
+            progress = slot.installer.Snapshot(logTail);
+            progress.steps.insert(progress.steps.begin(), slot.kitStep);
             return progress;
         }
-        if (m_s->installPast.state == InstallProgress::State::Idle)
-            return m_s->installer.Snapshot(logTail);
-        InstallProgress progress = m_s->installPast;
+        if (slot.installPast.state == InstallProgress::State::Idle)
+            return slot.installer.Snapshot(logTail);
+        InstallProgress progress = slot.installPast;
         size_t first = progress.log.size() - std::min(logTail, progress.log.size());
         progress.log.erase(progress.log.begin(), progress.log.begin() + ptrdiff_t(first));
         return progress;

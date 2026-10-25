@@ -41,7 +41,7 @@ Settings > Launcher > Language (English only, disabled, for now); the game's tex
 settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
    SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
-   and disc state ("Open" until the game is first shown, then "Checking your disc", "Needs your disc" or "Ready to play"); the
+   and its live state ("Open" until the game is first shown, then the states in "The sidebar's line"); the
    selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
 2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
    (current device, PLAY WITH: a menu of the others), the main button (CHOOSE DISC, INSTALL, then PLAY) with the portal's
@@ -84,8 +84,8 @@ in the sidebar (`[launcher] game=`); the other is one click away.
      Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
      art with "Skylanders" on it, in the row's left column (`GameLogoW` x `GameLogoH`); before that, and for the games
      coming later (no disc, so never any game art), a neutral badge: the initial on the game's colour.
-   - The name (shrunk to fit), then the disc's state with a dot ("Open" until the game is first shown, then "Checking your
-     disc", "Needs your disc" or "Ready to play"). The selected game's row has the orange bar while its Play page is open.
+   - The name (shrunk to fit), then the game's state with a dot ("The sidebar's line", below). The selected game's row has
+     the orange bar while its Play page is open.
    - COLLECTION and the Settings gear at the bottom, their icons in the logos' column and their labels in the names'.
    - Rows are reachable with the keyboard and the pad like the others.
 2. **Play** (the game page, no tabs).
@@ -105,6 +105,29 @@ in the sidebar (`[launcher] game=`); the other is one click away.
 4. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About. Clicking a game
    goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from. The game page's settings
    button opens it too, until each game has a settings page of its own (another branch).
+
+## The sidebar's line
+Under each enabled game's name, one line says what the game is doing, from the game's own slot (`App::SlotStatus`, the same
+state the Play page draws; Home's cards use it too), so it is right for the selected game and for the other one: the
+install of a game goes on in the background while the other is shown. In this order:
+| State | Line | Dot |
+|---|---|---|
+| never shown this session | Open | blue |
+| installing / updating (a build already exists) | `Installing 42 %` / `Updating 42 %`, a thin bar in the game's colour along the row's foot | blue |
+| the kit being downloaded; the last step | `Downloading tools 42 %`; `Finishing 97 %` | blue |
+| the disc being checked, or missing | Checking your disc; Needs your disc | blue |
+| the last install failed; it was interrupted | Install failed; Interrupted | red; blue |
+| a verified disc with no build yet | Ready to install | blue |
+| the kit moved on since the build | Update available | blue |
+| built | Ready to play | green |
+
+The percentage is the install card's overall fraction (`MakeInstallChecklist`), the same as the band's button. The text is
+cut with "..." to the column (the sidebar is a fixed width at every window size) and the bar is drawn over the row's own
+space, so nothing moves when the line changes. "Playing" is never shown: PLAY closes the launcher until the game ends.
+
+`SSA_LAUNCHER_TEST_SIDEBAR=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit and both games' `iso=`;
+`FAKE_SSABUILD_HOLD` keeps the build at 100 %) shoots and checks the line through an install and an update at 0, 50 and 100 %,
+with the other game shown meanwhile, then a failed build: `SkylauncherTest` runs it (`SidebarChecks`).
 
 ## Each game's look
 What belongs to the game on its page is drawn in **the game's own colours**, taken from its logo (`GameStyle` in

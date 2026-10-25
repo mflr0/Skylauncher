@@ -5,7 +5,8 @@
  * second shaders/compile/link pass that follows the movie shaders.
  *   FAKE_SSABUILD_FAIL=<step id>  fail half way through that step (toolchain, disc, recompile, shaders, compile, link,
  *                                 movies)
- *   FAKE_SSABUILD_DELAY=<seconds> pause between events (default 0.05) */
+ *   FAKE_SSABUILD_DELAY=<seconds> pause between events (default 0.05)
+ *   FAKE_SSABUILD_HOLD=<seconds>  wait after the last step, before finishing (to look at a build at 100 %) */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,6 +77,9 @@ int main(int argc, char** argv)
     step("shaders", "Translating the shaders", 5);
     step("compile", "Compiling the game", 5);
     step("link", "Linking the game", 2);
+    fflush(stdout);
+    if (getenv("FAKE_SSABUILD_HOLD") != NULL)
+        SLEEP_MS((int)(atof(getenv("FAKE_SSABUILD_HOLD")) * 1000));
     printf("@log finished\n");
 
     char path[4096];

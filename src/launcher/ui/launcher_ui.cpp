@@ -373,6 +373,7 @@ namespace launcher_ui
             m_testCollection = SDL_getenv("SSA_LAUNCHER_TEST_COLLECTION") != nullptr;
             m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
             m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
+            m_testSidebar = SDL_getenv("SSA_LAUNCHER_TEST_SIDEBAR") != nullptr;
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
             m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
         }
@@ -1070,11 +1071,37 @@ namespace launcher_ui
         }
     }
 
-    // A game's state in a few words, for the sidebar and Home: its slot's disc (nullptr: not opened this session).
-    const char* App::SlotStatus(const GameSlot* slot, bool* ready) const
+    // A game's state in a few words, for the sidebar and Home: the same state the game page draws (its band's button, its
+    // install card), read from the game's own slot (nullptr: not opened this session).
+    App::SlotLine App::SlotStatus(GameSlot* slot)
     {
-        *ready = slot != nullptr && slot->disc == DiscState::Ready;
-        return slot == nullptr ? "Open" : *ready ? "Ready to play" : slot->disc == DiscState::Verifying ? "Checking your disc" : "Needs your disc";
+        if (slot == nullptr)
+            return { "Open", Accent };
+        if (slot->installer.Running() || slot->kitDownload.Running())
+        {
+            InstallProgress snapshot = InstallSnapshot(*slot);
+            InstallChecklist list = MakeInstallChecklist(snapshot, SDL_GetTicks());
+            bool update = !slot->installed.runtime.empty(), kit = slot->kitDownload.Running();
+            const char* verb = kit ? "Downloading tools" : list.current >= 0 && list.rows[size_t(list.current)].id == "finish" ? "Finishing" : update ? "Updating" : "Installing";
+            return { fmt::format("{} {} %", verb, int(std::floor(std::clamp(list.overall, 0.0f, 1.0f) * 100))), Accent, list.overall };
+        }
+        if (slot->disc == DiscState::Verifying)
+            return { "Checking your disc", Accent, -1 };
+        if (slot->disc != DiscState::Ready)
+            return { "Needs your disc", Accent };
+        if (slot->installView)
+        {
+            InstallProgress::State state = InstallSnapshot(*slot).state;
+            if (state == InstallProgress::State::Failed)
+                return { "Install failed", Danger };
+            if (state == InstallProgress::State::Interrupted)
+                return { "Interrupted", Accent };
+        }
+        if (NeedsInstall(*slot))
+            return { "Ready to install", Accent };
+        if (UpdateAvailable(*slot))
+            return { "Update available", Accent };
+        return { "Ready to play", Ready };
     }
 
     void App::DrawSidebar()
@@ -1142,7 +1169,7 @@ namespace launcher_ui
             ImGui::PushID(entry.id);
             ImVec2 position;
             // The game already opened this session has its slot: its icon and disc state show here, not just the shown one's.
-            const GameSlot* slot = nullptr;
+            GameSlot* slot = nullptr;
             for (const auto& opened : m_slots)
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
@@ -1183,16 +1210,34 @@ namespace launcher_ui
             draw->AddText(ImVec2(nameX, position.y + 9), Rgb(entry.enabled ? SidebarInk : TextDim), entry.name);
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SidebarSmallSize - 2);
-            bool ready = false;
-            const char* status = entry.enabled ? SlotStatus(slot, &ready) : "Coming later";
+            SlotLine line = entry.enabled ? SlotStatus(slot) : SlotLine{ "Coming later", Accent };
             float statusX = nameX, statusY = position.y + 32;
             if (entry.enabled)
             {
-                draw->AddCircleFilled(ImVec2(statusX + 3.5f, statusY + ImGui::GetFontSize() / 2 + 1), 3.5f, Rgb(ready ? Ready : Accent));
+                draw->AddCircleFilled(ImVec2(statusX + 3.5f, statusY + ImGui::GetFontSize() / 2 + 1), 3.5f, Rgb(line.dot));
                 statusX += 12;
             }
-            draw->AddText(ImVec2(statusX, statusY), Rgb(entry.enabled ? TextSecondary : TextDim, entry.enabled ? 255 : 200), status);
+            // Fits the column at the smallest window too: cut with "..." rather than run over the edge.
+            std::string status = line.text;
+            while (status.size() > 4 && ImGui::CalcTextSize(status.c_str()).x > rowW - 10 - statusX)
+            {
+                status.resize(status.size() - 1);
+                while (!status.empty() && (status.back() & 0xC0) == 0x80)
+                    status.pop_back();
+                status.pop_back();
+                status += "...";
+            }
+            draw->AddText(ImVec2(statusX, statusY), Rgb(entry.enabled ? TextSecondary : TextDim, entry.enabled ? 255 : 200), status.c_str());
             ImGui::PopFont();
+            if (line.progress >= 0) // a thin bar in the game's colour along the row's foot, over the text's column
+            {
+                const GameStyle& style = StyleOf(entry.id);
+                float left = nameX, right = rowW - 14, y = position.y + GameRowH - 7;
+                draw->AddRectFilled(ImVec2(left, y), ImVec2(right, y + 3), Rgb(0xFFFFFF, 28), 1.5f);
+                float fill = std::floor(left + (right - left) * std::clamp(line.progress, 0.0f, 1.0f));
+                if (fill > left)
+                    draw->AddRectFilled(ImVec2(left, y), ImVec2(std::max(fill, left + 3), y + 3), Rgb(style.top), 1.5f);
+            }
             ImGui::PopID();
         }
 
@@ -1307,18 +1352,17 @@ namespace launcher_ui
                 draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, at.y + cardH * 0.36f - text.y / 2), Rgb(Text), entry.name);
                 ImGui::PopFont();
             }
-            const GameSlot* slot = nullptr;
+            GameSlot* slot = nullptr;
             for (const auto& opened : m_slots)
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
-            bool ready = false;
-            const char* status = SlotStatus(slot, &ready);
+            SlotLine line = SlotStatus(slot);
             ImGui::PushFont(m_boldFont, SidebarTextSize);
             draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), FindGame(entry.id) != nullptr ? FindGame(entry.id)->name : entry.name);
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SmallSize);
-            draw->AddCircleFilled(ImVec2(at.x + 24, end.y - 22), 4, Rgb(ready ? Ready : Accent));
-            draw->AddText(ImVec2(at.x + 34, end.y - 22 - ImGui::GetFontSize() / 2 - 1), Rgb(TextSecondary), status);
+            draw->AddCircleFilled(ImVec2(at.x + 24, end.y - 22), 4, Rgb(line.dot));
+            draw->AddText(ImVec2(at.x + 34, end.y - 22 - ImGui::GetFontSize() / 2 - 1), Rgb(TextSecondary), line.text.c_str());
             ImGui::PopFont();
             // Under the pointer: the game's own colour around the card.
             draw->AddRect(at, end, hovered ? Rgb(style.glow) : IM_COL32(255, 255, 255, 28), CardRadius, 0, hovered ? 2.5f : 1.0f);
@@ -1991,7 +2035,7 @@ namespace launcher_ui
             static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-view-menu",
                 "45-nav-view-closed", "46-nav-card", "47-nav-figure-page", "48-nav-delete-hint", "49-nav-delete-held",
                 "50-nav-back-to-play", "51-nav-settings-controls", "52-nav-settings-back" };
-            if (m_testButtons)
+            if (m_testButtons || m_testSidebar)
                 Screenshot(m_testShot.c_str());
             else if (m_testNav)
                 Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
@@ -2026,6 +2070,133 @@ namespace launcher_ui
             SDL_DestroySurface(rgba);
         }
         SDL_DestroySurface(surface);
+    }
+
+    // The sidebar's line through an install and an update (SSA_LAUNCHER_TEST_SIDEBAR, with a [launcher] kit= that is the fake
+    // kit and both games' iso=): Spyro's Adventure ready, installing at 0, 50 and 100 %, Giants shown meanwhile (the other
+    // game's line), ready, an update available, updating at 0, 50 and 100 %, then a build that fails. Each shot "<nn>-<state>"
+    // is checked against the line the sidebar draws (m_testFailures).
+    void App::TestSidebarScript(uint64_t now)
+    {
+        const GameInfo& ssa = *FindGame("ssa");
+        const GameInfo& giants = *FindGame("giants");
+        GameSlot& a = SlotFor(ssa);
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL sidebar step %d: %s (line \"%s\")\n", m_testStep, what, SlotStatus(&a).text.c_str());
+                m_testFailures++;
+            }
+        };
+        auto line = [&] { return SlotStatus(&a).text; };
+        auto starts = [&](const char* prefix) { return line().rfind(prefix, 0) == 0; };
+        auto env = [](const char* name, const char* value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value, true); };
+        auto shoot = [&](const char* name, uint64_t wait = 300) {
+            m_testShot = fmt::format("{:02}-{}", m_testStep, name);
+            m_testAt = now + wait;
+        };
+        auto percent = [&] { return MakeInstallChecklist(InstallSnapshot(a), now).overall; };
+        if (m_testBegan == 0)
+            m_testBegan = now;
+        if (now - m_testBegan > 300000)
+        {
+            expect(false, "timeout");
+            m_running = false;
+            return;
+        }
+        switch (m_testStep)
+        {
+        case 0: // both discs checked in the background
+            m_page = Page::Play;
+            if (m_testBegan == now)
+            {
+                SelectGame(giants);
+                SelectGame(ssa);
+                return;
+            }
+            if (a.disc == DiscState::Verifying || SlotFor(giants).disc == DiscState::Verifying)
+                return;
+            expect(a.disc == DiscState::Ready, "SSA's disc is ready");
+            m_testSha = a.check.xexSha256;
+            env("FAKE_SSABUILD_DELAY", "0.08");
+            env("FAKE_SSABUILD_HOLD", "2");
+            expect(line() == "Ready to install", "a verified disc with no build is not ready to play");
+            shoot("before-install", 600);
+            break;
+        case 1: // INSTALL: the line follows the install from its first moment
+            StartInstall();
+            expect(starts("Installing") && SlotStatus(&a).progress >= 0, "Installing at the start");
+            shoot("installing-0", 20);
+            break;
+        case 2:
+            if (percent() < 0.5f)
+                return;
+            expect(starts("Installing") || starts("Finishing"), "Installing at 50 %");
+            shoot("installing-50", 20);
+            break;
+        case 3: // the other game is shown: SSA's line goes on in the sidebar
+            SelectGame(giants);
+            expect(m_s != &a && (starts("Installing") || starts("Finishing")), "SSA's line while Giants is shown");
+            shoot("installing-other-game", 300);
+            break;
+        case 4: // back on SSA, held at the end of the last step
+            SelectGame(ssa);
+            if (percent() < 0.99f)
+                return;
+            expect(starts("Finishing") && SlotStatus(&a).progress >= 0.99f, "Finishing at 100 %");
+            shoot("installing-100", 20);
+            break;
+        case 5:
+            if (a.installer.Running() || a.installView)
+                return;
+            expect(!a.installed.runtime.empty() && line() == "Ready to play", "Ready to play once built");
+            shoot("ready", 4000);
+            break;
+        case 6: // the kit has moved on since the build: an update
+            m_config["install." + m_testSha]["kit"] = "0.0.0-old";
+            RefreshInstall();
+            expect(line() == "Update available", "Update available");
+            shoot("update-available", 400);
+            break;
+        case 7:
+            StartInstall();
+            expect(starts("Updating") && SlotStatus(&a).progress >= 0, "Updating at the start");
+            shoot("updating-0", 20);
+            break;
+        case 8:
+            if (percent() < 0.5f)
+                return;
+            expect(starts("Updating") || starts("Finishing"), "Updating at 50 %");
+            shoot("updating-50", 20);
+            break;
+        case 9:
+            if (percent() < 0.99f)
+                return;
+            expect(starts("Finishing") && SlotStatus(&a).progress >= 0.99f, "Finishing at 100 % of an update");
+            shoot("updating-100", 20);
+            break;
+        case 10:
+            if (a.installer.Running() || a.installView)
+                return;
+            expect(line() == "Ready to play", "Ready to play after the update");
+            env("FAKE_SSABUILD_HOLD", "0");
+            env("FAKE_SSABUILD_FAIL", "compile");
+            m_config["install." + m_testSha]["kit"] = "0.0.0-old";
+            RefreshInstall();
+            StartInstall();
+            m_testStep++;
+            break;
+        case 11:
+            if (a.installer.Running())
+                return;
+            expect(line() == "Install failed", "Install failed");
+            shoot("install-failed", 400);
+            break;
+        default:
+            SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
+            m_running = false;
+            break;
+        }
     }
 
     // Keyboard and pad navigation (SSA_LAUNCHER_TEST_NAV): keys go to ImGui as a player's would, a shot after each group.
@@ -2378,6 +2549,11 @@ namespace launcher_ui
         if (m_testNav)
         {
             TestNavScript(now);
+            return;
+        }
+        if (m_testSidebar)
+        {
+            TestSidebarScript(now);
             return;
         }
         if (m_testSwitch)
