@@ -546,8 +546,9 @@ namespace launcher_ui
         constexpr int Idle = 500;
         int wait = Idle;
         uint64_t now = SDL_GetTicks();
-        if (!m_toast.empty() && m_toastUntil > now) // wake to take it down
-            wait = std::min<int>(wait, int(m_toastUntil - now) + 1);
+        for (const ToastItem& item : m_toasts)
+            if (item.until > now) // wake to take it down
+                wait = std::min<int>(wait, int(item.until - now) + 1);
         // The night sky's stars twinkle, at 30 fps, while the window is seen.
         bool seen = !(SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_OCCLUDED | SDL_WINDOW_HIDDEN));
         if (seen && m_page == Page::Play && CachedArt(m_s->game.id, LauncherAssets::Role::HeroBackground, BackdropArtW) == nullptr)
@@ -1071,37 +1072,60 @@ namespace launcher_ui
         }
     }
 
-    // A game's state in a few words, for the sidebar and Home: the same state the game page draws (its band's button, its
-    // install card), read from the game's own slot (nullptr: not opened this session).
+    // A game's state in a few words, for the sidebar and Home, and the label of the game page's main button: the one place
+    // that decides, read from the game's own slot (nullptr: not opened this session). The page's other lines (the disc's
+    // status, the install card) say more about the same state. The table is in docs/launcher_ui.md.
     App::SlotLine App::SlotStatus(GameSlot* slot)
     {
+        using S = SlotState;
+        auto line = [](S state, const char* text, unsigned dot, const char* button, bool enabled = true, float progress = -1) {
+            return SlotLine{ text, dot, progress, state, button, enabled };
+        };
         if (slot == nullptr)
-            return { "Open", Accent };
+            return line(S::Closed, "Open", Accent, strings::ChooseDisc);
+        const bool built = !slot->installed.runtime.empty();
         if (slot->installer.Running() || slot->kitDownload.Running())
         {
             InstallProgress snapshot = InstallSnapshot(*slot);
             InstallChecklist list = MakeInstallChecklist(snapshot, SDL_GetTicks());
-            bool update = !slot->installed.runtime.empty(), kit = slot->kitDownload.Running();
-            const char* verb = kit ? "Downloading tools" : list.current >= 0 && list.rows[size_t(list.current)].id == "finish" ? "Finishing" : update ? "Updating" : "Installing";
-            return { fmt::format("{} {} %", verb, int(std::floor(std::clamp(list.overall, 0.0f, 1.0f) * 100))), Accent, list.overall };
+            bool kit = slot->kitDownload.Running();
+            bool finishing = list.current >= 0 && list.rows[size_t(list.current)].id == "finish";
+            S state = kit ? S::DownloadingTools : finishing ? S::Finishing : built ? S::Updating : S::Installing;
+            const char* verb = kit ? "Downloading tools" : finishing ? "Finishing" : built ? "Updating" : "Installing";
+            SlotLine result = line(state, "", Accent, built ? "UPDATING..." : "INSTALLING...", false, list.overall);
+            result.text = fmt::format("{} {} %", verb, int(std::floor(std::clamp(list.overall, 0.0f, 1.0f) * 100)));
+            return result;
         }
         if (slot->disc == DiscState::Verifying)
-            return { "Checking your disc", Accent, -1 };
-        if (slot->disc != DiscState::Ready)
-            return { "Needs your disc", Accent };
+            return line(S::Checking, "Checking your disc", Accent, "CHECKING...", false, -1);
+        if (slot->disc == DiscState::None)
+            return line(S::NoDisc, "Needs your disc", Accent, strings::ChooseDisc);
+        if (slot->disc == DiscState::Failed)
+        {
+            switch (slot->check.status)
+            {
+            case GameSourceStatus::NotFound: return line(S::DiscGone, "Disc not found", Danger, strings::ChooseDisc);
+            case GameSourceStatus::Unreadable: return line(S::DiscUnreadable, "Can't read the disc", Danger, strings::ChooseDisc);
+            case GameSourceStatus::WrongGame: return line(S::DiscWrong, "Wrong disc", Danger, strings::ChooseDisc);
+            case GameSourceStatus::WrongVersion: return line(S::DiscUnknown, "Unknown release", Danger, strings::ChooseDisc);
+            default: return line(S::DiscNotGame, "Not a game disc", Danger, strings::ChooseDisc);
+            }
+        }
+        // A verified disc. The page's button is INSTALL until the game is built, PLAY after.
+        const char* button = NeedsInstall(*slot) ? "INSTALL" : "PLAY";
         if (slot->installView)
         {
             InstallProgress::State state = InstallSnapshot(*slot).state;
             if (state == InstallProgress::State::Failed)
-                return { "Install failed", Danger };
+                return line(S::Failed, built ? "Update failed" : "Install failed", Danger, button);
             if (state == InstallProgress::State::Interrupted)
-                return { "Interrupted", Accent };
+                return line(S::Interrupted, "Interrupted", Accent, button);
         }
         if (NeedsInstall(*slot))
-            return { "Ready to install", Accent };
+            return line(S::ReadyToInstall, "Ready to install", Accent, button);
         if (UpdateAvailable(*slot))
-            return { "Update available", Accent };
-        return { "Ready to play", Ready };
+            return line(S::UpdateAvailable, "Update available", Accent, button);
+        return line(S::Ready, "Ready to play", Ready, button);
     }
 
     void App::DrawSidebar()
@@ -1228,6 +1252,8 @@ namespace launcher_ui
                 status += "...";
             }
             draw->AddText(ImVec2(statusX, statusY), Rgb(entry.enabled ? TextSecondary : TextDim, entry.enabled ? 255 : 200), status.c_str());
+            if (m_testSidebar)
+                m_drawn[std::string("sidebar:") + entry.id] = line.text;
             ImGui::PopFont();
             if (line.progress >= 0) // a thin bar in the game's colour along the row's foot, over the text's column
             {
@@ -1363,6 +1389,8 @@ namespace launcher_ui
             ImGui::PushFont(nullptr, SmallSize);
             draw->AddCircleFilled(ImVec2(at.x + 24, end.y - 22), 4, Rgb(line.dot));
             draw->AddText(ImVec2(at.x + 34, end.y - 22 - ImGui::GetFontSize() / 2 - 1), Rgb(TextSecondary), line.text.c_str());
+            if (m_testSidebar)
+                m_drawn[std::string("home:") + entry.id] = line.text;
             ImGui::PopFont();
             // Under the pointer: the game's own colour around the card.
             draw->AddRect(at, end, hovered ? Rgb(style.glow) : IM_COL32(255, 255, 255, 28), CardRadius, 0, hovered ? 2.5f : 1.0f);
@@ -1519,15 +1547,18 @@ namespace launcher_ui
         draw->AddLine(bar, ImVec2(barEnd.x, bar.y), Rgb(0xFFFFFF, 26), 1.0f);
         float middle = bar.y + BottomBarH / 2;
 
-        bool ready = m_s->disc == DiscState::Ready, verifying = m_s->disc == DiscState::Verifying, installing = Installing();
+        SlotLine state = SlotStatus(m_s);
+        bool ready = m_s->disc == DiscState::Ready, verifying = state.state == SlotState::Checking, installing = Installing();
         bool install = ready && NeedsInstall();
-        const char* label = installing ? "INSTALLING..." : install ? "INSTALL" : ready ? "PLAY" : verifying ? "CHECKING..." : strings::ChooseDisc;
+        const char* label = state.button;
         // The band's group, centred in it on whole points (crisp edges at any scale): the controller picker, then the
         // action button (the main action and the game's settings), both PlayButtonH tall. The smallest window fits it.
         const float groupW = ControllerW + ControllerGap + PlayButtonW + PlayGearW;
         float groupX = std::floor(bar.x + (barEnd.x - bar.x - groupW) / 2), buttonY = std::floor(middle - PlayButtonH / 2);
         float mainX = groupX + ControllerW + ControllerGap;
-        MainAction action{ label, !verifying && !installing && !m_testButtonsOff };
+        if (m_testSidebar)
+            m_drawn["button"] = std::string(label) + (state.buttonEnabled ? "" : " (off)");
+        MainAction action{ label, state.buttonEnabled && !m_testButtonsOff };
         if (installing)
             action.progress = MakeInstallChecklist(InstallSnapshot(), SDL_GetTicks()).overall;
         else if (verifying)
@@ -1903,27 +1934,71 @@ namespace launcher_ui
         m_focusTo = FocusTo::None;
     }
 
-    void App::Toast(std::string text)
+    constexpr float ToastWidth = 420, ToastMargin = 20; // the stack's text width and its distance from the window's top and right
+    constexpr size_t MaxToasts = 4;
+
+    void App::Toast(std::string text, bool error)
     {
-        // Long enough to read: 2.5 s, and more for a long message (an error and its reason), up to 6 s.
+        // Long enough to read: 2.5 s, and more for a long message, up to 6 s. A failure ("Couldn't ...") stays until closed.
+        error = error || text.rfind("Couldn't", 0) == 0;
         uint64_t readMs = std::clamp<uint64_t>(2500 + 45 * (text.size() > 40 ? text.size() - 40 : 0), 2500, 6000);
-        m_toast = std::move(text);
-        m_toastUntil = SDL_GetTicks() + readMs;
+        uint64_t until = error ? 0 : SDL_GetTicks() + readMs;
+        for (ToastItem& item : m_toasts)
+            if (item.text == text) // the same words again: the one already shown, kept longer
+            {
+                item.until = until;
+                return;
+            }
+        m_toasts.push_back({ std::move(text), until });
+        if (m_toasts.size() > MaxToasts)
+            m_toasts.erase(m_toasts.begin());
     }
 
     void App::DrawToast()
     {
-        if (m_toast.empty() || SDL_GetTicks() > m_toastUntil)
+        uint64_t now = SDL_GetTicks();
+        std::erase_if(m_toasts, [&](const ToastItem& item) { return item.until != 0 && now > item.until; });
+        if (m_toasts.empty())
             return;
-        // Bottom right, at most 560 points wide (a long one wraps, never over the sidebar).
+        // Top right, stacked downwards, newest at the bottom; each at most 420 points wide (a long one wraps). Errors have a
+        // cross; a click on any message closes it.
         ImVec2 size = ImGui::GetIO().DisplaySize;
-        float wrap = std::min(560.0f, size.x - SidebarW - 2 * Pad - 40);
-        ImVec2 text = ImGui::CalcTextSize(m_toast.c_str(), nullptr, false, wrap);
-        ImVec2 end(size.x - 24, size.y - 28), position(end.x - text.x - 40, end.y - text.y - 24);
+        float wrap = std::min(ToastWidth, size.x - SidebarW - 2 * Pad - 80);
         ImDrawList* draw = ImGui::GetForegroundDrawList();
-        draw->AddRectFilled(position, end, Rgb(PanelRaised, 245), Radius);
-        draw->AddRect(position, end, Rgb(Accent, 200), Radius, 2.0f);
-        draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(position.x + 20, position.y + 12), Rgb(Text), m_toast.c_str(), nullptr, wrap);
+        float y = ToastMargin;
+        int closed = -1;
+        for (size_t i = 0; i < m_toasts.size(); i++)
+        {
+            const ToastItem& item = m_toasts[i];
+            bool error = item.until == 0;
+            ImVec2 text = ImGui::CalcTextSize(item.text.c_str(), nullptr, false, wrap);
+            float width = text.x + 40 + (error ? 28 : 0);
+            ImVec2 position(size.x - ToastMargin - width, y), end(size.x - ToastMargin, y + text.y + 24);
+            // A window of its own, so a click closes the message and does not reach what is under it.
+            ImGui::SetNextWindowPos(position);
+            ImGui::SetNextWindowSize(ImVec2(end.x - position.x, end.y - position.y));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+            ImGui::Begin(fmt::format("##toast{}", i).c_str(), nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
+                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar);
+            if (ImGui::InvisibleButton("##close", ImVec2(end.x - position.x, end.y - position.y)))
+                closed = int(i);
+            bool hovered = ImGui::IsItemHovered();
+            ImGui::End();
+            ImGui::PopStyleVar(2);
+            draw->AddRectFilled(position, end, Rgb(PanelRaised, 245), Radius);
+            draw->AddRect(position, end, Rgb(error ? Danger : Accent, 200), Radius, 2.0f);
+            draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(position.x + 20, position.y + 12), Rgb(Text), item.text.c_str(), nullptr, wrap);
+            if (error) // a cross
+            {
+                ImVec2 centre(end.x - 22, position.y + 24);
+                draw->AddLine(ImVec2(centre.x - 5, centre.y - 5), ImVec2(centre.x + 5, centre.y + 5), Rgb(hovered ? Text : TextDim), 2.0f);
+                draw->AddLine(ImVec2(centre.x - 5, centre.y + 5), ImVec2(centre.x + 5, centre.y - 5), Rgb(hovered ? Text : TextDim), 2.0f);
+            }
+            y = end.y + 8;
+        }
+        if (closed >= 0)
+            m_toasts.erase(m_toasts.begin() + closed);
     }
 
     // Quitting during an install: keep installing (the default, B / Escape) or quit.
@@ -2072,6 +2147,27 @@ namespace launcher_ui
         SDL_DestroySurface(surface);
     }
 
+    // The states the sidebar test puts on a built, verified game by hand: the sidebar's line, the main button's label.
+    struct StateCase
+    {
+        const char* name;
+        const char* text;
+        const char* button; // as drawn: an unpressable one has " (off)"
+        void (*setup)(GameSlot&);
+    };
+    static const StateCase StateCases[] = {
+        { "no-disc", "Needs your disc", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::None; } },
+        { "checking", "Checking your disc", "CHECKING... (off)", [](GameSlot& slot) { slot.disc = DiscState::Verifying; slot.verify.done = false; } },
+        { "disc-gone", "Disc not found", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::Failed; slot.check.status = GameSourceStatus::NotFound; } },
+        { "unreadable", "Can't read the disc", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::Failed; slot.check.status = GameSourceStatus::Unreadable; } },
+        { "wrong-disc", "Wrong disc", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::Failed; slot.check.status = GameSourceStatus::WrongGame; } },
+        { "unknown-release", "Unknown release", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::Failed; slot.check.status = GameSourceStatus::WrongVersion; } },
+        { "not-a-game-disc", "Not a game disc", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::Failed; slot.check.status = GameSourceStatus::NotXboxDisc; } },
+        { "ready-to-install", "Ready to install", "INSTALL", [](GameSlot& slot) { slot.installed.runtime.clear(); } },
+        { "update-available", "Update available", "PLAY", [](GameSlot& slot) { slot.installed.kitVersion = "0.0.0-old"; } },
+        { "ready", "Ready to play", "PLAY", [](GameSlot&) {} },
+    };
+
     // The sidebar's line through an install and an update (SSA_LAUNCHER_TEST_SIDEBAR, with a [launcher] kit= that is the fake
     // kit and both games' iso=): Spyro's Adventure ready, installing at 0, 50 and 100 %, Giants shown meanwhile (the other
     // game's line), ready, an update available, updating at 0, 50 and 100 %, then a build that fails. Each shot "<nn>-<state>"
@@ -2125,7 +2221,8 @@ namespace launcher_ui
             break;
         case 1: // INSTALL: the line follows the install from its first moment
             StartInstall();
-            expect(starts("Installing") && SlotStatus(&a).progress >= 0, "Installing at the start");
+            expect(starts("Installing") && SlotStatus(&a).progress >= 0 && !SlotStatus(&a).buttonEnabled &&
+                SlotStatus(&a).button == std::string("INSTALLING..."), "Installing at the start");
             shoot("installing-0", 20);
             break;
         case 2:
@@ -2160,7 +2257,7 @@ namespace launcher_ui
             break;
         case 7:
             StartInstall();
-            expect(starts("Updating") && SlotStatus(&a).progress >= 0, "Updating at the start");
+            expect(starts("Updating") && SlotStatus(&a).progress >= 0 && SlotStatus(&a).button == std::string("UPDATING..."), "Updating at the start");
             shoot("updating-0", 20);
             break;
         case 8:
@@ -2189,13 +2286,72 @@ namespace launcher_ui
         case 11:
             if (a.installer.Running())
                 return;
-            expect(line() == "Install failed", "Install failed");
-            shoot("install-failed", 400);
+            expect(line() == "Update failed" && SlotStatus(&a).button == std::string("PLAY"), "Update failed, the build still there");
+            shoot("update-failed", 400);
             break;
         default:
+        {
+            // Every other state is put on the slot by hand, two steps each: the Play page (the sidebar's line and the main
+            // button are checked against what was drawn), then Home (the card's line).
+            constexpr int First = 12, Cases = int(std::size(StateCases)), Toasts = First + 2 * Cases;
+            if (m_testStep < Toasts)
+            {
+                int n = (m_testStep - First) / 2;
+                const StateCase& state = StateCases[n];
+                if ((m_testStep - First) % 2 == 0)
+                {
+                    if (n > 0)
+                        expect(m_drawn["home:ssa"] == StateCases[n - 1].text, "Home's card says the same");
+                    if (n == 0)
+                        m_testBuilt = a.installed.runtime;
+                    a.disc = DiscState::Ready;
+                    a.check.status = GameSourceStatus::Ok;
+                    a.installView = false;
+                    a.verify.done = true;
+                    a.installed.runtime = m_testBuilt;
+                    a.installed.kitVersion = a.kit ? a.kit->version : "";
+                    state.setup(a);
+                    m_page = Page::Play;
+                    expect(line() == state.text, state.name);
+                    shoot(fmt::format("{}-play", state.name).c_str(), 400);
+                }
+                else
+                {
+                    expect(m_drawn["sidebar:ssa"] == state.text, "the sidebar draws the state");
+                    expect(m_drawn["button"] == state.button, "the main button draws the state");
+                    m_page = Page::Home;
+                    shoot(fmt::format("{}-home", state.name).c_str(), 400);
+                }
+                break;
+            }
+            if (m_testStep == Toasts)
+            {
+                expect(m_drawn["home:ssa"] == StateCases[Cases - 1].text, "Home's card says the same");
+                a.verify.done = true;
+                m_page = Page::Play;
+                Toast("Game installed: press PLAY");
+                Toast("Log copied");
+                Toast("Couldn't save the settings");
+                Toast("Saves restored from 2026-10-26 09:30");
+                shoot("toasts-stacked", 400);
+                break;
+            }
+            if (m_testStep == Toasts + 1)
+            {
+                expect(m_toasts.size() == 4 && m_toasts[2].until == 0, "four messages, the error kept");
+                m_testAt = now + 3500; // the others have gone by themselves
+                m_testShot = fmt::format("{:02}-toasts-error-kept", m_testStep);
+                break;
+            }
+            if (m_testStep == Toasts + 2)
+            {
+                expect(m_toasts.size() == 1 && m_toasts[0].until == 0, "only the error is left");
+                m_toasts.clear();
+            }
             SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
             m_running = false;
             break;
+        }
         }
     }
 

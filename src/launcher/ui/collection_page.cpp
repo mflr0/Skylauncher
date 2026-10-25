@@ -200,9 +200,9 @@ namespace launcher_ui
         return collection::Folder();
     }
 
-    void CollectionPage::Toast(const std::string& text)
+    void CollectionPage::Toast(const std::string& text, bool error)
     {
-        m_app.Toast(text);
+        m_app.Toast(text, error);
     }
 
     void CollectionPage::Open()
@@ -368,7 +368,7 @@ namespace launcher_ui
             return;
         if (!m_model.CanEditSeats())
         {
-            Toast(SessionFile(*game).empty() ? "This game has no runtime yet: its seats can't be prepared"
+            Toast(SessionFile(*game).empty() ? "The game isn't installed yet: its seats can't be prepared"
                                              : "The game is running: the seats change from its Toy Box");
             return;
         }

@@ -235,7 +235,7 @@ namespace launcher_ui
         {
             RecordInstalledGame(m_config, m_s->installSha, progress.runtime, m_s->installKitVersion);
             SetInstallState(m_s->installSha, nullptr);
-            Toast("The game is installed: press PLAY");
+            Toast("Game installed: press PLAY");
             m_s->installView = false;
             RefreshInstall();
         }

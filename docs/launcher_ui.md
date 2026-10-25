@@ -41,7 +41,7 @@ Settings > Launcher > Language (English only, disabled, for now); the game's tex
 settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
    SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
-   and its live state ("Open" until the game is first shown, then the states in "The sidebar's line"); the
+   and its live state ("Open" until the game is first shown, then the states in "A game's states"); the
    selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
 2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
    (current device, PLAY WITH: a menu of the others), the main button (CHOOSE DISC, INSTALL, then PLAY) with the portal's
@@ -84,7 +84,7 @@ in the sidebar (`[launcher] game=`); the other is one click away.
      Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
      art with "Skylanders" on it, in the row's left column (`GameLogoW` x `GameLogoH`); before that, and for the games
      coming later (no disc, so never any game art), a neutral badge: the initial on the game's colour.
-   - The name (shrunk to fit), then the game's state with a dot ("The sidebar's line", below). The selected game's row has
+   - The name (shrunk to fit), then the game's state with a dot ("A game's states", below). The selected game's row has
      the orange bar while its Play page is open.
    - COLLECTION and the Settings gear at the bottom, their icons in the logos' column and their labels in the names'.
    - Rows are reachable with the keyboard and the pad like the others.
@@ -106,20 +106,34 @@ in the sidebar (`[launcher] game=`); the other is one click away.
    goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from. The game page's settings
    button opens it too, until each game has a settings page of its own (another branch).
 
-## The sidebar's line
-Under each enabled game's name, one line says what the game is doing, from the game's own slot (`App::SlotStatus`, the same
-state the Play page draws; Home's cards use it too), so it is right for the selected game and for the other one: the
-install of a game goes on in the background while the other is shown. In this order:
-| State | Line | Dot |
-|---|---|---|
-| never shown this session | Open | blue |
-| installing / updating (a build already exists) | `Installing 42 %` / `Updating 42 %`, a thin bar in the game's colour along the row's foot | blue |
-| the kit being downloaded; the last step | `Downloading tools 42 %`; `Finishing 97 %` | blue |
-| the disc being checked, or missing | Checking your disc; Needs your disc | blue |
-| the last install failed; it was interrupted | Install failed; Interrupted | red; blue |
-| a verified disc with no build yet | Ready to install | blue |
-| the kit moved on since the build | Update available | blue |
-| built | Ready to play | green |
+## A game's states
+One function decides: `App::SlotStatus(slot)` returns the game's `SlotState`, its line, its dot and the main button's label
+and whether it can be pressed. The sidebar, Home's cards and the Play page's main button all read it, so they cannot
+disagree; the page's other lines (the disc's status, the install card, the game settings' Disc tab) say more about the same
+`DiscState` / install state. In this order (the first that applies):
+| State | Sidebar and Home line | Dot | Main button |
+|---|---|---|---|
+| never shown this session | Open | blue | CHOOSE DISC |
+| the kit being downloaded | `Downloading tools 42 %` | blue | INSTALLING... (off) |
+| installing; its last step | `Installing 42 %`; `Finishing 97 %` | blue | INSTALLING... (off) |
+| updating a build; its last step | `Updating 42 %`; `Finishing 97 %` | blue | UPDATING... (off) |
+| the disc being checked | Checking your disc | blue | CHECKING... (off) |
+| no disc chosen | Needs your disc | blue | CHOOSE DISC |
+| the image moved or its drive gone | Disc not found | red | CHOOSE DISC |
+| the image can't be read | Can't read the disc | red | CHOOSE DISC |
+| another game's disc | Wrong disc | red | CHOOSE DISC |
+| this game, a release no build exists for | Unknown release | red | CHOOSE DISC |
+| a folder, not an Xbox 360 game, damaged | Not a game disc | red | CHOOSE DISC |
+| the last install failed (no build); the last update failed (a build) | Install failed; Update failed | red | INSTALL; PLAY |
+| the install was interrupted | Interrupted | blue | INSTALL, or PLAY if built |
+| a verified disc, no build yet | Ready to install | blue | INSTALL |
+| the kit moved on since the build | Update available | blue | PLAY |
+| verified disc and built (or an own runtime) | Ready to play | green | PLAY |
+
+"Ready to play" needs both the build and the verified disc: with no disc or a refused one the game says what the disc
+needs, even if it was built (the game reads the disc image while it runs). The Play page's disc line says more
+("Disc verified: 8.1 GB", the refusal's reason, "Drop your disc image here..."), the install card is shown while
+`installView`, and the game settings' Disc tab shows the same `DiscState`. The window has one fixed title.
 
 The percentage is the install card's overall fraction (`MakeInstallChecklist`), the same as the band's button. The text is
 cut with "..." to the column (the sidebar is a fixed width at every window size) and the bar is drawn over the row's own
@@ -187,7 +201,7 @@ always animates (`docs/settings.md`).
   leaving, cancels; it acts once per press; Space, Enter and the pad's A hold it too. The label is a plain verb, the
   instruction is the tooltip (shown on keyboard and pad focus too). Buttons are told apart by their ImGui ID.
 - **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
-- **Toasts.** One at a time, bottom right, at most 560 points wide; 2.5 s, longer for a long message (up to 6 s).
+- **Toasts.** Top right, stacked downwards (newest at the bottom, at most 4), each at most 420 points wide, 20 points from the window's top and right edges, over the page. 2.5 s, longer for a long message (up to 6 s); the same message again refreshes the one shown. A failure (`Toast(text, true)`, or a text starting "Couldn't") stays until it is closed, with a cross; a click on any message closes it and does not reach what is under it. Texts are short, sober, English, no full stop.
 - **Idle.** The loop sleeps in `SDL_WaitEventTimeout` (`App::IdleWait`): every frame only while something moves (a disc
   check, an install, an update, a held button, a text cursor, the logo's fall) and for three frames after an input; 30 fps for the night
   sky's stars; else it wakes every 0.5 s to poll the jobs, the portal and the collection.

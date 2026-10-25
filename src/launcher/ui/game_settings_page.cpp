@@ -219,11 +219,11 @@ namespace launcher_ui
         m_s->saveBackupsLoaded = false; // the restore made a backup of its own
         if (restore.ok)
             Toast("Saves restored from " + stamp.substr(0, 4) + "-" + stamp.substr(4, 2) + "-" + stamp.substr(6, 2) + " " +
-                stamp.substr(9, 2) + ":" + stamp.substr(11, 2) + ".");
+                stamp.substr(9, 2) + ":" + stamp.substr(11, 2));
         else if (restore.error == "the game is running")
-            Toast("Quit the game before restoring a backup.");
+            Toast("Quit the game before restoring a backup", true);
         else
-            Toast("The backup could not be restored: " + restore.error + ".");
+            Toast("Couldn't restore the backup: " + restore.error);
     }
 
     void App::DrawSaveBackups()
@@ -301,7 +301,7 @@ namespace launcher_ui
     void App::RunDataAction(const DataResult& result, const char* done)
     {
         m_s->saveBackupsLoaded = m_s->dataSizesLoaded = false;
-        Toast(result.ok ? fmt::format("{}: {} freed", done, LauncherFormatSize(result.freed)) : result.error);
+        Toast(result.ok ? fmt::format("{}: {} freed", done, LauncherFormatSize(result.freed)) : result.error, !result.ok);
     }
 
     void App::RunUninstall(const DataResult& result)
@@ -324,7 +324,7 @@ namespace launcher_ui
         spec.folder = DesktopFolder();
         spec.iconFolder = GameInstallFolder({});
         ShortcutResult result = CreateDesktopShortcut(spec);
-        Toast(result.ok ? fmt::format("Shortcut added to the Desktop: {}", datadir::Text(result.file.filename())) : result.error);
+        Toast(result.ok ? fmt::format("Shortcut added to the Desktop: {}", datadir::Text(result.file.filename())) : result.error, !result.ok);
     }
 
     void App::DrawGameTab()

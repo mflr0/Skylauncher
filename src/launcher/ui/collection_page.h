@@ -89,7 +89,7 @@ namespace launcher_ui
         void DrawIcon(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, ImVec2 at, float size, bool large);
         const FigureIconTexture& Icon(const collection::Toy* toy, collection::VariantKind kind, bool large);
         void CloseOverlay();
-        void Toast(const std::string& text);
+        void Toast(const std::string& text, bool error = false);
 
         // What Manage and the Figure page show from disk, read again only once the collection changed (m_generation):
         // drawn every frame, they read and decrypted every dump and backup at the display's rate.
