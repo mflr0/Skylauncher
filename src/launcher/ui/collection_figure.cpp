@@ -75,7 +75,17 @@ namespace launcher_ui
             constexpr const char* Locked = "On the portal in %s. Read-only until the game lets it go.";
         }
 
-        constexpr uint32_t MaxExperience = 33000; // the title's ceiling for a figure
+        // A hat's name from the first game whose catalogue lists it (Giants' "hats"), else its number.
+        std::string HatText(uint16_t hat)
+        {
+            if (hat == 0)
+                return "no hat";
+            for (const collection::Game& game : collection::Catalogue::Get().Games())
+                if (auto found = game.hats.find(hat); found != game.hats.end())
+                    return found->second;
+            return fmt::format("hat {}", hat);
+        }
+
         std::string BackupLabel(const std::string& backup)
         {
             std::string stem = fs::path(backup).stem().string(); // 2026-10-24T101500Z
@@ -124,11 +134,11 @@ namespace launcher_ui
             ImGui::TextColored(ImColor(Rgb(Danger)), "Unreadable: its checksums don't match. Restore a backup, or reset it.");
         else
         {
-            // Level, and the way to the next one.
-            uint32_t xp = f.stats.experience;
+            // Level, and the way to the next one: the figure's real level (up to Giants' 15), whatever the game shown.
+            uint32_t xp = figures::TotalExperience(f.stats);
             int level = f.level;
-            uint32_t from = figures::LevelExperience[std::clamp(level - 1, 0, figures::MaxLevel - 1)];
-            uint32_t to = level >= figures::MaxLevel ? from : figures::LevelExperience[level];
+            uint32_t from = figures::LevelExperience[std::clamp(level - 1, 0, figures::MaxLevelGiants - 1)];
+            uint32_t to = level >= figures::MaxLevelGiants ? from : figures::LevelExperience[level];
             float fraction = to > from ? std::clamp(float(xp - from) / float(to - from), 0.0f, 1.0f) : 1.0f;
             ImGui::PushFont(m_app.m_titleFont, 26);
             ImGui::TextColored(ImColor(Rgb(Text)), "Level %d", level);
@@ -138,7 +148,10 @@ namespace launcher_ui
             draw->AddRectFilled(at, ImVec2(at.x + width, at.y + 12), Rgb(Field), 6);
             draw->AddRectFilled(at, ImVec2(at.x + width * fraction, at.y + 12), Rgb(Accent), 6);
             ImGui::Dummy(ImVec2(0, 16));
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%u XP%s", xp, level >= figures::MaxLevel ? " (maximum level)" : fmt::format(" · {} for level {}", to - xp, level + 1).c_str());
+            std::string next = level >= figures::MaxLevelGiants ? " (maximum level)" : fmt::format(" · {} for level {}", to - xp, level + 1);
+            if (level > figures::MaxLevel)
+                next += fmt::format(" · level {} in Spyro's Adventure", figures::MaxLevel); // its cap; the figure keeps its levels
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%u XP%s", xp, next.c_str());
         }
         ImGui::Dummy(ImVec2(0, 4));
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 3));
@@ -156,8 +169,7 @@ namespace launcher_ui
             if (HasProgress(f) && f.state == figures::AreaState::Valid)
             {
                 row("Gold", fmt::format("{}   ·   play time {}", f.stats.gold, PlayTime(f.stats.playSeconds)));
-                row("Hero points", fmt::format("{}   ·   {}   ·   {} upgrades", f.stats.heroPoints,
-                    f.stats.hat == 0 ? std::string("no hat") : fmt::format("hat {}", f.stats.hat), std::popcount(f.stats.upgrades)));
+                row("Hero points", fmt::format("{}   ·   {}   ·   {} upgrades", f.stats.heroPoints, HatText(f.stats.hat), std::popcount(f.stats.upgrades)));
                 std::string nickname = figures::NicknameUtf8(f.stats);
                 row("Nickname", nickname.empty() ? std::string("None") : nickname);
             }
@@ -412,16 +424,35 @@ namespace launcher_ui
         auto label = [](const char* text) {
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", text);
         };
+        // The limits of the game the page shows: Spyro's Adventure edits its own part (up to level 10, its hat in the
+        // first area), Giants the whole (up to 15) and its hat; the rest of the figure stays as it is.
+        const int cap = figures::LevelCap(m_model.gameId);
         ImGui::SetNextItemWidth(380);
-        int level = figures::LevelForExperience(m_edit.experience);
-        label("Level");
-        if (ImGui::SliderInt("##level", &level, 1, figures::MaxLevel, "%d", ImGuiSliderFlags_AlwaysClamp))
-            m_edit.experience = figures::LevelExperience[std::clamp(level, 1, figures::MaxLevel) - 1];
-        int experience = int(m_edit.experience);
+        int level = figures::LevelForExperience(figures::ExperienceFor(m_edit, cap), cap);
+        label(fmt::format("Level in {}", ShortGameName(m_model.gameId)).c_str());
+        if (ImGui::SliderInt("##level", &level, 1, cap, "%d", ImGuiSliderFlags_AlwaysClamp))
+            figures::SetExperienceFor(m_edit, cap, figures::LevelExperience[std::clamp(level, 1, cap) - 1]);
+        int experience = int(figures::ExperienceFor(m_edit, cap));
         label("Experience");
         ImGui::SetNextItemWidth(380);
         if (ImGui::InputInt("##xp", &experience, 100, 1000))
-            m_edit.experience = uint32_t(std::clamp(experience, 0, int(MaxExperience)));
+            figures::SetExperienceFor(m_edit, cap, uint32_t(std::clamp(experience, 0, int(figures::LevelExperience[cap - 1]))));
+        // Giants and later: the hat picker, by the game's names (the catalogue's "hats").
+        const collection::Game* game = m_model.Game();
+        if (game != nullptr && !game->hats.empty())
+        {
+            label("Hat");
+            ImGui::SetNextItemWidth(380);
+            if (ImGui::BeginCombo("##hat", m_edit.hat == 0 ? "No hat" : HatText(m_edit.hat).c_str()))
+            {
+                if (ImGui::Selectable("No hat", m_edit.hat == 0))
+                    m_edit.hat = 0;
+                for (const auto& [number, name] : game->hats)
+                    if (ImGui::Selectable(fmt::format("{}##hat{}", name, number).c_str(), m_edit.hat == number))
+                        m_edit.hat = number;
+                ImGui::EndCombo();
+            }
+        }
         label("Gold");
         ImGui::SetNextItemWidth(380);
         char gold[8];

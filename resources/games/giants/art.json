@@ -1,0 +1,10 @@
+{
+  "format": 1,
+  "game": "giants",
+  "engine": "alchemy",
+  "about": "Where Giants keeps its pictures on the disc (docs/runtime/host/game_art.md). Names only: the pictures are read from the player's own disc.",
+  "logo": { "archive": "level/Title.bld", "entry": "level.bld", "picture": "giantslogo/rig/textures/spritelogo.png",
+            "compose": "sprite_sheet_logo", "plate": "giantslogo/rig/textures/title_giants_3d.png" },
+  "background": { "archive": "permanent/global.arc", "entry": "ui_levelfullscreen/mainmenu.png" },
+  "portraits": { "archive": "misc/UI_Collection_Champions.bld", "entry": "level.bld", "folder": "/collections/sky2/portraits/" }
+}

@@ -534,6 +534,21 @@ void EditChecks()
     edited.gold = 100;
     saved = MergeEditedStats(now, base, edited, "Gilou", "Gill");
     EXPECT(saved.gold == 100 && saved.playSeconds == 4200 && figures::NicknameUtf8(saved) == "Gill");
+    // Edited for Giants (level 15 and a hat): Giants' part and the hat are saved, Spyro's Adventure's own hat stays.
+    now.ssaHat = 4;
+    now.hat = 4;
+    edited = base;
+    figures::SetExperienceFor(edited, figures::LevelCap("giants"), figures::LevelExperience[14]);
+    edited.hat = 6;
+    saved = MergeEditedStats(now, base, edited, "Gilou", "Gilou");
+    EXPECT(figures::TotalExperience(saved) == 96500 && saved.hat == 6 && saved.ssaHat == 4 && saved.gold == 2600);
+    // Edited for Spyro's Adventure (cap 10): its part only; a figure Giants took to level 15 keeps those levels.
+    figures::FigureStats high = base;
+    figures::SetTotalExperience(high, 96500);
+    edited = high;
+    figures::SetExperienceFor(edited, figures::LevelCap("ssa"), 13000);
+    saved = MergeEditedStats(high, high, edited, "Gilou", "Gilou");
+    EXPECT(saved.experience == 13000 && saved.giantsExperience == 63500);
 
     using launcher_ui::Trimmed;
     EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Gilou's  ") == "Gilou's" && Trimmed("A b") == "A b");

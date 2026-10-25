@@ -1,9 +1,12 @@
-// See game_art.h; the per-game sources and the Giants logo composition are described in docs/runtime/host/game_art.md.
+// See game_art.h. Where each game keeps its pictures is data: its manifest, games/<id>/art.json, built in
+// (g_embeddedArtManifests); this file reads any manifest with the engine's reader. Described in
+// docs/runtime/host/game_art.md, with the Giants logo composition.
 #include "game_art.h"
 #include "alchemy_archive.h"
 #include "lux_images.h"
 #include "../collection/catalogue.h"
 #include "../collection/datadir.h"
+#include "../collection/json.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cctype>
@@ -11,8 +14,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <map>
 #include <optional>
 #include <set>
+
+extern const unsigned char g_embeddedArtManifests[];
+extern const size_t g_embeddedArtManifestsSize;
 
 namespace art
 {
@@ -248,11 +255,12 @@ namespace art
             return 0xFF000000 | uint32_t(b / n) << 16 | uint32_t(g / n) << 8 | uint32_t(r / n);
         }
 
-        // [Giants] The title's logo is a sprite sheet (spritelogo.png, 1024x1024): "SKYLANDERS" (the arch), "GIANTS", the
-        // row of 8 element medallions and the TM mark, apart. The title draws "GIANTS" under the arch's middle, behind it
-        // (as in the title's own flat picture, title_giants_3d.png), the medallions under it, the TM at their height on
-        // the right, and the dark blue plate behind all but the TM. `flat` is title_giants_3d.png (the plate's blue).
-        bool ComposeGiantsLogo(const Image& sheet, const Image* flat, Image& logo)
+        // [Giants] The manifest's "sprite_sheet_logo": the title's logo is a sprite sheet (spritelogo.png, 1024x1024):
+        // "SKYLANDERS" (the arch), "GIANTS", the row of 8 element medallions and the TM mark, apart. The title draws
+        // "GIANTS" under the arch's middle, behind it (as in the title's own flat picture, title_giants_3d.png), the
+        // medallions under it, the TM at their height on the right, and the dark blue plate behind all but the TM.
+        // `flat` is the manifest's "plate" picture (title_giants_3d.png: the plate's blue).
+        bool ComposeSpriteSheetLogo(const Image& sheet, const Image* flat, Image& logo)
         {
             std::vector<Band> bands = OpaqueBands(sheet);
             // Top to bottom (once the right way up): the arch, the word, the medallions with the TM.
@@ -290,37 +298,168 @@ namespace art
             return true;
         }
 
-        // --- What each game's pictures are ---------------------------------------------------------------------------
+        // --- The manifests: where each game keeps its pictures -------------------------------------------------------
 
         struct Art
         {
             Image logo, background;
         };
 
-        // [SSA] Both in uiimage.str: the painted Skylands sky behind the menus and the logo of the start menu.
-        void SsaPictures(const Disc& disc, Art& out)
+        // One picture's place on the disc.
+        struct Source
         {
-            std::vector<uint8_t> stream;
-            if (!lux::UnpackStream(ReadAll(disc, "uiimage.str"), stream))
-                return;
-            lux::DecodeImages(stream, [](const std::string& name) { return name == "skylanderslogo" || name == "fullscreen_000"; },
-                [&](const std::string& name, const Image& image) { (name == "fullscreen_000" ? out.background : out.logo) = image; });
+            std::string stream;          // [Lux] the strm file of UI images...
+            std::string archive, entry;  // [Alchemy] ...or the IGA archive and its IGZ entry (a fragment of its name)
+            std::string picture;         // the picture: its name [Lux], the end of its source path [Alchemy]; empty: the entry's first
+            std::string compose, plate;  // a composition step ("sprite_sheet_logo") and the second picture it uses
+        };
+
+        struct Manifest
+        {
+            std::string game;
+            Source logo, background;
+            // Portraits. [Lux]: the stream, the picture names per toy the catalogue names ("toy_{name}_hud": {name} is
+            // the catalogue's internal name, lower case) and, with `images`, the catalogue's other images. [Alchemy]:
+            // every square picture of the archive's entry under `folder`, named as on the disc.
+            Source portraits;
+            std::vector<std::string> pictures;
+            bool images = false;
+            std::string folder;
+        };
+
+        Source ReadSource(const collection::Json& json)
+        {
+            return { json["stream"].AsString(), json["archive"].AsString(), json["entry"].AsString(), json["picture"].AsString(),
+                json["compose"].AsString(), json["plate"].AsString() };
         }
 
-        // [SSA] The HUD portraits ("toy_<name>_hud", 128 px) and the "versus" pictures ("<name>_vs", 512 px) of the toys
-        // the catalogue names, and the other pictures it lists (items), from uigameimage.str.
-        int SsaPortraits(const Disc& disc, const std::filesystem::path& folder)
+        const std::vector<Manifest>& Manifests()
+        {
+            static const std::vector<Manifest> manifests = [] {
+                std::vector<Manifest> out;
+                collection::Json all;
+                std::string error;
+                if (!collection::Json::Parse(std::string(reinterpret_cast<const char*>(g_embeddedArtManifests), g_embeddedArtManifestsSize), all, error))
+                {
+                    fprintf(stderr, "[art] the built-in manifests do not load: %s\n", error.c_str());
+                    return out;
+                }
+                for (const collection::Json& json : all.Items())
+                {
+                    Manifest m;
+                    m.game = json["game"].AsString();
+                    m.logo = ReadSource(json["logo"]);
+                    m.background = ReadSource(json["background"]);
+                    m.portraits = ReadSource(json["portraits"]);
+                    for (const collection::Json& name : json["portraits"]["pictures"].Items())
+                        m.pictures.push_back(name.AsString());
+                    m.images = json["portraits"]["images"].AsBool();
+                    m.folder = json["portraits"]["folder"].AsString();
+                    if (!m.game.empty())
+                        out.push_back(std::move(m));
+                }
+                return out;
+            }();
+            return manifests;
+        }
+
+        const Manifest* FindManifest(std::string_view game)
+        {
+            for (const Manifest& manifest : Manifests())
+                if (game == manifest.game)
+                    return &manifest;
+            return nullptr;
+        }
+
+        // [Lux] The pictures `names` of a strm stream, decoded in one pass.
+        std::map<std::string, Image> LuxPictures(const Disc& disc, const std::string& stream, std::set<std::string> names)
+        {
+            std::map<std::string, Image> out;
+            std::vector<uint8_t> bytes;
+            if (names.empty() || !lux::UnpackStream(ReadAll(disc, stream), bytes))
+                return out;
+            lux::DecodeImages(bytes, [&](const std::string& name) { return names.erase(name) > 0; },
+                [&](const std::string& name, const Image& image) { out[name] = image; });
+            return out;
+        }
+
+        // [Alchemy] A picture of an archive's entry: the one whose source path ends with `picture`, or the first one.
+        bool AlchemyPicture(const Disc& disc, const Source& source, const std::string& picture, Image& out)
+        {
+            auto archive = OpenArchive(disc, source.archive);
+            std::optional<alchemy::IgzFile> scene = archive ? OpenScene(*archive, source.entry) : std::nullopt;
+            if (!scene)
+                return false;
+            for (const alchemy::IgzFile::Picture& candidate : scene->Pictures())
+                if ((picture.empty() || Lower(candidate.name).ends_with(Lower(picture))) && alchemy::DecodePicture(*scene, candidate, out))
+                    return true;
+            return false;
+        }
+
+        // The logo and the background, as the manifest says.
+        void ReadPictures(const Manifest& m, const Disc& disc, Image& logo, Image& background)
+        {
+            // [Lux] Pictures of one stream are decoded together.
+            std::map<std::string, std::set<std::string>> streams;
+            for (const Source* source : { &m.logo, &m.background })
+                if (!source->stream.empty())
+                    streams[source->stream].insert(source->picture);
+            std::map<std::string, std::map<std::string, Image>> decoded;
+            for (const auto& [stream, names] : streams)
+                decoded[stream] = LuxPictures(disc, stream, names);
+            auto read = [&](const Source& source, Image& out) {
+                if (!source.stream.empty())
+                {
+                    auto& found = decoded[source.stream];
+                    if (auto it = found.find(source.picture); it != found.end())
+                        out = it->second;
+                    return;
+                }
+                if (source.archive.empty())
+                    return;
+                Image picture;
+                if (!AlchemyPicture(disc, source, source.picture, picture))
+                    return;
+                if (source.compose == "sprite_sheet_logo")
+                {
+                    Image flat;
+                    bool haveFlat = !source.plate.empty() && AlchemyPicture(disc, source, source.plate, flat);
+                    ComposeSpriteSheetLogo(picture, haveFlat ? &flat : nullptr, out);
+                }
+                else if (source.compose.empty())
+                    out = std::move(picture);
+                else
+                    fprintf(stderr, "[art] %s: unknown composition \"%s\"\n", m.game.c_str(), source.compose.c_str());
+            };
+            read(m.logo, logo);
+            read(m.background, background);
+        }
+
+        int CountPngs(const std::filesystem::path& folder)
+        {
+            int present = 0;
+            std::error_code error;
+            for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+                present += entry.path().extension() == ".png";
+            return present;
+        }
+
+        // [Lux] The pictures the manifest's patterns give for each toy the catalogue names, and its other images.
+        int LuxPortraits(const Manifest& m, const Disc& disc, const std::filesystem::path& folder)
         {
             std::set<std::string> wanted;
-            if (const collection::Game* game = collection::Catalogue::Get().FindGame("ssa"))
+            if (const collection::Game* game = collection::Catalogue::Get().FindGame(m.game))
             {
                 for (const auto& [type, name] : game->names)
-                {
-                    wanted.insert("toy_" + Lower(name) + "_hud");
-                    wanted.insert(Lower(name) + "_vs");
-                }
-                for (const auto& [type, name] : game->images)
-                    wanted.insert(name);
+                    for (std::string pattern : m.pictures)
+                    {
+                        if (size_t at = pattern.find("{name}"); at != std::string::npos)
+                            pattern.replace(at, 6, Lower(name));
+                        wanted.insert(pattern);
+                    }
+                if (m.images)
+                    for (const auto& [type, name] : game->images)
+                        wanted.insert(name);
             }
             int present = 0;
             for (auto it = wanted.begin(); it != wanted.end();)
@@ -331,9 +470,9 @@ namespace art
             if (wanted.empty())
                 return present;
             std::vector<uint8_t> stream;
-            if (!lux::UnpackStream(ReadAll(disc, "uigameimage.str"), stream))
+            if (!lux::UnpackStream(ReadAll(disc, m.portraits.stream), stream))
             {
-                fprintf(stderr, "[art] cannot read the UI images (uigameimage.str) of the disc\n");
+                fprintf(stderr, "[art] cannot read the UI images (%s) of the disc\n", m.portraits.stream.c_str());
                 return present;
             }
             lux::DecodeImages(stream, [&](const std::string& name) { return wanted.erase(name) > 0; },
@@ -341,64 +480,34 @@ namespace art
             return present;
         }
 
-        // [Giants] The logo from the title's sprite sheet (level/Title.bld), the main menu's painting (permanent/global.arc,
-        // ui_levelfullscreen/mainmenu.png, 1600x960 DXT1).
-        void GiantsPictures(const Disc& disc, Art& out)
+        // [Alchemy] Every square picture of the entry under the manifest's folder (Giants' collection screen: all
+        // Skylanders and their decos, sidekicks and items), named as on the disc ("eruptor_lightcore.png"). Done when
+        // every portrait the catalogue's "portraits" names is there.
+        int AlchemyPortraits(const Manifest& m, const Disc& disc, const std::filesystem::path& folder)
         {
-            if (auto archive = OpenArchive(disc, "level/Title.bld"))
-                if (auto scene = OpenScene(*archive, "level.bld"))
-                {
-                    Image sheet, flat;
-                    bool haveSheet = false, haveFlat = false;
-                    for (const alchemy::IgzFile::Picture& picture : scene->Pictures())
-                    {
-                        if (picture.name.ends_with("giantslogo/rig/textures/spritelogo.png"))
-                            haveSheet = alchemy::DecodePicture(*scene, picture, sheet);
-                        else if (picture.name.ends_with("giantslogo/rig/textures/title_giants_3d.png"))
-                            haveFlat = alchemy::DecodePicture(*scene, picture, flat);
-                    }
-                    if (haveSheet)
-                        ComposeGiantsLogo(sheet, haveFlat ? &flat : nullptr, out.logo);
-                }
-            if (auto archive = OpenArchive(disc, "permanent/global.arc"))
-                if (auto file = OpenScene(*archive, "ui_levelfullscreen/mainmenu.png"))
-                    for (const alchemy::IgzFile::Picture& picture : file->Pictures())
-                        if (out.background.rgba.empty())
-                            alchemy::DecodePicture(*file, picture, out.background);
-        }
-
-        // [Giants] Every portrait of the collection screen (misc/UI_Collection_Champions.bld: all Skylanders and their
-        // Series 2, LightCore, Legendary and alternate decos, the sidekicks and the magic items; 256x256 DXT5), named
-        // as on the disc ("eruptor_lightcore.png"). The catalogue's "portraits" map says which toy each one is.
-        int GiantsPortraits(const Disc& disc, const std::filesystem::path& folder)
-        {
-            constexpr std::string_view Folder = "/collections/sky2/portraits/";
-            // Done when every portrait the catalogue names is there.
-            const collection::Game* game = collection::Catalogue::Get().FindGame("giants");
+            const collection::Game* game = collection::Catalogue::Get().FindGame(m.game);
             bool complete = game != nullptr && !game->portraits.empty();
             if (game != nullptr)
                 for (const auto& [key, name] : game->portraits)
                     complete = complete && Exists(folder / (name + ".png"));
-            int present = 0;
-            std::error_code error;
-            for (const auto& entry : std::filesystem::directory_iterator(folder, error))
-                present += entry.path().extension() == ".png";
+            int present = CountPngs(folder);
             if (complete)
                 return present;
-            auto archive = OpenArchive(disc, "misc/UI_Collection_Champions.bld");
-            std::optional<alchemy::IgzFile> scene = archive ? OpenScene(*archive, "level.bld") : std::nullopt;
+            auto archive = OpenArchive(disc, m.portraits.archive);
+            std::optional<alchemy::IgzFile> scene = archive ? OpenScene(*archive, m.portraits.entry) : std::nullopt;
             if (!scene)
             {
-                fprintf(stderr, "[art] cannot read the collection screen (misc/UI_Collection_Champions.bld) of the disc\n");
+                fprintf(stderr, "[art] cannot read %s of the disc\n", m.portraits.archive.c_str());
                 return present;
             }
+            const std::string under = Lower(m.folder);
             for (const alchemy::IgzFile::Picture& picture : scene->Pictures())
             {
                 std::string name = Lower(picture.name);
-                size_t at = name.find(Folder);
-                if (at == std::string::npos || picture.width != picture.height || !name.ends_with(".png"))
+                size_t at = name.find(under);
+                if (under.empty() || at == std::string::npos || picture.width != picture.height || !name.ends_with(".png"))
                     continue;
-                name = name.substr(at + Folder.size(), name.size() - at - Folder.size() - 4);
+                name = name.substr(at + under.size(), name.size() - at - under.size() - 4);
                 std::filesystem::path path = folder / (name + ".png");
                 Image image;
                 if (!Exists(path) && alchemy::DecodePicture(*scene, picture, image) && SavePng(image, path))
@@ -407,24 +516,13 @@ namespace art
             return present;
         }
 
-        struct Recipe
+        int ReadPortraits(const Manifest& m, const Disc& disc, const std::filesystem::path& folder)
         {
-            const char* game;
-            void (*pictures)(const Disc&, Art&);
-            int (*portraits)(const Disc&, const std::filesystem::path&);
-        };
-
-        constexpr Recipe Recipes[] = {
-            { "ssa", SsaPictures, SsaPortraits },
-            { "giants", GiantsPictures, GiantsPortraits },
-        };
-
-        const Recipe* FindRecipe(std::string_view game)
-        {
-            for (const Recipe& recipe : Recipes)
-                if (game == recipe.game)
-                    return &recipe;
-            return nullptr;
+            if (!m.portraits.stream.empty())
+                return LuxPortraits(m, disc, folder);
+            if (!m.portraits.archive.empty())
+                return AlchemyPortraits(m, disc, folder);
+            return CountPngs(folder);
         }
 
         int ReadVersion(const std::filesystem::path& manifest)
@@ -474,13 +572,13 @@ namespace art
 
     bool Known(std::string_view game)
     {
-        return FindRecipe(game) != nullptr;
+        return FindManifest(game) != nullptr;
     }
 
     Extraction Extract(std::string_view game, const Disc& disc, const std::vector<uint8_t>& titleIconPng, int parts)
     {
         Extraction result;
-        const Recipe* recipe = FindRecipe(game);
+        const Manifest* where = FindManifest(game); // the game's art.json
         std::filesystem::path cache = CacheFolder(game), portraits = PortraitFolder(game);
         std::error_code error;
         if ((parts & Pictures) && !cache.empty())
@@ -497,10 +595,10 @@ namespace art
             bool current = ReadVersion(manifest) == CacheVersion;
             if (!titleIconPng.empty())
                 SaveBytes(titleIconPng, cache / RoleFile(Role::TitleIcon));
-            if (recipe != nullptr && (!current || !Exists(cache / RoleFile(Role::Logo)) || !Exists(cache / RoleFile(Role::Background))))
+            if (where != nullptr && (!current || !Exists(cache / RoleFile(Role::Logo)) || !Exists(cache / RoleFile(Role::Background))))
             {
                 Art pictures;
-                recipe->pictures(disc, pictures);
+                ReadPictures(*where, disc, pictures.logo, pictures.background);
                 if (!pictures.logo.rgba.empty())
                     SavePng(pictures.logo, cache / RoleFile(Role::Logo));
                 if (!pictures.background.rgba.empty())
@@ -515,10 +613,10 @@ namespace art
             result.background = Exists(cache / RoleFile(Role::Background));
             result.titleIcon = Exists(cache / RoleFile(Role::TitleIcon));
         }
-        if ((parts & Portraits) && recipe != nullptr && !portraits.empty())
+        if ((parts & Portraits) && where != nullptr && !portraits.empty())
         {
             std::filesystem::create_directories(portraits, error);
-            result.portraits = recipe->portraits(disc, portraits);
+            result.portraits = ReadPortraits(*where, disc, portraits);
         }
         return result;
     }

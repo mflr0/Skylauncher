@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Copies SSARecomp's figure and collection library and its disc picture readers (src/shared/art, docs/launcher_ui.md
-# "Disc art") into this checkout (docs/collection_ui.md), or with --check only
+# Copies SSARecomp's figure and collection library, its disc picture readers and the games' art manifests
+# (src/shared/art, resources/games/<id>/art.json, docs/launcher_ui.md "Disc art") into this checkout
+# (docs/collection_ui.md), or with --check only
 # lists the files that differ. The SSARecomp copies are the reference (they have the tests): change them there.
 # Same files as SSARecomp's tools/sync_skylauncher.sh, into Skylauncher's layout (src/shared/). The library is in
 # runtime/host/ (SSARecomp's tree since the multi-game reorganisation) or SSARecomp/host/ (older checkouts).
@@ -27,6 +28,14 @@ if [[ -d "$from/$lib/host/art" ]]; then
     done
 fi
 pairs+=("resources/collection/catalogue.json:resources/collection/catalogue.json" "cmake/embed_file.cmake:cmake/embed_file.cmake")
+# Each game's art manifest (where its pictures are on the disc), joined and built in by cmake/join_json.cmake.
+if [[ -f "$from/cmake/join_json.cmake" ]]; then
+    pairs+=("cmake/join_json.cmake:cmake/join_json.cmake")
+    for manifest in "$from"/games/*/art.json; do
+        id=$(basename "$(dirname "$manifest")")
+        pairs+=("games/$id/art.json:resources/games/$id/art.json")
+    done
+fi
 
 status=0
 for pair in "${pairs[@]}"; do

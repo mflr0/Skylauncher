@@ -179,6 +179,16 @@ namespace figures
 
     uint32_t TotalExperience(const FigureStats& stats) { return stats.experience + stats.giantsExperience; }
 
+    uint32_t ExperienceFor(const FigureStats& stats, int cap) { return cap <= MaxLevel ? stats.experience : TotalExperience(stats); }
+
+    void SetExperienceFor(FigureStats& stats, int cap, uint32_t experience)
+    {
+        if (cap <= MaxLevel)
+            stats.experience = std::min(experience, MaxBaseExperience);
+        else
+            SetTotalExperience(stats, experience);
+    }
+
     void SetTotalExperience(FigureStats& stats, uint32_t total)
     {
         total = std::min(total, MaxBaseExperience + MaxGiantsExperience);
@@ -268,7 +278,8 @@ namespace figures
         stats.sequence = a[0x09];
         stats.upgrades = Le16(a + 0x10);
         stats.platforms = a[0x13];
-        stats.hat = Le16(a + 0x14);
+        stats.ssaHat = Le16(a + 0x14);
+        stats.hat = stats.ssaHat;
         memcpy(stats.owner.data(), a + 0x18, stats.owner.size());
         for (size_t i = 0; i < 16; i++)
         {
@@ -291,6 +302,7 @@ namespace figures
                 stats.giantsExperience = Le16(extra + 3);
             if (extra[5] != 0)
                 stats.hat = extra[5];
+            stats.swapForceExperience = Le32(extra + 8);
         }
         return AreaState::Valid;
     }
@@ -343,8 +355,9 @@ namespace figures
         uint8_t extraA[ExtraSize], extraB[ExtraSize];
         PackExtra(plain, ExtraBlocks[0], extraA);
         PackExtra(plain, ExtraBlocks[1], extraB);
+        // A hat only Giants shows (not the first area's own) needs the extra area too.
         bool writeExtra = newestExtra >= 0 || !ExtraBlank(extraA) || !ExtraBlank(extraB) || stats.giantsExperience != 0 ||
-            stats.hat != 0;
+            (stats.hat != 0 && stats.hat != stats.ssaHat) || stats.swapForceExperience != 0;
 
         uint8_t* a = area;
         a[0] = uint8_t(stats.experience);
@@ -354,7 +367,7 @@ namespace figures
         Put32(a + 0x05, stats.playSeconds);
         Put16(a + 0x10, stats.upgrades);
         a[0x13] = stats.platforms;
-        Put16(a + 0x14, stats.hat);
+        Put16(a + 0x14, stats.ssaHat);
         memcpy(a + 0x18, stats.owner.data(), stats.owner.size());
         memset(a + 0x20, 0, 0x10);
         memset(a + 0x40, 0, 0x10);
@@ -383,7 +396,10 @@ namespace figures
         if (writeExtra)
         {
             Put16(extra + 3, stats.giantsExperience);
-            extra[5] = uint8_t(std::min<uint16_t>(stats.hat, 0xFF));
+            // The extra area's hat changes only when Giants would show another one (0 there means the first area's).
+            if (stats.hat != (extra[5] != 0 ? extra[5] : stats.ssaHat))
+                extra[5] = uint8_t(std::min<uint16_t>(stats.hat, 0xFF));
+            Put32(extra + 8, stats.swapForceExperience);
             uint8_t sequence = newestExtra >= 0 ? extra[2] : stats.extraSequence;
             for (int i = 0; i < 2; i++)
             {
