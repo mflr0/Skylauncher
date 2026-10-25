@@ -69,10 +69,18 @@ The launcher, the game and SSABuild keep everything under one root per OS, chose
 | `kit/<release tag>/` | the kits the launcher downloaded |
 | `toolchains/` | the compiler SSABuild downloads (Windows) |
 | `logs/` | `skylauncher-game.log` (+ `.prev.log`) and `migration.log` |
-| `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `pipelines.bin`, `portal.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Another game (Giants) gets its own folder. |
+| `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `saves-backup/`, `pipelines.bin`, `portal.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Another game (Giants) gets its own folder. |
 
 `SKYLANDERS_DATA` replaces the root (tests, portable use). `SKYLAUNCHER_DATA` still replaces the launcher's part of it
 (the game folder, the kits, the logs). Settings > Game data > **Open data folder** opens the root.
+
+**Save backups.** Settings > Game data lists the backups the game keeps of its saves (`SSA/saves-backup/<time>/`, see
+SSARecomp's `docs/settings.md`): date, time and size, newest first. **Restore** first keeps the saves the player has now
+as a backup of its own, then copies the chosen one back byte for byte. It is refused while the game runs: the game holds
+`SSA/saves-backup/game.lock` with its process id while it plays, and a marker a crash left behind is dropped once that
+process is gone. The code is the shared library's `save_backup.{h,cpp}` (`src/shared/collection/`, synced from
+SSARecomp by `tools/sync_collection.sh`), so the game and the launcher agree on the folder, the names and the rotation
+(the last 10, plus one per day for 7 days).
 
 **Moving from the older layout.** Before 0.3.1 the data was in `<roaming>/SSARecomp/` (and its nested `SSARecomp/`),
 in `Skylauncher/` (`games/<sha256>/`, `kit/`; `%LOCALAPPDATA%\Skylauncher` on Windows) and, on Windows,
