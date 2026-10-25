@@ -33,7 +33,7 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
 4. `@done <path>` and exit code 0: the path is saved for that disc and PLAY appears. On Windows SDL cannot report the
    exit code of a process started without a console window, so there `@done` alone means success.
 5. When the kit changes (another `build=` in its `kit.txt`), the Play page offers **Update the game**; Settings >
-   Game data has **Reinstall the game** and **Open the game folder**. SSABuild is incremental, so these are quick when
+   Game data has **Reinstall the game** (held a second) and **Open the game folder**. SSABuild is incremental, so these are quick when
    little changed.
 
 Cancel stops only the process the launcher started: SIGTERM then SIGKILL after 3 s on macOS and Linux; on Windows
@@ -76,7 +76,7 @@ The launcher, the game and SSABuild keep everything under one root per OS, chose
 (the game folder, the kits, the logs). Settings > Game data > **Open data folder** opens the root.
 
 **Save backups.** Settings > Game data lists the backups the game keeps of its saves (`SSA/saves-backup/<time>/`, see
-SSARecomp's `docs/settings.md`): date, time and size, newest first. **Restore** first keeps the saves the player has now
+SSARecomp's `docs/settings.md`): date, time and size, newest first. **Restore** (held a second) first keeps the saves the player has now
 as a backup of its own, then copies the chosen one back byte for byte. It is refused while the game runs: the game holds
 `SSA/saves-backup/game.lock` with its process id while it plays, and a marker a crash left behind is dropped once that
 process is gone. The code is the shared library's `save_backup.{h,cpp}` (`src/shared/collection/`, synced from

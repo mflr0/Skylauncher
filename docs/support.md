@@ -18,7 +18,8 @@ see below), **Copy game log** (the end of `SSARecomp.log`, then of `skylauncher-
 
 ## Report a problem
 
-**Report a problem** builds one text file and shows it in a window before anything else: the header has the launcher,
+**Report a problem** builds one text file and shows it in a window before anything else (Close, Escape or the pad's B
+close it): the header has the launcher,
 kit and game build versions, the OS and the GPU line from the last game log (plus the disc image path), then the files,
 each under a `===== name =====` heading:
 
@@ -48,8 +49,8 @@ folder, and three buttons: **Report** (copies the log, opens a new GitHub issue 
 
 ## Portal status
 
-Next to PLAY and under COLLECTION's title the launcher shows "Portal: <model>" (for example "Portal: Portal of Power") or
-"Portal: not detected"; the tooltip says that without a real portal the game uses the emulated one (Toy Box) and points to
+Under PLAY and under COLLECTION's title the launcher shows "Portal: <model>" (for example "Portal: Portal of Power") or
+"Portal: not detected"; the tooltip says that without a real portal the game uses the virtual portal (its Toy Box) and points to
 "Test the portal" below. It is read with SDL's HID API (`SDL_hid_enumerate(0x1430, 0)`, Activision's vendor id) by a
 worker thread (`src/launcher/portal_status.{h,cpp}`) that scans once at start, then only when `SDL_hid_device_change_count()`
 changes, at most every 2 s, so the UI never waits. Models by product id: `0150` Portal of Power, `1F17` Xbox 360 portal

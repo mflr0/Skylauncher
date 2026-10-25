@@ -29,16 +29,38 @@ is easy to iterate without touching the game runtime.
 
 ## Layout
 The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
-GitHub issue) and the GitHub link bottom right. A language menu (not wired yet) sits top right on Home and Play. No game is
-selected until the player clicks one in the sidebar.
+GitHub issue) and the GitHub link bottom right. The top right is kept for the launcher's own language (#4): the game's text
+and voice languages are in Settings > Language ("Game text", "Game voices"). No game is selected until the player clicks
+one in the sidebar.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure enabled, the others "Coming later",
    SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom.
 2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
-   (current device, a menu of the others), the main button (CHOOSE ISO, then PLAY once the disc is verified) and, on the right,
-   the disc name with "Change disc...".
+   (current device, PLAY WITH: a menu of the others), the main button (CHOOSE DISC, INSTALL, then PLAY) with the portal's
+   line under it and, on the right, "Change disc...". PLAY and INSTALL check that the image is still there first.
 3. Collection - see below.
 4. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About. Clicking a game
-   goes back to Play.
+   goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
+
+## Interaction rules
+- **Focus.** Every control takes the keyboard and pad focus and shows it: ImGui's buttons draw it, the widgets drawn by
+  hand over an `InvisibleButton` call `App::FocusRing` (the accent ring) and pass `ImGuiButtonFlags_EnableNav` (ImGui
+  1.91+ leaves invisible buttons out of navigation otherwise). The page's columns are `ImGuiChildFlags_NavFlattened`.
+- **Pad and keyboard.** The sidebar and the page are separate windows: B / Escape on Play or Home moves the focus to the
+  sidebar's current row; A on a row opens its page with the focus on its first control (`App::GoTo`, `TakeFocus`).
+  B / Escape leave Settings and Collection, close dialogs and menus, clear the collection's search; whatever is open
+  answers it before the page does (`m_backTaken`). LB / RB change Settings tab and the collection's section. The
+  launcher starts with the focus in the sidebar.
+- **Hold to confirm.** What deletes or overwrites is a red button held for a second (`App::HoldButton`, the state in
+  `hold_confirm.h`): Reset and Delete (Figure page), Delete for good (trash), Mark as not in use (a stale lock), Restore
+  (a save backup), Reset to defaults (keyboard), Reinstall the game. The fill shows the time; releasing, or the pointer
+  leaving, cancels; it acts once per press; Space, Enter and the pad's A hold it too. The label is a plain verb, the
+  instruction is the tooltip (shown on keyboard and pad focus too). Buttons are told apart by their ImGui ID.
+- **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
+- **Toasts.** One at a time, bottom right, at most 560 points wide; 2.5 s, longer for a long message (up to 6 s).
+- **Idle.** The loop sleeps in `SDL_WaitEventTimeout` (`App::IdleWait`): every frame only while something moves (a disc
+  check, an install, an update, a held button, a text cursor) and for three frames after an input; 30 fps for the night
+  sky's stars; else it wakes every 0.5 s to poll the jobs, the portal and the collection.
+- **Copy.** New and changed sentences sit at the top of their file (`namespace strings`), ready for #4.
 
 ## Collection
 See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favourites, backups
@@ -106,7 +128,10 @@ SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ./build/Skylauncher.app/Contents/MacOS/Skylauncher
 ```
 It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
-`07-figure-sheet.png` and `08-new-figure.png` (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
+`07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png` and `11-disc-gone.png`
+(INSTALL on an image that moved) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
+With `SSA_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `52-`): B to the sidebar, A into Collection, Y for
+View, the D-pad to a seat and a card, X for its Figure page, Space held on Delete, B back, RB in Settings.
 With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
 (`docs/install.md`).
 
