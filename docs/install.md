@@ -102,8 +102,8 @@ cache `SSA/launcher-cache` is trimmed to 256 MB (oldest files first) when a game
 
 The kit's zip keeps the Unix modes of `SSABuild` and its `bin/` programs, and `InstallKitZip` restores them, so the
 AppImage runs the downloaded SSABuild directly. The game is built as `games/<sha256>/SSARecomp`; PLAY starts it and
-keeps its output in `skylauncher-game.log`, as on the other systems. SSABuild caches its compiler (zig) in
-`~/.cache/SSARecomp/toolchains`.
+keeps its output in `skylauncher-game.log`, as on the other systems. SSABuild caches its compiler (zig) in the data folder's
+`toolchains/` (`~/.local/share/Skylanders/toolchains`).
 
 The real portal needs read and write access to its `/dev/hidraw*` node, which a udev rule gives the logged-in user:
 
