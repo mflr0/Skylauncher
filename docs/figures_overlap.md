@@ -2,7 +2,7 @@
 
 Decided: option A, done (`docs/collection_ui.md`). What follows is the comparison as it stood before. Skylauncher's figure engine (`src/shared/figures/`, used by the Collection
 page) and SSARecomp's collection library (`docs/collection.md` and `docs/collection_api.md` in that repo; code in
-`SSARecomp/host/figures/` and `SSARecomp/host/collection/`, with `tools/sync_skylauncher.sh` to copy it here) do the
+`runtime/host/figures/` and `runtime/host/collection/` (`SSARecomp/host/` in older checkouts), with `tools/sync_skylauncher.sh` to copy it here) do the
 same jobs.
 
 | Job | Skylauncher (`src/shared/figures/`) | SSARecomp library |
