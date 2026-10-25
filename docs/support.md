@@ -12,7 +12,7 @@ In the "Skylanders" data folder (`%APPDATA%\Skylanders\` on Windows, `~/Library/
 | `SSA/install.log` (`.prev.log`), `SSA/install-logs/` | the launcher, SSABuild | what SSABuild printed during the install, and its own step logs kept after the build (docs/install.md) |
 | `logs/migration.log` | the first start after an update | what was moved from the older folders |
 
-Settings > Game data > Support: **Report a problem** (one text file with the last logs, the settings and the versions;
+Settings (the gear) > Support: **Report a problem** (one text file with the last logs, the settings and the versions;
 see below), **Copy game log** (the end of `SSARecomp.log`, then of `skylauncher-game.log`, each under a heading) and
 **Open logs folder** (`logs/`). `SKYLAUNCHER_LOG_DIR` replaces both log folders (tests).
 

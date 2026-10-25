@@ -6,7 +6,7 @@ No telemetry: the only request is `GET https://api.github.com/repos/<repo>/relea
 ## Flow
 
 1. **Check**: at start, at most once a day (`[update] last_check`, epoch seconds), unless `[update] auto_check=0`; and on
-   demand in Settings > About > Check for updates. `SKYLAUNCHER_NO_UPDATE_CHECK` turns the start-up check off.
+   demand in Settings > Launcher > Check for updates. `SKYLAUNCHER_NO_UPDATE_CHECK` turns the start-up check off.
 2. The tag (`vX.Y.Z`) is compared, as semver, with the built version (`SKYLAUNCHER_VERSION`, the CMake cache variable the CI
    sets from the tag or run number, shown in About). Pre-releases and tags that aren't versions are never offered.
 3. A **banner** above the page (it pushes the page down 56 px, nothing overlaps): "Update available: vX.Y.Z", **Update now**,

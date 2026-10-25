@@ -85,7 +85,7 @@ Portal of Power. Then click **Test the portal**.
 
 ## If something goes wrong
 
-- Settings > Game data > **Copy game log** copies the log so you can send it to us. **Open logs folder** shows the
+- Settings (the gear) > Support > **Copy game log** copies the log so you can send it to us. **Open logs folder** shows the
   files.
 - Everything is in one "Skylanders" folder: `%APPDATA%\Skylanders\` on Windows, `~/Library/Application Support/Skylanders/`
   on Mac, `~/.local/share/Skylanders/` on Linux. The logs are in its `logs/` and `SSA/` folders.
