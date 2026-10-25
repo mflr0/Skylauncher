@@ -11,8 +11,9 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
    saying the game is built from the disc, about 15 minutes and 6 GB, and internet is needed once for the compiler
    (`InstallMinutes`, `InstallGigabytes` in `game_install.h`).
 3. With no kit (below), INSTALL first downloads it: the checklist starts with **Downloading the game tools** (a bar in MB,
-   retry with **Retry**; a failure says "The game tools couldn't be downloaded"). On Linux there is no kit: "The game can't be
-   installed on Linux yet." See `docs/updates.md` for the release it comes from.
+   retry with **Retry**; a failure says "The game tools couldn't be downloaded"). Linux (from 0.3.1) gets
+   `ssa-kit-linux-x64.zip` the same way: its SSABuild downloads zig as the compiler, no root needed. See `docs/updates.md`
+   for the release it comes from.
    Then INSTALL runs `SSABuild --iso <iso> --out <game folder> --kit <kit>`. The progress card replaces the logo
    (`ui/install_page.cpp`, its model is `install_checklist.{h,cpp}`):
    - a fixed **checklist** of eight steps: Preparing the compiler, Reading the disc, Translating the game code, Translating
@@ -52,6 +53,26 @@ Which runtime PLAY starts: `SKYLAUNCHER_RUNTIME`, else the game built for this d
 `SSARecomp` next to the launcher. A runtime set up by hand (the last two) also hides INSTALL.
 
 `SKYLAUNCHER_DATA` replaces the data folder (the games and the downloaded kits), for tests.
+
+## Linux
+
+The kit's zip keeps the Unix modes of `SSABuild` and its `bin/` programs, and `InstallKitZip` restores them, so the
+AppImage runs the downloaded SSABuild directly. The game is built as `games/<sha256>/SSARecomp`; PLAY starts it and
+keeps its output in `skylauncher-game.log`, as on the other systems. SSABuild caches its compiler (zig) in
+`~/.cache/SSARecomp/toolchains`.
+
+The real portal needs read and write access to its `/dev/hidraw*` node, which a udev rule gives the logged-in user:
+
+```sh
+echo 'SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1430", ATTRS{idProduct}=="0150", MODE="0660", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-skylanders-portal.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+
+then unplug and replug the portal. Without it the game's log has `[portal] hid: Linux needs this udev rule ...`.
+
+Tested in containers only (amd64 under Rosetta, Mesa's lavapipe, offscreen): a fake release over `file://`
+(`SKYLAUNCHER_UPDATE_URL`) with the real kit, INSTALL to PLAY with `SSA_LAUNCHER_TEST_INSTALL=real` and
+`SSA_LAUNCHER_TEST_PLAY=1` (PLAY once the install has finished). Not yet on a Linux desktop or a Steam Deck.
 
 ## Code
 

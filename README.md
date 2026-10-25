@@ -9,9 +9,19 @@ on your computer.
 ## What you need
 
 - Your own copy of *Skylanders: Spyro's Adventure* for Xbox 360, as a disc image (`.iso`).
-- Windows 10 or 11 (64-bit), or a Mac with Apple Silicon. Linux builds of the launcher exist, but the game can't be
-  installed on Linux yet.
+- Windows 10 or 11 (64-bit), a Mac with Apple Silicon, or a Linux PC (below).
 - An internet connection the first time: INSTALL downloads the game tools (about 30 to 40 MB) and the compiler.
+- **Linux:** an x86_64 PC with a Vulkan driver (Mesa or NVIDIA), about 6 GB free, and a distribution from 2022 or later
+  (glibc 2.34+: Ubuntu 22.04+, Fedora, Arch, SteamOS on the Steam Deck). No compiler or root is needed: INSTALL
+  downloads zig (55 MB) as the compiler. A real portal needs a udev rule once, the only step that needs `sudo` (on
+  the Steam Deck, set a password with `passwd` first):
+
+  ```sh
+  echo 'SUBSYSTEM=="hidraw", ATTRS{idVendor}=="1430", ATTRS{idProduct}=="0150", MODE="0660", TAG+="uaccess"' | sudo tee /etc/udev/rules.d/70-skylanders-portal.rules
+  sudo udevadm control --reload-rules && sudo udevadm trigger
+  ```
+
+  Then unplug the portal and plug it in again.
 
 ## Get started
 
