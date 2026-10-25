@@ -77,7 +77,6 @@ namespace launcher_ui
         void DrawUnknown();
         void DrawTidy();
         void HandleShortcuts();
-        bool HoldButton(const char* label, float width);
         void DrawIcon(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, ImVec2 at, float size, bool large);
         const FigureIconTexture& Icon(const collection::Toy* toy, collection::VariantKind kind, bool large);
         void CloseOverlay();
@@ -128,9 +127,6 @@ namespace launcher_ui
         char m_label[64] = {};
         bool m_renaming = false;
         std::string m_confirm;          // "restore:<backup>"
-        std::string m_hold;             // the hold button being held, and since when
-        uint64_t m_holdSince = 0;
-        bool m_holdFired = false;       // the held button already acted: it waits for the release
         std::string m_addGame = "ssa";
         uint16_t m_addToy = 0xFFFF;
         int m_addVersion = 0;           // 0: standard, else 1 + an index in the toy's variants

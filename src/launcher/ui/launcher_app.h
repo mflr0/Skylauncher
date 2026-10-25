@@ -11,6 +11,7 @@
 #include "launcher/portal_status.h"
 #include "launcher/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
+#include "launcher/ui/hold_confirm.h"
 #include "shared/collection/save_backup.h"
 #include <SDL3/SDL.h>
 #include <atomic>
@@ -194,6 +195,10 @@ namespace launcher_ui
             unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive);
         void BoldText(const char* text, unsigned color);
         bool Toggle(const char* id, bool* value);
+        // Acts once held for a second (HoldConfirm); `hint` is its tooltip, which says so. Red: for what deletes or overwrites.
+        bool HoldButton(const char* label, float width, const char* hint);
+        // The keyboard and pad focus around the last item, for the widgets drawn over an InvisibleButton.
+        void FocusRing(float rounding);
         template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
         bool BeginSettingsTable(const char* id);
@@ -304,6 +309,8 @@ namespace launcher_ui
 
         // The collection page and its state.
         std::unique_ptr<CollectionPage> m_collection = std::make_unique<CollectionPage>(*this);
+
+        HoldConfirm m_hold;
 
         std::string m_toast;
         uint64_t m_toastUntil = 0;

@@ -61,46 +61,20 @@ namespace launcher_ui
         ImGui::EndPopup();
     }
 
-    // A button that acts after being held for a second (reset, delete): the mouse button or A. The fill shows the time.
-    bool CollectionPage::HoldButton(const char* label, float width)
-    {
-        constexpr uint64_t HoldMs = 1000;
-        ImGui::PushStyleColor(ImGuiCol_Button, Rgb(Danger, 70));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(Danger, 110));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(Danger, 150));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Text));
-        ImGui::Button(label, ImVec2(width, 40));
-        ImGui::PopStyleColor(4);
-        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        ImVec2 text = ImGui::CalcTextSize(label);
-        ImGui::GetWindowDrawList()->AddText(ImVec2((min.x + max.x - text.x) / 2 + BoldOffset, (min.y + max.y - text.y) / 2), Rgb(Text), label);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Hold to confirm");
-        bool done = false;
-        if (ImGui::IsItemActive())
-        {
-            uint64_t now = SDL_GetTicks();
-            if (m_hold != label)
-            {
-                m_hold = label;
-                m_holdSince = now;
-            }
-            float t = std::min(1.0f, float(now - m_holdSince) / HoldMs);
-            ImGui::GetWindowDrawList()->AddRectFilled(min, ImVec2(min.x + (max.x - min.x) * t, max.y), Rgb(Danger, 190), Radius);
-            ImGui::GetWindowDrawList()->AddText(ImVec2((min.x + max.x - text.x) / 2, (min.y + max.y - text.y) / 2), Rgb(Text), label);
-            if (t >= 1.0f && !m_holdFired)
-                done = m_holdFired = true; // once per press: keeping the button down does not repeat the action
-        }
-        else if (m_hold == label)
-        {
-            m_hold.clear();
-            m_holdFired = false;
-        }
-        return done;
-    }
-
     namespace
     {
+        // The Figure page's words that changed in the polish pass (the rest are still inline, for #4).
+        namespace strings
+        {
+            constexpr const char* Reset = "Reset";
+            constexpr const char* ResetHint = "Hold to reset it to new. A backup is kept.";
+            constexpr const char* Delete = "Delete";
+            constexpr const char* DeleteHint = "Hold to move it to the trash. Manage > Trash puts it back.";
+            constexpr const char* Release = "Mark as not in use";
+            constexpr const char* ReleaseHint = "Hold if the game that took it has closed or crashed.";
+            constexpr const char* Locked = "On the portal in %s. Read-only until the game lets it go.";
+        }
+
         constexpr uint32_t MaxExperience = 33000; // the title's ceiling for a figure
         std::string BackupLabel(const std::string& backup)
         {
@@ -223,7 +197,7 @@ namespace launcher_ui
         {
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
             ImGui::PushTextWrapPos(right + textW);
-            ImGui::TextWrapped("On the portal in %s (pid %lld). Read-only until the game lets it go.", LiveGame(f).c_str(), (long long)f.lock.pid);
+            ImGui::TextWrapped(strings::Locked, LiveGame(f).c_str());
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
         }
@@ -345,14 +319,14 @@ namespace launcher_ui
             ImGui::EndPopup();
         }
         ImGui::SameLine(0, 8);
-        if (HoldButton("Reset (hold)", 140))
+        if (m_app.HoldButton(strings::Reset, 140, strings::ResetHint))
         {
             std::string error;
             Toast(collection::ResetToNew(path, &error) ? "Reset to new (a backup was kept)" : "Couldn't reset it: " + error);
             Reload();
         }
         ImGui::SameLine(0, 8);
-        bool deleteIt = HoldButton("Delete (hold)", 140);
+        bool deleteIt = m_app.HoldButton(strings::Delete, 140, strings::DeleteHint);
         ImGui::EndDisabled();
         if (deleteIt) // after EndDisabled: the page is gone once it is deleted
         {
@@ -371,7 +345,7 @@ namespace launcher_ui
         if (f.lock.Busy())
         {
             ImGui::SetCursorScreenPos(ImVec2(right, row1 - 56));
-            if (HoldButton("It is not in use any more (hold)", 330))
+            if (m_app.HoldButton(strings::Release, 240, strings::ReleaseHint))
             {
                 collection::BreakLock(path);
                 Reload();

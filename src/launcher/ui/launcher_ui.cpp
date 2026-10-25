@@ -718,12 +718,54 @@ namespace launcher_ui
         bool pressed = ImGui::InvisibleButton(id, size);
         if (pressed)
             *value = !*value;
+        bool hovered = ImGui::IsItemHovered();
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? Accent : Field), size.y / 2);
-        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? AccentDark : Border), size.y / 2, 2.0f);
+        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? (hovered ? AccentHover : Accent) : hovered ? FieldHover : Field), size.y / 2);
+        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? AccentDark : hovered ? BorderBright : Border), size.y / 2, 2.0f);
         float knob = *value ? position.x + size.x - size.y / 2 : position.x + size.y / 2;
         draw->AddCircleFilled(ImVec2(knob, position.y + size.y / 2), size.y / 2 - 5, Rgb(*value ? AccentInk : TextSecondary));
+        FocusRing(size.y / 2);
         return pressed;
+    }
+
+    void App::FocusRing(float rounding)
+    {
+        if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
+            return;
+        constexpr float Gap = 4;
+        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+        ImGui::GetWindowDrawList()->AddRect(ImVec2(min.x - Gap, min.y - Gap), ImVec2(max.x + Gap, max.y + Gap), Rgb(Accent), rounding + Gap, 0, 2.0f);
+    }
+
+    bool App::HoldButton(const char* label, float width, const char* hint)
+    {
+        ImVec2 at = ImGui::GetCursorScreenPos(), size(width, 40);
+        ImGui::InvisibleButton(label, size);
+        // Held: pressed and, for the mouse, still under the pointer (leaving cancels). Space, Enter and the pad's A hold it too.
+        bool mouse = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+        bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
+        bool held = active && (!mouse || hovered);
+        bool inputDown = mouse || ImGui::IsKeyDown(ImGuiKey_Space) || ImGui::IsKeyDown(ImGuiKey_Enter) ||
+            ImGui::IsKeyDown(ImGuiKey_KeypadEnter) || ImGui::IsKeyDown(ImGuiKey_GamepadFaceDown);
+        bool done = false;
+        float fill = m_hold.Update(ImGui::GetItemID(), held, inputDown, SDL_GetTicks(), done);
+
+        // Colours through GetColorU32: they fade with the rest under BeginDisabled.
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        float rounding = ImGui::GetStyle().FrameRounding;
+        ImVec2 end(at.x + size.x, at.y + size.y);
+        draw->AddRectFilled(at, end, ImGui::GetColorU32(Rgb(Danger, held ? 150 : hovered ? 110 : 70)), rounding);
+        if (fill > 0)
+            draw->AddRectFilled(at, ImVec2(at.x + size.x * fill, end.y), ImGui::GetColorU32(Rgb(Danger, 200)), rounding);
+        const char* labelEnd = std::strstr(label, "##"); // "Delete##trash" shows "Delete"
+        ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
+        ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
+        draw->AddText(ImVec2(at.x + (size.x - text.x) / 2, at.y + (size.y - text.y) / 2), ImGui::GetColorU32(Rgb(Text)), label, labelEnd);
+        ImGui::PopFont();
+        FocusRing(rounding);
+        if (hovered && hint != nullptr)
+            ImGui::SetTooltip("%s", hint);
+        return done;
     }
 
     void App::SettingRow(const char* label, const char* hint)

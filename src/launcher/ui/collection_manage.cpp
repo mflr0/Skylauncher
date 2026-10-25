@@ -17,6 +17,13 @@ namespace launcher_ui
 
     namespace
     {
+        // Manage's words that changed in the polish pass (the rest are still inline, for #4).
+        namespace strings
+        {
+            constexpr const char* DeleteForGood = "Delete for good";
+            constexpr const char* DeleteForGoodHint = "Hold to delete it for good. This can't be undone.";
+        }
+
         struct DialogResult
         {
             std::atomic<bool> done{ false };
@@ -128,7 +135,7 @@ namespace launcher_ui
                 Reload();
             }
             ImGui::SameLine(0, 8);
-            if (HoldButton("Delete for good (hold)", 230))
+            if (m_app.HoldButton(strings::DeleteForGood, 200, strings::DeleteForGoodHint))
             {
                 collection::DeleteForGood(entry.id);
                 Reload();
