@@ -20,8 +20,8 @@ namespace launcher_ui
         // Manage's words that changed in the polish pass (the rest are still inline, for #4).
         namespace strings
         {
-            constexpr const char* DeleteForGood = "Delete for good";
-            constexpr const char* DeleteForGoodHint = "Hold to delete it for good. This can't be undone.";
+            constexpr const char* DeleteForGood = N_("Delete for good");
+            constexpr const char* DeleteForGoodHint = N_("Hold to delete it for good.");
         }
 
         struct DialogResult
@@ -49,12 +49,15 @@ namespace launcher_ui
 
         std::vector<std::string> ChooseFigureFiles(SDL_Window* window)
         {
-            static const SDL_DialogFileFilter filters[] = { { "Figure dumps (.sky, .bin, .dmp)", "sky;bin;dmp" } };
+            static std::string filterName;
+            filterName = Tr("Figure dumps (.sky, .bin, .dmp)"); // the dialog is asynchronous: the text must outlive this call
+            static SDL_DialogFileFilter filters[1];
+            filters[0] = { filterName.c_str(), "sky;bin;dmp" };
             DialogResult result;
             SDL_PropertiesID properties = SDL_CreateProperties();
             SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, const_cast<SDL_DialogFileFilter*>(filters));
             SDL_SetNumberProperty(properties, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, 1);
-            SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, "Import figures");
+            SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, Tr("Import figures"));
             SDL_SetBooleanProperty(properties, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, true);
             SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, window);
             SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, Collect, &result, properties);
@@ -78,20 +81,20 @@ namespace launcher_ui
 
     void CollectionPage::ExportTo(const std::vector<std::string>& paths)
     {
-        std::string folder = ChooseFolder(m_app.m_window, "Export the figures to");
+        std::string folder = ChooseFolder(m_app.m_window, Tr("Export the figures to"));
         if (folder.empty())
             return;
         int count = collection::Export(paths, folder);
-        Toast(fmt::format("Exported {} figure{} to {}", count, count == 1 ? "" : "s", folder));
+        Toast(count == 1 ? Tf("Exported {} figure to {}", count, folder) : Tf("Exported {} figures to {}", count, folder));
     }
 
     void CollectionPage::DrawManage(ImVec2 size)
     {
-        m_app.Title("MANAGE", HeadlineSize - 6, Text);
+        m_app.Title(Tr("MANAGE"), HeadlineSize - 6, Text);
         RefreshDisk();
         size_t unknown = std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return f.toy == nullptr; });
-        const std::string tabs[] = { fmt::format("Trash  {}", m_trash.size()), "Backups", "Import and export", fmt::format("Unknown toys  {}", unknown),
-            fmt::format("Tidy  {}", m_starters) };
+        const std::string tabs[] = { Tf("Trash  {}", m_trash.size()), Tr("Backups"), Tr("Import and export"), Tf("Unknown toys  {}", unknown),
+            Tf("Tidy  {}", m_starters) };
         for (int i = 0; i < 5; i++)
         {
             if (i > 0)
@@ -111,30 +114,30 @@ namespace launcher_ui
         }
         ImGui::EndChild();
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + size.x - Pad - 110, ImGui::GetWindowPos().y + size.y - Pad - 40));
-        if (m_app.PillButton("Close", false, 110, true))
+        if (m_app.PillButton(Tr("Close"), false, 110, true))
             CloseOverlay();
     }
 
     void CollectionPage::DrawTrash()
     {
         const std::vector<collection::TrashEntry> trash = m_trash; // a copy: the buttons below reload it
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Deleted figures stay here for 30 days. Their stats and name come back with them.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Deleted figures are kept 30 days."));
         ImGui::Dummy(ImVec2(0, 6));
         if (trash.empty())
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "The trash is empty.");
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("The trash is empty."));
         for (const collection::TrashEntry& entry : trash)
         {
             ImGui::PushID(entry.id.c_str());
             m_app.BoldText(entry.file.c_str(), Text);
             ImGui::SameLine(0, 12);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ShortDate(entry.deleted).c_str(), entry.reason == "tidy" ? "tidied" : "deleted");
-            if (m_app.PillButton("Put back", false, 120, true))
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ShortDate(entry.deleted).c_str(), entry.reason == "tidy" ? Tr("tidied") : Tr("deleted"));
+            if (m_app.PillButton(Tr("Put back"), false, 120, true))
             {
-                Toast(collection::Undelete(entry.id).empty() ? "Couldn't put it back" : "Put back: " + entry.file);
+                Toast(collection::Undelete(entry.id).empty() ? Tr("Couldn't put it back") : Tr("Put back: ") + entry.file);
                 Reload();
             }
             ImGui::SameLine(0, 8);
-            if (m_app.HoldButton(strings::DeleteForGood, 200, strings::DeleteForGoodHint))
+            if (m_app.HoldButton(Tr(strings::DeleteForGood), 200, Tr(strings::DeleteForGoodHint)))
             {
                 collection::DeleteForGood(entry.id);
                 Reload();
@@ -146,7 +149,7 @@ namespace launcher_ui
 
     void CollectionPage::DrawBackups()
     {
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Every change makes a backup; the newest 10 of each figure are kept.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("The latest 10 backups are kept."));
         ImGui::Dummy(ImVec2(0, 6));
         bool any = false;
         for (const Figure& figure : m_model.figures)
@@ -156,7 +159,7 @@ namespace launcher_ui
                 continue;
             any = true;
             ImGui::PushID(figure.path.c_str());
-            if (m_app.Chip(fmt::format("{}  {}##b", Name(figure), backups.size()).c_str(), m_backupsOf == figure.path))
+            if (m_app.Chip(Tf("{}  {}##b", Name(figure), backups.size()).c_str(), m_backupsOf == figure.path))
                 m_backupsOf = m_backupsOf == figure.path ? std::string() : figure.path;
             ImGui::PopID();
             if (m_backupsOf != figure.path)
@@ -168,10 +171,10 @@ namespace launcher_ui
                 ImGui::TextUnformatted(backup.label.c_str());
                 ImGui::SameLine(0, 14);
                 ImGui::BeginDisabled(!Writable(figure));
-                if (m_app.PillButton("Restore", false, 100, true))
+                if (m_app.PillButton(Tr("Restore"), false, 100, true))
                 {
                     std::string error;
-                    Toast(collection::Restore(figure.path, backup.path, &error) ? "Backup restored" : "Couldn't restore it: " + error);
+                    Toast(collection::Restore(figure.path, backup.path, &error) ? Tr("Backup restored") : Tr("Couldn't restore it: ") + error);
                     Reload();
                 }
                 ImGui::EndDisabled();
@@ -180,23 +183,23 @@ namespace launcher_ui
             }
         }
         if (!any)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "No backups yet.");
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("No backups yet."));
     }
 
     void CollectionPage::DrawImportExport()
     {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop .sky, .bin or .dmp files (or a folder of them) on the window. Each is checked as a 1 KB tag and copied; a dump already in the collection is skipped.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop figure files or a folder on the window."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
-        if (m_app.PillButton("Import files...", true, 190, true))
+        if (m_app.PillButton(Tr("Import files..."), true, 190, true))
             Import(ChooseFigureFiles(m_app.m_window));
         ImGui::SameLine(0, 8);
-        if (m_app.PillButton("Import a folder...", false, 210, true))
-            if (std::string folder = ChooseFolder(m_app.m_window, "Import the figures of a folder"); !folder.empty())
+        if (m_app.PillButton(Tr("Import a folder..."), false, 210, true))
+            if (std::string folder = ChooseFolder(m_app.m_window, Tr("Import the figures of a folder")); !folder.empty())
                 Import({ folder });
         ImGui::Dummy(ImVec2(0, 12));
-        if (m_app.PillButton("Export everything...", false, 230, true))
+        if (m_app.PillButton(Tr("Export everything..."), false, 230, true))
         {
             std::vector<std::string> paths;
             for (const Figure& figure : m_model.figures)
@@ -204,7 +207,7 @@ namespace launcher_ui
             ExportTo(paths);
         }
         ImGui::SameLine(0, 8);
-        if (m_app.PillButton("Show in folder", false, 190, true))
+        if (m_app.PillButton(Tr("Show in folder"), false, 190, true))
         {
             SDL_CreateDirectory(collection::Folder().c_str());
             { std::string folder = collection::Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
@@ -216,7 +219,7 @@ namespace launcher_ui
     void CollectionPage::DrawUnknown()
     {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Toys the catalogue doesn't know. They stay usable; the game decides what to do with them. Naming one adds it to the collection's catalogue.json, shown at the next start.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Toys missing from the catalogue. Name one to show it."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         bool any = false;
@@ -226,45 +229,45 @@ namespace launcher_ui
                 continue;
             any = true;
             ImGui::PushID(figure.path.c_str());
-            m_app.BoldText(fmt::format("Unknown toy {} (variant {:04X})", figure.type, figure.variant).c_str(), Text);
+            m_app.BoldText(Tf("Unknown toy {} (variant {:04X})", figure.type, figure.variant).c_str(), Text);
             ImGui::SameLine(0, 12);
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", figure.file.c_str());
             if (m_unknownType == figure.type)
             {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
                 ImGui::SetNextItemWidth(260);
-                ImGui::InputTextWithHint("##unknownname", "Its name", m_unknownName, sizeof(m_unknownName));
+                ImGui::InputTextWithHint("##unknownname", Tr("Its name"), m_unknownName, sizeof(m_unknownName));
                 ImGui::PopStyleVar();
                 ImGui::SameLine(0, 8);
-                if (m_app.PillButton("Save", true, 100, true) && m_unknownName[0] != 0)
+                if (m_app.PillButton(Tr("Save"), true, 100, true) && m_unknownName[0] != 0)
                 {
-                    Toast(NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId) ? "Named: shown with its name from the next start"
-                                                                                                                : "Couldn't write catalogue.json");
+                    Toast(NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId) ? Tr("Named: shown at the next start")
+                                                                                                                : Tr("Couldn't save the name"));
                     m_unknownType = 0xFFFF;
                     m_unknownName[0] = 0;
                 }
             }
-            else if (m_app.PillButton("Name this toy", false, 170, true))
+            else if (m_app.PillButton(Tr("Name this toy"), false, 170, true))
                 m_unknownType = figure.type;
             ImGui::PopID();
             ImGui::Dummy(ImVec2(0, 6));
         }
         if (!any)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "Every toy of the collection is in the catalogue.");
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("No unknown toys."));
     }
 
     void CollectionPage::DrawTidy()
     {
         RefreshDisk();
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Older versions of the game made one never-played figure of every character at each start. They are not yours, so My Skylanders hides them. Tidy moves them to the trash (30 days, recoverable).");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Blank figures made by old game versions. Tidy moves them to the trash."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         ImGui::BeginDisabled(m_starters == 0);
-        if (m_app.PillButton(fmt::format("Move {} to the trash", m_starters).c_str(), true, 260, true))
+        if (m_app.PillButton(Tf("Move {} to the trash", m_starters).c_str(), true, 260, true))
         {
             int moved = collection::Tidy();
-            Toast(fmt::format("{} figure{} moved to the trash", moved, moved == 1 ? "" : "s"));
+            Toast(moved == 1 ? Tf("{} figure moved to the trash", moved) : Tf("{} figures moved to the trash", moved));
             Reload();
         }
         ImGui::EndDisabled();
@@ -275,9 +278,10 @@ namespace launcher_ui
     namespace
     {
         // Screens, in order (the step is the index).
-        constexpr const char* Shots[] = { "20-collection", "21-view-menu", "22-by-category", "23-figure-page", "24-edit-stats", "25-add-a-figure",
-            "26-add-later-game", "27-manage-trash", "28-manage-backups", "29-live-portal", "30-after-delete", "31-giants-figure",
-            "32-giants-edit-stats", "33-add-lightcore" };
+        constexpr const char* Shots[] = { "20-collection", "21-choose-player-1", "22-choose-magic-item", "23-filter-water", "24-figure-sheet",
+            "25-figure-details", "26-figure-delete", "27-edit", "28-add-a-figure", "29-add-later-game", "30-manage-trash", "31-manage-backups",
+            "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
+            "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -323,6 +327,12 @@ namespace launcher_ui
         make(14, 0, 700, 90, ""); // a second Gill Grunt: "owned x2"
         std::string doomed = make(12, 0, 0, 0, ""), doomed2 = make(10, 0, 0, 0, ""); // two in the trash: one hold button each
         collection::SetLabel(gill, "Splash's");
+        {
+            Figure bought; // Gill Grunt: the first path chosen, two of its upgrades and two basic ones bought
+            collection::Read(gill, bought);
+            bought.stats.upgrades = 0x0075;
+            collection::WriteStats(gill, bought.stats);
+        }
         collection::SetFavourite(gill, true);
         collection::SetFavourite(spyro, true);
         collection::SetFavourite(legendary, true);
@@ -350,9 +360,20 @@ namespace launcher_ui
             figures::SetTotalExperience(high.stats, figures::LevelExperience[figures::MaxLevelGiants - 1]);
             high.stats.gold = 40000;
             high.stats.hat = 6;
+            high.stats.upgrades = 0x0645;
             collection::WriteStats(eruptor, high.stats);
             collection::Touch(eruptor, "giants");
         }
+        // A Series 2 Eruptor: a variant with its own artwork in Giants.
+        if (const collection::Toy* toy = collection::Catalogue::Get().Find(9))
+            for (const collection::Variant& variant : toy->variants)
+                if (variant.kind == collection::VariantKind::Series && !variant.sameTag)
+                {
+                    std::string series = make(9, variant.id, 12000, 3100, ""); // played: its level and "last played" agree
+                    if (!series.empty())
+                        collection::Touch(series, "giants");
+                    break;
+                }
         collection::Delete(doomed);
         collection::Delete(doomed2);
         (void)chop; (void)item; (void)pack; (void)sidekick; (void)dark;
@@ -365,11 +386,13 @@ namespace launcher_ui
     void CollectionPage::TestScreen(int step)
     {
         m_overlay = Overlay::None;
-        m_viewMenu = false;
         m_editing = false;
+        m_details = false;
         m_confirm.clear();
-        if (step != 1 && step != 2)
-            m_view = collection::View{};
+        m_choosing = -1;
+        m_filter = ShelfFilter{};
+        m_search[0] = 0;
+        m_addSearch[0] = 0;
         auto figureOf = [&](uint16_t type) -> std::string {
             for (const Figure& figure : m_model.figures)
                 if (figure.type == type && !collection::UntouchedStarter(figure) && figure.level > 1)
@@ -378,29 +401,31 @@ namespace launcher_ui
         };
         switch (step)
         {
-        case 1: m_viewMenu = true; break;
-        case 2:
-            m_view.group = "category";
-            m_view.order = "name";
+        case 1: Choose(0); break;
+        case 2: Choose(2); break;
+        case 3: m_filter.element = int(collection::Element::Water); break;
+        case 4: OpenFigure(figureOf(14)); break;
+        case 5:
+            OpenFigure(figureOf(14));
+            m_details = true;
             break;
-        case 3: OpenFigure(figureOf(14)); break;
-        case 4:
+        case 6:
+            OpenFigure(figureOf(14));
+            m_confirm = "delete";
+            break;
+        case 7:
             OpenFigure(figureOf(14));
             if (const Figure* figure = m_model.Find(m_figure))
-            {
-                m_edit = m_editBase = figure->stats;
-                snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(figure->stats).c_str());
-                m_editing = true;
-            }
+                OpenEdit(*figure);
             break;
-        case 5:
+        case 8:
             m_overlay = Overlay::Add;
             m_addGame = "ssa";
             m_addToy = 14;
             m_addVersion = 0;
             m_addCategory = -1;
             break;
-        case 6:
+        case 9:
             m_overlay = Overlay::Add;
             m_addGame = "swap_force";
             m_addToy = 0xFFFF;
@@ -412,16 +437,16 @@ namespace launcher_ui
                 }
             m_addCategory = int(collection::Category::SwapTop);
             break;
-        case 7:
+        case 10:
             m_overlay = Overlay::Manage;
             m_manageTab = 0;
             break;
-        case 8:
+        case 11:
             m_overlay = Overlay::Manage;
             m_manageTab = 1;
             m_backupsOf = figureOf(14);
             break;
-        case 9:
+        case 12:
         {
 #ifndef _WIN32
             // A game holds the figures of the seats: a lock of a live process other than this one.
@@ -435,30 +460,38 @@ namespace launcher_ui
 #endif
             break;
         }
-        case 10: // deleting a figure from its page: back to the list, on the next figure
+        case 13: // the game quit; deleting a figure from its sheet: back to the shelf, on the next figure
+            for (const std::string& seat : m_model.seats)
+                if (!seat.empty() && getenv("SSA_COLLECTION") != nullptr)
+                    collection::BreakLock(seat);
+            Reload();
             OpenFigure(figureOf(19));
             DeleteFigure(m_figure);
             break;
-        case 11: // Giants: a figure at level 15 with a hat, its page and its Edit stats (the hat picker)
-        case 12:
+        case 14: // Giants: its own seats (a runtime now), the same shelf with Giants' levels
         {
-            m_model.gameId = "giants";
-            m_view = collection::View{};
-            Reload();
+            SelectPortalGame("giants");
+            std::string eruptor;
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 9 && figure.level == figures::MaxLevelGiants)
+                    eruptor = figure.path;
+            TestSetSeats({ eruptor, figureOf(14), "" }); // the test's two games share SSA_SAVE_DIR, so one session file
+            break;
+        }
+        case 15: // Giants: a figure at level 15 with a hat, its sheet and its Edit (the hat picker)
+        case 16:
+        {
+            SelectPortalGame("giants");
             std::string eruptor;
             for (const Figure& figure : m_model.figures)
                 if (figure.type == 9 && figure.level == figures::MaxLevelGiants)
                     eruptor = figure.path;
             OpenFigure(eruptor);
-            if (const Figure* figure = step == 12 ? m_model.Find(m_figure) : nullptr)
-            {
-                m_edit = m_editBase = figure->stats;
-                snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(figure->stats).c_str());
-                m_editing = true;
-            }
+            if (const Figure* figure = step == 16 ? m_model.Find(m_figure) : nullptr)
+                OpenEdit(*figure);
             break;
         }
-        case 13: // Add a figure, Giants: Eruptor's versions, the LightCore chosen
+        case 17: // Add a figure, Giants: Eruptor's versions, the LightCore chosen
         {
             m_overlay = Overlay::Add;
             m_addGame = "giants";
@@ -469,6 +502,62 @@ namespace launcher_ui
                 for (size_t i = 0; i < toy->variants.size(); i++)
                     if (toy->variants[i].kind == collection::VariantKind::LightCore)
                         m_addVersion = int(i) + 1;
+            break;
+        }
+        case 18: // back to Spyro's Adventure (its seats as seeded): a search that finds nothing
+        {
+            SelectPortalGame("ssa");
+            std::vector<std::string> seats(4);
+            for (const Figure& figure : m_model.figures)
+            {
+                if (figure.type == 14 && figure.favourite)
+                    seats[0] = figure.path;
+                else if (figure.type == 16)
+                    seats[1] = figure.path;
+                else if (figure.type == 200)
+                    seats[2] = figure.path;
+                else if (figure.type == 300)
+                    seats[3] = figure.path;
+            }
+            TestSetSeats(seats);
+            snprintf(m_search, sizeof(m_search), "%s", "zzz");
+            break;
+        }
+        case 19: // choosing for a seat nothing goes on: no trap seat in SSA, so the adventure seat with the pack taken off
+            SelectPortalGame("ssa");
+            TakeOff(3);
+            for (const Figure& figure : m_model.figures)
+                if (figure.toy != nullptr && figure.toy->category == collection::Category::Adventure)
+                    collection::Delete(figure.path);
+            Reload();
+            Choose(3);
+            break;
+        case 20: // Add a figure: "polar" finds Polar Whirlwind (a version of Whirlwind), already chosen
+        {
+            m_overlay = Overlay::Add;
+            m_addGame = "ssa";
+            m_addCategory = -1;
+            m_addToy = 0xFFFF;
+            m_addVersion = 0;
+            snprintf(m_addSearch, sizeof(m_addSearch), "%s", "polar");
+            for (const collection::Toy& toy : collection::Catalogue::Get().Toys())
+                for (size_t i = 0; i < toy.variants.size(); i++)
+                    if (toy.variants[i].name.find("Polar") != std::string::npos && m_addToy == 0xFFFF)
+                    {
+                        m_addToy = toy.type;
+                        m_addVersion = int(i) + 1;
+                    }
+            break;
+        }
+        case 21: // Giants: a Series 2 Eruptor's sheet, with its own artwork
+        {
+            SelectPortalGame("giants");
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 9 && figure.variant != 0)
+                {
+                    OpenFigure(figure.path);
+                    break;
+                }
             break;
         }
         default: break;

@@ -469,8 +469,12 @@ namespace art
                         wanted.insert(pattern);
                     }
                 if (m.images)
+                {
                     for (const auto& [type, name] : game->images)
                         wanted.insert(name);
+                    for (const auto& [category, name] : game->kindPictures)
+                        wanted.insert(name);
+                }
             }
             int present = 0;
             for (auto it = wanted.begin(); it != wanted.end();)

@@ -1,4 +1,5 @@
 #include "shared/figures/figure_icons.h"
+#include "shared/collection/icons.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -103,6 +104,10 @@ namespace figures
         Rgba outline = Unpack(style.outline);
         Rgba badge = Unpack(VariantBadgeColor(kind, style));
         bool hasBadge = kind != VariantKind::Base;
+        // Magic items, adventure packs, sidekicks: the mark the Toy Box draws too (collection::KindGlyph), over the shape.
+        bool glyph = toy != nullptr && collection::HasKindGlyph(category);
+        Rgba mark = Unpack(style.mark);
+        constexpr float GlyphScale = 0.27f; // the glyph's [-1, 1] square inside the shape
         float fillAlpha = kind == VariantKind::Crystal ? 0.65f : 1.0f;
         const float badgeX = 0.30f, badgeY = 0.30f, badgeR = 0.13f;
 
@@ -125,6 +130,8 @@ namespace figures
                                 color = Scale(color, 0.8f);
                             if (shape > -style.outlineWidth)
                                 color = outline;
+                            else if (glyph && collection::KindGlyph(category, x / GlyphScale, y / GlyphScale) < 0)
+                                color = mark;
                         }
                         if (hasBadge)
                         {

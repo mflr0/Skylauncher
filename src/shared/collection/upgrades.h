@@ -47,6 +47,23 @@ namespace collection
     // A toy type the game defines as another's alternate (Legendary Bash, Dark Spyro) gets its base toy's list.
     UpgradeTable Upgrades(const Toy& toy, const std::string& game, const std::string& language = "en");
 
+    // The Edit sheets' rules (Toy Box and Skylauncher), on the 16-bit field. A path upgrade (bits 6-8, shared by both paths)
+    // counts as bought only on the path that is chosen; the other path's are shown greyed.
+    bool UpgradeBought(uint16_t bits, const Upgrade& upgrade);
+    bool UpgradeGreyed(uint16_t bits, const Upgrade& upgrade);
+    // Buys or gives back one upgrade. On a path that is not chosen it first switches to it (as the game does: the bought
+    // path upgrades move to the new path), then toggles.
+    uint16_t ToggleUpgrade(uint16_t bits, const Upgrade& upgrade);
+    // Everything of the table bought (the chosen path, else the first); nothing (no path either).
+    uint16_t AllUpgrades(uint16_t bits, const UpgradeTable& table);
+    uint16_t NoUpgrades(uint16_t bits);
+    int BoughtCount(uint16_t bits, const UpgradeTable& table);
+    // A name or description for display: the game's button marks become "the button" / "le bouton", line breaks and
+    // doubled spaces go; the description is cut to its first sentence.
+    std::string UpgradeLabel(const std::string& text, const std::string& language);
+    std::string UpgradeName(const std::string& name, const std::string& language); // UpgradeLabel without a final full stop
+    std::string UpgradeLine(const std::string& description, const std::string& language);
+
     // <data>/<Game>/upgrades.json (SKYLANDERS_DATA moves the data root for tests).
     std::filesystem::path UpgradeFile(std::string_view game);
 }

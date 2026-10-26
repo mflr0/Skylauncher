@@ -160,6 +160,16 @@ namespace collection
             ReadMap(item["names"], game.names);
             ReadMap(item["images"], game.images);
             ReadMap(item["hats"], game.hats);
+            for (const auto& [key, value] : item["kind_pictures"].Members())
+            {
+                Category category = ParseCategory(key);
+                if (category == Category::Count)
+                {
+                    error = "unknown category \"" + key + "\" in the kind pictures of " + game.id;
+                    return false;
+                }
+                game.kindPictures[category] = value.AsString();
+            }
             for (auto [field, pictures] : { std::pair{ "portraits", &game.portraits }, std::pair{ "artworks", &game.artworks } })
                 for (const auto& [key, value] : item[field].Members())
                 {

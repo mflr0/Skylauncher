@@ -21,7 +21,7 @@ is easy to iterate without touching the game runtime.
   `game_run.{h,cpp}`, `ui/support_page.cpp` - game logs, the crash dialog, the portal test (docs/support.md);
   `updater.{h,cpp}`, `ui/update_page.cpp` - updates, the banner and About (docs/updates.md);
   `shared/mini_json.{h,cpp}` - the JSON reader for GitHub's answer.
-- `src/launcher/ui/collection_*.{h,cpp}` - the collection page on the shared library: seats, sections, View, Figure page, Add a figure, Manage (`docs/collection_ui.md`).
+- `src/launcher/ui/collection_*.{h,cpp}` - the collection page on the shared library: the portal at the next start, the bar, the shelf, the figure sheet, Add a figure, Manage (`docs/collection_ui.md`).
 - `src/launcher/ui/game_look.cpp` - the game page in each game's own look: the action button (`DrawMainAction`), the logo's
   arrival (`LogoDrop`, `DrawHeroLogo`), the disc's pictures as textures (`LoadArt`, `CachedArt`), `SystemReducesMotion`.
 - `src/shared/art/` - SSARecomp's disc picture readers and per-game provider (`game_art`), copied by its
@@ -228,7 +228,7 @@ always animates (`docs/settings.md`).
 - **Pad and keyboard.** The sidebar and the page are separate windows: B / Escape on Play or Home moves the focus to the
   sidebar's current row; A on a row opens its page with the focus on its first control (`App::GoTo`, `TakeFocus`).
   B / Escape leave Settings, Game settings and Collection, close dialogs and menus, clear the collection's search; whatever is open
-  answers it before the page does (`m_backTaken`). LB / RB change Settings and Game settings tab (`App::DrawTabBar`) and the collection's section. The
+  answers it before the page does (`m_backTaken`). LB / RB change Settings and Game settings tab (`App::DrawTabBar`) and the seat the collection chooses for. The
   launcher starts with the focus in the sidebar.
 - **Hold to confirm.** What deletes or overwrites is a red button held for a second (`App::HoldButton`, the state in
   `hold_confirm.h`): Reset and Delete (Figure page), Delete for good (trash), Mark as not in use (a stale lock), Restore
@@ -267,9 +267,10 @@ the one standard COM call (`#ifdef _WIN32`, checked to compile with MinGW) and n
 
 ## Collection
 See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favourites, backups
-and six-game catalogue) with the Toy Box's organisation: the seats of the next session, My Skylanders in sections, the
-View menu, the Figure page, Add a figure and Manage. The icons are the shown game's portraits from its disc, else the other
-game's, else the generated ones (`figures::IconStyle`): "Disc art" below.
+and six-game catalogue) with the Toy Box's model: the portal at the next start (the game's seats on top), the bar
+(search, Element, Game, Type), the shelf (every figure once, favourites first), the figure sheet (Put on the portal, Edit,
+Favourite, `...`, Details), Add a figure and Manage. The icons are the shown game's portraits from its disc, else the
+other game's, else the toy's family picture, else the generated ones (`figures::IconStyle`): "Disc art" below.
 
 ## Disc art
 The launcher never ships Skylanders artwork. After a disc is verified, the check's worker thread calls the shared
@@ -282,7 +283,7 @@ differs per game is the provider's table.
 | Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 1033x541, with the plate and the medallions) | `<data>/<Game>/launcher-cache/logo.png` |
 | Background (game page, Home) | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | `.../background.png` |
 | Title icon | `default.xex` XDBF resource | the same | `.../title_icon.png` |
-| Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px) of `uigameimage.str`: 78 | the collection screen's 123 portraits (256 px) | `<data>/<Game>/portraits/` |
+| Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px), 4 items and 3 family icons (potion, compass, paw) of `uigameimage.str`: 81 | the collection screen's 123 portraits (256 px) | `<data>/<Game>/portraits/` |
 
 - Already cached pictures are kept (a second check reads nothing); `manifest.ini` records the reader's version and what
   was found. Deleting the folders is always safe. The cache of older launchers (`SSA/launcher-cache/<title id>/`, for every
@@ -295,7 +296,7 @@ differs per game is the provider's table.
   test, and the fallback when no GPU renderer opens) drops one triangle of an image wider than that (seen with Giants'
   1600 px painting).
 - The toys' pictures follow one rule (`collection::PortraitPath`): the shown game's, else the other game's, else the
-  generated icon (see `docs/collection_ui.md`).
+  toy's family picture, else the generated icon (see `docs/collection_ui.md`).
 
 ## Legibility
 - Outfit was loaded from its variable file at the font's default axis, **Thin (100)**, and "bold" was that thin text drawn twice.
@@ -359,8 +360,9 @@ game's Video tab, `04-` the launcher's Controls) (it creates a few figures in `S
 
 `07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-disc-gone.png`
 (INSTALL on an image that moved) and `12-logo-drop.png` (the logo early in its fall) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
-With `SSA_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `52-`): B to the sidebar, A into Collection, Y for
-View, the D-pad to a seat and a card, X for its Figure page, Space held on Delete, B back, RB in Settings.
+With `SSA_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `53-`): B to the sidebar, A into Collection, Y for
+the search, the D-pad to a seat, A to choose for it, down and A to put the first card there, X for a card's sheet, B back,
+RB in Settings.
 With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
 (`docs/install.md`).
 
@@ -388,7 +390,7 @@ repository's working copy (its own HOME, the offscreen driver).
   Giants builds), a switch back and forth with each state kept, and PLAY on each returning its game and build. It is run by
   `SkylauncherTest` when `SKYLAUNCHER_TEST_GIANTS_ISO` is set.
 - `SSA_LAUNCHER_TEST_SEATX=1` (with `SSA_LAUNCHER_SHOTS`, `SSA_COLLECTION`, `SSA_SAVE_DIR` on scratch paths) runs the seat X script
-  (`App::TestSeatXScript`): the Collection page's four seats (player 1, player 2, item, adventure) each emptied by the mouse on the X,
+  (`App::TestSeatXScript`): the Collection page's four seat tiles (player 1, player 2, item, adventure) each emptied by the mouse on the X,
   by Delete and by the pad's X, checking after every try that only that seat is empty. It is run by `SkylauncherTest`.
 - `SkylauncherTest` checks verification, settings (`tests/settings_test.cpp`: per-game video, the command line, the shortcut files,
   delete data and uninstall on scratch folders), font/text helpers, the disc texture decoder, the seat X and the in-place game switch

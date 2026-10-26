@@ -46,6 +46,16 @@ namespace launcher_ui
     figures::FigureStats MergeEditedStats(const figures::FigureStats& now, const figures::FigureStats& base, const figures::FigureStats& edited,
         const std::string& baseNickname, const std::string& nickname);
 
+    // The bar's filters on the shelf (docs/collection_ui.md); -1 or empty: all.
+    struct ShelfFilter
+    {
+        int element = -1;      // a collection::Element
+        std::string game;      // the game a toy came with ("giants")
+        int category = -1;     // a collection::Category
+        std::string text;      // in the name, the nickname, the toy's name or the file name, any case
+        int seat = -1;         // choosing for this seat of the model's game: only what goes there and the game reads
+    };
+
     class CollectionModel
     {
     public:
@@ -70,6 +80,11 @@ namespace launcher_ui
         // when the trash refuses it: then nothing has changed.
         bool Delete(const std::string& path, std::string* error);
         std::vector<std::string> OnPortal() const; // the seated paths
+        // The figures the page shows, into `shown`, cut by collection::Group's shelf for Game(): every figure once,
+        // favourites first, then what the game took (newest first), then by element; unknown toys and the toys the game
+        // does not read after (none of those when choosing for a seat). The untouched starters the game made on its own
+        // are left out unless seated; `hidden` (optional) counts them.
+        std::vector<collection::Section> Shelf(const ShelfFilter& filter, std::vector<collection::Figure>& shown, int* hidden = nullptr) const;
 
     private:
         std::string Signature() const;

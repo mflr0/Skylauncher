@@ -3,6 +3,7 @@
 #include "shared/collection/json.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fmt/format.h>
@@ -286,6 +287,50 @@ namespace launcher_ui
         return true;
     }
 
+    std::vector<collection::Section> CollectionModel::Shelf(const ShelfFilter& filter, std::vector<collection::Figure>& shown, int* hidden) const
+    {
+        const collection::Game* game = Game();
+        const collection::Catalogue& catalogue = collection::Catalogue::Get();
+        auto lower = [](std::string text) {
+            std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(tolower(c)); });
+            return text;
+        };
+        std::string text = lower(std::string(Trimmed(filter.text)));
+        std::vector<std::string> seated = OnPortal();
+        shown.clear();
+        if (hidden != nullptr)
+            *hidden = 0;
+        for (const collection::Figure& figure : figures)
+        {
+            if (std::find(seated.begin(), seated.end(), figure.path) == seated.end() && collection::UntouchedStarter(figure))
+            {
+                if (hidden != nullptr)
+                    (*hidden)++; // the game made it on its own: not the player's (Manage > Tidy)
+                continue;
+            }
+            const collection::Toy* toy = figure.toy;
+            if (filter.seat >= 0)
+            {
+                if (game == nullptr || size_t(filter.seat) >= game->seats.size() || !SeatAccepts(game->seats[filter.seat], figure) ||
+                    (toy != nullptr && !catalogue.Accepts(game->id, figure.type)))
+                    continue;
+            }
+            if ((filter.element >= 0 && (toy == nullptr || int(toy->element) != filter.element)) ||
+                (filter.category >= 0 && (toy == nullptr || int(toy->category) != filter.category)) ||
+                (!filter.game.empty() && (toy == nullptr || toy->game != filter.game)))
+                continue;
+            if (!text.empty())
+            {
+                std::string words = figure.label + "\n" + figures::NicknameUtf8(figure.stats) + "\n" + figure.DisplayName() + "\n" +
+                    (toy != nullptr ? toy->name : std::string()) + "\n" + figure.file;
+                if (lower(words).find(text) == std::string::npos)
+                    continue;
+            }
+            shown.push_back(figure);
+        }
+        return collection::Group(shown, collection::GroupBy::Smart, collection::OrderBy::Recent, gameId);
+    }
+
     std::vector<std::string> CollectionModel::OnPortal() const
     {
         std::vector<std::string> paths;
@@ -315,6 +360,10 @@ namespace launcher_ui
             stats.gold = edited.gold;
         if (edited.heroPoints != base.heroPoints)
             stats.heroPoints = edited.heroPoints;
+        if (edited.upgrades != base.upgrades)
+            stats.upgrades = edited.upgrades;
+        if (edited.wowPow != base.wowPow)
+            stats.wowPow = edited.wowPow;
         if (nickname != baseNickname)
             figures::SetNicknameUtf8(stats, nickname);
         return stats;

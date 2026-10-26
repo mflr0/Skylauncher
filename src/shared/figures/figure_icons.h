@@ -1,8 +1,9 @@
 #pragma once
 
-// An icon for every toy, for the figures the player's disc has no picture of (magic items, adventure packs, the later
-// games' toys, and any toy before a disc is verified): a shape for the category, the element's colour, a badge for the
-// variant. The disc's own portraits are preferred when they exist (collection::PortraitPath). The toys are the shared
+// An icon for every toy, for the figures no disc has a picture of (the later games' toys, any toy before a disc is
+// verified): a shape for the category, the element's colour, a badge for the variant, and for magic items, adventure
+// packs and sidekicks the mark the Toy Box draws too (collection::KindGlyph: a potion, a compass, a paw). The discs'
+// own pictures are preferred when they exist (collection::PortraitPath, a family's picture included). The toys are the shared
 // catalogue's (collection/catalogue.h); the look is the launcher's own.
 //
 // The look is all in IconStyle, so it can follow another visual identity without touching the drawing.
@@ -20,6 +21,7 @@ namespace figures
         uint32_t neutral = 0xFF7A6E66;     // the fill of toys without an element (items, packs)
         uint32_t light = 0xFF9EF2FF;       // Light and Dark (Trap Team on): Spyro's Adventure's palette has neither
         uint32_t dark = 0xFF5A2E3E;
+        uint32_t mark = 0xFFF4F4F6;        // the family's mark (an item's potion...) over the shape
         float outlineWidth = 0.035f;       // fraction of the icon size
         float shade = 0.35f;               // how much darker the bottom of the fill is than its top
         // Badge colours of the variant kinds that have their own; the others take the catalogue's (VariantKindRgb).
