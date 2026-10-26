@@ -1,0 +1,60 @@
+# Translations
+
+The launcher's own text (pages, buttons, states, notifications, dialogs, install steps, errors, tooltips) is in the player's
+language. The game's text and voice languages are a different thing: they are the game's, set in each game's settings
+(Language tab, `[<game>] language`).
+
+## How it works
+- **English is the source, and the key.** The code writes the English text and asks for it translated: `Tr("Cancel")`.
+  `Tf("{} min ago", minutes)` formats too. A string that sits in a table or a constant (where it can't call `Tr` yet) is
+  marked `N_("...")` and goes through `Tr` where it is shown. Both are in `src/launcher/i18n.h`.
+- **One file per language:** `resources/lang/<code>.txt`, built into the executable by CMake (no code change to add one). A string
+  a language doesn't have shows in English, so a language can be added before it is complete.
+- **The file format:** `@code fr` and `@name Français` (the language's own name, shown in the menu), `#` comments, then one
+  `English<TAB>translation` per line; `\n` is a line break. The English is the text of the code, character for character.
+- **Placeholders:** `{}` is replaced by the next argument; `{0}`, `{1}`... pick one by its number, so a language can put them in
+  another order (`{1} of {0}`). The format part is kept (`{:08X}`, `{:g}`). A translation that doesn't fit the arguments is
+  replaced by the English one at run time, and fails the test.
+- **A text a language says in two ways** (singular and plural) is two English strings (`Copied: {}, 1 file`, `Copied: {}, {} files`);
+  a sentence is never built from pieces.
+- **Not translated:** names (Skylauncher, the games, the figures), the text of the problem report (it goes to the maintainers),
+  the command-line help, and what other programs print: the installer kit's own lines in the install log, the game's portal
+  test answers, GitHub's messages. A message built before the language changed (a toast already shown, a disc check's result)
+  stays in the language it was made in until it is made again.
+
+## Which language is shown
+Settings > Launcher > Language: **Same as the game**, or one language of the list. Remembered in `[launcher] language`
+(`docs/settings.md`) and applied at once, with no restart.
+- **Same as the game** follows the text language of the game that is shown (Game settings > Language > Game text), when the
+  launcher has a file for it, else English. A game with no text language chosen counts as English.
+- **Not chosen yet** (the default): the system's language, the first of the system's preferred languages the launcher has,
+  else English.
+- `SKYLAUNCHER_LANGUAGE=<code>` forces a language (the tests and the screenshots use it).
+
+## Adding a language
+1. Take the language's code from the disc's: `de`, `es`, `it`, `nl`, `sv`, `no`, `da`, `fi` (the codes of
+   `LanguageChoices` in `ui/launcher_app.h`; Norwegian is `no`, whatever the system calls it).
+2. Make the list of strings: `SKYLAUNCHER_TEST_I18N_DUMP=/path/to/list.txt SKYLAUNCHER_TEST_I18N_ONLY=1 SkylauncherTest x <scratch>`
+   writes every English string, each followed by a tab, in the file format. Copy it to `resources/lang/<code>.txt`, add
+   `@code` and `@name` at the top, and write the translations after the tabs.
+3. Build (CMake finds the file). The language is in the menu.
+4. Run `SKYLAUNCHER_TEST_I18N_ALL=1 SKYLAUNCHER_TEST_I18N_ONLY=1 SkylauncherTest x <scratch>`: it lists the strings still
+   missing, the placeholders that differ from the English, and the entries the code no longer has. The key coverage test is part
+   of the full `SkylauncherTest`.
+5. Look at it in the window, smallest size included (`SKYLAUNCHER_LANGUAGE=<code>`; `SSA_LAUNCHER_TEST_SIZE=1024x680` with
+   `SSA_LAUNCHER_SHOTS` takes the screenshot test's pictures at that size): a language is often longer than English. Buttons
+   widen to their label; a long sentence is better shortened.
+
+## For a developer
+- Every user-visible string goes through `Tr`, `Tf` or `N_`. The test (`tests/i18n_test.cpp`) reads the sources, collects every
+  such string and checks each language file against them, and refuses a plain literal given straight to a button, a title, a tooltip
+  or a text call. Changing an English string is changing its key: update the language files (the test lists what no longer matches).
+- Keep a translated string in a `std::string` rather than a `const char*` past the frame: the pointer `Tr` returns is valid until the
+  language changes.
+- Window text is translated where it is drawn, every frame; text made once and kept (a toast, a disc check's message) is
+  translated when it is made.
+
+## Not yet translated
+The **Collection page and the figure sheet** (`ui/collection_*.cpp`) are being redesigned on another branch: their files are not
+touched here, so their text is still English in every language. They follow once that branch is merged: wrap their strings the
+same way, add them to the language files, and drop the exclusion in `tests/i18n_test.cpp` (`SourceFiles`).

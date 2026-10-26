@@ -118,7 +118,7 @@ namespace launcher_ui
         else
             section["state"] = state;
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast("Couldn't save the settings");
+            Toast(Tr("Couldn't save the settings"), true);
     }
 
     void App::StartInstall()
@@ -219,12 +219,12 @@ namespace launcher_ui
                     StartInstaller();
                 }
                 else
-                    m_s->kitError = "The game tools were downloaded but SSABuild wasn't found in them.";
+                    m_s->kitError = Tr("The game tools were downloaded but SSABuild wasn't found in them.");
             }
             else if (kit.state == KitDownloader::State::Cancelled)
             {
                 m_s->installView = m_s->kitUsed = false;
-                Toast("Installation cancelled");
+                Toast(Tr("Installation cancelled"));
             }
             return;
         }
@@ -235,7 +235,7 @@ namespace launcher_ui
         {
             RecordInstalledGame(m_config, m_s->installSha, progress.runtime, m_s->installKitVersion);
             SetInstallState(m_s->installSha, nullptr);
-            Toast("Game installed: press PLAY");
+            Toast(Tr("Game installed: press PLAY"));
             m_s->installView = false;
             RefreshInstall();
         }
@@ -243,7 +243,7 @@ namespace launcher_ui
         {
             SetInstallState(m_s->installSha, nullptr);
             m_s->installView = false;
-            Toast("Installation cancelled");
+            Toast(Tr("Installation cancelled"));
         }
         else if (progress.state == InstallProgress::State::Failed && SettingGet(m_config, "install." + m_s->installSha, "state") != "failed")
             SetInstallState(m_s->installSha, "failed");
@@ -268,7 +268,7 @@ namespace launcher_ui
         float left = ImGui::GetCursorScreenPos().x;
 
         // Title, and on its right the percentage, or once stopped a close button.
-        const char* title = failed ? "INSTALLATION STOPPED" : interrupted ? "INSTALLATION INTERRUPTED" : "INSTALLING THE GAME";
+        const char* title = failed ? Tr("INSTALLATION STOPPED") : interrupted ? Tr("INSTALLATION INTERRUPTED") : Tr("INSTALLING THE GAME");
         ImVec2 titleAt = ImGui::GetCursorScreenPos();
         Title(title, TitleSize, failed ? Danger : Text);
         if (failed || interrupted)
@@ -285,7 +285,7 @@ namespace launcher_ui
             bool hovered = ImGui::IsItemHovered();
             FocusRing(CloseSize / 2);
             if (hovered)
-                ImGui::SetTooltip("Close");
+                ImGui::SetTooltip("%s", Tr("Close"));
             ImVec2 c(closeAt.x + CloseSize / 2, closeAt.y + CloseSize / 2);
             if (hovered)
                 draw->AddCircleFilled(c, CloseSize / 2, Rgb(PanelRaisedHover), 24);
@@ -313,10 +313,10 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(width, BarH));
         {
             int stepNumber = list.current >= 0 ? list.current + 1 : int(list.rows.size());
-            std::string where = fmt::format("Step {} of {}", stepNumber, list.rows.size());
+            std::string where = Tf("Step {} of {}", stepNumber, list.rows.size());
             std::string times;
             if (list.elapsedMs > 0)
-                times = InstallDuration(list.elapsedMs) + " elapsed";
+                times = Tf("{} elapsed", InstallDuration(list.elapsedMs));
             if (running)
             {
                 std::string timeLeft = InstallTimeLeft(list.etaMs);
@@ -344,7 +344,7 @@ namespace launcher_ui
             draw->AddPolyline(std::array{ ImVec2(dot.x - 4.5f, dot.y), ImVec2(dot.x - 1.2f, dot.y + 3.5f), ImVec2(dot.x + 4.5f, dot.y - 3.5f) }.data(),
                 3, Rgb(Panel), 0, 2.2f);
             ImGui::SetCursorScreenPos(ImVec2(rowAt.x + 30, rowAt.y));
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%d of %zu steps done", list.current, list.rows.size());
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{} of {} steps done", list.current, list.rows.size()).c_str());
             ImGui::SetCursorScreenPos(ImVec2(rowAt.x, rowAt.y + rowH));
         }
         for (size_t i = 0; i < list.rows.size(); i++)
@@ -438,7 +438,7 @@ namespace launcher_ui
             ImGui::PushTextWrapPos(left + width);
             if (!progress.error.empty())
                 ImGui::TextWrapped("%s", progress.error.c_str());
-            ImGui::TextWrapped("What was already built is kept: Retry carries on from this step.");
+            ImGui::TextWrapped("%s", Tr("What was already built is kept: Retry carries on from this step."));
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
             ImGui::PopFont();
@@ -447,8 +447,8 @@ namespace launcher_ui
         {
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
             ImGui::PushTextWrapPos(left + width);
-            ImGui::TextWrapped(m_s->installPastPid != 0 ? "The installer started earlier is still stopping. Resume will be possible in a moment."
-                                                     : "Skylauncher was closed before the game was built. Resume carries on where it stopped.");
+            ImGui::TextWrapped("%s", m_s->installPastPid != 0 ? Tr("The installer started earlier is still stopping. Resume will be possible in a moment.")
+                                                           : Tr("Skylauncher was closed before the game was built. Resume carries on where it stopped."));
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
         }
@@ -468,7 +468,7 @@ namespace launcher_ui
             ImGui::PushFont(m_monoFont, SmallSize);
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));
             if (progress.logLines > progress.log.size())
-                ImGui::TextColored(ImColor(Rgb(TextDim)), "(%zu earlier lines: Copy log has them all)", progress.logLines - progress.log.size());
+                ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tf("({} earlier lines: Copy log has them all)", progress.logLines - progress.log.size()).c_str());
             for (const std::string& line : progress.log)
             {
                 bool error = line.starts_with("error") || line.find(": error") != std::string::npos;
@@ -487,7 +487,7 @@ namespace launcher_ui
         // Buttons along the card's bottom edge: details on the left, the actions on the right.
         ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - Pad - 40));
         float rowY = ImGui::GetCursorPosY();
-        if (PillButton(m_s->installLog ? "Hide details" : "Show details", false, 150))
+        if (PillButton(m_s->installLog ? Tr("Hide details") : Tr("Show details"), false, 130))
             m_s->installLog = !m_s->installLog;
         constexpr float ButtonW = 150;
         float gap = ImGui::GetStyle().ItemSpacing.x;
@@ -497,7 +497,7 @@ namespace launcher_ui
         if (failed || interrupted)
         {
             ImGui::SameLine();
-            if (PillButton("Copy log", false, 120))
+            if (PillButton(Tr("Copy log"), false, 120))
             {
                 std::string text;
                 if (m_s->installPast.state == State::Idle)
@@ -507,21 +507,21 @@ namespace launcher_ui
                 for (const std::string& line : m_s->installPast.log)
                     text += line + "\n";
                 SDL_SetClipboardText(text.c_str());
-                Toast("Log copied");
+                Toast(Tr("Log copied"));
             }
             ImGui::SameLine();
-            if (PillButton("Open logs folder", false, 170))
+            if (PillButton(Tr("Open logs folder"), false, 140))
                 OpenFolder(GameInstallFolder(m_s->installSha));
             rightButtons(1);
             ImGui::BeginDisabled(m_s->installPastPid != 0);
-            if (PillButton(failed ? "Retry" : "Resume", true, ButtonW, true))
+            if (PillButton(failed ? Tr("Retry") : Tr("Resume"), true, ButtonW, true))
                 StartInstall();
             ImGui::EndDisabled();
         }
         else if (running)
         {
             rightButtons(1);
-            if (PillButton("Cancel", false, ButtonW))
+            if (PillButton(Tr("Cancel"), false, ButtonW))
             {
                 m_s->installer.Cancel();
                 m_s->kitDownload.Cancel();

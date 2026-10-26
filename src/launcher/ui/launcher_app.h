@@ -8,6 +8,7 @@
 #include "launcher/game_install.h"
 #include "launcher/game_run.h"
 #include "launcher/game_settings.h"
+#include "launcher/i18n.h"
 #include "launcher/updater.h"
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
@@ -48,14 +49,14 @@ namespace launcher_ui
     };
 
     inline constexpr KeyAction KeyActions[] = {
-        { "a", "A (jump, confirm)", SDLK_SPACE }, { "b", "B (back)", SDLK_X }, { "x", "X (attack)", SDLK_C },
-        { "y", "Y (attack)", SDLK_V }, { "start", "Start", SDLK_RETURN }, { "back", "Back", SDLK_BACKSPACE },
-        { "lb", "Left bumper", SDLK_Q }, { "rb", "Right bumper", SDLK_E }, { "lt", "Left trigger", SDLK_1 },
-        { "rt", "Right trigger", SDLK_3 }, { "left_up", "Move up", SDLK_W }, { "left_down", "Move down", SDLK_S },
-        { "left_left", "Move left", SDLK_A }, { "left_right", "Move right", SDLK_D }, { "right_up", "Camera up", SDLK_I },
-        { "right_down", "Camera down", SDLK_K }, { "right_left", "Camera left", SDLK_J },
-        { "right_right", "Camera right", SDLK_L }, { "dpad_up", "D-pad up", SDLK_UP }, { "dpad_down", "D-pad down", SDLK_DOWN },
-        { "dpad_left", "D-pad left", SDLK_LEFT }, { "dpad_right", "D-pad right", SDLK_RIGHT },
+        { "a", N_("A (jump, confirm)"), SDLK_SPACE }, { "b", N_("B (back)"), SDLK_X }, { "x", N_("X (attack)"), SDLK_C },
+        { "y", N_("Y (attack)"), SDLK_V }, { "start", N_("Start"), SDLK_RETURN }, { "back", N_("Back"), SDLK_BACKSPACE },
+        { "lb", N_("Left bumper"), SDLK_Q }, { "rb", N_("Right bumper"), SDLK_E }, { "lt", N_("Left trigger"), SDLK_1 },
+        { "rt", N_("Right trigger"), SDLK_3 }, { "left_up", N_("Move up"), SDLK_W }, { "left_down", N_("Move down"), SDLK_S },
+        { "left_left", N_("Move left"), SDLK_A }, { "left_right", N_("Move right"), SDLK_D }, { "right_up", N_("Camera up"), SDLK_I },
+        { "right_down", N_("Camera down"), SDLK_K }, { "right_left", N_("Camera left"), SDLK_J },
+        { "right_right", N_("Camera right"), SDLK_L }, { "dpad_up", N_("D-pad up"), SDLK_UP }, { "dpad_down", N_("D-pad down"), SDLK_DOWN },
+        { "dpad_left", N_("D-pad left"), SDLK_LEFT }, { "dpad_right", N_("D-pad right"), SDLK_RIGHT },
     };
 
     struct Choice
@@ -66,16 +67,16 @@ namespace launcher_ui
     };
 
     // The runtime runs at 30 or 60: any other limit it is given means 60 (docs/settings.md).
-    inline constexpr Choice FpsChoices[] = { { "30", "30 (original)" }, { "60", "60 (experimental)", "0 120 144 240" } };
-    inline constexpr Choice AspectChoices[] = { { "auto", "Auto (follows the window)" }, { "16:9", "16:9 (with bars)" } };
-    inline constexpr Choice ScaleChoices[] = { { "auto", "Auto" }, { "1", "x1" }, { "2", "x2" }, { "3", "x3" }, { "4", "x4" },
+    inline constexpr Choice FpsChoices[] = { { "30", N_("30 (original)") }, { "60", N_("60 (experimental)"), "0 120 144 240" } };
+    inline constexpr Choice AspectChoices[] = { { "auto", N_("Auto (follows the window)") }, { "16:9", N_("16:9 (with bars)") } };
+    inline constexpr Choice ScaleChoices[] = { { "auto", N_("Auto") }, { "1", "x1" }, { "2", "x2" }, { "3", "x3" }, { "4", "x4" },
         { "5", "x5" }, { "6", "x6" }, { "7", "x7" }, { "8", "x8" }, { "9", "x9" }, { "10", "x10" } };
-    inline constexpr Choice GlyphChoices[] = { { "auto", "Automatic (follows what you play with)" }, { "xbox360", "Xbox 360" },
-        { "xboxone", "Xbox One / Series", "xbox" }, { "playstation", "PlayStation" }, { "nintendo", "Nintendo" }, { "keyboard", "Keyboard" } };
-    inline constexpr Choice FilterChoices[] = { { "1", "Trilinear" }, { "2", "Anisotropic 2x" }, { "4", "Anisotropic 4x" },
-        { "8", "Anisotropic 8x" }, { "16", "Anisotropic 16x" } };
-    inline constexpr Choice PortalChoices[] = { { "auto", "Auto: a real portal if plugged in, else virtual" }, { "emulated", "Virtual (no portal needed)" },
-        { "real", "Real portal (Wii, PlayStation, Xbox)", "hid usb" } };
+    inline constexpr Choice GlyphChoices[] = { { "auto", N_("Automatic (follows what you play with)") }, { "xbox360", "Xbox 360" },
+        { "xboxone", N_("Xbox One / Series"), "xbox" }, { "playstation", "PlayStation" }, { "nintendo", "Nintendo" }, { "keyboard", N_("Keyboard") } };
+    inline constexpr Choice FilterChoices[] = { { "1", N_("Trilinear") }, { "2", N_("Anisotropic 2x") }, { "4", N_("Anisotropic 4x") },
+        { "8", N_("Anisotropic 8x") }, { "16", N_("Anisotropic 16x") } };
+    inline constexpr Choice PortalChoices[] = { { "auto", N_("Auto: a real portal if plugged in, else virtual") }, { "emulated", N_("Virtual (no portal needed)") },
+        { "real", N_("Real portal (Wii, PlayStation, Xbox)"), "hid usb" } };
     inline constexpr Choice LanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
         { "it", "Italiano" }, { "nl", "Nederlands" }, { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
 
@@ -272,6 +273,8 @@ namespace launcher_ui
         void DrawSettings();     // the launcher's settings (the gear): Controls, Launcher, Support, About
         void DrawControls();
         void DrawLauncherTab();
+        void DrawLauncherLanguage(); // Settings > Launcher > Language
+        void UpdateLanguage();       // each frame: the text follows [launcher] language, or the game's language
         void DrawSupport();      // support_page.cpp: logs and the problem report
         // A game's own settings (game_settings_page.cpp), opened from the Settings button on its Play page.
         void DrawGameSettings();
@@ -346,6 +349,8 @@ namespace launcher_ui
         bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
         bool PillButton(const char* label, bool primary = false, float width = 0, bool bold = false, unsigned fill = PanelRaised,
             unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive);
+        // The width of a PillButton: `width`, or wider when the label (a translation may be longer) needs it.
+        float PillWidth(const char* label, float width, bool bold = false);
         void BoldText(const char* text, unsigned color);
         bool Toggle(const char* id, bool* value);
         // Acts once held for a second (HoldConfirm); `hint` is its tooltip, which says so. Red: for what deletes or overwrites.
@@ -511,10 +516,10 @@ namespace launcher_ui
         int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
         bool changed = false;
         ImGui::SetNextItemWidth(width);
-        if (ImGui::BeginCombo(label, choices[index].label))
+        if (ImGui::BeginCombo(label, Tr(choices[index].label)))
         {
             for (size_t i = 0; i < N; i++)
-                if (ImGui::Selectable(choices[i].label, int(i) == index))
+                if (ImGui::Selectable(Tr(choices[i].label), int(i) == index))
                 {
                     Set(section, key, choices[i].value);
                     changed = true;

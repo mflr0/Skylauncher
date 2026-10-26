@@ -1,4 +1,5 @@
 #include "launcher/game_copy.h"
+#include "launcher/i18n.h"
 #include "launcher/ui/launcher_ui.h"
 #include "shared/collection/datadir.h"
 #include "shared/vfs.h"
@@ -40,7 +41,7 @@ void GameCopyJob::Start(const GameInfo& game, const std::string& image, const st
         DiscFileSystem disc;
         if (!disc.Open(image.c_str()))
         {
-            m_result.error = "couldn't open the disc image";
+            m_result.error = Tr("couldn't open the disc image");
             m_done = true;
             return;
         }
@@ -74,9 +75,9 @@ std::string CopyFailureText(const gamedata::CopyResult& result)
 {
     using Outcome = gamedata::CopyResult::Outcome;
     if (result.outcome == Outcome::NotEnoughSpace)
-        return fmt::format("Not enough space: the copy needs {} and this drive has {} free.", LauncherFormatSize(result.needed),
+        return Tf("Not enough space: the copy needs {} and this drive has {} free.", LauncherFormatSize(result.needed),
             LauncherFormatSize(result.available));
     if (result.outcome == Outcome::Failed)
-        return "The copy stopped: " + result.error + ". Press the button again to carry on from there.";
+        return Tf("The copy stopped: {}. Press the button again to carry on from there.", result.error);
     return {};
 }
