@@ -1,4 +1,5 @@
 #include "launcher/game_settings.h"
+#include "launcher/i18n.h"
 #include "launcher/game_install.h"
 #include "shared/collection/datadir.h"
 #include "shared/collection/save_backup.h"
@@ -63,7 +64,7 @@ namespace
         if (error)
         {
             if (result.ok)
-                result.error = "Couldn't delete " + datadir::Text(path) + ": " + error.message();
+                result.error = Tf("Couldn't delete {}: {}", datadir::Text(path), error.message());
             result.ok = false;
         }
         else
@@ -104,12 +105,12 @@ namespace
         if (!Deletable(folders.game))
         {
             result.ok = false;
-            result.error = "This game has no folder.";
+            result.error = Tr("This game has no folder.");
         }
         else if (GameIsRunning(folders))
         {
             result.ok = false;
-            result.error = "The game is running: quit it first.";
+            result.error = Tr("The game is running: quit it first.");
         }
         return result;
     }

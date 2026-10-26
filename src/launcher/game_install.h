@@ -93,6 +93,7 @@ struct InstallProgress
     std::vector<Step> steps;
     uint64_t done = 0, total = 0;  // the current step's @progress
     std::string error;             // @error, or why SSABuild stopped
+    bool startFailed = false;      // the installer never started (the kit, the folder): `error` is in the launcher's language
     std::string runtime;           // @done
     std::string action;            // the current step's last @log line
     std::vector<std::string> log;  // every line, @log text and anything else SSABuild printed

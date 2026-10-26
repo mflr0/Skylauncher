@@ -40,10 +40,10 @@ namespace launcher_ui
 
         std::string AgoText(int64_t seconds)
         {
-            if (seconds < 90) return "just now";
-            if (seconds < 5400) return fmt::format("{} min ago", seconds / 60);
-            if (seconds < 36 * 3600) return fmt::format("{} h ago", seconds / 3600);
-            return fmt::format("{} days ago", seconds / 86400);
+            if (seconds < 90) return Tr("just now");
+            if (seconds < 5400) return Tf("{} min ago", seconds / 60);
+            if (seconds < 36 * 3600) return Tf("{} h ago", seconds / 3600);
+            return Tf("{} days ago", seconds / 86400);
         }
     }
 
@@ -80,10 +80,10 @@ namespace launcher_ui
             {
                 Set("update", "last_check", std::to_string(Now()));
                 if (m_updateManual)
-                    m_updateDoneNote = !state.checked ? "Couldn't check: " + state.checkError
-                        : state.launcherNewer          ? "Version " + state.launcher.tag + " is available."
-                        : state.kitNewer               ? "Skylauncher is up to date. A new version of the game is available."
-                                                       : "Skylauncher is up to date.";
+                    m_updateDoneNote = !state.checked ? Tf("Couldn't check: {}", state.checkError)
+                        : state.launcherNewer          ? Tf("Version {} is available.", state.launcher.tag)
+                        : state.kitNewer               ? Tr("Skylauncher is up to date. A new version of the game is available.")
+                                                       : Tr("Skylauncher is up to date.");
             }
             else if (state.phase == UpdateManager::Phase::Done && state.doing == "kit")
             {
@@ -130,41 +130,43 @@ namespace launcher_ui
         enum { None, WhatsNew, UpdateLauncher, UpdateKit, Later, KitLater, Restart, Cancel, Retry, Dismiss };
         if (state.restartNeeded)
         {
-            text = fmt::format("Skylauncher {} is installed. Restart to use it.", state.launcher.tag);
-            buttons = { { "Restart now", true, 150, Restart } };
+            text = Tf("Skylauncher {} is installed. Restart to use it.", state.launcher.tag);
+            buttons = { { Tr("Restart now"), true, 150, Restart } };
         }
         else if (progress)
         {
-            const char* what = state.doing == "kit" ? "the game kit" : "Skylauncher";
-            text = state.phase == Phase::Downloading ? fmt::format("Downloading {}", what)
-                : state.phase == Phase::Verifying    ? fmt::format("Checking {}", what)
-                                                     : fmt::format("Installing {}", what);
+            bool kit = state.doing == "kit";
+            text = state.phase == Phase::Downloading ? Tr(kit ? N_("Downloading the game kit") : N_("Downloading Skylauncher"))
+                : state.phase == Phase::Verifying    ? Tr(kit ? N_("Checking the game kit") : N_("Checking Skylauncher"))
+                                                     : Tr(kit ? N_("Installing the game kit") : N_("Installing Skylauncher"));
             barFraction = state.phase == Phase::Downloading ? state.progress : -1;
             if (state.phase == Phase::Downloading)
-                buttons = { { "Cancel", false, 120, Cancel } };
+                buttons = { { Tr("Cancel"), false, 120, Cancel } };
         }
         else if (state.phase == Phase::Failed)
         {
-            text = "The update failed: " + state.error;
-            buttons = { { "Retry", true, 110, Retry }, { "Close", false, 110, Dismiss } };
+            text = Tf("The update failed: {}", state.error);
+            buttons = { { Tr("Retry"), true, 110, Retry }, { Tr("Close"), false, 110, Dismiss } };
         }
         else if (state.phase == Phase::Done && !state.note.empty())
         {
             text = state.note;
-            buttons = { { "OK", false, 90, Dismiss } };
+            buttons = { { Tr("OK"), false, 90, Dismiss } };
         }
         else if (state.launcherNewer && !m_updateLater)
         {
-            text = "Update available: " + state.launcher.tag;
-            buttons = { { "Update now", true, 140, UpdateLauncher }, { "What's new", false, 130, WhatsNew }, { "Later", false, 100, Later } };
+            text = Tf("Update available: {}", state.launcher.tag);
+            buttons = { { Tr("Update now"), true, 140, UpdateLauncher }, { Tr("What's new"), false, 130, WhatsNew }, { Tr("Later"), false, 100, Later } };
         }
         else
         {
-            text = "A new version of the game is available";
-            buttons = { { "Update the game", true, 170, UpdateKit }, { "Later", false, 100, KitLater } };
+            text = Tr("A new version of the game is available");
+            buttons = { { Tr("Update the game"), true, 170, UpdateKit }, { Tr("Later"), false, 100, KitLater } };
         }
 
         float gap = 10, buttonsW = 0;
+        for (Button& button : buttons)
+            button.width = PillWidth(button.label, button.width, button.primary);
         for (const Button& button : buttons)
             buttonsW += button.width + gap;
         float contentW = display.x - SidebarW - 2 * Pad;
@@ -233,7 +235,7 @@ namespace launcher_ui
                 m_running = false;
             }
             else
-                Toast("Couldn't restart: start Skylauncher again");
+                Toast(Tr("Couldn't restart: start Skylauncher again"), true);
             break;
         }
         }
@@ -255,23 +257,23 @@ namespace launcher_ui
             if (!m_whatsNewOpen)
                 ImGui::CloseCurrentPopup();
             UpdateManager::State state = m_updates.Snapshot();
-            Title(("What's new in " + state.launcher.tag).c_str(), TitleSize, Text);
+            Title(Tf("What's new in {}", state.launcher.tag).c_str(), TitleSize, Text);
             ImGui::BeginChild("##notes", ImVec2(0, -52), ImGuiChildFlags_None);
-            std::string notes = state.launcher.notes.empty() ? std::string("No notes were published with this version.") : state.launcher.notes;
+            std::string notes = state.launcher.notes.empty() ? std::string(Tr("No notes were published with this version.")) : state.launcher.notes;
             ImGui::PushTextWrapPos(0);
             ImGui::TextUnformatted(notes.c_str()); // plain text: the release's Markdown as written
             ImGui::PopTextWrapPos();
             ImGui::EndChild();
-            if (PillButton("Release page", false, 160) && !state.launcher.pageUrl.empty())
+            if (PillButton(Tr("Release page"), false, 160) && !state.launcher.pageUrl.empty())
                 SDL_OpenURL(state.launcher.pageUrl.c_str());
             ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 2 * 140 - ImGui::GetStyle().ItemSpacing.x);
-            if (PillButton("Close", false, 140) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
+            if (PillButton(Tr("Close"), false, 140) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
                 m_whatsNewOpen = false;
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SameLine();
-            if (PillButton("Update now", true, 140, true))
+            if (PillButton(Tr("Update now"), true, 140, true))
             {
                 m_whatsNewOpen = false;
                 ImGui::CloseCurrentPopup();
@@ -290,7 +292,7 @@ namespace launcher_ui
         UpdateManager::State state = m_updates.Snapshot();
         bool busy = m_updates.Busy();
         ImGui::BeginDisabled(busy);
-        if (PillButton(state.phase == UpdateManager::Phase::Checking ? "Checking..." : "Check for updates", false, 220))
+        if (PillButton(state.phase == UpdateManager::Phase::Checking ? Tr("Checking...") : Tr("Check for updates"), false, 220))
             StartUpdateCheck(true);
         ImGui::EndDisabled();
         ImGui::SameLine(0, 14);
@@ -298,18 +300,18 @@ namespace launcher_ui
         if (!m_updateDoneNote.empty())
             ImGui::TextColored(ImColor(Rgb(state.checked && !state.launcherNewer ? Ok : TextSecondary)), "%s", m_updateDoneNote.c_str());
         else if (int64_t last = SettingInt(m_config, "update", "last_check", 0); last > 0)
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Last checked %s", AgoText(Now() - last).c_str());
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Last checked {}", AgoText(Now() - last)).c_str());
         ImGui::Dummy(ImVec2(0, 2));
         bool automatic = ParseBool(SettingGet(m_config, "update", "auto_check", "1"));
         if (Toggle("##autocheck", &automatic))
             Set("update", "auto_check", automatic ? "1" : "0");
         ImGui::SameLine(0, 12);
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Check for updates when Skylauncher starts (once a day)");
+        ImGui::TextUnformatted(Tr("Check for updates when Skylauncher starts (once a day)"));
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("A check asks github.com for the latest release of Skylauncher: no account, no identifier, nothing else is sent. "
-            "Updates are checked against the release's SHA-256 before they are installed.");
+        ImGui::TextWrapped("%s", Tr("A check asks github.com for the latest release of Skylauncher: no account, no identifier, nothing else is sent. "
+            "Updates are checked against the release's SHA-256 before they are installed."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
@@ -317,30 +319,30 @@ namespace launcher_ui
     void App::DrawAbout()
     {
         Title("Skylauncher", HeadlineSize);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Version %s, %s", LauncherVersion().c_str(), PlatformName());
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Version {}, {}", LauncherVersion(), PlatformName()).c_str());
         ImGui::Dummy(ImVec2(0, 6));
-        ImGui::TextWrapped("A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown "
-            "from the game is read from your own disc and kept on this computer.");
+        ImGui::TextWrapped("%s", Tr("A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown "
+            "from the game is read from your own disc and kept on this computer."));
 
         ImGui::Dummy(ImVec2(0, 14));
-        Title("Credits", TitleSize, Text);
-        ImGui::TextWrapped("The launcher's look, colours, fonts, background and layout are dorydev's design.");
+        Title(Tr("Credits"), TitleSize, Text);
+        ImGui::TextWrapped("%s", Tr("The launcher's look, colours, fonts, background and layout are dorydev's design."));
         ImGui::Dummy(ImVec2(0, 4));
-        ImGui::TextWrapped("Made with SDL 3 (zlib), Dear ImGui, {fmt}, stb, miniz and XenonRecomp's XEX readers (MIT), and the Outfit and "
-            "Bungee fonts (SIL Open Font License). Skylauncher is MIT licensed.");
+        ImGui::TextWrapped("%s", Tr("Made with SDL 3 (zlib), Dear ImGui, {fmt}, stb, miniz and XenonRecomp's XEX readers (MIT), and the Outfit and "
+            "Bungee fonts (SIL Open Font License). Skylauncher is MIT licensed."));
         ImGui::Dummy(ImVec2(0, 6));
-        if (PillButton("Project page", false, 180))
+        if (PillButton(Tr("Project page"), false, 180))
             SDL_OpenURL(Project);
         ImGui::SameLine();
-        if (PillButton("Licences", false, 150))
+        if (PillButton(Tr("Licences"), false, 150))
             SDL_OpenURL((std::string(Project) + "/blob/main/THIRD_PARTY_NOTICES.md").c_str());
         ImGui::SameLine();
-        if (PillButton("Report a bug", false, 180))
+        if (PillButton(Tr("Report a bug"), false, 180))
             SDL_OpenURL((std::string(Project) + "/issues/new").c_str());
         ImGui::Dummy(ImVec2(0, 10));
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextWrapped("Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision.");
+        ImGui::TextWrapped("%s", Tr("Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
@@ -370,7 +372,7 @@ namespace launcher_ui
             m_testAt = now + 500;
             break;
         case 3:
-            m_updateDoneNote = "Skylauncher is up to date.";
+            m_updateDoneNote = Tr("Skylauncher is up to date.");
             m_testAt = now + 400;
             break;
         case 4:

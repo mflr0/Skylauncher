@@ -36,9 +36,8 @@ is easy to iterate without touching the game runtime.
 
 ## Layout
 The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
-GitHub issue) and the GitHub link bottom right. The top right is kept for the launcher's own language (#4): its slot is
-Settings > Launcher > Language (English only, disabled, for now); the game's text and voice languages are in that game's
-settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
+GitHub issue) and the GitHub link bottom right. The launcher's own language is in Settings > Launcher > Language
+(`docs/translations.md`); the game's text and voice languages are in that game's settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
    SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
    and its live state ("Open" until the game is first shown, then the states in "A game's states"); the
@@ -74,8 +73,8 @@ Controls tab moves to the game pages the way Video did (`GameVideoKeys` shows ho
 The launcher opens on **Home**, the menu page (the SKYLAUNCHER title goes back to it): the **library**, a card per
 playable game (its painting from the disc behind its logo, its name and state; the game's colours before its disc was
 ever read), then the games **coming later** as quiet chips in their colours; "Report a bug" (a new GitHub issue) and the
-GitHub link bottom right. A card opens its game's page. The top right is kept for the launcher's own language (#4): the
-game's text and voice languages are in Settings > Language ("Game text", "Game voices"). The game shown last is selected
+GitHub link bottom right. A card opens its game's page. The launcher's own language is in Settings > Launcher > Language
+(`docs/translations.md`); the game's text and voice languages are in that game's settings ("Game text", "Game voices"). The game shown last is selected
 in the sidebar (`[launcher] game=`); the other is one click away.
 1. **Left sidebar** (grey, fixed width).
    - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.3.1`, from
@@ -237,7 +236,7 @@ always animates (`docs/settings.md`).
   leaving, cancels; it acts once per press; Space, Enter and the pad's A hold it too. The label is a plain verb, the
   instruction is the tooltip (shown on keyboard and pad focus too). Buttons are told apart by their ImGui ID.
 - **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
-- **Toasts.** Top right, stacked downwards (newest at the bottom, at most 4), each at most 420 points wide, 20 points from the window's top and right edges, over the page. 2.5 s, longer for a long message (up to 6 s); the same message again refreshes the one shown. A failure (`Toast(text, true)`, or a text starting "Couldn't") stays until it is closed, with a cross; a click on any message closes it and does not reach what is under it. Texts are short, sober, English, no full stop.
+- **Toasts.** Top right, stacked downwards (newest at the bottom, at most 4), each at most 420 points wide, 20 points from the window's top and right edges, over the page. 2.5 s, longer for a long message (up to 6 s); the same message again refreshes the one shown. A failure (`Toast(text, true)`, or a text starting "Couldn't") stays until it is closed, with a cross; a click on any message closes it and does not reach what is under it. Texts are short, sober, no full stop; they are English in the code and go through the string table (`docs/translations.md`). An error is a `Toast(text, true)` (a text starting "Couldn't" is one too, as the collection page's English toasts still are).
 - **Idle.** The loop sleeps in `SDL_WaitEventTimeout` (`App::IdleWait`): every frame only while something moves (a disc
   check, an install, an update, a held button, a text cursor, the logo's fall) and for three frames after an input; 30 fps for the night
   sky's stars; else it wakes every 0.5 s to poll the jobs, the portal and the collection.

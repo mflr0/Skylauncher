@@ -1,4 +1,5 @@
 #include "launcher/launcher.h"
+#include "launcher/i18n.h"
 #include "launcher/ui/launcher_ui.h"
 #include "shared/collection/datadir.h"
 #include "shared/collection/game_data.h"
@@ -33,7 +34,7 @@ namespace
 
 #ifdef __APPLE__
     constexpr char SelectAgainHint[] = "hold Shift (or Option) while the app starts, or start it with --launcher";
-    constexpr char PermissionHint[] = "\n\nIf the file is there, allow access in System Settings > Privacy & Security > Files and Folders.";
+    constexpr char PermissionHint[] = N_("\n\nIf the file is there, allow access in System Settings > Privacy & Security > Files and Folders.");
 #else
     constexpr char SelectAgainHint[] = "hold Shift while the app starts, or start it with --launcher";
     constexpr char PermissionHint[] = "";
@@ -186,43 +187,43 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
     using enum GameSourceStatus;
     auto report = [&](float fraction, std::string_view step) { if (progress) progress(fraction, step); };
 
-    report(0.03f, "Looking for the disc image");
+    report(0.03f, Tr("Looking for the disc image"));
     SDL_PathInfo info;
     if (!SDL_GetPathInfo(path.c_str(), &info))
-        return { NotFound, fmt::format("\"{}\" doesn't exist. Was it moved, renamed, or is its drive disconnected?", path) };
+        return { NotFound, Tf("\"{}\" doesn't exist. Was it moved, renamed, or is its drive disconnected?", path) };
     // A folder is only the copy of the game data (shared/collection/game_data.h); the disc reader reads it like an image.
     const bool copy = info.type == SDL_PATHTYPE_DIRECTORY;
     if (copy && !std::filesystem::exists(datadir::FromText(path) / gamedata::ManifestName))
-        return { Folder, fmt::format("\"{}\" is a folder. Extracted game folders aren't supported yet: choose the disc image (.iso).", path) };
+        return { Folder, Tf("\"{}\" is a folder. Extracted game folders aren't supported yet: choose the disc image (.iso).", path) };
 
-    report(0.10f, "Opening the disc image");
+    report(0.10f, Tr("Opening the disc image"));
     if (!copy)
     {
         SDL_IOStream* file = SDL_IOFromFile(path.c_str(), "rb");
         if (file == nullptr)
-            return { Unreadable, fmt::format("\"{}\" can't be read ({}).{}", path, SDL_GetError(), PermissionHint) };
+            return { Unreadable, Tf("\"{}\" can't be read ({}).{}", path, SDL_GetError(), Tr(PermissionHint)) };
         SDL_CloseIO(file);
     }
 
-    report(0.25f, "Reading the Xbox 360 disc layout");
+    report(0.25f, Tr("Reading the Xbox 360 disc layout"));
     DiscFileSystem disc;
     if (!disc.Open(path.c_str()))
-        return { NotXboxDisc, fmt::format("\"{}\" isn't an Xbox 360 disc image, or the file is incomplete.", path) };
+        return { NotXboxDisc, Tf("\"{}\" isn't an Xbox 360 disc image, or the file is incomplete.", path) };
 
-    report(0.42f, "Finding default.xex");
+    report(0.42f, Tr("Finding default.xex"));
     const DiscFileSystem::Entry* entry = disc.Find("default.xex");
     if (entry == nullptr || entry->directory)
-        return { NotXbox360Game, "This disc image has no default.xex: it isn't an Xbox 360 game, or the image is incomplete." };
+        return { NotXbox360Game, Tr("This disc image has no default.xex: it isn't an Xbox 360 game, or the image is incomplete.") };
 
-    report(0.55f, "Reading default.xex");
+    report(0.55f, Tr("Reading default.xex"));
     std::vector<uint8_t> xex = disc.ReadAll("default.xex");
     if (xex.size() != entry->size)
-        return { Damaged, "This disc image is incomplete: default.xex is cut short. Copy or dump the disc again." };
+        return { Damaged, Tr("This disc image is incomplete: default.xex is cut short. Copy or dump the disc again.") };
 
-    report(0.70f, "Checking the Xbox 360 executable");
+    report(0.70f, Tr("Checking the Xbox 360 executable"));
     auto execution = ReadExecutionInfo(xex);
     if (!execution)
-        return { Damaged, "This disc image is damaged: its default.xex isn't a valid Xbox 360 executable." };
+        return { Damaged, Tr("This disc image is damaged: its default.xex isn't a valid Xbox 360 executable.") };
 
     const GameInfo* owner = nullptr;
     for (const GameInfo& candidate : g_games)
@@ -235,18 +236,18 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
     }
     if (owner != &game)
     {
-        std::string found = owner != nullptr ? owner->name : fmt::format("another game (title ID {:08X})", execution->titleId);
-        return { WrongGame, fmt::format("This disc image is {}, not {}.", found, game.name), {}, owner != nullptr ? owner->id : "" };
+        std::string found = owner != nullptr ? owner->name : Tf("another game (title ID {:08X})", execution->titleId);
+        return { WrongGame, Tf("This disc image is {}, not {}.", found, game.name), {}, owner != nullptr ? owner->id : "" };
     }
 
-    report(0.84f, "Fingerprinting default.xex (SHA-256)");
+    report(0.84f, Tr("Fingerprinting default.xex (SHA-256)"));
     std::string sha256 = Sha256Hex(xex);
-    report(0.97f, "Comparing with the supported releases");
+    report(0.97f, Tr("Comparing with the supported releases"));
     for (const GameRelease& release : game.releases)
     {
         if (sha256 == release.defaultXexSha256)
         {
-            report(1.0f, "Verified");
+            report(1.0f, Tr("Verified"));
             return { Ok, {}, sha256 };
         }
     }
@@ -254,15 +255,15 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
     {
         if (release.mediaId == execution->mediaId && release.version == execution->version)
         {
-            return { Damaged, fmt::format("This looks like the {} disc of {}, but its default.xex isn't the original one: "
+            return { Damaged, Tf("This looks like the {} disc of {}, but its default.xex isn't the original one: "
                 "the image is damaged or modified. Copy or dump the disc again.", release.label, game.name) };
         }
     }
 
     std::string supported;
     for (const GameRelease& release : game.releases)
-        supported += fmt::format("\n- {} (media ID {:08X}, version {})", release.label, release.mediaId, FormatVersion(release.version));
-    return { WrongVersion, fmt::format("This is {}, but a disc version this build doesn't support (media ID {:08X}, version {}). "
+        supported += Tf("\n- {} (media ID {:08X}, version {})", release.label, release.mediaId, FormatVersion(release.version));
+    return { WrongVersion, Tf("This is {}, but a disc version this build doesn't support (media ID {:08X}, version {}). "
         "The game code is recompiled from one exact default.xex, so other regions and revisions can't run yet.\n\nSupported:{}",
         game.name, execution->mediaId, FormatVersion(execution->version), supported) };
 }

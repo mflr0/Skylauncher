@@ -1,4 +1,5 @@
 #include "launcher/updater.h"
+#include "launcher/i18n.h"
 #include "launcher/launcher.h"
 #include "shared/mini_json.h"
 #include <SDL3/SDL.h>
@@ -80,7 +81,7 @@ namespace
         SDL_DestroyProperties(properties);
         if (process == nullptr)
         {
-            output = fmt::format("curl couldn't start ({})", SDL_GetError());
+            output = Tf("curl couldn't start ({})", SDL_GetError());
             return false;
         }
         SDL_IOStream* stream = static_cast<SDL_IOStream*>(SDL_GetPointerProperty(SDL_GetProcessProperties(process), SDL_PROP_PROCESS_STDOUT_POINTER, nullptr));
@@ -220,13 +221,13 @@ bool ParseRelease(const std::string& json, ReleaseInfo& release, std::string* er
     if (!ParseJson(json, root, &parseError))
     {
         if (error != nullptr)
-            *error = "The answer isn't valid JSON (" + parseError + ")";
+            *error = Tf("The answer isn't valid JSON ({})", parseError);
         return false;
     }
     if (root["tag_name"].Str().empty())
     {
         if (error != nullptr)
-            *error = root["message"].IsString() ? "GitHub says: " + root["message"].Str() : "The answer has no release in it";
+            *error = root["message"].IsString() ? Tf("GitHub says: {}", root["message"].Str()) : std::string(Tr("The answer has no release in it"));
         return false;
     }
     release = {};
@@ -334,7 +335,7 @@ HttpResult HttpDownload(const std::string& url, const fs::path& file, const std:
     HttpResult result;
     if (url.empty() || !(url.starts_with("https://") || url.starts_with("file://") || SDL_getenv("SKYLAUNCHER_UPDATE_URL") != nullptr))
     {
-        result.error = "The address isn't a secure one (https)";
+        result.error = Tr("The address isn't a secure one (https)");
         return result;
     }
     std::error_code error;
@@ -368,15 +369,15 @@ HttpResult HttpDownload(const std::string& url, const fs::path& file, const std:
         fs::remove(part, error);
         output = Trimmed(output);
         if (output.empty())
-            output = "no answer";
-        result.error = output == "cancelled" ? output : "The download failed: " + output;
+            output = Tr("no answer");
+        result.error = output == "cancelled" ? output : Tf("The download failed: {}", output);
         return result;
     }
     fs::remove(file, error);
     fs::rename(part, file, error);
     if (error)
     {
-        result.error = "Couldn't save the download: " + error.message();
+        result.error = Tf("Couldn't save the download: {}", error.message());
         return result;
     }
     if (progress)
@@ -392,12 +393,12 @@ fs::path DownloadVerified(const ReleaseInfo& release, std::string_view assetName
     const ReleaseAsset* sums = FindAsset(release, "SHA256SUMS");
     if (asset == nullptr)
     {
-        error = fmt::format("{} has no {} for this computer", release.tag, assetName);
+        error = Tf("{} has no {} for this computer", release.tag, assetName);
         return {};
     }
     if (sums == nullptr)
     {
-        error = fmt::format("{} has no SHA256SUMS: the download can't be checked, so it isn't installed", release.tag);
+        error = Tf("{} has no SHA256SUMS: the download can't be checked, so it isn't installed", release.tag);
         return {};
     }
     std::error_code fsError;
@@ -412,7 +413,7 @@ fs::path DownloadVerified(const ReleaseInfo& release, std::string_view assetName
     fs::remove(sumsFile, fsError);
     if (expected.empty())
     {
-        error = fmt::format("SHA256SUMS doesn't list {}: the download can't be checked", assetName);
+        error = Tf("SHA256SUMS doesn't list {}: the download can't be checked", assetName);
         return {};
     }
     fs::path file = folder / FromUtf8(std::string(assetName));
@@ -426,7 +427,7 @@ fs::path DownloadVerified(const ReleaseInfo& release, std::string_view assetName
     if (actual != expected)
     {
         fs::remove(file, fsError);
-        error = "The download is damaged or isn't the published file (its SHA-256 doesn't match): nothing was installed";
+        error = Tr("The download is damaged or isn't the published file (its SHA-256 doesn't match): nothing was installed");
         return {};
     }
     return file;
@@ -446,7 +447,7 @@ bool ReplaceInPlace(const fs::path& target, const fs::path& fresh, std::string& 
         fs::rename(target, backup, fsError);
         if (fsError)
         {
-            error = fmt::format("Couldn't move {} aside: {}", ToUtf8(target.filename()), fsError.message());
+            error = Tf("Couldn't move {} aside: {}", ToUtf8(target.filename()), fsError.message());
             return false;
         }
     }
@@ -456,7 +457,7 @@ bool ReplaceInPlace(const fs::path& target, const fs::path& fresh, std::string& 
         std::string reason = fsError.message();
         if (hadTarget)
             fs::rename(backup, target, fsError); // roll back
-        error = fmt::format("Couldn't put the new {} in place: {}", ToUtf8(target.filename()), reason);
+        error = Tf("Couldn't put the new {} in place: {}", ToUtf8(target.filename()), reason);
         return false;
     }
     return true;
@@ -478,7 +479,7 @@ bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
     mz_zip_archive archive{};
     if (!mz_zip_reader_init_file(&archive, ToUtf8(zip).c_str(), 0))
     {
-        error = "The download isn't a zip file";
+        error = Tr("The download isn't a zip file");
         return false;
     }
     std::error_code fsError;
@@ -489,14 +490,14 @@ bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
         mz_zip_archive_file_stat stat;
         if (!mz_zip_reader_file_stat(&archive, i, &stat))
         {
-            error = "The zip file is damaged";
+            error = Tr("The zip file is damaged");
             ok = false;
             break;
         }
         std::string name = stat.m_filename;
         if (!SafeEntry(name))
         {
-            error = "The zip file holds a path outside its folder: " + name;
+            error = Tf("The zip file holds a path outside its folder: {}", name);
             ok = false;
             break;
         }
@@ -521,7 +522,7 @@ bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
         }
         if (!mz_zip_reader_extract_to_file(&archive, i, ToUtf8(out).c_str(), 0))
         {
-            error = "Couldn't unpack " + name;
+            error = Tf("Couldn't unpack {}", name);
             ok = false;
             break;
         }
@@ -580,7 +581,7 @@ bool InstallKitZip(const fs::path& zip, const fs::path& kitFolder, std::string& 
     if (!fs::exists(SSABuildIn(fresh), fsError))
     {
         fs::remove_all(staging, fsError);
-        error = "The download isn't a game kit (no SSABuild in it)";
+        error = Tr("The download isn't a game kit (no SSABuild in it)");
         return false;
     }
     bool ok;
@@ -591,7 +592,7 @@ bool InstallKitZip(const fs::path& zip, const fs::path& kitFolder, std::string& 
         fs::rename(fresh, kitFolder, fsError);
         ok = !fsError;
         if (!ok)
-            error = "Couldn't put the kit in place: " + fsError.message();
+            error = Tf("Couldn't put the kit in place: {}", fsError.message());
     }
     fs::remove_all(staging, fsError);
     if (ok)
@@ -630,7 +631,7 @@ fs::path DownloadKit(const std::string& repo, const std::string& tag, const fs::
     if (asset == nullptr)
     {
         fs::remove_all(work, fsError);
-        error = fmt::format("The release {} has no {}", release.tag, KitAssetName());
+        error = Tf("The release {} has no {}", release.tag, KitAssetName());
         return {};
     }
     uint64_t size = asset->size;
@@ -814,7 +815,7 @@ void UpdateManager::UpdateLauncher()
                 SDL_OpenURL(("file://" + ToUtf8(dmg)).c_str());
                 std::lock_guard lock(m_mutex);
                 m_state.phase = Phase::Done;
-                m_state.note = "The installer was opened: drag Skylauncher to Applications, replacing the old one.";
+                m_state.note = Tr("The installer was opened: drag Skylauncher to Applications, replacing the old one.");
             }
             m_busy = false;
             return;
@@ -825,7 +826,7 @@ void UpdateManager::UpdateLauncher()
             SDL_OpenURL(release.pageUrl.c_str());
             std::lock_guard lock(m_mutex);
             m_state.phase = Phase::Done;
-            m_state.note = "This copy can't update itself: the release page was opened.";
+            m_state.note = Tr("This copy can't update itself: the release page was opened.");
             m_busy = false;
             return;
         }
@@ -854,7 +855,7 @@ void UpdateManager::UpdateLauncher()
         if (!fs::exists(fresh, fsError))
         {
             fs::remove_all(folder, fsError);
-            Fail("The download holds no Skylauncher.app");
+            Fail(Tr("The download holds no Skylauncher.app"));
             m_busy = false;
             return;
         }
@@ -894,7 +895,7 @@ void UpdateManager::UpdateKit()
         }
         if (kitFolder.empty() || !Writable(kitFolder.parent_path()))
         {
-            Fail("The folder next to Skylauncher can't be written to: move Skylauncher somewhere you can write, then try again");
+            Fail(Tr("The folder next to Skylauncher can't be written to: move Skylauncher somewhere you can write, then try again"));
             m_busy = false;
             return;
         }
@@ -915,7 +916,7 @@ void UpdateManager::UpdateKit()
                 std::lock_guard lock(m_mutex);
                 m_state.phase = Phase::Done;
                 m_state.kitNewer = false;
-                m_state.note = "The game kit is up to date: update the game to use it.";
+                m_state.note = Tr("The game kit is up to date: update the game to use it.");
                 fs::remove_all(folder, fsError);
                 m_busy = false;
                 return;

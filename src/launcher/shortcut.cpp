@@ -1,4 +1,5 @@
 #include "launcher/shortcut.h"
+#include "launcher/i18n.h"
 #include "shared/collection/datadir.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -174,8 +175,8 @@ std::vector<uint8_t> MacIcns(const std::vector<uint8_t>& png)
 
 std::string LinuxDesktopEntry(std::string_view gameName, const fs::path& launcher, std::string_view gameId, const fs::path& icon)
 {
-    std::string text = "[Desktop Entry]\nType=Application\nVersion=1.0\nName=" + std::string(gameName) + "\nComment=Play " + std::string(gameName) +
-        " with Skylauncher\nExec=" + DesktopExecQuote(datadir::Text(launcher)) + " " + ShortcutArguments(gameId) + "\n";
+    std::string text = "[Desktop Entry]\nType=Application\nVersion=1.0\nName=" + std::string(gameName) + "\nComment=" +
+        Tf("Play {} with Skylauncher", gameName) + "\nExec=" + DesktopExecQuote(datadir::Text(launcher)) + " " + ShortcutArguments(gameId) + "\n";
     if (!icon.empty())
         text += "Icon=" + datadir::Text(icon) + "\n";
     return text + "Terminal=false\nCategories=Game;\n";
@@ -243,7 +244,7 @@ ShortcutResult WriteMacApp(const ShortcutSpec& spec)
     fs::create_directories(app / "Contents" / "MacOS", error);
     fs::create_directories(app / "Contents" / "Resources", error);
     if (error)
-        return Fail("Couldn't make " + datadir::Text(app) + ": " + error.message());
+        return Fail(Tf("Couldn't make {}: {}", datadir::Text(app), error.message()));
     std::vector<uint8_t> icns = MacIcns(spec.iconPng);
     bool ok = WriteText(app / "Contents" / "Info.plist", MacInfoPlist(spec.gameName, spec.gameId, !icns.empty())) &&
         WriteText(app / "Contents" / "MacOS" / "launch", MacLaunchScript(spec.launcher, spec.gameId)) &&
@@ -251,7 +252,7 @@ ShortcutResult WriteMacApp(const ShortcutSpec& spec)
     fs::permissions(app / "Contents" / "MacOS" / "launch", fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec |
         fs::perms::others_read | fs::perms::others_exec, error);
     if (!ok)
-        return Fail("Couldn't write " + datadir::Text(app));
+        return Fail(Tf("Couldn't write {}", datadir::Text(app)));
     fs::last_write_time(app, fs::file_time_type::clock::now(), error); // the Finder looks at the icon again
     ShortcutResult result;
     result.ok = true;
@@ -271,7 +272,7 @@ ShortcutResult WriteLinuxDesktop(const ShortcutSpec& spec)
     fs::create_directories(spec.folder, error);
     fs::path file = spec.folder / (lower + ".desktop");
     if (!WriteText(file, LinuxDesktopEntry(spec.gameName, spec.launcher, spec.gameId, icon)))
-        return Fail("Couldn't write " + datadir::Text(file));
+        return Fail(Tf("Couldn't write {}", datadir::Text(file)));
     // Desktops launch a .desktop file only when it is executable.
     fs::permissions(file, fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec | fs::perms::others_read | fs::perms::others_exec, error);
     ShortcutResult result;
@@ -299,7 +300,7 @@ namespace
         {
             std::string arguments = ShortcutArguments(spec.gameId); // ASCII
             std::wstring wideArguments(arguments.begin(), arguments.end());
-            std::wstring description = datadir::FromText("Play " + spec.gameName).wstring();
+            std::wstring description = datadir::FromText(Tf("Play {}", spec.gameName)).wstring();
             link->SetPath(spec.launcher.c_str());
             link->SetArguments(wideArguments.c_str());
             link->SetWorkingDirectory(spec.launcher.parent_path().c_str());
@@ -318,7 +319,7 @@ namespace
         if (SUCCEEDED(init))
             CoUninitialize();
         if (!ok)
-            return Fail("Windows couldn't make the shortcut " + datadir::Text(file));
+            return Fail(Tf("Windows couldn't make the shortcut {}", datadir::Text(file)));
         ShortcutResult result;
         result.ok = true;
         result.file = file;
@@ -330,13 +331,13 @@ namespace
 ShortcutResult CreateDesktopShortcut(const ShortcutSpec& spec)
 {
     if (spec.folder.empty())
-        return Fail("This computer has no Desktop folder.");
+        return Fail(Tr("This computer has no Desktop folder."));
     if (spec.launcher.empty())
-        return Fail("Skylauncher couldn't find its own file.");
+        return Fail(Tr("Skylauncher couldn't find its own file."));
     std::error_code error;
     fs::create_directories(spec.folder, error);
     if (!fs::is_directory(spec.folder, error))
-        return Fail("The Desktop folder " + datadir::Text(spec.folder) + " can't be written.");
+        return Fail(Tf("The Desktop folder {} can't be written.", datadir::Text(spec.folder)));
 #if defined(__APPLE__)
     return WriteMacApp(spec);
 #elif defined(_WIN32)

@@ -38,7 +38,7 @@ namespace launcher_ui
         GameSlot& target = SlotFor(*other);
         if (target.installer.Running() || target.kitDownload.Running() || target.copyJob.Running() || target.disc == DiscState::Verifying)
         {
-            Toast(fmt::format("{} is busy: try again when it is done", other->name), true);
+            Toast(Tf("{} is busy: try again when it is done", other->name), true);
             return;
         }
         const std::string path = m_s->discPath;
@@ -46,7 +46,7 @@ namespace launcher_ui
             m_config[m_s->game.id].erase("iso"); // it never was this game's disc
         StartGameDisc();
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast("Couldn't save the settings");
+            Toast(Tr("Couldn't save the settings"), true);
 
         target.started = true; // its own start (below) replaces the first-visit one
         SelectGame(*other);
@@ -54,7 +54,7 @@ namespace launcher_ui
         if (m_s->copy.state == gamedata::State::Complete)
         {
             StartGameDisc();
-            Toast(fmt::format("{} already plays from its copied game data", other->name));
+            Toast(Tf("{} already plays from its copied game data", other->name));
         }
         else
             StartVerify(path); // remembered once it is verified
@@ -78,12 +78,12 @@ namespace launcher_ui
         m_s->copy = gamedata::Inspect(gamedata::Folder(m_s->game.id));
         if (result.outcome == Outcome::Done)
         {
-            Toast(fmt::format("{}: game data copied", m_s->game.name));
+            Toast(Tf("{}: game data copied", m_s->game.name));
             m_s->copyMessage.clear();
             StartVerify(datadir::Text(gamedata::Folder(m_s->game.id))); // from now on the game plays from the copy
         }
         else if (result.outcome == Outcome::Cancelled)
-            Toast("Copy stopped: copy again to carry on from there");
+            Toast(Tr("Copy stopped: copy again to carry on from there"));
         else
         {
             m_s->copyMessage = CopyFailureText(result);
@@ -100,17 +100,17 @@ namespace launcher_ui
         std::string error;
         if (!gamedata::Remove(folder, error))
         {
-            Toast("Couldn't remove the copy: " + error, true);
+            Toast(Tf("Couldn't remove the copy: {}", error), true);
             return;
         }
         m_s->copyMessage.clear();
         StartGameDisc(); // the disc image again, if the player has one
-        Toast(fmt::format("Copy removed: {} freed", LauncherFormatSize(size)));
+        Toast(Tf("Copy removed: {} freed", LauncherFormatSize(size)));
     }
 
     void App::DrawGameData()
     {
-        Title("Game data", TitleSize, Text);
+        Title(Tr("Game data"), TitleSize, Text);
         auto note = [](const std::string& text) {
             ImGui::PushFont(nullptr, SmallSize);
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
@@ -123,74 +123,75 @@ namespace launcher_ui
         const bool ready = m_s->disc == DiscState::Ready && !m_s->fromCopy;
         const bool canCopy = ready && !Installing();
         auto showFolder = [&] {
-            if (PillButton("Show in folder", false, 200))
+            if (PillButton(Tr("Show in folder"), false, 200))
                 if (!OpenFolder(gamedata::Folder(m_s->game.id)))
-                    Toast("Couldn't open the folder");
+                    Toast(Tr("Couldn't open the folder"), true);
         };
 
         if (m_s->copyJob.Running())
         {
             const uint64_t total = m_s->copyJob.Total();
-            ImGui::TextColored(ImColor(Rgb(Play)), "%s", total == 0 ? "Copying the game data..." :
-                fmt::format("Copying the game data: {} of {}", LauncherFormatSize(m_s->copyJob.Bytes()), LauncherFormatSize(total)).c_str());
+            ImGui::TextColored(ImColor(Rgb(Play)), "%s", total == 0 ? Tr("Copying the game data...") :
+                Tf("Copying the game data: {} of {}", LauncherFormatSize(m_s->copyJob.Bytes()), LauncherFormatSize(total)).c_str());
             ImGui::ProgressBar(m_s->copyJob.Fraction(), ImVec2(420, 10), "");
-            if (PillButton("Stop", false, 160))
+            if (PillButton(Tr("Stop"), false, 160))
                 m_s->copyJob.Cancel();
-            note("Each file is read back and compared with the disc before it counts. You can stop at any time: the files already copied stay, "
-                 "and copying again carries on from there. Quitting Skylauncher stops it the same way.");
+            note(Tr("Each file is read back and compared with the disc before it counts. You can stop at any time: the files already copied stay, "
+                 "and copying again carries on from there. Quitting Skylauncher stops it the same way."));
             return;
         }
 
         switch (copy.state)
         {
         case gamedata::State::Complete:
-            ImGui::TextColored(ImColor(Rgb(Ok)), "Copied: %s, %zu %s", LauncherFormatSize(copy.total).c_str(), copy.files, copy.files == 1 ? "file" : "files");
-            if (HoldButton("Remove the copy", 260, "Hold to delete the copied game data. The game reads the disc image again."))
+            ImGui::TextColored(ImColor(Rgb(Ok)), "%s", (copy.files == 1 ? Tf("Copied: {}, 1 file", LauncherFormatSize(copy.total))
+                                                                       : Tf("Copied: {}, {} files", LauncherFormatSize(copy.total), copy.files)).c_str());
+            if (HoldButton(Tr("Remove the copy"), 260, Tr("Hold to delete the copied game data. The game reads the disc image again.")))
                 RemoveCopy();
             ImGui::SameLine();
             showFolder();
-            note("The game plays from these files: the disc image isn't needed to play, update or reinstall. Removing the copy frees the "
-                 "space and brings the disc image back.");
+            note(Tr("The game plays from these files: the disc image isn't needed to play, update or reinstall. Removing the copy frees the "
+                 "space and brings the disc image back."));
             break;
         case gamedata::State::Partial:
-            ImGui::TextColored(ImColor(Rgb(Play)), "Interrupted: %s of %s copied", LauncherFormatSize(copy.present).c_str(), LauncherFormatSize(copy.total).c_str());
+            ImGui::TextColored(ImColor(Rgb(Play)), "%s", Tf("Interrupted: {} of {} copied", LauncherFormatSize(copy.present), LauncherFormatSize(copy.total)).c_str());
             ImGui::BeginDisabled(!canCopy);
-            if (PillButton("Carry on copying", true, 260, true))
+            if (PillButton(Tr("Carry on copying"), true, 260, true))
                 StartCopy();
             ImGui::EndDisabled();
             ImGui::SameLine();
-            if (HoldButton("Remove the partial copy", 300, "Hold to delete the files copied so far."))
+            if (HoldButton(Tr("Remove the partial copy"), 300, Tr("Hold to delete the files copied so far.")))
                 RemoveCopy();
-            note(ready ? "The game still reads the disc image until the copy is complete."
-                       : "Choose and verify the disc image to carry on. The game reads the disc image until the copy is complete.");
+            note(ready ? Tr("The game still reads the disc image until the copy is complete.")
+                       : Tr("Choose and verify the disc image to carry on. The game reads the disc image until the copy is complete."));
             break;
         case gamedata::State::Damaged:
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-            ImGui::TextWrapped("The copied game data is damaged: %s.", copy.problem.c_str());
+            ImGui::TextWrapped("%s", Tf("The copied game data is damaged: {}.", copy.problem).c_str());
             ImGui::PopStyleColor();
             ImGui::BeginDisabled(!canCopy);
-            if (PillButton("Repair the copy", true, 260, true))
+            if (PillButton(Tr("Repair the copy"), true, 260, true))
                 StartCopy();
             ImGui::EndDisabled();
             ImGui::SameLine();
-            if (HoldButton("Remove the copy", 260, "Hold to delete the copied game data."))
+            if (HoldButton(Tr("Remove the copy"), 260, Tr("Hold to delete the copied game data.")))
                 RemoveCopy();
-            note(ready ? "The game reads the disc image instead. Repairing copies again only the files that are missing or changed."
-                       : "Choose and verify the disc image to repair it: the game needs the disc image or an intact copy.");
+            note(ready ? Tr("The game reads the disc image instead. Repairing copies again only the files that are missing or changed.")
+                       : Tr("Choose and verify the disc image to repair it: the game needs the disc image or an intact copy."));
             break;
         case gamedata::State::None:
             ImGui::BeginDisabled(!canCopy);
-            if (PillButton("Copy the game data", true, 300, true))
+            if (PillButton(Tr("Copy the game data"), true, 300, true))
                 StartCopy();
             ImGui::EndDisabled();
             ImGui::SameLine();
-            if (PillButton("Show in folder", false, 200))
+            if (PillButton(Tr("Show in folder"), false, 200))
                 if (!OpenFolder(gamedata::Folder(m_s->game.id).parent_path()))
-                    Toast("Couldn't open the folder");
-            note(fmt::format("Copies the disc's files{} into {} so the game no longer needs the disc image. Each file is checked against the disc. "
-                             "Nothing changes if you don't: the game reads the disc image, and nothing is duplicated.{}",
-                m_s->discSize > 0 && ready ? fmt::format(" (up to {})", LauncherFormatSize(m_s->discSize)) : std::string(), folderText,
-                ready ? "" : " Choose and verify the disc image first."));
+                    Toast(Tr("Couldn't open the folder"), true);
+            note(Tf("Copies the disc's files{0} into {1} so the game no longer needs the disc image. Each file is checked against the disc. "
+                       "Nothing changes if you don't: the game reads the disc image, and nothing is duplicated.{2}",
+                m_s->discSize > 0 && ready ? Tf(" (up to {})", LauncherFormatSize(m_s->discSize)) : std::string(), folderText,
+                ready ? std::string() : std::string(" ") + Tr("Choose and verify the disc image first.")));
             break;
         }
         if (!m_s->copyMessage.empty())

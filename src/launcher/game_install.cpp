@@ -1,4 +1,5 @@
 #include "launcher/game_install.h"
+#include "launcher/i18n.h"
 #include "launcher/updater.h"
 #include "shared/collection/datadir.h"
 #include <SDL3/SDL.h>
@@ -354,18 +355,19 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
         std::lock_guard lock(m_mutex);
         m_progress.state = InstallProgress::State::Failed;
         m_progress.error = std::move(message);
+        m_progress.startFailed = true;
         m_progress.log.push_back(m_progress.error);
         m_progress.logLines = m_progress.log.size();
         return false;
     };
 
     if (!kit)
-        return fail("The installer kit wasn't found. Put the ssa-kit folder (the one with SSABuild in it) next to Skylauncher, "
-            "then press Retry.");
+        return fail(Tr("The installer kit wasn't found. Put the ssa-kit folder (the one with SSABuild in it) next to Skylauncher, "
+            "then press Retry."));
     std::error_code error;
     std::filesystem::create_directories(out, error);
     if (error)
-        return fail(fmt::format("Couldn't create the game folder {}: {}", Utf8(out), error.message()));
+        return fail(Tf("Couldn't create the game folder {}: {}", Utf8(out), error.message()));
     m_logFile = out / "install.log";
     m_out = out;
     m_kitFolder = kit->folder;
@@ -396,7 +398,7 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     m_process = SDL_CreateProcessWithProperties(properties);
     SDL_DestroyProperties(properties);
     if (m_process == nullptr)
-        return fail(fmt::format("Couldn't start {}: {}", program, SDL_GetError()));
+        return fail(Tf("Couldn't start {}: {}", program, SDL_GetError()));
 
 #if defined(_WIN32)
     // A job holds SSABuild and the compilers it starts, so cancelling (or closing the launcher) stops them all.
@@ -491,8 +493,8 @@ void GameInstaller::Read()
     {
         progress.state = InstallProgress::State::Failed;
         if (progress.error.empty())
-            progress.error = exitCode != 0 ? fmt::format("The installer stopped with exit code {}.", exitCode)
-                                           : std::string("The installer stopped before the game was built.");
+            progress.error = exitCode != 0 ? Tf("The installer stopped with exit code {}.", exitCode)
+                                           : std::string(Tr("The installer stopped before the game was built."));
     }
     m_pid = 0;
     m_running = false;
