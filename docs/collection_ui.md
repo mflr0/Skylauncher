@@ -22,7 +22,12 @@ dorydev's look; her colours, fonts and widgets are untouched (`launcher_theme.h`
   `collection::BestPicturePath(game, toy, variant)` gives its best picture (the variant's own first, the largest).
 - **Variants.** The catalogue lists every variant Spyro's Adventure and Giants know (Series 2, LightCore, Legendary and
   the alternate decos, with the ids Giants reads), and the later games' from public lists; SSARecomp's
-  `docs/runtime/host/collection.md` ("The games' own toy tables") has the sources.
+  `docs/runtime/host/collection.md` ("The games' own toy tables") has the sources. Variants of kind `base` are the
+  plain figure as sold with a non-zero id (named after the toy).
+- **Upgrades.** `collection::Upgrades(toy, game, language)` (`shared/collection/upgrades.h`) gives what each bit of a
+  figure's upgrade field means, with the game's own names, descriptions and prices in English or French; the texts
+  are read from the player's disc when it is checked (`<data>/<Game>/upgrades.json`, part `art::Upgrades`), else a
+  plain list ("Upgrade 1"...). SSARecomp's `docs/runtime/host/figures.md` ("Upgrades") has the bit layout.
 - Removed: `figure_file.*` and `figure_collection.*` (the old engine), replaced by `figure_tag`/`figure_crypto`/
   `figure_data` and `collection`.
 - Folder: `collection::Folder()` (`%APPDATA%\Skylanders\Collection`, `~/Library/Application Support/Skylanders/Collection`).

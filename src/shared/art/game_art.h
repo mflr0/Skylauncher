@@ -64,7 +64,8 @@ namespace art
         Pictures = 1,  // logo, background, title icon
         Portraits = 2, // the toy portraits (the in-game Toy Box asks for these only)
         Artworks = 4,  // the large toy pictures of the games that have them (Giants: about 8 s and 60 MB the first time)
-        All = 7,
+        Upgrades = 8,  // the toys' upgrade names, descriptions and prices (<data>/<Game>/upgrades.json; game_text.h)
+        All = 15,
     };
 
     struct Extraction
@@ -72,6 +73,7 @@ namespace art
         bool logo = false, background = false, titleIcon = false; // present in the cache afterwards
         int portraits = 0;                                          // portrait files in the folder afterwards
         int artworks = 0;                                           // artwork files in its folder afterwards
+        bool upgrades = false;                                      // upgrades.json present afterwards
     };
 
     // Reads `game`'s pictures from the player's disc into its caches; what is already cached (by this version of the

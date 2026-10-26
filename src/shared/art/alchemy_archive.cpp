@@ -606,6 +606,12 @@ namespace art::alchemy
         return out;
     }
 
+    std::string IgzFile::TypeName(uint64_t object) const
+    {
+        uint32_t type = Be32(object);
+        return type < m_types.size() ? m_types[type] : std::string();
+    }
+
     std::vector<IgzFile::Picture> IgzFile::Pictures() const
     {
         std::vector<Picture> out;
