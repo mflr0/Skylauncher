@@ -3,6 +3,7 @@
 #include "launcher/portal_status.h"
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
+#include "launcher/updater.h"
 #include "assets/launcher_assets.h"
 #include "shared/art/game_art.h"
 #include "shared/collection/icons.h"
@@ -617,6 +618,7 @@ void EditChecks()
 }
 
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
+void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder); // tests/shell_test.cpp
 int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
 int I18nChecks(); // tests/i18n_test.cpp
 int CopyChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso); // tests/copy_test.cpp
@@ -684,6 +686,71 @@ static void SidebarChecks(const std::filesystem::path& scratch, const std::strin
     SetActiveGame("ssa");
 }
 
+// The kit follows the launcher (App::TestKitScript, in an offscreen window): an old kit next to the launcher is replaced by the one
+// of the launcher's own release before INSTALL builds anything; a kit that does not build Giants is replaced before Giants' INSTALL;
+// and at start, or right after a self-update, the old kit is fetched on its own. The release is a fake one (a file:// URL), its kit
+// the fake kit under another build; the kit "next to the launcher" is a copy of it with an older kit.txt.
+static void KitFlowChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso)
+{
+    auto set = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
+    namespace fs = std::filesystem;
+    fs::path newKit = scratch / "kitflow" / "kit-new";
+    fs::remove_all(scratch / "kitflow");
+    fs::create_directories(newKit.parent_path());
+    fs::copy(SKYLAUNCHER_FAKE_KIT, newKit, fs::copy_options::recursive);
+    std::ofstream(newKit / "kit.txt") << "version=0.5.0\nbuild=kit-new\ngames=ssa,giants\n";
+    SemVer next = ParseSemVer(LauncherVersion());
+    std::string nextTag = "v" + std::to_string(next.major) + "." + std::to_string(next.minor) + "." + std::to_string(next.patch + 1);
+    MakeKitRelease(scratch / "kitflow" / "release", { "v" + LauncherVersion(), nextTag }, newKit);
+
+    struct Case { const char* mode; const char* kitText; };
+    const Case cases[] = {
+        { "old", "version=0.3.1\nbuild=old\n" },                       // a kit from before this launcher: SSA only
+        { "giants", "version=9.0.0\nbuild=old\ngames=ssa\n" },         // recent enough, but it cannot build Giants
+        { "start", "version=0.3.1\nbuild=old\n" },
+    };
+    for (const Case& test : cases)
+    {
+        if (std::string_view(test.mode) == "giants" && giantsIso.empty())
+            continue;
+        fs::path root = scratch / "kitflow" / test.mode;
+        fs::create_directories(root / "shots");
+        fs::create_directories(root / "base");
+        fs::copy(SKYLAUNCHER_FAKE_KIT, root / "base" / "ssa-kit-test", fs::copy_options::recursive);
+        std::ofstream(root / "base" / "ssa-kit-test" / "kit.txt") << test.kitText;
+        set("SDL_VIDEO_DRIVER", "offscreen");
+        set("SDL_AUDIO_DRIVER", "dummy");
+        set("SKYLANDERS_DATA", (root / "data").string());
+        set("SKYLAUNCHER_DATA", (root / "launcher_data").string());
+        set("SSA_COLLECTION", (root / "collection").string());
+        set("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
+        set("SKYLAUNCHER_BASE_PATH", (root / "base").string());
+        set("SKYLAUNCHER_UPDATE_URL", "file://" + (scratch / "kitflow" / "release" / "latest.json").string());
+        set("FAKE_SSABUILD_DELAY", "0.01");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
+        set("SSA_LAUNCHER_SHOTS", (root / "shots").string());
+        set("SSA_LAUNCHER_TEST_KIT", test.mode);
+        std::string ini = (root / "kit.ini").string();
+        set("SSA_LAUNCHER_INI", ini);
+        LauncherConfig config;
+        config["ssa"]["iso"] = ssaIso;
+        config["giants"]["iso"] = giantsIso;
+        {
+            launcher_ui::App app(*FindGame("ssa"), ini, config);
+            app.Run();
+            EXPECT(app.TestFailures() == 0);
+        }
+        // The old kit was never used: only the fetched one is in the data folder's kit/, the old one is untouched.
+        EXPECT(fs::exists(root / "base" / "ssa-kit-test" / "kit.txt"));
+        SetActiveGame("ssa");
+    }
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_TEST_KIT");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_BASE_PATH");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY");
+}
+
 // The X on every seat of the collection page, in the offscreen window (App::TestSeatXScript): players, item and adventure seats,
 // each emptied by the mouse on the X, by Delete and by the pad's X. It runs the launcher itself as a child process, because the
 // collection's folder is fixed for a process by its first use, and the checks above have used theirs. Scratch folders only.
@@ -742,6 +809,12 @@ int main(int argc, char** argv)
         int failures = CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
         printf("%d failures\n", failures);
         return failures == 0 ? 0 : 1;
+    }
+    if (getenv("SKYLAUNCHER_TEST_KIT_ONLY") != nullptr) // only "The kit follows the launcher" (quick to rerun)
+    {
+        KitFlowChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
+        printf("%d failures\n", g_failures);
+        return g_failures == 0 ? 0 : 1;
     }
     CollectionChecks(scratch);
     HoldChecks();
@@ -884,6 +957,8 @@ int main(int argc, char** argv)
         printf("The sidebar line through an install and an update:\n");
         SidebarChecks(scratch, iso.string(), giantsIso);
     }
+    printf("The kit follows the launcher:\n");
+    KitFlowChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
     printf("Copy the game data:\n");
     g_failures += CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
     printf("The seats' X in the window:\n");
@@ -922,6 +997,20 @@ int main(int argc, char** argv)
     EXPECT(LauncherLanguageLabel(helperConfig, game) == "pt-BR");
     helperConfig["ssa"]["language"].clear();
     helperConfig["ssa"]["voice_language"].clear();
+    // Giants: twelve languages on its disc; its voices follow the text until one is chosen.
+    const GameInfo& giantsGame = *FindGame("giants");
+    EXPECT(LauncherVoiceLabel(helperConfig, giantsGame) == "English");
+    helperConfig["giants"]["language"] = "es-419";
+    EXPECT(LauncherLanguageLabel(helperConfig, giantsGame) == "Español (Latinoamérica)" && LauncherVoiceLabel(helperConfig, giantsGame) == "Español (Latinoamérica)");
+    helperConfig["giants"]["voice_language"] = "pt";
+    EXPECT(LauncherVoiceLabel(helperConfig, giantsGame) == "Português");
+    helperConfig["giants"]["language"].clear();
+    helperConfig["giants"]["voice_language"].clear();
+    const char* const giantsCodes[] = { "en", "fr", "de", "es", "es-419", "it", "nl", "pt", "sv", "no", "da", "fi" };
+    EXPECT(std::size(launcher_ui::GiantsLanguageChoices) == std::size(giantsCodes) && std::size(launcher_ui::GiantsVoiceChoices) == std::size(giantsCodes) + 1);
+    for (size_t i = 0; i < std::size(giantsCodes); i++)
+        EXPECT(std::string(launcher_ui::GiantsLanguageChoices[i].value) == giantsCodes[i] && std::string(launcher_ui::GiantsVoiceChoices[i + 1].value) == giantsCodes[i]);
+    EXPECT(std::string(launcher_ui::GiantsVoiceChoices[0].value).empty());
 
     EXPECT(!LauncherFullscreen(helperConfig));
     helperConfig["launcher"]["fullscreen"] = "YES";

@@ -55,7 +55,9 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
    game selected; B / Escape or **Back** return to its Play page):
    - Video: fullscreen, resolution scale, frame rate limit (30 or 60), skip intro movies, VSync, texture filtering, widescreen,
      HD texture packs (and their folder), Advanced > dump textures. The game's own copy, `[<game>.video]` (docs/settings.md).
-   - Language: game text and game voices (`[<game>] language`, `voice_language`).
+   - Language: game text and game voices (`[<game>] language`, `voice_language`). Giants' disc has twelve languages for both (English,
+     French, German, Spanish, Latin-American Spanish `es-419`, Italian, Dutch, Portuguese, Swedish, Norwegian, Danish, Finnish) and its
+     voices default to **Same as text** (an empty `voice_language`); Spyro's Adventure has ten, its voices default to English.
    - Disc: the image's file name and state; **Choose... / Change...**, **Remove** (the launcher forgets it; the file is not
      touched), **Show in folder**. Disabled while a check or an install runs.
    - Saves: **Open saves folder** and the save backups with Restore (held, refused while the game runs).
@@ -114,6 +116,7 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 |---|---|---|---|
 | never shown this session | Open | blue | CHOOSE DISC |
 | the kit being downloaded | `Downloading tools 42 %` | blue | INSTALLING... (off) |
+| the kit renewed at start or after an update (a verified disc) | `Downloading tools 42 %` | blue | INSTALL (off), or PLAY |
 | installing; its last step | `Installing 42 %`; `Finishing 97 %` | blue | INSTALLING... (off) |
 | updating a build; its last step | `Updating 42 %`; `Finishing 97 %` | blue | UPDATING... (off) |
 | the disc being checked | Checking your disc | blue | CHECKING... (off) |

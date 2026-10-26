@@ -19,12 +19,14 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `update` | `repo` | `owner/name` | Where Skylauncher's releases are (default `mflr0/Skylauncher`) | n/a |
 | `update` | `kit_repo` | `owner/name` | Where the player kit's releases are; empty: no kit updates | n/a |
 | `update` | `kit_tag` | text | The release of the installed kit, written after a kit update | n/a |
+| `update` | `kit_fetched` | release tag | The launcher release whose kit was fetched at start or by INSTALL: not asked again for it (docs/updates.md) | n/a |
 | `install.<sha256>` | `runtime` | path | The game the launcher built for the disc whose `default.xex` has this SHA-256 | n/a |
 | `install.<sha256>` | `kit` | text | The kit version it was built with; another kit offers "Update the game" | n/a |
 | `install.<sha256>` | `state`, `pid` | `running`, `failed`; process id | An install that runs or stopped: shown again after a restart | n/a |
 | `ssa` | `iso` | path | The verified disc image | yes |
 | `ssa` | `language` | `en` `fr` `de` `es` `it` `nl` `sv` `no` `da` `fi` | Text language | yes |
 | `ssa` | `voice_language` | same codes | Voice language | yes |
+| `giants` | `language`, `voice_language` | `en` `fr` `de` `es` `es-419` `it` `nl` `pt` `sv` `no` `da` `fi` | Text and voice language (the disc's twelve); `voice_language` empty or absent: the voices follow the text | yes |
 | `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes (the key is per game: see "Per-game video" below) |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
 | `video` | `fps_limit` | `30`, `60` | Frame rate cap (the game is made for 30; 60 is experimental). Other values the runtime reads as 60 | yes |

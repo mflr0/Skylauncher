@@ -517,11 +517,100 @@ namespace
     }
 }
 
+namespace
+{
+    // Which kit a launcher builds with: what it builds (games=), from which release, and the kit next to the launcher against
+    // the downloaded ones (docs/updates.md, "The kit follows the launcher").
+    void KitFollowChecks(const std::filesystem::path& scratch)
+    {
+        std::filesystem::path root = scratch / "kitfollow";
+        auto setEnv = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
+        auto kit = [&](const std::filesystem::path& folder, const std::string& text) {
+            WriteBytes(folder / "SSABuild", "x");
+            WriteBytes(folder / "SSABuild.exe", "x");
+            WriteBytes(folder / "kit.txt", text);
+        };
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
+        setEnv("SKYLAUNCHER_DATA", (root / "data").string());
+
+        // What a kit builds: games= in kit.txt; a kit from before 0.5.0 says nothing and builds Spyro's Adventure only.
+        kit(root / "old", "version=0.3.1\nbuild=a\n");
+        kit(root / "multi", "version=0.5.0\nbuild=b\ngames=ssa, giants\n");
+        std::optional<InstallKit> old = InstallKitIn(root / "old"), multi = InstallKitIn(root / "multi");
+        SHELL_EXPECT(old && old->Builds("ssa") && !old->Builds("giants"));
+        SHELL_EXPECT(multi && multi->Builds("ssa") && multi->Builds("giants") && !multi->Builds("swapforce"));
+
+        // From an older release than the launcher: the kit.txt version, or the folder's release tag; the player's own never.
+        SHELL_EXPECT(KitOlderThanLauncher(*old, "0.4.0") && !KitOlderThanLauncher(*old, "0.3.1") && !KitOlderThanLauncher(*multi, "0.4.0"));
+        old->tag = "v0.4.0";
+        SHELL_EXPECT(!KitOlderThanLauncher(*old, "0.4.0") && KitOlderThanLauncher(*old, "0.4.1"));
+        old->chosen = true;
+        SHELL_EXPECT(!KitOlderThanLauncher(*old, "9.0.0"));
+        kit(root / "none", "build=c\n");
+        SHELL_EXPECT(!KitOlderThanLauncher(*InstallKitIn(root / "none"), "9.0.0"));
+
+        // Next to the launcher or downloaded: the kit next to it, unless a downloaded one comes from a newer release.
+        setEnv("SKYLAUNCHER_BASE_PATH", (root / "base").string());
+        kit(root / "base" / "ssa-kit-windows-x64", "version=0.3.1\nbuild=beside\n");
+        auto found = FindInstallKit({});
+        SHELL_EXPECT(found && found->version == "beside" && found->tag.empty() && !found->chosen);
+        kit(DownloadedKitsFolder() / "v0.4.0", "version=0.5.0\nbuild=downloaded\ngames=ssa,giants\n");
+        found = FindInstallKit({});
+        SHELL_EXPECT(found && found->version == "downloaded" && found->tag == "v0.4.0" && found->Builds("giants"));
+        kit(root / "base" / "ssa-kit-windows-x64", "version=0.5.0\nbuild=beside\n");
+        found = FindInstallKit({});
+        SHELL_EXPECT(found && found->version == "beside");
+        // The player's own choice wins over both, and is never called old.
+        setEnv("SKYLAUNCHER_KIT", (root / "old").string());
+        found = FindInstallKit({});
+        SHELL_EXPECT(found && found->chosen && found->version == "a" && !KitOlderThanLauncher(*found, "9.0.0"));
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_BASE_PATH");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA");
+        printf("Kit: games=, the release it comes from, next to the launcher against downloaded, the player's own\n");
+    }
+}
+
+// The kit of a fake release for SkylauncherTest's launcher checks (tests/launcher_test.cpp): `kitFolder`'s files in a zip, as the kit
+// asset of a release for each of `tags`, the last one the latest; `<tag>.json` is the release of that tag, as the launcher asks for
+// its own. `folder` is what SKYLAUNCHER_UPDATE_URL points into. Where `zip` exists the Unix modes are kept (so the kit's SSABuild
+// runs once unpacked).
+void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder)
+{
+    std::filesystem::create_directories(folder);
+    std::filesystem::path zip = folder / KitAssetName();
+    std::filesystem::remove(zip);
+    std::filesystem::remove_all(folder / "ssa-kit");
+    std::filesystem::copy(kitFolder, folder / "ssa-kit", std::filesystem::copy_options::recursive);
+    bool zipped = false;
+#if !defined(_WIN32)
+    zipped = std::system(("cd '" + folder.string() + "' && zip -qr '" + KitAssetName() + "' ssa-kit").c_str()) == 0;
+#endif
+    if (!zipped)
+    {
+        mz_zip_archive archive{};
+        mz_zip_writer_init_file(&archive, zip.string().c_str(), 0);
+        for (const auto& entry : std::filesystem::directory_iterator(kitFolder))
+            if (entry.is_regular_file())
+                mz_zip_writer_add_file(&archive, ("ssa-kit/" + entry.path().filename().string()).c_str(), entry.path().string().c_str(), nullptr, 0, 6);
+        mz_zip_writer_finalize_archive(&archive);
+        mz_zip_writer_end(&archive);
+    }
+    std::filesystem::remove_all(folder / "ssa-kit");
+    std::string bytes = ReadBytes(zip);
+    for (const std::string& tag : tags)
+    {
+        MakeRelease(folder, tag, { { KitAssetName(), bytes } }, {});
+        std::filesystem::copy_file(folder / "latest.json", folder / (tag + ".json"), std::filesystem::copy_options::overwrite_existing);
+    }
+}
+
 int ShellChecks(const std::filesystem::path& scratch)
 {
     ChecklistChecks(scratch);
     GameRunChecks(scratch);
     UpdaterChecks(scratch);
+    KitFollowChecks(scratch);
     SaveBackupChecks(scratch);
     ReportChecks(scratch);
     return g_shellFailures;

@@ -22,7 +22,16 @@ struct InstallKit
     std::filesystem::path ssabuild; // the kit's SSABuild executable
     std::string release;            // "version=" in kit.txt: the release it came from, "" when it has none
     std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
+    std::vector<std::string> games; // "games=" in kit.txt: what the kit builds ("ssa", "giants"); a kit before 0.5.0 has none: SSA only
+    std::string tag;                // the release it was downloaded from (its kit/<tag>/ folder), "" for any other kit
+    bool chosen = false;            // SKYLAUNCHER_KIT or "[launcher] kit=": the player's own, never replaced by the launcher
+
+    bool Builds(std::string_view gameId) const;
 };
+
+// The kit comes from an older release than the launcher's version: its kit/<tag>/ folder, else "version=" in its kit.txt.
+// False for a kit that says nothing about it, and for the player's own (`chosen`).
+bool KitOlderThanLauncher(const InstallKit& kit, std::string_view launcherVersion);
 
 // Where Skylauncher keeps what it makes: the "Skylanders" data folder shared with the games (datadir.h: SKYLANDERS_DATA, else
 // %APPDATA%\Skylanders on Windows, ~/Library/Application Support/Skylanders on macOS, ~/.local/share/Skylanders on Linux), or
@@ -34,9 +43,10 @@ std::filesystem::path DownloadedKitsFolder(); // kit/<release tag>/ folders, eac
 std::optional<InstallKit> InstallKitIn(const std::filesystem::path& folder);
 
 // The kit: SKYLAUNCHER_KIT, else "[launcher] kit=", else a folder next to the launcher (or its macOS app bundle) named
-// ssa-kit, kit, or starting with ssa-kit (an unzipped "ssa-kit-windows-x64"), else the newest downloaded kit. Empty when
-// none holds SSABuild.
-std::optional<InstallKit> FindInstallKit(const LauncherConfig& config);
+// ssa-kit, kit, or starting with ssa-kit (an unzipped "ssa-kit-windows-x64") unless a downloaded kit comes from a newer
+// release (or when it cannot build `gameId`, if one is given and the downloaded kit can), else the newest downloaded kit.
+// Empty when none holds SSABuild.
+std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::string_view gameId = {});
 
 // A runtime the player set up themselves: SKYLAUNCHER_RUNTIME, else "[launcher] runtime=" in the settings file, else
 // the game's runtime executable next to the launcher (or inside its macOS app bundle). Empty when none exists.

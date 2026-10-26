@@ -79,6 +79,14 @@ namespace launcher_ui
         { "real", N_("Real portal (Wii, PlayStation, Xbox)"), "hid usb" } };
     inline constexpr Choice LanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
         { "it", "Italiano" }, { "nl", "Nederlands" }, { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
+    // Giants' disc has twelve text and voice languages: Spanish twice (Spain, Latin America) and Portuguese. Its voices follow the
+    // text unless one is chosen (an empty voice_language).
+    inline constexpr Choice GiantsLanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
+        { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" }, { "sv", "Svenska" },
+        { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
+    inline constexpr Choice GiantsVoiceChoices[] = { { "", N_("Same as text") }, { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" },
+        { "es", "Español" }, { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" },
+        { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
 
     template<size_t N>
     int ChoiceIndex(const Choice (&choices)[N], const std::string& value, int fallback)
@@ -381,6 +389,9 @@ namespace launcher_ui
         bool Installing() const { return m_s->installer.Running() || m_s->kitDownload.Running(); }
         void StartInstaller();
         void StartKitDownload();
+        bool KitNeedsFetch(const GameSlot& slot) const; // no kit, one from an older release, or one that can't build the game
+        void RefreshKit(const std::string& tag);        // at start and after a self-update: the kit of release `tag` replaces an older one
+        void PollKitRefresh();
         bool UpdateAvailable() const;
         bool UpdateAvailable(const GameSlot& slot) const;
         void StartInstall();
@@ -417,6 +428,7 @@ namespace launcher_ui
         void TestSwitchScript(uint64_t now);
         void TestCopyScript(uint64_t now);
         void TestSidebarScript(uint64_t now);
+        void TestKitScript(uint64_t now);
         void TestSeatXScript(uint64_t now);
         void TestButtonsScript(uint64_t now);
         void PlayNow(); // PLAY on the shown game: its disc and built game are what the launcher returns
@@ -456,6 +468,8 @@ namespace launcher_ui
         bool m_updateManual = false;     // the running check was asked for: say the answer, even "up to date"
         bool m_updateLater = false;      // the player closed the banner for this session
         bool m_kitLater = false;
+        KitDownloader m_kitRefresh;      // the kit of the launcher's own release, fetched on its own (not part of an install)
+        std::string m_kitRefreshTag;     // the release it was started for; empty when none is under way
         bool m_whatsNewOpen = false;
         bool m_updateWasBusy = false;
         std::string m_updateDoneNote;    // the last answer of a manual check, shown in About
@@ -500,6 +514,8 @@ namespace launcher_ui
         std::map<std::string, std::string> m_drawn; // while testing: what the sidebar, Home and the main button drew ("sidebar:ssa", "home:ssa", "button")
         bool m_testSidebar = false;    // SSA_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
         bool m_testCopy = false;       // SSA_LAUNCHER_TEST_COPY: copying the game data, playing from it, the wrong-disc button
+        std::string m_testNextTag;     // the release the launcher "became" in the kit check
+        std::string m_testKit;         // SSA_LAUNCHER_TEST_KIT: "old", "giants" or "start": the kit that follows the launcher (fake release)
         bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
         int m_testFailures = 0;
         uint64_t m_testBegan = 0;

@@ -68,7 +68,19 @@ namespace
                 kit.version = Trim(text.substr(6));
             else if (text.starts_with("version="))
                 version = Trim(text.substr(8));
+            else if (text.starts_with("games="))
+            {
+                std::string_view list = text.substr(6);
+                for (size_t comma = 0; !list.empty(); list.remove_prefix(comma == std::string_view::npos ? list.size() : comma + 1))
+                {
+                    comma = list.find(',');
+                    if (std::string_view game = Trim(list.substr(0, comma)); !game.empty())
+                        kit.games.emplace_back(game);
+                }
+            }
         }
+        if (kit.games.empty())
+            kit.games.push_back("ssa"); // before 0.5.0 a kit builds Spyro's Adventure only and says nothing
         kit.release = version;
         if (kit.version.empty())
             kit.version = version;
@@ -99,35 +111,27 @@ std::filesystem::path DownloadedKitsFolder() { return LauncherDataFolder() / "ki
 
 std::optional<InstallKit> InstallKitIn(const std::filesystem::path& folder) { return KitIn(folder); }
 
-std::optional<InstallKit> FindInstallKit(const LauncherConfig& config)
+bool InstallKit::Builds(std::string_view gameId) const
 {
+    return std::find(games.begin(), games.end(), gameId) != games.end();
+}
+
+bool KitOlderThanLauncher(const InstallKit& kit, std::string_view launcherVersion)
+{
+    return !kit.chosen && IsNewer(launcherVersion, kit.tag.empty() ? kit.release : kit.tag);
+}
+
+std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::string_view gameId)
+{
+    auto chosen = [](std::optional<InstallKit> kit) {
+        if (kit)
+            kit->chosen = true;
+        return kit;
+    };
     if (const char* path = SDL_getenv("SKYLAUNCHER_KIT"); path != nullptr && *path != 0)
-        return KitIn(Path(path));
+        return chosen(KitIn(Path(path)));
     if (std::string path = Setting(config, "launcher", "kit"); !path.empty())
-        return KitIn(Path(path));
-
-    const char* base = SDL_GetBasePath();
-    if (base == nullptr)
-        return {};
-    std::vector<std::filesystem::path> folders{ Path(base) };
-    // A macOS app's base path is Skylauncher.app/Contents/Resources: the kit sits next to the app.
-    std::filesystem::path bundle = folders[0].parent_path();
-    if (bundle.filename().empty())
-        bundle = bundle.parent_path();
-    if (bundle.filename() == "Resources" && bundle.parent_path().filename() == "Contents")
-        folders.push_back(bundle.parent_path().parent_path().parent_path());
-
-    for (const std::filesystem::path& folder : folders)
-    {
-        for (const char* name : { "ssa-kit", "kit" })
-            if (auto kit = KitIn(folder / name))
-                return kit;
-        std::error_code error;
-        for (const auto& entry : std::filesystem::directory_iterator(folder, error))
-            if (entry.is_directory(error) && Utf8(entry.path().filename()).starts_with("ssa-kit"))
-                if (auto kit = KitIn(entry.path()))
-                    return kit;
-    }
+        return chosen(KitIn(Path(path)));
 
     // The kits Skylauncher downloaded (kit/<release tag>/): the newest release.
     std::optional<InstallKit> best;
@@ -141,10 +145,44 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config)
         if (kit && (!best || CompareSemVer(tag, bestTag) > 0))
         {
             best = kit;
+            best->tag = name;
             bestTag = tag;
         }
     }
-    return best;
+
+    // A kit next to the launcher is used unless a downloaded one comes from a newer release (a stale kit left there).
+    auto nextToLauncher = [&]() -> std::optional<InstallKit> {
+        const char* base = SDL_getenv("SKYLAUNCHER_BASE_PATH"); // tests: the folder the launcher "is in"
+        if (base == nullptr || *base == 0)
+            base = SDL_GetBasePath();
+        if (base == nullptr)
+            return {};
+        std::vector<std::filesystem::path> folders{ Path(base) };
+        // A macOS app's base path is Skylauncher.app/Contents/Resources: the kit sits next to the app.
+        std::filesystem::path bundle = folders[0].parent_path();
+        if (bundle.filename().empty())
+            bundle = bundle.parent_path();
+        if (bundle.filename() == "Resources" && bundle.parent_path().filename() == "Contents")
+            folders.push_back(bundle.parent_path().parent_path().parent_path());
+
+        for (const std::filesystem::path& folder : folders)
+        {
+            for (const char* name : { "ssa-kit", "kit" })
+                if (auto kit = KitIn(folder / name))
+                    return kit;
+            std::error_code error;
+            for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+                if (entry.is_directory(error) && Utf8(entry.path().filename()).starts_with("ssa-kit"))
+                    if (auto kit = KitIn(entry.path()))
+                        return kit;
+        }
+        return {};
+    };
+    std::optional<InstallKit> beside = nextToLauncher();
+    if (!beside || !best)
+        return beside ? beside : best;
+    bool downloadedWins = IsNewer(best->tag, beside->release) || beside->release.empty() || (!gameId.empty() && !beside->Builds(gameId) && best->Builds(gameId));
+    return downloadedWins ? best : beside;
 }
 
 std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly)
