@@ -20,8 +20,8 @@ namespace launcher_ui
         // Manage's words that changed in the polish pass (the rest are still inline, for #4).
         namespace strings
         {
-            constexpr const char* DeleteForGood = "Delete for good";
-            constexpr const char* DeleteForGoodHint = "Hold to delete it for good. This can't be undone.";
+            constexpr const char* DeleteForGood = N_("Delete for good");
+            constexpr const char* DeleteForGoodHint = N_("Hold to delete it for good. This can't be undone.");
         }
 
         struct DialogResult
@@ -49,12 +49,15 @@ namespace launcher_ui
 
         std::vector<std::string> ChooseFigureFiles(SDL_Window* window)
         {
-            static const SDL_DialogFileFilter filters[] = { { "Figure dumps (.sky, .bin, .dmp)", "sky;bin;dmp" } };
+            static std::string filterName;
+            filterName = Tr("Figure dumps (.sky, .bin, .dmp)"); // the dialog is asynchronous: the text must outlive this call
+            static SDL_DialogFileFilter filters[1];
+            filters[0] = { filterName.c_str(), "sky;bin;dmp" };
             DialogResult result;
             SDL_PropertiesID properties = SDL_CreateProperties();
             SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, const_cast<SDL_DialogFileFilter*>(filters));
             SDL_SetNumberProperty(properties, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, 1);
-            SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, "Import figures");
+            SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, Tr("Import figures"));
             SDL_SetBooleanProperty(properties, SDL_PROP_FILE_DIALOG_MANY_BOOLEAN, true);
             SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, window);
             SDL_ShowFileDialogWithProperties(SDL_FILEDIALOG_OPENFILE, Collect, &result, properties);
@@ -78,20 +81,20 @@ namespace launcher_ui
 
     void CollectionPage::ExportTo(const std::vector<std::string>& paths)
     {
-        std::string folder = ChooseFolder(m_app.m_window, "Export the figures to");
+        std::string folder = ChooseFolder(m_app.m_window, Tr("Export the figures to"));
         if (folder.empty())
             return;
         int count = collection::Export(paths, folder);
-        Toast(fmt::format("Exported {} figure{} to {}", count, count == 1 ? "" : "s", folder));
+        Toast(count == 1 ? Tf("Exported {} figure to {}", count, folder) : Tf("Exported {} figures to {}", count, folder));
     }
 
     void CollectionPage::DrawManage(ImVec2 size)
     {
-        m_app.Title("MANAGE", HeadlineSize - 6, Text);
+        m_app.Title(Tr("MANAGE"), HeadlineSize - 6, Text);
         RefreshDisk();
         size_t unknown = std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return f.toy == nullptr; });
-        const std::string tabs[] = { fmt::format("Trash  {}", m_trash.size()), "Backups", "Import and export", fmt::format("Unknown toys  {}", unknown),
-            fmt::format("Tidy  {}", m_starters) };
+        const std::string tabs[] = { Tf("Trash  {}", m_trash.size()), Tr("Backups"), Tr("Import and export"), Tf("Unknown toys  {}", unknown),
+            Tf("Tidy  {}", m_starters) };
         for (int i = 0; i < 5; i++)
         {
             if (i > 0)
@@ -111,30 +114,30 @@ namespace launcher_ui
         }
         ImGui::EndChild();
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + size.x - Pad - 110, ImGui::GetWindowPos().y + size.y - Pad - 40));
-        if (m_app.PillButton("Close", false, 110, true))
+        if (m_app.PillButton(Tr("Close"), false, 110, true))
             CloseOverlay();
     }
 
     void CollectionPage::DrawTrash()
     {
         const std::vector<collection::TrashEntry> trash = m_trash; // a copy: the buttons below reload it
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Deleted figures stay here for 30 days. Their stats and name come back with them.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Deleted figures stay here for 30 days. Their stats and name come back with them."));
         ImGui::Dummy(ImVec2(0, 6));
         if (trash.empty())
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "The trash is empty.");
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("The trash is empty."));
         for (const collection::TrashEntry& entry : trash)
         {
             ImGui::PushID(entry.id.c_str());
             m_app.BoldText(entry.file.c_str(), Text);
             ImGui::SameLine(0, 12);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ShortDate(entry.deleted).c_str(), entry.reason == "tidy" ? "tidied" : "deleted");
-            if (m_app.PillButton("Put back", false, 120, true))
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ShortDate(entry.deleted).c_str(), entry.reason == "tidy" ? Tr("tidied") : Tr("deleted"));
+            if (m_app.PillButton(Tr("Put back"), false, 120, true))
             {
-                Toast(collection::Undelete(entry.id).empty() ? "Couldn't put it back" : "Put back: " + entry.file);
+                Toast(collection::Undelete(entry.id).empty() ? Tr("Couldn't put it back") : Tr("Put back: ") + entry.file);
                 Reload();
             }
             ImGui::SameLine(0, 8);
-            if (m_app.HoldButton(strings::DeleteForGood, 200, strings::DeleteForGoodHint))
+            if (m_app.HoldButton(Tr(strings::DeleteForGood), 200, Tr(strings::DeleteForGoodHint)))
             {
                 collection::DeleteForGood(entry.id);
                 Reload();
@@ -146,7 +149,7 @@ namespace launcher_ui
 
     void CollectionPage::DrawBackups()
     {
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Every change makes a backup; the newest 10 of each figure are kept.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Every change makes a backup; the newest 10 of each figure are kept."));
         ImGui::Dummy(ImVec2(0, 6));
         bool any = false;
         for (const Figure& figure : m_model.figures)
@@ -156,7 +159,7 @@ namespace launcher_ui
                 continue;
             any = true;
             ImGui::PushID(figure.path.c_str());
-            if (m_app.Chip(fmt::format("{}  {}##b", Name(figure), backups.size()).c_str(), m_backupsOf == figure.path))
+            if (m_app.Chip(Tf("{}  {}##b", Name(figure), backups.size()).c_str(), m_backupsOf == figure.path))
                 m_backupsOf = m_backupsOf == figure.path ? std::string() : figure.path;
             ImGui::PopID();
             if (m_backupsOf != figure.path)
@@ -168,10 +171,10 @@ namespace launcher_ui
                 ImGui::TextUnformatted(backup.label.c_str());
                 ImGui::SameLine(0, 14);
                 ImGui::BeginDisabled(!Writable(figure));
-                if (m_app.PillButton("Restore", false, 100, true))
+                if (m_app.PillButton(Tr("Restore"), false, 100, true))
                 {
                     std::string error;
-                    Toast(collection::Restore(figure.path, backup.path, &error) ? "Backup restored" : "Couldn't restore it: " + error);
+                    Toast(collection::Restore(figure.path, backup.path, &error) ? Tr("Backup restored") : Tr("Couldn't restore it: ") + error);
                     Reload();
                 }
                 ImGui::EndDisabled();
@@ -180,23 +183,23 @@ namespace launcher_ui
             }
         }
         if (!any)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "No backups yet.");
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("No backups yet."));
     }
 
     void CollectionPage::DrawImportExport()
     {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop .sky, .bin or .dmp files (or a folder of them) on the window. Each is checked as a 1 KB tag and copied; a dump already in the collection is skipped.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop .sky, .bin or .dmp files (or a folder of them) on the window. Each is checked as a 1 KB tag and copied; a dump already in the collection is skipped."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
-        if (m_app.PillButton("Import files...", true, 190, true))
+        if (m_app.PillButton(Tr("Import files..."), true, 190, true))
             Import(ChooseFigureFiles(m_app.m_window));
         ImGui::SameLine(0, 8);
-        if (m_app.PillButton("Import a folder...", false, 210, true))
-            if (std::string folder = ChooseFolder(m_app.m_window, "Import the figures of a folder"); !folder.empty())
+        if (m_app.PillButton(Tr("Import a folder..."), false, 210, true))
+            if (std::string folder = ChooseFolder(m_app.m_window, Tr("Import the figures of a folder")); !folder.empty())
                 Import({ folder });
         ImGui::Dummy(ImVec2(0, 12));
-        if (m_app.PillButton("Export everything...", false, 230, true))
+        if (m_app.PillButton(Tr("Export everything..."), false, 230, true))
         {
             std::vector<std::string> paths;
             for (const Figure& figure : m_model.figures)
@@ -204,7 +207,7 @@ namespace launcher_ui
             ExportTo(paths);
         }
         ImGui::SameLine(0, 8);
-        if (m_app.PillButton("Show in folder", false, 190, true))
+        if (m_app.PillButton(Tr("Show in folder"), false, 190, true))
         {
             SDL_CreateDirectory(collection::Folder().c_str());
             { std::string folder = collection::Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
@@ -216,7 +219,7 @@ namespace launcher_ui
     void CollectionPage::DrawUnknown()
     {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Toys the catalogue doesn't know. They stay usable; the game decides what to do with them. Naming one adds it to the collection's catalogue.json, shown at the next start.");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Toys the catalogue doesn't know. They stay usable; the game decides what to do with them. Naming one adds it to the collection's catalogue.json, shown at the next start."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         bool any = false;
@@ -226,45 +229,45 @@ namespace launcher_ui
                 continue;
             any = true;
             ImGui::PushID(figure.path.c_str());
-            m_app.BoldText(fmt::format("Unknown toy {} (variant {:04X})", figure.type, figure.variant).c_str(), Text);
+            m_app.BoldText(Tf("Unknown toy {} (variant {:04X})", figure.type, figure.variant).c_str(), Text);
             ImGui::SameLine(0, 12);
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", figure.file.c_str());
             if (m_unknownType == figure.type)
             {
                 ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
                 ImGui::SetNextItemWidth(260);
-                ImGui::InputTextWithHint("##unknownname", "Its name", m_unknownName, sizeof(m_unknownName));
+                ImGui::InputTextWithHint("##unknownname", Tr("Its name"), m_unknownName, sizeof(m_unknownName));
                 ImGui::PopStyleVar();
                 ImGui::SameLine(0, 8);
-                if (m_app.PillButton("Save", true, 100, true) && m_unknownName[0] != 0)
+                if (m_app.PillButton(Tr("Save"), true, 100, true) && m_unknownName[0] != 0)
                 {
-                    Toast(NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId) ? "Named: shown with its name from the next start"
-                                                                                                                : "Couldn't write catalogue.json");
+                    Toast(NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId) ? Tr("Named: shown with its name from the next start")
+                                                                                                                : Tr("Couldn't write catalogue.json"));
                     m_unknownType = 0xFFFF;
                     m_unknownName[0] = 0;
                 }
             }
-            else if (m_app.PillButton("Name this toy", false, 170, true))
+            else if (m_app.PillButton(Tr("Name this toy"), false, 170, true))
                 m_unknownType = figure.type;
             ImGui::PopID();
             ImGui::Dummy(ImVec2(0, 6));
         }
         if (!any)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "Every toy of the collection is in the catalogue.");
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Every toy of the collection is in the catalogue."));
     }
 
     void CollectionPage::DrawTidy()
     {
         RefreshDisk();
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Older versions of the game made one never-played figure of every character at each start. They are not yours, so My Skylanders hides them. Tidy moves them to the trash (30 days, recoverable).");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Older versions of the game made one never-played figure of every character at each start. They are not yours, so My Skylanders hides them. Tidy moves them to the trash (30 days, recoverable)."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         ImGui::BeginDisabled(m_starters == 0);
-        if (m_app.PillButton(fmt::format("Move {} to the trash", m_starters).c_str(), true, 260, true))
+        if (m_app.PillButton(Tf("Move {} to the trash", m_starters).c_str(), true, 260, true))
         {
             int moved = collection::Tidy();
-            Toast(fmt::format("{} figure{} moved to the trash", moved, moved == 1 ? "" : "s"));
+            Toast(moved == 1 ? Tf("{} figure moved to the trash", moved) : Tf("{} figures moved to the trash", moved));
             Reload();
         }
         ImGui::EndDisabled();

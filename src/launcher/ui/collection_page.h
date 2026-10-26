@@ -23,6 +23,9 @@ namespace launcher_ui
     std::string PlayTime(uint32_t seconds);
     std::string ShortDate(const std::string& iso);    // "2026-10-24 10:15" from ISO 8601 UTC
     std::string ElementName(collection::Element element);
+    std::string CategoryLabel(collection::Category category);   // the type's name in the launcher's language
+    std::string KindLabel(collection::VariantKind kind);        // the version's name in the launcher's language
+    bool French();                                              // the launcher shows French (the library's own French texts)
     unsigned ElementInk(collection::Element element); // 0xRRGGBB
     std::string Lower(std::string text);
 

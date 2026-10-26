@@ -409,7 +409,7 @@ namespace
             EXPECT(std::any_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == gill; }) &&
                 std::all_of(shown.begin(), shown.end(), [](const collection::Figure& f) { return f.toy != nullptr && f.toy->element == collection::Element::Water; }));
             launcher_ui::ShelfFilter text;
-            text.text = "  GILOU ";
+            text.text = "  SPLASH ";
             model.Shelf(text, shown);
             EXPECT(std::any_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == gill; }) &&
                 std::none_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == spyro || f.path == anvil; }));

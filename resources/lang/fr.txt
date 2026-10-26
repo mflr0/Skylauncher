@@ -455,3 +455,249 @@ nothing yet	0 octet
 {} {} %	{} {} %
 {}: game data copied	{} : données du jeu copiées
 {}: {} freed	{} : {} libérés
+
+# The Collection page, the figure sheet, Add a figure and Manage
+   level {} · {} gold	   niveau {} · {} or
+   owned x{}	   possédé x{}
+  (replaces {})	  (remplace {})
+ · maximum level	 · niveau maximum
+ · {} already there	 · {} déjà présent(s)
+ · {} favourite	 · {} favori
+ · {} favourites	 · {} favoris
+ · {} not a figure	 · {} qui n'est pas une figurine
+ · {} to level {}	 · {} avant le niveau {}
+ · {} unknown toy (Manage)	 · {} jouet inconnu (Gérer)
+ · {} unknown toys (Manage)	 · {} jouets inconnus (Gérer)
++  Add a figure	+  Ajouter une figurine
+. A backup is kept before the change.	. Une copie de secours est gardée avant le changement.
+A new figure is created as it leaves the box. Toys of later games can be created too; they wait for their game.	Une figurine neuve est créée comme à la sortie de la boîte. Les jouets des jeux suivants peuvent l'être aussi ; ils attendent leur jeu.
+ADD A FIGURE	AJOUTER UNE FIGURINE
+Add a figure from the catalogue, import your own dumps (.sky, .bin, .dmp: drop them on the window), or start with the three Skylanders of the starter pack.	Ajoutez une figurine du catalogue, importez vos propres dumps (.sky, .bin, .dmp : déposez-les sur la fenêtre), ou commencez avec les trois Skylanders du pack de démarrage.
+Add to favourites	Ajouter aux favoris
+Adventure	Aventure
+Adventure Packs	Packs d'aventure
+Air	Air
+All elements	Tous les éléments
+All games	Tous les jeux
+All types	Tous les types
+Alternate deco	Autre déco
+At the next start of {}	Au prochain lancement de {}
+Back up now	Sauvegarder maintenant
+Backed up	Sauvegardé
+Backup restored	Copie restaurée
+Backups	Copies de secours
+Choose	Choisir
+Choose a figure for {}	Choisir une figurine pour {}
+Choose a figure to see its versions.	Choisissez une figurine pour voir ses versions.
+Choose another	En choisir une autre
+Chrome	Chrome
+Clear the search and the filters	Effacer la recherche et les filtres
+Click a seat, then a figure	Cliquez sur une place, puis sur une figurine
+Click: its sheet · drag it onto a seat	Clic : sa fiche · glissez-la sur une place
+Click: put it on {}	Clic : la mettre sur {}
+Couldn't back it up	Sauvegarde impossible
+Couldn't create the figure	Création de la figurine impossible
+Couldn't delete it: 	Suppression impossible : 
+Couldn't duplicate it: 	Duplication impossible : 
+Couldn't put it back	Remise en place impossible
+Couldn't reset it: 	Réinitialisation impossible : 
+Couldn't restore it: 	Restauration impossible : 
+Couldn't save it: 	Enregistrement impossible : 
+Couldn't write catalogue.json	Écriture de catalogue.json impossible
+Couldn't write the seats for the next start	Écriture des places pour le prochain lancement impossible
+Create {}	Créer {}
+Created {}	{} créé
+Creation Crystals	Cristaux de création
+Crystal Clear	Cristal
+Dark	Sombre
+Delete	Suppr
+Delete for good	Supprimer pour de bon
+Delete...	Supprimer...
+Deleted figures stay here for 30 days. Their stats and name come back with them.	Les figurines supprimées restent ici 30 jours. Leurs stats et leur nom reviennent avec elles.
+Details  ^	Détails  ^
+Details  v	Détails  v
+Drop .sky, .bin or .dmp files (or a folder of them) on the window. Each is checked as a 1 KB tag and copied; a dump already in the collection is skipped.	Déposez des fichiers .sky, .bin ou .dmp (ou un dossier) sur la fenêtre. Chacun est vérifié comme une puce de 1 Ko puis copié ; un dump déjà dans la collection est ignoré.
+Duplicate	Dupliquer
+Duplicate, back up, restore, reset, delete	Dupliquer, sauvegarder, restaurer, réinitialiser, supprimer
+Duplicated: 	Dupliquée : 
+EDIT	MODIFIER
+Earth	Terre
+Edit	Modifier
+Element	Élément
+Empty	Vide
+Eon's Elite	Élite d'Eon
+Event and exclusive	Événement et exclusif
+Every change makes a backup; the newest 10 of each figure are kept.	Chaque changement fait une copie de secours ; les 10 plus récentes de chaque figurine sont gardées.
+Every toy of the collection is in the catalogue.	Tous les jouets de la collection sont dans le catalogue.
+Experience	Expérience
+Export everything...	Tout exporter...
+Export the figures to	Exporter les figurines vers
+Exported {} figure to {}	{} figurine exportée vers {}
+Exported {} figures to {}	{} figurines exportées vers {}
+Favourite	Favori
+Figure dumps (.sky, .bin, .dmp)	Dumps de figurines (.sky, .bin, .dmp)
+File	Fichier
+Fire	Feu
+Flocked	Floqué
+For {}	Pour {}
+Giants	Géants
+Glow in the Dark	Phosphorescent
+Gold	Or
+Hat	Chapeau
+Hero points	Points de héros
+Hold if the game that took it has closed or crashed.	Maintenez si le jeu qui l'a prise s'est fermé ou a planté.
+Hold to delete	Maintenir pour supprimer
+Hold to delete it for good. This can't be undone.	Maintenez pour la supprimer pour de bon. C'est irréversible.
+Hold to move it to the trash. Manage > Trash puts it back.	Maintenez pour la mettre à la corbeille. Gérer > Corbeille la remet.
+Hold to reset	Maintenir pour réinitialiser
+Hold to reset it to new. A backup is kept.	Maintenez pour la remettre à neuf. Une copie de secours est gardée.
+Import a folder...	Importer un dossier...
+Import and export	Import et export
+Import figures	Importer des figurines
+Import files...	Importer des fichiers...
+Import the figures of a folder	Importer les figurines d'un dossier
+Imported {}	{} importée(s)
+Item or adventure	Objet ou aventure
+Its name	Son nom
+Last played	Dernière partie
+Later games  {}	Jeux suivants  {}
+Legendary	Légendaire
+Level in {}	Niveau dans {}
+Level {}	Niveau {}
+Life	Vie
+Light	Lumière
+LightCore	LightCore
+MANAGE	GÉRER
+Magic	Magie
+Magic Items	Objets magiques
+Magic item	Objet magique
+Manage: trash, backups, import and export	Gérer : corbeille, copies de secours, import et export
+Mark as not in use	Marquer comme non utilisée
+Metallic	Métallisé
+Minis and sidekicks	Minis et acolytes
+Missing figure	Figurine absente
+Move {} to the trash	Mettre {} à la corbeille
+Move {} to the trash? Manage > Trash puts it back for 30 days.	Mettre {} à la corbeille ? Gérer > Corbeille la remet pendant 30 jours.
+Moved to the trash (Manage > Trash)	Mise à la corbeille (Gérer > Corbeille)
+My Skylanders is empty	Mes Skylanders est vide
+Name (optional)	Nom (facultatif)
+Name in the lists (empty: the toy's name)	Nom dans les listes (vide : le nom du jouet)
+Name this toy	Nommer ce jouet
+Named: shown with its name from the next start	Nommé : affiché avec son nom dès le prochain lancement
+Never	Jamais
+New: never played yet. Its level shows once a game has used it.	Neuve : jamais jouée. Son niveau s'affiche dès qu'un jeu l'a utilisée.
+Nickname	Surnom
+Nickname in the game (16 characters)	Surnom dans le jeu (16 caractères)
+No element	Aucun élément
+No figure matches	Aucune figurine ne correspond
+No game this launcher knows	Aucun jeu connu de ce lanceur
+No hat	Sans chapeau
+None	Aucun
+None of your figures goes on {} in {}. Add a figure creates one.	Aucune de vos figurines ne va sur {} dans {}. Ajouter une figurine en crée une.
+None yet	Aucune pour l'instant
+Not for {}	Pas pour {}
+Nothing for this seat yet	Rien pour cette place pour l'instant
+Nothing matches the search and the filters.	Rien ne correspond à la recherche et aux filtres.
+ON THE PORTAL NOW	SUR LE PORTAIL MAINTENANT
+Older versions of the game made one never-played figure of every character at each start. They are not yours, so My Skylanders hides them. Tidy moves them to the trash (30 days, recoverable).	Les anciennes versions du jeu créaient à chaque lancement une figurine jamais jouée par personnage. Elles ne sont pas à vous : Mes Skylanders les masque. Ranger les met à la corbeille (30 jours, récupérables).
+On	Sur
+On the portal in {}. Read-only until the game lets it go.	Sur le portail dans {}. Lecture seule tant que le jeu ne la libère pas.
+On the portal in {}: read-only	Sur le portail dans {} : lecture seule
+On {} at the next start of {}	Sur {} au prochain lancement de {}
+Open its sheet	Ouvrir sa fiche
+Other	Autre
+PORTAL AT THE NEXT START	PORTAIL AU PROCHAIN LANCEMENT
+Pick a figure below, or click the seat again to stop	Choisissez une figurine ci-dessous, ou recliquez sur la place pour arrêter
+Pick one below	Choisissez-en une ci-dessous
+Player {}	Joueur {}
+Playing now	En jeu
+Plays in	Joue dans
+Put back	Remettre
+Put back the copy from {}? The present state is backed up first.	Remettre la copie du {} ? L'état actuel est d'abord sauvegardé.
+Put back: 	Remise : 
+Put it on {}	La mettre sur {}
+Put on the portal  v	Mettre sur le portail  v
+Reset to new (a backup was kept)	Remise à neuf (une copie de secours est gardée)
+Reset to new...	Remettre à neuf...
+Reset {} to new? It loses its level, gold and upgrades; a backup is kept.	Remettre {} à neuf ? Elle perd son niveau, son or et ses améliorations ; une copie de secours est gardée.
+Restore a backup	Restaurer une copie de secours
+Save	Enregistrer
+Saved	Enregistré
+Saved (a backup was kept)	Enregistré (une copie de secours est gardée)
+Search the catalogue	Rechercher dans le catalogue
+Senseis	Senseis
+Series	Séries
+Show in the folder	Afficher dans le dossier
+Show the collection folder	Afficher le dossier de la collection
+Silver	Argent
+Skylanders	Skylanders
+Standard	Standard
+Start with Spyro, Gill Grunt, Trigger Happy	Commencer avec Spyro, Gill Grunt, Trigger Happy
+SuperChargers	SuperChargers
+Swap Force bottoms	Swap Force (bas)
+Swap Force tops	Swap Force (haut)
+Take it off	La retirer
+Tech	Tech
+The game is running: change the seats from its Toy Box	Le jeu tourne : changez les places depuis son Coffre à jouets
+The game is running: use its Toy Box	Le jeu tourne : utilisez son Coffre à jouets
+The game isn't installed yet: its seats can't be prepared	Le jeu n'est pas encore installé : ses places ne peuvent pas être préparées
+The game whose portal you are preparing	Le jeu dont vous préparez le portail
+The trash is empty.	La corbeille est vide.
+This game can't start with prepared seats yet	Ce jeu ne peut pas encore démarrer avec des places préparées
+Tidy  {}	Ranger  {}
+Tidy the starters	Ranger les figurines de départ
+Toy	Jouet
+Toy type {}	Jouet de type {}
+Toys the catalogue doesn't know. They stay usable; the game decides what to do with them. Naming one adds it to the collection's catalogue.json, shown at the next start.	Jouets que le catalogue ne connaît pas. Ils restent utilisables ; le jeu décide quoi en faire. En nommer un l'ajoute au catalogue.json de la collection, affiché au prochain lancement.
+Trap	Piège
+Trap Masters	Maîtres des pièges
+Trap shape	Forme de piège
+Traps	Pièges
+Trash	Corbeille
+Trash  {}	Corbeille  {}
+Trophies	Trophées
+Type	Type
+Undead	Mort-vivant
+Unknown	Inconnu
+Unknown toy {}	Jouet inconnu {}
+Unknown toy {} (variant {:04X})	Jouet inconnu {} (variante {:04X})
+Unknown toys	Jouets inconnus
+Unknown toys  {}	Jouets inconnus  {}
+Unreadable: its checksums don't match. Restore a backup, or reset it.	Illisible : ses sommes de contrôle ne correspondent pas. Restaurez une copie de secours, ou remettez-la à neuf.
+Vehicle {}	Véhicule {}
+Vehicles	Véhicules
+Villains	Méchants
+Water	Eau
+Works in {}  {}	Fonctionne dans {}  {}
+Your figures	Vos figurines
+deleted	supprimée
+every game	tous les jeux
+figure	figurine
+for other games: they can't go on this portal	pour d'autres jeux : elles ne vont pas sur ce portail
+hat {}	chapeau {}
+needs {}	demande {}
+no hat	sans chapeau
+only what {} reads	seulement ce que {} lit
+owned x{}	possédé x{}
+the collection's index can't be written	l'index de la collection ne peut pas être écrit
+tidied	rangée
+{}   ·   {}   ·   {} upgrades	{}   ·   {}   ·   {} améliorations
+{}   ·   {} played	{}   ·   {} de jeu
+{}  {}##b	{}  {}##b
+{} can't start with prepared seats yet	{} ne peut pas encore démarrer avec des places préparées
+{} doesn't go on {}	{} ne va pas sur {}
+{} figure	{} figurine
+{} figure copied into the shared collection	{} figurine copiée dans la collection partagée
+{} figure moved to the trash	{} figurine mise à la corbeille
+{} figures	{} figurines
+{} figures copied into the shared collection	{} figurines copiées dans la collection partagée
+{} figures moved to the trash	{} figurines mises à la corbeille
+{} h {:02} min	{} h {:02} min
+{} is in use by {}	{} est utilisée par {}
+{} is not for {}	{} n'est pas pour {}
+{} is running: change them in its Toy Box	{} tourne : changez-les depuis son Coffre à jouets
+{} keep no level or gold.	{} n'ont ni niveau ni or.
+{} min	{} min
+{} · type {} · variant {:04X}	{} · type {} · variante {:04X}
+{}: {} taken off	{} : {} retirée
+Search by name or nickname	Rechercher par nom ou surnom
