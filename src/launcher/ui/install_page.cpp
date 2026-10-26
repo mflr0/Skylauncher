@@ -219,7 +219,7 @@ namespace launcher_ui
                     StartInstaller();
                 }
                 else
-                    m_s->kitError = Tr("The game tools were downloaded but SSABuild wasn't found in them.");
+                    m_s->kitError = Tr("The game tools are incomplete.");
             }
             else if (kit.state == KitDownloader::State::Cancelled)
             {
@@ -438,7 +438,7 @@ namespace launcher_ui
             ImGui::PushTextWrapPos(left + width);
             if (!progress.error.empty())
                 ImGui::TextWrapped("%s", progress.error.c_str());
-            ImGui::TextWrapped("%s", Tr("What was already built is kept: Retry carries on from this step."));
+            ImGui::TextWrapped("%s", Tr("Retry carries on from this step."));
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
             ImGui::PopFont();
@@ -447,8 +447,8 @@ namespace launcher_ui
         {
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
             ImGui::PushTextWrapPos(left + width);
-            ImGui::TextWrapped("%s", m_s->installPastPid != 0 ? Tr("The installer started earlier is still stopping. Resume will be possible in a moment.")
-                                                           : Tr("Skylauncher was closed before the game was built. Resume carries on where it stopped."));
+            ImGui::TextWrapped("%s", m_s->installPastPid != 0 ? Tr("The earlier install is still stopping. Resume in a moment.")
+                                                           : Tr("Skylauncher closed during the install. Resume carries on."));
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
         }
@@ -468,7 +468,7 @@ namespace launcher_ui
             ImGui::PushFont(m_monoFont, SmallSize);
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));
             if (progress.logLines > progress.log.size())
-                ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tf("({} earlier lines: Copy log has them all)", progress.logLines - progress.log.size()).c_str());
+                ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tf("({} earlier lines in Copy log)", progress.logLines - progress.log.size()).c_str());
             for (const std::string& line : progress.log)
             {
                 bool error = line.starts_with("error") || line.find(": error") != std::string::npos;

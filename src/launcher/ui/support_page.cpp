@@ -15,7 +15,6 @@ namespace launcher_ui
         // The save dialog answers on a thread of its own: the callback writes the file and leaves the outcome here,
         // the window tells the player on its next frame.
         std::mutex g_saveMutex;
-        std::string g_savedPath;
         bool g_saveOk = false, g_saveFailed = false;
 
         void SDLCALL SaveReport(void* userdata, const char* const* files, int)
@@ -34,7 +33,6 @@ namespace launcher_ui
             out.close();
             if (out)
             {
-                g_savedPath = files[0];
                 g_saveOk = true;
             }
             else
@@ -49,14 +47,14 @@ namespace launcher_ui
                 opened = opened || entry.opened;
             good = opened || mode == "emulated";
             if (mode == "emulated")
-                return Tr("Virtual portal, as chosen: no portal needed.");
+                return Tr("Virtual portal chosen.");
             if (opened)
                 return Tr("Real portal: the game will use it.");
             if (result.portals.empty())
-                return mode == "real" ? Tr("No portal found: the game will wait for one to be plugged in.")
-                                      : Tr("No portal found: the game will use the virtual portal.");
-            return mode == "real" ? Tr("The portal can't be opened: the game will wait for it.")
-                                  : Tr("The portal can't be opened: the game will use the virtual portal.");
+                return mode == "real" ? Tr("No portal found: the game will wait for one.")
+                                      : Tr("No portal found: using the virtual portal.");
+            return mode == "real" ? Tr("The portal can't be opened: the game will wait.")
+                                  : Tr("The portal can't be opened: using the virtual portal.");
         }
     }
 
@@ -88,7 +86,7 @@ namespace launcher_ui
             std::lock_guard lock(g_saveMutex);
             if (g_saveOk)
             {
-                Toast(Tf("Report saved to {}", g_savedPath));
+                Toast(Tr("Report saved"));
                 g_saveOk = false;
             }
             else if (g_saveFailed)
@@ -113,8 +111,7 @@ namespace launcher_ui
             Title(Tr("Report a problem"), TitleSize, Text);
             ImGui::PushFont(nullptr, SmallSize);
             ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s",
-                Tr("This is everything the report holds. Your account, your computer's name and your home folder are replaced. "
-                   "Nothing is sent: save it, or copy it into an issue."));
+                Tr("Your names are removed and nothing is sent."));
             ImGui::PopFont();
             ImGui::Dummy(ImVec2(0, 6));
             ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
@@ -172,9 +169,9 @@ namespace launcher_ui
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, buttonY + (buttonH - ImGui::GetTextLineHeight()) / 2)); // centred on the button
         if (runtime.empty())
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("The test is part of the game: install it first."));
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Install the game first."));
         else if (!m_probe.ran)
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Plug the portal in, then check that the game sees it."));
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Plug in the portal, then test it."));
         ImGui::PopFont();
         if (!m_probe.ran || testing)
             return;
@@ -243,10 +240,9 @@ namespace launcher_ui
             Toast(Tr("Couldn't open the folder"), true);
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", any ? Tr("The log of the last time the game ran, to send with a bug report. It stays on your computer until you paste it.")
-                                     : Tr("No game log yet: it appears after the game has run once."));
-        ImGui::TextWrapped("%s", Tr("Report a problem makes one text file with the last logs, your settings and your versions, with your "
-                                    "account, computer and folder names replaced. It is shown before you save or copy it; nothing is sent."));
+        ImGui::TextWrapped("%s", any ? Tr("The game's last log, for a bug report.")
+                                     : Tr("No game log yet."));
+        ImGui::TextWrapped("%s", Tr("You see the report before saving it; nothing is sent."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }

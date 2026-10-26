@@ -42,20 +42,18 @@ namespace launcher_ui
         {
             constexpr const char* ChooseDisc = N_("Choose disc");
             constexpr const char* PlayWith = N_("PLAY WITH");
-            constexpr const char* DiscGone = N_("\"{}\" isn't there any more. Was it moved, renamed, or is its drive disconnected? Choose it again.");
-            constexpr const char* LauncherLanguageHint = N_("The language of Skylauncher's own text. \"Same as the game\" follows the game's text language, "
-                                                         "which is set in that game's settings (Language tab).");
-            constexpr const char* DataFolderHint = N_("Settings, saves, figures, the games Skylauncher built and its logs. The same folder for both games.");
+            constexpr const char* DiscGone = N_("The disc image isn't there. Choose it again.");
+            constexpr const char* LauncherLanguageHint = N_("Skylauncher's own language. \"Same as the game\" follows its text language.");
+            constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds, shared by both games.");
             constexpr const char* GameSettings = N_("Game settings");
             constexpr const char* ResetKeys = N_("Reset to defaults");
-            constexpr const char* ResetKeysHint = N_("Hold to put every key back to its default.");
+            constexpr const char* ResetKeysHint = N_("Hold to reset every key.");
             constexpr const char* NoGamepad = N_("No gamepad connected.");
             constexpr const char* OneGamepad = N_("1 gamepad connected.");
             constexpr const char* Gamepads = N_("{} gamepads connected.");
-            constexpr const char* PortalTip = N_("Without a real portal the game uses the virtual portal (its Toy Box).\n"
-                                              "Settings > Controls > Test the portal checks that the game sees it.");
+            constexpr const char* PortalTip = N_("Without a real portal, the game uses its virtual one (the Toy Box).");
             constexpr const char* QuitTitle = N_("The game is still installing");
-            constexpr const char* QuitText = N_("If you quit now, the install stops. It carries on from this step next time.");
+            constexpr const char* QuitText = N_("The install stops and can resume later.");
             constexpr const char* KeepInstalling = N_("Keep installing");
             constexpr const char* Quit = N_("Quit");
         }
@@ -752,14 +750,14 @@ namespace launcher_ui
             m_page = Page::Play;
             if (std::string iso = SettingGet(m_config, m_s->game.id, "iso"); !iso.empty())
             {
-                Toast(Tr("The copied game data is damaged: checking the disc image instead"), true);
+                Toast(Tr("Game data damaged: using the disc image"), true);
                 StartVerify(iso);
             }
             else
             {
                 m_s->disc = DiscState::Failed;
                 m_s->check.status = GameSourceStatus::Damaged;
-                m_s->check.message = Tf("The copied game data is damaged: {}", m_s->copy.problem);
+                m_s->check.message = Tf("Game data damaged: {}", m_s->copy.problem);
             }
             return false;
         }
@@ -768,7 +766,7 @@ namespace launcher_ui
             return true;
         m_s->disc = DiscState::Failed;
         m_s->check.status = GameSourceStatus::NotFound;
-        m_s->check.message = Tf(strings::DiscGone, m_s->discPath);
+        m_s->check.message = Tr(strings::DiscGone);
         m_s->installView = m_s->kitUsed = false;
         m_page = Page::Play;
         return false;
@@ -795,7 +793,7 @@ namespace launcher_ui
         if (m_s->disc == DiscState::Ready && !NeedsInstall() && !Installing())
             PlayNow();
         else
-            Toast(m_s->disc == DiscState::Ready ? Tr("The game isn't built yet: INSTALL it first") : Tr("The game's disc image is needed first"));
+            Toast(m_s->disc == DiscState::Ready ? Tr("Press INSTALL first") : Tr("Choose the disc image first"));
     }
 
     void App::Browse()
@@ -819,7 +817,7 @@ namespace launcher_ui
     // The device the game listens to: "auto", "keyboard" or "gamepad:<SDL GUID>" ([input] device= and gamepad=).
     std::vector<std::pair<std::string, std::string>> App::DeviceOptions() const
     {
-        std::vector<std::pair<std::string, std::string>> options = { { "auto", Tr("Automatic (first gamepad, else keyboard)") }, { "keyboard", Tr("Keyboard") } };
+        std::vector<std::pair<std::string, std::string>> options = { { "auto", Tr("Automatic (gamepad first)") }, { "keyboard", Tr("Keyboard") } };
         for (SDL_JoystickID id : m_gamepads)
         {
             char text[64];
@@ -842,7 +840,7 @@ namespace launcher_ui
         for (const auto& [value, label] : DeviceOptions())
             if (value == current)
                 return label;
-        return current.starts_with("gamepad:") ? Tr("Saved gamepad (not connected)") : Tr("Automatic (first gamepad, else keyboard)");
+        return current.starts_with("gamepad:") ? Tr("Saved gamepad (not connected)") : Tr("Automatic (gamepad first)");
     }
 
     void App::SetDevice(const std::string& value)
@@ -1412,7 +1410,7 @@ namespace launcher_ui
 
         Title(Tr("LIBRARY"), HeadlineSize, Text);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("Each game's art comes from your own disc, once it has been checked."));
+        ImGui::TextUnformatted(Tr("Game art comes from your own disc."));
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 10));
 
@@ -1589,7 +1587,7 @@ namespace launcher_ui
             switch (m_s->disc)
             {
             case DiscState::None:
-                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop your disc image (.iso) here, or choose it below."));
+                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop your disc image (.iso) here."));
                 break;
             case DiscState::Verifying:
                 ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_s->verify.Stage().c_str());
@@ -1601,21 +1599,20 @@ namespace launcher_ui
                 if (!m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
                 {
                     ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-                    ImGui::TextWrapped("%s", Tr("The copied game data is damaged, so the disc image is used. Repair or remove the copy in the game's settings."));
+                    ImGui::TextWrapped("%s", Tr("Game data damaged: using the disc image."));
                     ImGui::PopStyleColor();
                 }
                 if (NeedsInstall())
                 {
                     ImGui::PushTextWrapPos(available.x - 40); // window coordinates
                     ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-                    ImGui::TextWrapped("%s", Tf("Install builds the game on your PC from your disc: about {} minutes and {} GB, internet needed "
-                        "once for the compiler.", InstallMinutesFor(m_s->game.id), InstallGigabytes).c_str());
+                    ImGui::TextWrapped("%s", Tf("Builds the game on your PC: about {} min, {} GB, internet needed once.", InstallMinutesFor(m_s->game.id), InstallGigabytes).c_str());
                     ImGui::PopStyleColor();
                     ImGui::PopTextWrapPos();
                 }
                 else if (UpdateAvailable())
                 {
-                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("A new version of the game is ready to build."));
+                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("A game update is ready."));
                     ImGui::SameLine(0, 10);
                     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 2));
                     ImGui::PushStyleColor(ImGuiCol_Button, Rgb(Accent));
@@ -1805,7 +1802,7 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
         size_t gamepads = m_gamepads.size();
         std::string connected = gamepads == 0 ? Tr(strings::NoGamepad) : gamepads == 1 ? Tr(strings::OneGamepad) : Tf(strings::Gamepads, gamepads);
-        ImGui::Text("%s", Tf("{} Xbox, PlayStation, Switch and most other controllers work.", connected).c_str());
+        ImGui::Text("%s", Tf("{} Xbox, PlayStation and Switch pads work.", connected).c_str());
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 12));
 
@@ -1816,15 +1813,12 @@ namespace launcher_ui
             Set("portal", "toybox_auto_open", autoOpen ? "1" : "0");
         ImGui::SameLine(0, 14);
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(Tr("Open the Toy Box when the game asks for a figure"));
+        ImGui::TextUnformatted(Tr("Auto-open Toy Box"));
         DrawPortalTest();
         ImGui::Dummy(ImVec2(0, 12));
 
         Title(Tr("Button glyphs"), TitleSize, Text);
         Combo("##glyphs", "input", "glyphs", GlyphChoices, 0, 440);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("The button pictures the game shows in its menus and prompts."));
-        ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 12));
 
         // Keyboard bindings, two columns of actions.
@@ -1876,7 +1870,7 @@ namespace launcher_ui
         }
         ImGui::PopStyleVar();
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("F6/Tab opens the Toy Box, F7 places the next figure, F8 removes them all."));
+        ImGui::TextUnformatted(Tr("F6 or Tab opens the Toy Box, F7 adds a figure, F8 clears them."));
         ImGui::PopStyleColor();
     }
 
@@ -1947,7 +1941,7 @@ namespace launcher_ui
         Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("For Skylauncher and what both games share. Each game has its own settings on its page."));
+        ImGui::TextUnformatted(Tr("For Skylauncher and both games."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
@@ -1975,7 +1969,7 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 16));
         Title(Tr("Data folder"), TitleSize, Text);
         ImGui::TextWrapped("%s", datadir::Text(LauncherDataFolder()).c_str());
-        if (PillButton(Tr("Open data folder"), false, 260))
+        if (PillButton(Tr("Show in folder"), false, 260))
         {
             std::error_code error;
             std::filesystem::create_directories(LauncherDataFolder(), error);

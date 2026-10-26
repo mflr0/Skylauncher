@@ -362,12 +362,11 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     };
 
     if (!kit)
-        return fail(Tr("The installer kit wasn't found. Put the ssa-kit folder (the one with SSABuild in it) next to Skylauncher, "
-            "then press Retry."));
+        return fail(Tr("Game kit not found. Put the ssa-kit folder next to Skylauncher, then press Retry."));
     std::error_code error;
     std::filesystem::create_directories(out, error);
     if (error)
-        return fail(Tf("Couldn't create the game folder {}: {}", Utf8(out), error.message()));
+        return fail(Tf("Couldn't create the game folder: {}", error.message()));
     m_logFile = out / "install.log";
     m_out = out;
     m_kitFolder = kit->folder;
@@ -398,7 +397,7 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     m_process = SDL_CreateProcessWithProperties(properties);
     SDL_DestroyProperties(properties);
     if (m_process == nullptr)
-        return fail(Tf("Couldn't start {}: {}", program, SDL_GetError()));
+        return fail(Tf("Couldn't start the game: {}", SDL_GetError()));
 
 #if defined(_WIN32)
     // A job holds SSABuild and the compilers it starts, so cancelling (or closing the launcher) stops them all.

@@ -108,7 +108,7 @@ The developer docs are in `docs/`: `launcher_ui.md` covers the screens and theme
 
 ## Credits and licence
 
-The launcher's look, colours, fonts, background and layout are dorydev's design.
+Designed by dorydev.
 
 MIT licence, see `LICENSE`. The third-party components are listed in `THIRD_PARTY_NOTICES.md`.
 

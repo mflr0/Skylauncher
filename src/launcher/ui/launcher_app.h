@@ -71,7 +71,7 @@ namespace launcher_ui
     inline constexpr Choice AspectChoices[] = { { "auto", N_("Auto (follows the window)") }, { "16:9", N_("16:9 (with bars)") } };
     inline constexpr Choice ScaleChoices[] = { { "auto", N_("Auto") }, { "1", "x1" }, { "2", "x2" }, { "3", "x3" }, { "4", "x4" },
         { "5", "x5" }, { "6", "x6" }, { "7", "x7" }, { "8", "x8" }, { "9", "x9" }, { "10", "x10" } };
-    inline constexpr Choice GlyphChoices[] = { { "auto", N_("Automatic (follows what you play with)") }, { "xbox360", "Xbox 360" },
+    inline constexpr Choice GlyphChoices[] = { { "auto", N_("Automatic") }, { "xbox360", "Xbox 360" },
         { "xboxone", N_("Xbox One / Series"), "xbox" }, { "playstation", "PlayStation" }, { "nintendo", "Nintendo" }, { "keyboard", N_("Keyboard") } };
     inline constexpr Choice FilterChoices[] = { { "1", N_("Trilinear") }, { "2", N_("Anisotropic 2x") }, { "4", N_("Anisotropic 4x") },
         { "8", N_("Anisotropic 8x") }, { "16", N_("Anisotropic 16x") } };
@@ -197,7 +197,7 @@ namespace launcher_ui
         std::string discPath;
         uint64_t discSize = 0;
         VerifyJob verify;
-        // "Copy the game data" (game_copy.h): what the game's copy is, whether discPath is that copy (the game plays from
+        // "Copy files" (game_copy.h): what the game's copy is, whether discPath is that copy (the game plays from
         // it, the disc image is not needed), and the copy being made.
         gamedata::Status copy;
         bool fromCopy = false;

@@ -6,7 +6,7 @@ No telemetry: the only request is `GET https://api.github.com/repos/<repo>/relea
 ## Flow
 
 1. **Check**: at start, at most once a day (`[update] last_check`, epoch seconds), unless `[update] auto_check=0`; and on
-   demand in Settings > Launcher > Check for updates. `SKYLAUNCHER_NO_UPDATE_CHECK` turns the start-up check off.
+   demand in Settings > Launcher > Check now. `SKYLAUNCHER_NO_UPDATE_CHECK` turns the start-up check off.
 2. The tag (`vX.Y.Z`) is compared, as semver, with the built version (`SKYLAUNCHER_VERSION`, the CMake cache variable the CI
    sets from the tag or run number, shown in About). Pre-releases and tags that aren't versions are never offered.
 3. A **banner** above the page (it pushes the page down 56 px, nothing overlaps): "Update available: vX.Y.Z", **Update now**,
@@ -37,7 +37,7 @@ The kit is an asset of the launcher's own release: `ssa-kit-windows-x64.zip`, `s
   `v<launcher version>`, else the latest one; the zip is checked against that release's `SHA256SUMS` (a mismatch or a missing line
   refuses it), then unpacked into `kit/<release tag>/` in the data folder.
 - **Updates**: the installed kit's release is `[update] kit_tag` (written after a download or an update), else `version=` in its
-  `kit.txt`. A newer tag shows "A new version of the game is available" with **Update the game**: the zip is verified, unpacked
+  `kit.txt`. A newer tag shows "Game update available" with **Update the game**: the zip is verified, unpacked
   into `kit/<tag>/` (or over the kit next to the launcher, if that is the one in use) and, a disc being verified, the install
   runs again; SSABuild is incremental. `[update] repo=` changes where the launcher itself is looked up.
 

@@ -19,7 +19,12 @@ and words, a sheet with three main actions. The look is dorydev's: her colours, 
   portraits, its Series 2, LightCore, Legendary and alternate decos too), else from the other game's disc (Jet-Vac on
   Spyro's Adventure's page), else the generated icon: `collection::PortraitPath(game, toy, VariantFor(toy, kind), large)`.
   The pictures are those `shared/art` cached in `<data>/<Game>/portraits/` when the disc was checked (or the game's Toy
-  Box opened); SSARecomp's `docs/runtime/host/game_art.md` has the rule and the formats.
+  Box opened); SSARecomp's `docs/runtime/host/game_art.md` has the rule and the formats. Giants' large artworks (the
+  versus screen's, about 1000x960, not square) are cached in `portraits/artworks/`; for a large view of one figure,
+  `collection::BestPicturePath(game, toy, variant)` gives its best picture (the variant's own first, the largest).
+- **Variants.** The catalogue lists every variant Spyro's Adventure and Giants know (Series 2, LightCore, Legendary and
+  the alternate decos, with the ids Giants reads), and the later games' from public lists; SSARecomp's
+  `docs/runtime/host/collection.md` ("The games' own toy tables") has the sources.
 - Removed: `figure_file.*` and `figure_collection.*` (the old engine), replaced by `figure_tag`/`figure_crypto`/
   `figure_data` and `collection`.
 - Folder: `collection::Folder()` (`%APPDATA%\Skylanders\Collection`, `~/Library/Application Support/Skylanders/Collection`).

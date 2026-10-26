@@ -56,11 +56,11 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
    - Video: fullscreen, resolution scale, frame rate limit (30 or 60), skip intro movies, VSync, texture filtering, widescreen,
      HD texture packs (and their folder), Advanced > dump textures. The game's own copy, `[<game>.video]` (docs/settings.md).
    - Language: game text and game voices (`[<game>] language`, `voice_language`).
-   - Disc: the image's path and state; **Choose / Change disc...**, **Remove disc** (the launcher forgets it; the file is not
+   - Disc: the image's file name and state; **Choose... / Change...**, **Remove** (the launcher forgets it; the file is not
      touched), **Show in folder**. Disabled while a check or an install runs.
    - Saves: **Open saves folder** and the save backups with Restore (held, refused while the game runs).
-   - Game: **Create a desktop shortcut**, the folders, the built game with **Reinstall the game** (held), **Clear caches**,
-     **Delete saves and data** (held), **Uninstall the game** (held), each with the size it frees and what it keeps
+   - Game: **Create** (under Desktop shortcut), the folders, the built game with **Reinstall** (held), **Clear caches**,
+     **Delete saves and data** (held), **Remove game** (held), each with the size it frees and what it keeps
      (docs/install.md, "Delete data, uninstall").
 
 **Why the split.** The gear used to hold game things (disc image, graphics, game languages, saves) that looked like the
@@ -77,7 +77,7 @@ GitHub link bottom right. A card opens its game's page. The launcher's own langu
 (`docs/translations.md`); the game's text and voice languages are in that game's settings ("Game text", "Game voices"). The game shown last is selected
 in the sidebar (`[launcher] game=`); the other is one click away.
 1. **Left sidebar** (grey, fixed width).
-   - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.3.1`, from
+   - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.4.0`, from
      `SKYLAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" and YOUR GAMES.
    - The seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later", SuperChargers
      Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
@@ -152,9 +152,9 @@ the window is `ui/game_data_page.cpp` (+ `game_settings_page.cpp` for the tab). 
 
 | Copy | Game data section | The game |
 |---|---|---|
-| none | **Copy the game data** (needs a verified disc image and no install running), how much room it takes | plays from the disc image |
+| none | **Copy files** (needs a verified disc image and no install running), how much room it takes | plays from the disc image |
 | running | a bar "Copying the game data: 3.2 GB of 8.1 GB", **Stop**; the disc image's buttons are off | plays from the disc image (a copy is never read before it is complete) |
-| stopped, failed or the launcher quit | "Interrupted: 3.2 GB of 8.1 GB copied", **Carry on copying**, **Remove the partial copy** | from the disc image; carrying on reads only the missing files |
+| stopped, failed or the launcher quit | "Interrupted: 3.2 GB of 8.1 GB copied", **Carry on copying**, **Remove the copy** | from the disc image; carrying on reads only the missing files |
 | complete | "Copied: 8.1 GB, 1142 files", **Remove the copy** (held), Show in folder | **from the copy**: the Play page says "GAME DATA: Game data copied: 8.1 GB", the Disc image section says it is not needed, "Change disc..." is hidden, the state is "Ready to play" (or "Ready to install") **with no disc image at all** |
 | damaged (a file is missing or changed since) | the first problem, **Repair the copy** (copies again, only what is wrong), **Remove the copy** | **falls back to the disc image** (the Play page says the copy is damaged); with no disc image the state is "Game data damaged" |
 
@@ -231,8 +231,8 @@ always animates (`docs/settings.md`).
   answers it before the page does (`m_backTaken`). LB / RB change Settings and Game settings tab (`App::DrawTabBar`) and the seat the collection chooses for. The
   launcher starts with the focus in the sidebar.
 - **Hold to confirm.** What deletes or overwrites is a red button held for a second (`App::HoldButton`, the state in
-  `hold_confirm.h`): Reset and Delete (the figure sheet's red bar), Delete for good (trash), Mark as not in use (a stale lock), Restore
-  (a save backup), Reset to defaults (keyboard), Reinstall the game, Delete saves and data, Uninstall the game. The fill shows the time; releasing, or the pointer
+  `hold_confirm.h`): Reset and Delete (Figure page), Delete for good (trash), Mark as not in use (a stale lock), Restore
+  (a save backup), Reset to defaults (keyboard), Reinstall, Delete saves and data, Remove game. The fill shows the time; releasing, or the pointer
   leaving, cancels; it acts once per press; Space, Enter and the pad's A hold it too. The label is a plain verb, the
   instruction is the tooltip (shown on keyboard and pad focus too). Buttons are told apart by their ImGui ID.
 - **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
@@ -243,7 +243,7 @@ always animates (`docs/settings.md`).
 - **Copy.** New and changed sentences sit at the top of their file (`namespace strings`), ready for #4.
 
 ## Desktop shortcut
-Game settings > Game > **Create a desktop shortcut** (enabled once the disc is verified: the icon comes from it) puts a launcher for
+Game settings > Game > Desktop shortcut > **Create** (enabled once the disc is verified: the icon comes from it) puts a launcher for
 that game on the Desktop. It starts Skylauncher as `Skylauncher --game <id> --play`: the window opens on that game's page, checks the
 disc, and starts the game as soon as it is ready. If it can't (no disc, a failed check, the game not built yet) the window stays
 open and says why, so the shortcut never leaves the player with nothing. Made again, it replaces the old one.
@@ -311,6 +311,19 @@ differs per game is the provider's table.
 - Glyphs are rasterized at the screen's density with no extra oversampling (`OversampleH/V=1`, `PixelSnapH`): stems stay
   one pixel on a 1.5x or 2x display. FreeType (`imgui_freetype`, light hinting) isn't built in: it would be a new library,
   and with static weights the stb rasterizer is crisp enough; revisit if a display shows blur.
+
+## Writing
+The launcher's texts are short. A player reads them to decide or to know what to do, not to learn how it works.
+1. A **help line is one short sentence**, one line at the default window size: what it does for the player. It leaves out
+   how it works (checks, hashes, caches), what happens if you don't, and anything the label already says.
+2. **No path in running text.** Where the place matters there is a "Show in folder" button (the existing one) instead.
+3. **No help line** when the label is clear on its own.
+4. **Errors and notifications** say what happened, then what to do: one short line each, no full stop in a toast.
+5. **Numbers that help decide** (sizes, times) stay, rounded. The tone is the same; French keeps "vous" and is as short.
+6. **Labels are two or three words**, and a title and its button do not repeat words ("Desktop shortcut" and **Create**,
+   not "Create a desktop shortcut").
+
+Developer details (the runtime's name, an option's file, the SHA-256 a check uses) belong in these docs, not in the window.
 
 ## Size on high-DPI screens
 Every size is in launcher points. `App::UpdateUiScale` picks how many window units a point is: `[launcher] ui_scale`, else

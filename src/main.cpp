@@ -30,9 +30,7 @@ namespace
     void ShowGameStopped(const GameInfo& game, int exitCode)
     {
         SDL_InitSubSystem(SDL_INIT_VIDEO);
-        std::string message = Tf("{} stopped unexpectedly (exit code {}).\n\nIts log has what happened: press Copy log, "
-            "then Report to tell us about it. The log stays on your computer until you paste it.\n\nLogs folder: {}", game.name, exitCode,
-            GameLogFolder().string());
+        std::string message = Tf("{} stopped unexpectedly (exit code {}).\n\nPress Copy log, then Report.", game.name, exitCode);
         const SDL_MessageBoxButtonData buttons[] = { { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 2, Tr("Report") }, { 0, 1, Tr("Copy log") },
             { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, Tr("Close") } };
         SDL_MessageBoxData box{ SDL_MESSAGEBOX_ERROR, nullptr, Tr("The game stopped unexpectedly"), message.c_str(), 3, buttons, nullptr };
@@ -95,8 +93,7 @@ int main(int argc, char** argv)
         runtime = !installed.empty() ? installed : FindRuntime(*game, config);
     if (runtime.empty())
     {
-        std::string message = Tf("The game runtime ({}) was not found next to the launcher.\n\n"
-            "Put it in the same folder, or set its path with \"runtime=\" in the [launcher] section of:\n{}", game->runtime, configPath);
+        std::string message = Tf("The game ({}) wasn't found next to Skylauncher.\n\nPut it in the same folder.", game->runtime);
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, message.c_str(), nullptr);
         return 1;
     }
