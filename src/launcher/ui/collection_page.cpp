@@ -181,6 +181,8 @@ namespace launcher_ui
         FigureIconTexture icon;
         if (!path.empty())
             icon.texture = LoadPngFile(m_app.m_renderer, path);
+        if (icon.texture != nullptr)
+            SDL_GetTextureSize(icon.texture, &icon.width, &icon.height);
         if (icon.texture == nullptr)
         {
             constexpr int Size = 128;
@@ -205,6 +207,34 @@ namespace launcher_ui
         draw->AddText(ImVec2(position.x + 1, position.y + 2), IM_COL32(0, 0, 0, 120), letters.c_str());
         draw->AddText(position, IM_COL32_WHITE, letters.c_str());
         ImGui::PopFont();
+    }
+
+    void CollectionPage::DrawPicture(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, uint16_t variant, ImVec2 at, float box)
+    {
+        std::string path = toy != nullptr ? collection::BestPicturePath(m_app.m_s->game.id, *toy, variant) : std::string();
+        if (path.empty())
+        {
+            DrawIcon(draw, toy, kind, at, box, true);
+            return;
+        }
+        auto found = m_icons.find(path);
+        if (found == m_icons.end())
+        {
+            FigureIconTexture picture;
+            picture.texture = LoadPngFile(m_app.m_renderer, path);
+            if (picture.texture != nullptr)
+                SDL_GetTextureSize(picture.texture, &picture.width, &picture.height);
+            found = m_icons.emplace(path, picture).first;
+        }
+        const FigureIconTexture& picture = found->second;
+        if (picture.texture == nullptr || picture.width <= 0 || picture.height <= 0)
+        {
+            DrawIcon(draw, toy, kind, at, box, true);
+            return;
+        }
+        float scale = std::min(box / picture.width, box / picture.height), w = picture.width * scale, h = picture.height * scale;
+        ImVec2 corner(at.x + (box - w) / 2, at.y + (box - h) / 2);
+        draw->AddImage(Ref(picture.texture), corner, ImVec2(corner.x + w, corner.y + h));
     }
 
     // ---- Data -----------------------------------------------------------------------------------------------------

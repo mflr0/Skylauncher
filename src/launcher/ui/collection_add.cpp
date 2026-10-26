@@ -163,7 +163,7 @@ namespace launcher_ui
                 if (ImGui::Selectable((std::string("##v") + std::to_string(i)).c_str(), m_addVersion == int(i), 0, ImVec2(0, Row)))
                     m_addVersion = int(i);
                 ImDrawList* draw = ImGui::GetWindowDrawList();
-                DrawIcon(draw, chosen, versions[i].second, ImVec2(at.x + 4, at.y + 3), Row - 6, false);
+                DrawPicture(draw, chosen, versions[i].second, i == 0 ? uint16_t(0) : chosen->variants[i - 1].id, ImVec2(at.x + 4, at.y + 3), Row - 6);
                 float textX = at.x + Row + 6;
                 ImGui::PushFont(m_app.m_boldFont, SmallSize);
                 draw->AddText(ImVec2(textX, at.y + 5), Rgb(Text), LauncherMiddleEllipsis(versions[i].first, 26).c_str());

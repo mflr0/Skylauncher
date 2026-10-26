@@ -34,6 +34,7 @@ namespace launcher_ui
     {
         SDL_Texture* texture = nullptr;
         bool generated = false;
+        float width = 0, height = 0; // the picture's own size (an artwork is not square)
     };
 
     class CollectionPage
@@ -96,6 +97,9 @@ namespace launcher_ui
         void DrawTidy();
         void HandleShortcuts();
         void DrawIcon(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, ImVec2 at, float size, bool large);
+        // The best picture of a toy (its variant's artwork when the game has one, else a portrait), fitted into the square
+        // `box` at `at` and centred; the drawn icon when there is none.
+        void DrawPicture(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, uint16_t variant, ImVec2 at, float box);
         const FigureIconTexture& Icon(const collection::Toy* toy, collection::VariantKind kind, bool large);
         void CloseOverlay();
         void Toast(const std::string& text, bool error = false);

@@ -281,7 +281,7 @@ namespace launcher_ui
         constexpr const char* Shots[] = { "20-collection", "21-choose-player-1", "22-choose-magic-item", "23-filter-water", "24-figure-sheet",
             "25-figure-details", "26-figure-delete", "27-edit", "28-add-a-figure", "29-add-later-game", "30-manage-trash", "31-manage-backups",
             "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
-            "39-choose-empty", "40-add-search-version" };
+            "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -357,6 +357,16 @@ namespace launcher_ui
             collection::WriteStats(eruptor, high.stats);
             collection::Touch(eruptor, "giants");
         }
+        // A Series 2 Eruptor: a variant with its own artwork in Giants.
+        if (const collection::Toy* toy = collection::Catalogue::Get().Find(9))
+            for (const collection::Variant& variant : toy->variants)
+                if (variant.kind == collection::VariantKind::Series && !variant.sameTag)
+                {
+                    std::string series = collection::Create(9, variant.id);
+                    if (!series.empty())
+                        collection::Touch(series, "giants");
+                    break;
+                }
         collection::Delete(doomed);
         collection::Delete(doomed2);
         (void)chop; (void)item; (void)pack; (void)sidekick; (void)dark;
@@ -530,6 +540,17 @@ namespace launcher_ui
                         m_addToy = toy.type;
                         m_addVersion = int(i) + 1;
                     }
+            break;
+        }
+        case 21: // Giants: a Series 2 Eruptor's sheet, with its own artwork
+        {
+            SelectPortalGame("giants");
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 9 && figure.variant != 0)
+                {
+                    OpenFigure(figure.path);
+                    break;
+                }
             break;
         }
         default: break;

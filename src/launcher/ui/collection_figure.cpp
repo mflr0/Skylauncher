@@ -236,7 +236,7 @@ namespace launcher_ui
         constexpr float Picture = 220;
         ImVec2 origin = ImGui::GetCursorScreenPos();
         draw->AddRectFilled(origin, ImVec2(origin.x + Picture, origin.y + Picture), Rgb(Field), RadiusLarge);
-        DrawIcon(draw, f.toy, f.Kind(), ImVec2(origin.x + 10, origin.y + 10), Picture - 20, true);
+        DrawPicture(draw, f.toy, f.Kind(), f.variant, ImVec2(origin.x + 6, origin.y + 6), Picture - 12);
         float badgeX = origin.x;
         auto badge = [&](const std::string& text, unsigned fill, unsigned ink) {
             ImGui::PushFont(nullptr, SmallSize - 1);
