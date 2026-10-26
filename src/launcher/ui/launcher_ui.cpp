@@ -939,29 +939,57 @@ namespace launcher_ui
         return pressed && enabled;
     }
 
-    bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive)
+    bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive, int chevron)
     {
+        unsigned ink = primary ? AccentInk : Text;
         ImGui::PushStyleColor(ImGuiCol_Button, Rgb(primary ? Accent : fill));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? AccentHover : fillHover));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? AccentDark : fillActive));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(primary ? AccentInk : Text));
+        ImGui::PushStyleColor(ImGuiCol_Text, chevron != 0 ? IM_COL32(0, 0, 0, 0) : Rgb(ink));
         if (bold)
             ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        bool pressed = ImGui::Button(label, ImVec2(PillWidth(label, width, bold), 40));
+        bool pressed = ImGui::Button(label, ImVec2(PillWidth(label, width, bold, chevron), 40));
         if (bold)
             ImGui::PopFont();
         ImGui::PopStyleColor(4);
+        if (chevron != 0)
+            DrawLabelChevron(label, ink, chevron, bold);
         return pressed;
     }
 
-    float App::PillWidth(const char* label, float width, bool bold)
+    float App::PillWidth(const char* label, float width, bool bold, int chevron)
     {
         if (bold)
             ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
         float need = ImGui::CalcTextSize(label, nullptr, true).x + 2 * ImGui::GetStyle().FramePadding.x + 16;
+        if (chevron != 0)
+            need += ImGui::GetFontSize() * 0.9f;
         if (bold)
             ImGui::PopFont();
         return std::max(width, std::ceil(need));
+    }
+
+    void App::DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir)
+    {
+        float half = size / 2, rise = size / 4 * (dir > 0 ? 1 : -1);
+        ImVec2 points[3] = { ImVec2(centre.x - half, centre.y - rise), ImVec2(centre.x, centre.y + rise), ImVec2(centre.x + half, centre.y - rise) };
+        draw->AddPolyline(points, 3, Rgb(color), ImDrawFlags_None, std::max(1.5f, size / 6));
+    }
+
+    void App::DrawLabelChevron(const char* label, unsigned color, int dir, bool bold)
+    {
+        if (bold)
+            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
+        const char* end = std::strstr(label, "##");
+        ImVec2 text = ImGui::CalcTextSize(label, end);
+        float size = ImGui::GetFontSize() * 0.6f, gap = ImGui::GetFontSize() * 0.4f;
+        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+        float left = (min.x + max.x - (text.x + gap + size)) / 2, middle = (min.y + max.y) / 2;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddText(ImVec2(left, middle - text.y / 2), Rgb(color), label, end);
+        DrawChevron(draw, ImVec2(left + text.x + gap + size / 2, middle), size, color, dir);
+        if (bold)
+            ImGui::PopFont();
     }
 
     bool App::Toggle(const char* id, bool* value)

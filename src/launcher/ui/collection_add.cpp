@@ -49,10 +49,19 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 4));
 
         std::string search = Lower(m_addSearch);
+        // The first version (1-based, 0 = none) of a toy whose own name holds the search: "polar" finds Polar Whirlwind.
+        auto firstMatchingVersion = [&](const Toy& toy) {
+            if (search.empty())
+                return 0;
+            for (size_t i = 0; i < toy.variants.size(); i++)
+                if (Lower(toy.variants[i].name).find(search) != std::string::npos)
+                    return int(i) + 1;
+            return 0;
+        };
         auto matches = [&](const Toy& toy) {
             if (m_addCategory >= 0 && int(toy.category) != m_addCategory)
                 return false;
-            return search.empty() || Lower(toy.name).find(search) != std::string::npos;
+            return search.empty() || Lower(toy.name).find(search) != std::string::npos || firstMatchingVersion(toy) > 0;
         };
 
         // Owned copies of a toy (not counting the starters the game made on its own).
@@ -92,7 +101,7 @@ namespace launcher_ui
                 if (ImGui::InvisibleButton("##toy", ImVec2(Cell, Cell + 38), ImGuiButtonFlags_EnableNav))
                 {
                     m_addToy = toy.type;
-                    m_addVersion = 0;
+                    m_addVersion = firstMatchingVersion(toy);
                     m_created.clear();
                     m_addLabel[0] = 0;
                 }
@@ -116,6 +125,14 @@ namespace launcher_ui
                 ImVec2 noteSize = ImGui::CalcTextSize(note.c_str());
                 draw->AddText(ImVec2(at.x + (Cell - noteSize.x) / 2, at.y + Cell), Rgb(pass == 1 ? TextDim : Ok), note.c_str());
                 ImGui::PopFont();
+                if (!toy.variants.empty()) // it has versions: a small badge, the count
+                {
+                    std::string more = "+" + std::to_string(toy.variants.size());
+                    ImGui::PushFont(nullptr, SmallSize - 1);
+                    float moreW = ImGui::CalcTextSize(more.c_str()).x + 12;
+                    ImGui::PopFont();
+                    m_app.Badge(draw, ImVec2(at.x + Cell - moreW - 6, at.y + 6), more.c_str(), Accent, AccentInk);
+                }
             }
             ImGui::Dummy(ImVec2(0, 10));
         }
@@ -136,13 +153,28 @@ namespace launcher_ui
             for (const collection::Variant& variant : chosen->variants)
                 versions.push_back({ variant.name, variant.kind });
             m_addVersion = std::clamp(m_addVersion, 0, int(versions.size()) - 1);
+            m_app.BoldText(Tr("Versions"), TextSecondary);
             for (size_t i = 0; i < versions.size(); i++)
             {
                 int count = i == 0 ? owned(chosen->type, 0, {})
                     : chosen->variants[i - 1].sameTag ? owned(chosen->type, -1, chosen->variants[i - 1].name) : owned(chosen->type, chosen->variants[i - 1].id, {});
-                std::string text = versions[i].first + (count > 0 ? Tf("   owned x{}", count) : "");
-                if (ImGui::Selectable((text + "##v" + std::to_string(i)).c_str(), m_addVersion == int(i)))
+                // A row: the version's picture (the toy's own when it has none), its name, its kind and how many are owned.
+                constexpr float Row = 50;
+                ImVec2 at = ImGui::GetCursorScreenPos();
+                if (ImGui::Selectable((std::string("##v") + std::to_string(i)).c_str(), m_addVersion == int(i), 0, ImVec2(0, Row)))
                     m_addVersion = int(i);
+                ImDrawList* draw = ImGui::GetWindowDrawList();
+                DrawIcon(draw, chosen, versions[i].second, ImVec2(at.x + 4, at.y + 3), Row - 6, false);
+                float textX = at.x + Row + 6;
+                ImGui::PushFont(m_app.m_boldFont, SmallSize);
+                draw->AddText(ImVec2(textX, at.y + 5), Rgb(Text), LauncherMiddleEllipsis(versions[i].first, 26).c_str());
+                ImGui::PopFont();
+                ImGui::PushFont(nullptr, SmallSize - 1);
+                std::string kind = versions[i].second == collection::VariantKind::Base ? std::string() : KindLabel(versions[i].second);
+                if (count > 0)
+                    kind += (kind.empty() ? "" : "  ·  ") + Tf("owned x{}", count);
+                draw->AddText(ImVec2(textX, at.y + 27), Rgb(count > 0 ? Ok : TextDim), kind.c_str());
+                ImGui::PopFont();
             }
         }
         ImGui::EndChild();

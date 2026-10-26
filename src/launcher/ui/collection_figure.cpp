@@ -271,8 +271,12 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(PanelRaised));
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Accent));
-        if (ImGui::Button(m_details ? Tr("Details  ^") : Tr("Details  v")))
+        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 0, 0, 0));
+        ImVec2 detailsSize(m_app.PillWidth(Tr("Details"), 0, false, 1), 0);
+        if (ImGui::Button(Tr("Details"), detailsSize))
             m_details = !m_details;
+        ImGui::PopStyleColor();
+        m_app.DrawLabelChevron(Tr("Details"), Accent, m_details ? -1 : 1, false);
         ImGui::PopStyleColor(3);
         m_app.FocusRing(RadiusSmall);
         if (m_details)
@@ -333,7 +337,7 @@ namespace launcher_ui
         // 1. Put on the portal (of the next start), on a seat it fits.
         ImGui::BeginDisabled(!m_model.CanEditSeats());
         ImVec2 putAt = ImGui::GetCursorScreenPos();
-        if (m_app.PillButton(Tr("Put on the portal  v"), true, 210, true))
+        if (m_app.PillButton(Tr("Put on the portal"), true, 210, true, PanelRaised, PanelRaisedHover, PanelRaisedActive, 1))
             ImGui::OpenPopup("##puton");
         ImGui::EndDisabled();
         if (!m_model.CanEditSeats() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))

@@ -763,12 +763,12 @@ namespace launcher_ui
     // A filter of the bar: a button with the filter's name, or its value when one is chosen, and a menu of the values.
     bool CollectionPage::FilterMenu(const char* id, const char* all, const std::string& current, float width, const std::function<void()>& items)
     {
-        std::string label = (current.empty() ? std::string(Tr(all)) : current) + "  v##" + id;
+        std::string label = (current.empty() ? std::string(Tr(all)) : current) + "##" + id;
         ImVec2 at = ImGui::GetCursorScreenPos();
         bool set = !current.empty();
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 19);
         bool pressed = m_app.PillButton(label.c_str(), false, width, set, set ? AccentDark : PanelRaised, set ? Accent : PanelRaisedHover,
-            set ? AccentDark : PanelRaisedActive);
+            set ? AccentDark : PanelRaisedActive, 1);
         m_navBar = m_navBar || ImGui::IsItemFocused();
         ImGui::PopStyleVar();
         std::string popup = std::string("##menu") + id;

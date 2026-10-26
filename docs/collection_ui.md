@@ -96,7 +96,13 @@ At the first visit to the page (`CollectionPage::Open`):
   writes no stats (and makes no backup).
 - **Add a figure**: a game selector (the six games), search, a **Type** menu (as the bar's), one card per character,
   "owned x2"; the toys the game reads first, then "Later games" labelled "needs Giants". A side panel lists the versions
-  (standard, variants, same-tag editions); name (optional) and Create; "Put it on Player 1" afterwards.
+  (standard, variants, same-tag editions); name (optional) and Create; "Put it on Player 1" afterwards. A toy with
+  versions has a "+3" badge on its card; the panel is titled "Versions", each row with its picture (the toy's own when
+  it has none) and its kind (an unknown kind from a newer `catalogue.json` shows as "Other"); the search also matches
+  the versions' names ("polar" finds Whirlwind, with Polar Whirlwind chosen).
+- **Chevrons** are drawn, never typed: `App::DrawChevron` / `DrawLabelChevron` (`PillButton`'s `chevron` argument) draw
+  two lines in the label's colour, down when closed and up when open (Details, Put on the portal, the Element / Game /
+  Type menus). The combo boxes use ImGui's own arrow.
 - **Manage**: Trash (put back, delete for good (held); 30 days), Backups (per figure, restore), Import and export (files,
   a folder, drop files or a folder on the window; export everything; show in folder), Unknown toys (name one:
   `catalogue.json` of the collection, applied at the next start), Tidy (the starters).
@@ -127,7 +133,7 @@ At the first visit to the page (`CollectionPage::Open`):
   that Giants can be prepared but not the games without a runtime. Seat X: 12 of 12. Everything runs in a scratch
   folder (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
 - Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `39-choose-empty`: the shelf, choosing for Player 1 and for the Magic
+  refuses without it) and writes `20-collection` to `40-add-search-version`: the shelf, choosing for Player 1 and for the Magic
   item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
   backups), the live portal (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
   its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on. Set `SKYLANDERS_DATA`

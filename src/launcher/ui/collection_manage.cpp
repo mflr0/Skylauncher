@@ -281,7 +281,7 @@ namespace launcher_ui
         constexpr const char* Shots[] = { "20-collection", "21-choose-player-1", "22-choose-magic-item", "23-filter-water", "24-figure-sheet",
             "25-figure-details", "26-figure-delete", "27-edit", "28-add-a-figure", "29-add-later-game", "30-manage-trash", "31-manage-backups",
             "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
-            "39-choose-empty" };
+            "39-choose-empty", "40-add-search-version" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -375,6 +375,7 @@ namespace launcher_ui
         m_choosing = -1;
         m_filter = ShelfFilter{};
         m_search[0] = 0;
+        m_addSearch[0] = 0;
         auto figureOf = [&](uint16_t type) -> std::string {
             for (const Figure& figure : m_model.figures)
                 if (figure.type == type && !collection::UntouchedStarter(figure) && figure.level > 1)
@@ -514,6 +515,23 @@ namespace launcher_ui
             Reload();
             Choose(3);
             break;
+        case 20: // Add a figure: "polar" finds Polar Whirlwind (a version of Whirlwind), already chosen
+        {
+            m_overlay = Overlay::Add;
+            m_addGame = "ssa";
+            m_addCategory = -1;
+            m_addToy = 0xFFFF;
+            m_addVersion = 0;
+            snprintf(m_addSearch, sizeof(m_addSearch), "%s", "polar");
+            for (const collection::Toy& toy : collection::Catalogue::Get().Toys())
+                for (size_t i = 0; i < toy.variants.size(); i++)
+                    if (toy.variants[i].name.find("Polar") != std::string::npos && m_addToy == 0xFFFF)
+                    {
+                        m_addToy = toy.type;
+                        m_addVersion = int(i) + 1;
+                    }
+            break;
+        }
         default: break;
         }
         m_generation++;

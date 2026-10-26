@@ -458,7 +458,6 @@ nothing yet	0 octet
 
 # The Collection page, the figure sheet, Add a figure and Manage
    level {} · {} gold	   niveau {} · {} or
-   owned x{}	   possédé x{}
   (replaces {})	  (remplace {})
  · maximum level	 · niveau maximum
  · {} already there	 · {} déjà présent(s)
@@ -514,8 +513,7 @@ Delete	Suppr
 Delete for good	Supprimer pour de bon
 Delete...	Supprimer...
 Deleted figures stay here for 30 days. Their stats and name come back with them.	Les figurines supprimées restent ici 30 jours. Leurs stats et leur nom reviennent avec elles.
-Details  ^	Détails  ^
-Details  v	Détails  v
+Details	Détails
 Drop .sky, .bin or .dmp files (or a folder of them) on the window. Each is checked as a 1 KB tag and copied; a dump already in the collection is skipped.	Déposez des fichiers .sky, .bin ou .dmp (ou un dossier) sur la fenêtre. Chacun est vérifié comme une puce de 1 Ko puis copié ; un dump déjà dans la collection est ignoré.
 Duplicate	Dupliquer
 Duplicate, back up, restore, reset, delete	Dupliquer, sauvegarder, restaurer, réinitialiser, supprimer
@@ -616,7 +614,7 @@ Put back	Remettre
 Put back the copy from {}? The present state is backed up first.	Remettre la copie du {} ? L'état actuel est d'abord sauvegardé.
 Put back: 	Remise : 
 Put it on {}	La mettre sur {}
-Put on the portal  v	Mettre sur le portail  v
+Put on the portal	Mettre sur le portail
 Reset to new (a backup was kept)	Remise à neuf (une copie de secours est gardée)
 Reset to new...	Remettre à neuf...
 Reset {} to new? It loses its level, gold and upgrades; a backup is kept.	Remettre {} à neuf ? Elle perd son niveau, son or et ses améliorations ; une copie de secours est gardée.
@@ -701,3 +699,4 @@ tidied	rangée
 {} · type {} · variant {:04X}	{} · type {} · variante {:04X}
 {}: {} taken off	{} : {} retirée
 Search by name or nickname	Rechercher par nom ou surnom
+Versions	Versions
