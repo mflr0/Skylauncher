@@ -336,6 +336,41 @@ namespace collection
         return {};
     }
 
+    std::string BestPicturePath(const std::string& gameId, const Toy& toy, uint16_t variant)
+    {
+        std::vector<const Game*> games;
+        if (const Game* viewed = Catalogue::Get().FindGame(gameId))
+            games.push_back(viewed);
+        for (const Game& game : Catalogue::Get().Games())
+            if (game.id != gameId)
+                games.push_back(&game);
+        // A file the game names for `key` (type << 16 | variant) in `pictures`, under its portraits folder.
+        auto find = [](const Game& game, const std::map<uint32_t, std::string>& pictures, uint32_t key, const char* subfolder) -> std::string {
+            auto it = pictures.find(key);
+            if (it == pictures.end())
+                return {};
+            std::string folder;
+            if (const char* portraits = getenv("SSA_PORTRAITS"))
+                folder = std::string(portraits) + "/";
+            else if (std::filesystem::path data = datadir::Game(game.id); !data.empty())
+                folder = datadir::Text(data / "portraits") + "/";
+            else
+                return {};
+            std::string path = folder + subfolder + it->second + ".png";
+            return SDL_GetPathInfo(path.c_str(), nullptr) ? path : std::string();
+        };
+        uint32_t plain = uint32_t(toy.type) << 16;
+        if (variant != 0)
+            for (const Game* game : games)
+                for (auto [pictures, subfolder] : { std::pair{ &game->artworks, "artworks/" }, std::pair{ &game->portraits, "" } })
+                    if (std::string path = find(*game, *pictures, plain | variant, subfolder); !path.empty())
+                        return path;
+        for (const Game* game : games)
+            if (std::string path = find(*game, game->artworks, plain, "artworks/"); !path.empty())
+                return path;
+        return PortraitPath(gameId, toy, variant, true);
+    }
+
     uint16_t VariantFor(const Toy& toy, VariantKind kind)
     {
         if (kind == VariantKind::Base || kind == toy.edition)

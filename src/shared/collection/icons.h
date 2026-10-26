@@ -32,6 +32,11 @@ namespace collection
     // The rule for every picture of a toy (docs/runtime/host/game_art.md): the art of the game being viewed (`gameId`),
     // else another game's (catalogue order), else empty, and the caller draws the generated icon.
     std::string PortraitPath(const std::string& gameId, const Toy& toy, uint16_t variant = 0, bool large = false);
+    // The best picture of a toy or variant from the discs (docs/runtime/host/game_art.md): the variant's own picture
+    // before the plain toy's, and for each the largest: the game's artwork (Giants' versus art, about 1000x960, not
+    // square; <portraits>/artworks), then its portrait. The game being viewed first, then the others in catalogue
+    // order. Empty: the caller draws the generated icon. PortraitPath stays the square picture for icons and cards.
+    std::string BestPicturePath(const std::string& gameId, const Toy& toy, uint16_t variant = 0);
     // When only the kind is known (the Toy Box, the collection's cards): the toy's one variant of that kind, else 0.
     uint16_t VariantFor(const Toy& toy, VariantKind kind);
     // PortraitPath with no game being viewed: the first game, in catalogue order, that has one.
