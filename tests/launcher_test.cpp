@@ -6,6 +6,7 @@
 #include "assets/launcher_assets.h"
 #include "shared/art/game_art.h"
 #include "shared/collection/icons.h"
+#include "shared/collection/upgrades.h"
 #include "launcher/ui/launcher_app.h"
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/ui/collection_model.h"
@@ -794,6 +795,11 @@ int main(int argc, char** argv)
         EXPECT(provider.Get(LauncherAssets::Role::Logo).valid && provider.Get(LauncherAssets::Role::HeroBackground).valid);
         EXPECT(provider.Get(LauncherAssets::Role::TitleIcon).valid && LauncherAssets::Cached(id, LauncherAssets::Role::Logo).valid);
         EXPECT(found.portraits >= minimumPortraits);
+        // The upgrades' names, read with the pictures (shared/collection/upgrades.h): Spyro's list from the disc.
+        collection::UpgradeTable spyro = collection::Upgrades(*collection::Catalogue::Get().Find(16), id, "fr");
+        printf("  %s: upgrades from the disc %s, Spyro's first: %s\n", id, spyro.fromDisc ? "yes" : "NO",
+            spyro.upgrades.empty() ? "-" : spyro.upgrades[0].name.c_str());
+        EXPECT(spyro.fromDisc && spyro.upgrades.size() >= 11 && spyro.upgrades[0].bit == collection::UpgradePathChosenBit + 2);
     };
     printf("Disc pictures:\n");
     std::string dataBefore = getenv("SKYLANDERS_DATA") != nullptr ? getenv("SKYLANDERS_DATA") : "";
