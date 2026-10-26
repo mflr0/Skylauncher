@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <set>
 #include <fmt/format.h>
 #include <SDL3/SDL.h>
 #if defined(_WIN32)
@@ -377,6 +378,49 @@ namespace
         SDL_Delay(30);
         EXPECT(model.Poll(4000000, 0) && model.Find(gill)->level == 10);
 
+        // The shelf (docs/collection_ui.md): every figure once, the favourites first; choosing for a seat shows only what
+        // goes there and the game reads; the bar's filters and search. The card's level is the Toy Box's.
+        {
+            std::vector<collection::Figure> shown;
+            int hidden = -1;
+            std::vector<collection::Section> shelf = model.Shelf({}, shown, &hidden);
+            std::set<std::string> paths;
+            size_t total = 0;
+            for (const collection::Section& section : shelf)
+            {
+                total += section.items.size();
+                for (size_t i : section.items)
+                    paths.insert(shown[i].path);
+            }
+            EXPECT(!shelf.empty() && shelf[0].kind == collection::Section::Kind::Shelf && hidden >= 0);
+            EXPECT(total == shown.size() && paths.size() == shown.size() && shown.size() + size_t(hidden) == model.figures.size());
+            EXPECT(!shelf[0].items.empty() && shown[shelf[0].items[0]].favourite);
+            launcher_ui::ShelfFilter forItem;
+            forItem.seat = 2; // Magic item
+            model.Shelf(forItem, shown);
+            EXPECT(shown.size() == 1 && shown[0].path == anvil);
+            launcher_ui::ShelfFilter forPlayer;
+            forPlayer.seat = 0;
+            model.Shelf(forPlayer, shown);
+            EXPECT(!shown.empty() && std::all_of(shown.begin(), shown.end(), [](const collection::Figure& f) { return collection::HasProgress(f); }));
+            launcher_ui::ShelfFilter water;
+            water.element = int(collection::Element::Water);
+            model.Shelf(water, shown);
+            EXPECT(std::any_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == gill; }) &&
+                std::all_of(shown.begin(), shown.end(), [](const collection::Figure& f) { return f.toy != nullptr && f.toy->element == collection::Element::Water; }));
+            launcher_ui::ShelfFilter text;
+            text.text = "  GILOU ";
+            model.Shelf(text, shown);
+            EXPECT(std::any_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == gill; }) &&
+                std::none_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == spyro || f.path == anvil; }));
+            launcher_ui::ShelfFilter later;
+            later.game = "giants";
+            EXPECT(model.Shelf(later, shown).empty() && shown.empty()); // no Giants toy here
+            EXPECT(collection::LevelText(*model.Find(gill), "ssa") == "Level 10" && collection::LevelText(*model.Find(anvil), "ssa").empty());
+            // Giants starts with prepared seats too; the games with no runtime yet have none.
+            EXPECT(!launcher_ui::SessionFile(*catalogue.FindGame("giants")).empty() && launcher_ui::SessionFile(*catalogue.FindGame("swap_force")).empty());
+        }
+
         // The launcher's own earlier state moves over: favourites and "starts on the portal", by name.
         fs::remove(session);
         std::vector<std::string> moved = launcher_ui::MoveLauncherSettings(ssa, legacy.string(), { "016 Spyro.sky" }, { "200 Anvil Rain.sky", "014 Gill Grunt.sky", "new:5" });
@@ -393,6 +437,13 @@ namespace
             EXPECT(icon.size() == 32 * 32 * 4 && icon[(16 * 32 + 16) * 4 + 3] > 0);
         }
         EXPECT(figures::GenerateIcon(nullptr, collection::VariantKind::Base, 32).size() == 32 * 32 * 4);
+        // Magic items, adventure packs and sidekicks carry the family's mark (the Toy Box's): a light centre on the shape.
+        for (uint16_t type : { uint16_t(200), uint16_t(300) })
+        {
+            std::vector<uint8_t> marked = figures::GenerateIcon(catalogue.Find(type), collection::VariantKind::Base, 64);
+            const uint8_t* centre = &marked[(size_t(type == 200 ? 36 : 32) * 64 + 32) * 4];
+            EXPECT(centre[0] > 200 && centre[1] > 200 && centre[2] > 200);
+        }
         // Deleting a figure (issue #13): it leaves the seat and the list, lands in trash/ with its metadata, the index is
         // rewritten in one go, and Undelete brings it all back. A collection.json that does not load refuses it, with a
         // reason, and moves nothing.

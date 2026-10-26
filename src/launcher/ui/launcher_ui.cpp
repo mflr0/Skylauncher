@@ -2107,9 +2107,9 @@ namespace launcher_ui
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-quit-while-installing", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
-            static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-view-menu",
-                "45-nav-view-closed", "46-nav-card", "47-nav-figure-page", "48-nav-delete-hint", "49-nav-delete-held",
-                "50-nav-back-to-play", "51-nav-settings-controls", "52-nav-settings-back" };
+            static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-search",
+                "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
+                "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             if (m_testButtons || m_testSidebar)
                 Screenshot(m_testShot.c_str());
             else if (m_testNav)
@@ -2542,18 +2542,18 @@ namespace launcher_ui
         static const std::vector<int> Steps[] = {
             {},                                                        // 40: the launcher opens, the focus in the sidebar
             { ImGuiKey_Escape },                                       // 41: B: the ring on the game's row
-            { ImGuiKey_DownArrow },                                    // 42: down: past the games coming later
+            { ImGuiKey_DownArrow, ImGuiKey_DownArrow },                // 42: down: past Giants and the games coming later
             { ImGuiKey_Space },                                        // 43: A: Collection, the ring on Add a figure
-            { ImGuiKey_GamepadFaceUp, ImGuiKey_DownArrow },            // 44: Y: the View menu, focused
-            { ImGuiKey_GamepadFaceRight },                             // 45: B: closed, the ring back on View
-            { ImGuiKey_LeftArrow, ImGuiKey_LeftArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow,
-              ImGuiKey_RightArrow },                                   // 46: a seat, then right: the list's first card
-            { ImGuiKey_GamepadFaceLeft },                              // 47: X: its Figure page
-            { ImGuiKey_DownArrow, ImGuiKey_RightArrow, ImGuiKey_RightArrow, ImGuiKey_RightArrow }, // 48: on Delete, its hint
-            { Hold | ImGuiKey_Space },                                 // 49: held for 1.5 s: in the trash, back to the list
-            { Release | ImGuiKey_Space, ImGuiKey_GamepadFaceRight },   // 50: B: back to Play, on the main button
-            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_GamepadR1 }, // 51: Settings > Controls
-            { ImGuiKey_Escape },                                       // 52: Escape: back to Play
+            { ImGuiKey_GamepadFaceUp },                                // 44: Y: the search box takes the keyboard
+            { ImGuiKey_Escape },                                       // 45: B: out of the search
+            { ImGuiKey_UpArrow },                                      // 46: up: to the seats, above the bar
+            { ImGuiKey_Space },                                        // 47: A: choosing for that seat (lit, the bar says so)
+            { ImGuiKey_DownArrow },                                    // 48: down: the shelf's first card
+            { ImGuiKey_Space },                                        // 49: A: it goes on the seat, the choosing ends
+            { ImGuiKey_GamepadFaceLeft },                              // 50: X: the focused card's sheet
+            { ImGuiKey_GamepadFaceRight, ImGuiKey_GamepadFaceRight },  // 51: B, B: closed, back to Play
+            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_GamepadR1 }, // 52: Settings > Controls
+            { ImGuiKey_Escape },                                       // 53: Escape: back to Play
         };
         if (m_testStep >= int(std::size(Steps)))
         {

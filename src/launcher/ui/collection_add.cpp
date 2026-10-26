@@ -32,8 +32,21 @@ namespace launcher_ui
         ImGui::SameLine(0, 10);
         ImGui::SetNextItemWidth(260);
         ImGui::InputTextWithHint("##addsearch", "Search the catalogue", m_addSearch, sizeof(m_addSearch));
+        // Type: the same menu as the shelf's bar.
+        ImGui::SameLine(0, 10);
+        ImGui::SetNextItemWidth(220);
+        if (ImGui::BeginCombo("##addtype", m_addCategory < 0 ? "All types" : collection::CategoryName(Category(m_addCategory))))
+        {
+            if (ImGui::Selectable("All types", m_addCategory < 0))
+                m_addCategory = -1;
+            for (int category = 0; category < int(Category::Count); category++)
+                if (std::any_of(catalogue.Toys().begin(), catalogue.Toys().end(), [&](const Toy& toy) { return int(toy.category) == category; }))
+                    if (ImGui::Selectable(collection::CategoryName(Category(category)), m_addCategory == category))
+                        m_addCategory = category;
+            ImGui::EndCombo();
+        }
         ImGui::PopStyleVar();
-        ImGui::Dummy(ImVec2(0, 2));
+        ImGui::Dummy(ImVec2(0, 4));
 
         std::string search = Lower(m_addSearch);
         auto matches = [&](const Toy& toy) {
@@ -41,27 +54,6 @@ namespace launcher_ui
                 return false;
             return search.empty() || Lower(toy.name).find(search) != std::string::npos;
         };
-        float right = ImGui::GetCursorScreenPos().x + size.x - 2 * Pad;
-        for (int category = -1; category < int(Category::Count); category++)
-        {
-            int count = 0;
-            for (const Toy& toy : catalogue.Toys())
-                if (category < 0 || int(toy.category) == category)
-                    count++;
-            if (category >= 0 && count == 0)
-                continue;
-            std::string label = fmt::format("{}##addcat{}", category < 0 ? "All" : collection::CategoryName(Category(category)), category);
-            float w = ImGui::CalcTextSize(label.c_str(), strstr(label.c_str(), "##")).x + 26;
-            if (category > -1)
-            {
-                ImGui::SameLine(0, 6);
-                if (ImGui::GetCursorScreenPos().x + w > right)
-                    ImGui::NewLine();
-            }
-            if (m_app.Chip(label.c_str(), m_addCategory == category))
-                m_addCategory = category;
-        }
-        ImGui::Dummy(ImVec2(0, 4));
 
         // Owned copies of a toy (not counting the starters the game made on its own).
         auto owned = [&](uint16_t type, int variant, const std::string& edition) {

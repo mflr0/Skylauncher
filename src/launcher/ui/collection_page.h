@@ -1,13 +1,15 @@
 #pragma once
 
-// The Collection page: the seats of the game's next session, My Skylanders in sections, the View menu, the Figure page,
-// Add a figure and Manage (docs/collection_ui.md). The figures are the shared collection's (SSARecomp's library); the
+// The Collection page: the portal at the next start (the seats of the chosen game), the bar (search, Element, Game,
+// Type, Add a figure), the shelf (every figure once, favourites first), the figure sheet, Add a figure and Manage
+// (docs/collection_ui.md). The figures are the shared collection's (SSARecomp's library); the
 // look is the launcher's. Drawn by App's widgets (a friend), in collection_page.cpp, collection_figure.cpp,
 // collection_add.cpp and collection_manage.cpp.
 #include "launcher/ui/collection_model.h"
 #include "shared/figures/figure_icons.h"
 #include <SDL3/SDL.h>
 #include <imgui.h>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -23,7 +25,6 @@ namespace launcher_ui
     std::string ElementName(collection::Element element);
     unsigned ElementInk(collection::Element element); // 0xRRGGBB
     std::string Lower(std::string text);
-    bool HasProgress(const collection::Figure& figure); // a character: it has a level, gold...
 
     // A figure's picture: the disc's portrait, or a generated icon (the page writes the initials over those).
     struct FigureIconTexture
@@ -45,8 +46,8 @@ namespace launcher_ui
         // A dropped file or folder: figure dumps join the collection. False if it holds none (a disc image).
         bool Drop(const std::string& path);
         std::string Folder() const;
-        // B / Escape belongs to the page: an overlay, the View menu or a search is open.
-        bool TakesBack() const { return m_overlay != Overlay::None || m_viewMenu || m_search[0] != 0; }
+        // B / Escape belongs to the page: an overlay is open, a seat is being chosen for, or a search is typed.
+        bool TakesBack() const { return m_overlay != Overlay::None || m_choosing >= 0 || m_search[0] != 0; }
 
         // SSA_LAUNCHER_TEST_SEATX: the X of every seat, pressed by mouse, keyboard and pad (App::TestSeatXScript).
         std::vector<std::string> TestSeats() const { return m_model.seats; }
@@ -66,17 +67,22 @@ namespace launcher_ui
         void Open();
         void Reload();
         void Rebuild();
+        void SelectPortalGame(const std::string& id);
         void DrawHeader(float width);
-        void DrawSeats();
+        void DrawSeats(float width);
         void DrawSeatMenu();
         void TakeOff(size_t seat);
+        void Choose(int seat);  // the next card picked goes on this seat; -1: stop choosing
+        void DrawBar();
+        bool FilterMenu(const char* id, const char* all, const std::string& current, float width, const std::function<void()>& items);
         void DrawList();
-        void DrawViewMenu(ImVec2 anchor);
         bool DrawCard(const collection::Figure& figure, float width, bool dim);
         void DrawOverlay();
         void DrawFigurePage(ImVec2 size);
-        void DrawStats(const collection::Figure& figure, float width);
+        void DrawFigureFacts(const collection::Figure& figure, float width);
+        void DrawDetails(const collection::Figure& figure);
         void DrawEditStats(const collection::Figure& figure);
+        void OpenEdit(const collection::Figure& figure);
         void DeleteFigure(const std::string& path);
         void DrawAdd(ImVec2 size);
         void DrawManage(ImVec2 size);
@@ -109,6 +115,7 @@ namespace launcher_ui
         std::string Name(const collection::Figure& figure) const;
         std::string Detail(const collection::Figure& figure) const;
         std::string SeatName(size_t seat) const;
+        std::string SeatTag(size_t seat) const; // "P1", "P2"; "On" for the shared seats
         std::string SectionName(const collection::Section& section) const;
         std::string LiveGame(const collection::Figure& figure) const; // "Spyro's Adventure" when a game holds it
 
@@ -117,41 +124,37 @@ namespace launcher_ui
         bool m_opened = false;
         std::map<std::string, FigureIconTexture> m_icons;
 
-        // The list: filtered and cut into sections when something it depends on changed.
+        // The shelf: filtered and cut into sections when something it depends on changed.
         int m_generation = 0;
         std::string m_listKey;
         std::vector<collection::Figure> m_list;
         std::vector<collection::Section> m_sections;
         int m_hiddenStarters = 0;
-        size_t m_seat = 0;              // the focused seat: the list shows what goes there
+        ShelfFilter m_filter;           // Element, Game, Type (the search is m_search)
+        char m_search[64] = {};
+        bool m_focusSearch = false;     // Y, F3: the search box takes the keyboard next frame
+        int m_choosing = -1;            // the seat the next card goes on (a seat clicked, A, LB/RB); -1: browsing
         std::vector<ImVec2> m_crossAt;  // where each seat's X was drawn this frame (-1: none), for the test
         int m_navSeat = -1;             // the seat with the keyboard or pad focus this frame, -1: none
         int m_hoverSeat = -1;           // the seat under the mouse this frame
-        bool m_navEdgeCard = false;     // the focused card is the first of its row (Left goes to the seats)
-        int m_focusSeat = -1;           // the D-pad crosses between the columns: focus this seat next frame,
-        bool m_focusCard = false;       // or the list's first card
+        int m_focusSeat = -1;           // the D-pad crosses between the seats and the shelf: focus this seat next frame,
+        bool m_focusCard = false;       // or the shelf's first card
+        bool m_navTopCard = false;      // the focused card is in the shelf's first row (Up goes to the seats)
+        bool m_navBar = false;          // the search or a filter of the bar has the focus (Up goes to the seats)
         int m_seatMenu = -1;            // the seat whose right-click menu is open
-        std::string m_selected;         // the card with the focus (double click or Enter: put on the seat)
-        std::string m_hovered;          // the card under the mouse or the focus (X: its Figure page)
-        char m_search[64] = {};
-        collection::View m_view;
-        bool m_foreignOpen = false;     // "Not for this game" unfolded
-        int m_jumpTo = -1;              // a section to scroll to (strip, LB/RB)
-        int m_currentSection = 0;
-        std::vector<float> m_sectionY;  // where each section starts in the list (last frame)
-        bool m_viewMenu = false;
-        bool m_viewFocus = false;       // the View menu just opened (focus it) or closed (focus its button)
+        std::string m_selected;         // the card with the focus
+        std::string m_hovered;          // the card under the mouse or the focus (X: its sheet)
 
         // The overlays.
         Overlay m_overlay = Overlay::None;
-        std::string m_figure;           // the Figure page's dump
+        std::string m_figure;           // the figure sheet's dump
+        bool m_details = false;         // the sheet's Details are open
         bool m_editing = false;
         figures::FigureStats m_edit;
         figures::FigureStats m_editBase; // as read when Edit stats opened: Save writes back only what changed since
         char m_nickname[64] = {};        // 16 characters of up to 3 bytes, and the terminator
         char m_label[64] = {};
-        bool m_renaming = false;
-        std::string m_confirm;          // "restore:<backup>"
+        std::string m_confirm;          // "restore:<backup>", "reset", "delete": the bar over the sheet's actions
         std::string m_addGame = "ssa";
         uint16_t m_addToy = 0xFFFF;
         int m_addVersion = 0;           // 0: standard, else 1 + an index in the toy's variants

@@ -275,9 +275,10 @@ namespace launcher_ui
     namespace
     {
         // Screens, in order (the step is the index).
-        constexpr const char* Shots[] = { "20-collection", "21-view-menu", "22-by-category", "23-figure-page", "24-edit-stats", "25-add-a-figure",
-            "26-add-later-game", "27-manage-trash", "28-manage-backups", "29-live-portal", "30-after-delete", "31-giants-figure",
-            "32-giants-edit-stats", "33-add-lightcore" };
+        constexpr const char* Shots[] = { "20-collection", "21-choose-player-1", "22-choose-magic-item", "23-filter-water", "24-figure-sheet",
+            "25-figure-details", "26-figure-delete", "27-edit", "28-add-a-figure", "29-add-later-game", "30-manage-trash", "31-manage-backups",
+            "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
+            "39-choose-empty" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -365,11 +366,12 @@ namespace launcher_ui
     void CollectionPage::TestScreen(int step)
     {
         m_overlay = Overlay::None;
-        m_viewMenu = false;
         m_editing = false;
+        m_details = false;
         m_confirm.clear();
-        if (step != 1 && step != 2)
-            m_view = collection::View{};
+        m_choosing = -1;
+        m_filter = ShelfFilter{};
+        m_search[0] = 0;
         auto figureOf = [&](uint16_t type) -> std::string {
             for (const Figure& figure : m_model.figures)
                 if (figure.type == type && !collection::UntouchedStarter(figure) && figure.level > 1)
@@ -378,29 +380,31 @@ namespace launcher_ui
         };
         switch (step)
         {
-        case 1: m_viewMenu = true; break;
-        case 2:
-            m_view.group = "category";
-            m_view.order = "name";
+        case 1: Choose(0); break;
+        case 2: Choose(2); break;
+        case 3: m_filter.element = int(collection::Element::Water); break;
+        case 4: OpenFigure(figureOf(14)); break;
+        case 5:
+            OpenFigure(figureOf(14));
+            m_details = true;
             break;
-        case 3: OpenFigure(figureOf(14)); break;
-        case 4:
+        case 6:
+            OpenFigure(figureOf(14));
+            m_confirm = "delete";
+            break;
+        case 7:
             OpenFigure(figureOf(14));
             if (const Figure* figure = m_model.Find(m_figure))
-            {
-                m_edit = m_editBase = figure->stats;
-                snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(figure->stats).c_str());
-                m_editing = true;
-            }
+                OpenEdit(*figure);
             break;
-        case 5:
+        case 8:
             m_overlay = Overlay::Add;
             m_addGame = "ssa";
             m_addToy = 14;
             m_addVersion = 0;
             m_addCategory = -1;
             break;
-        case 6:
+        case 9:
             m_overlay = Overlay::Add;
             m_addGame = "swap_force";
             m_addToy = 0xFFFF;
@@ -412,16 +416,16 @@ namespace launcher_ui
                 }
             m_addCategory = int(collection::Category::SwapTop);
             break;
-        case 7:
+        case 10:
             m_overlay = Overlay::Manage;
             m_manageTab = 0;
             break;
-        case 8:
+        case 11:
             m_overlay = Overlay::Manage;
             m_manageTab = 1;
             m_backupsOf = figureOf(14);
             break;
-        case 9:
+        case 12:
         {
 #ifndef _WIN32
             // A game holds the figures of the seats: a lock of a live process other than this one.
@@ -435,30 +439,38 @@ namespace launcher_ui
 #endif
             break;
         }
-        case 10: // deleting a figure from its page: back to the list, on the next figure
+        case 13: // the game quit; deleting a figure from its sheet: back to the shelf, on the next figure
+            for (const std::string& seat : m_model.seats)
+                if (!seat.empty() && getenv("SSA_COLLECTION") != nullptr)
+                    collection::BreakLock(seat);
+            Reload();
             OpenFigure(figureOf(19));
             DeleteFigure(m_figure);
             break;
-        case 11: // Giants: a figure at level 15 with a hat, its page and its Edit stats (the hat picker)
-        case 12:
+        case 14: // Giants: its own seats (a runtime now), the same shelf with Giants' levels
         {
-            m_model.gameId = "giants";
-            m_view = collection::View{};
-            Reload();
+            SelectPortalGame("giants");
+            std::string eruptor;
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 9 && figure.level == figures::MaxLevelGiants)
+                    eruptor = figure.path;
+            TestSetSeats({ eruptor, figureOf(14), "" }); // the test's two games share SSA_SAVE_DIR, so one session file
+            break;
+        }
+        case 15: // Giants: a figure at level 15 with a hat, its sheet and its Edit (the hat picker)
+        case 16:
+        {
+            SelectPortalGame("giants");
             std::string eruptor;
             for (const Figure& figure : m_model.figures)
                 if (figure.type == 9 && figure.level == figures::MaxLevelGiants)
                     eruptor = figure.path;
             OpenFigure(eruptor);
-            if (const Figure* figure = step == 12 ? m_model.Find(m_figure) : nullptr)
-            {
-                m_edit = m_editBase = figure->stats;
-                snprintf(m_nickname, sizeof(m_nickname), "%s", figures::NicknameUtf8(figure->stats).c_str());
-                m_editing = true;
-            }
+            if (const Figure* figure = step == 16 ? m_model.Find(m_figure) : nullptr)
+                OpenEdit(*figure);
             break;
         }
-        case 13: // Add a figure, Giants: Eruptor's versions, the LightCore chosen
+        case 17: // Add a figure, Giants: Eruptor's versions, the LightCore chosen
         {
             m_overlay = Overlay::Add;
             m_addGame = "giants";
@@ -471,6 +483,34 @@ namespace launcher_ui
                         m_addVersion = int(i) + 1;
             break;
         }
+        case 18: // back to Spyro's Adventure (its seats as seeded): a search that finds nothing
+        {
+            SelectPortalGame("ssa");
+            std::vector<std::string> seats(4);
+            for (const Figure& figure : m_model.figures)
+            {
+                if (figure.type == 14 && figure.favourite)
+                    seats[0] = figure.path;
+                else if (figure.type == 16)
+                    seats[1] = figure.path;
+                else if (figure.type == 200)
+                    seats[2] = figure.path;
+                else if (figure.type == 300)
+                    seats[3] = figure.path;
+            }
+            TestSetSeats(seats);
+            snprintf(m_search, sizeof(m_search), "%s", "zzz");
+            break;
+        }
+        case 19: // choosing for a seat nothing goes on: no trap seat in SSA, so the adventure seat with the pack taken off
+            SelectPortalGame("ssa");
+            TakeOff(3);
+            for (const Figure& figure : m_model.figures)
+                if (figure.toy != nullptr && figure.toy->category == collection::Category::Adventure)
+                    collection::Delete(figure.path);
+            Reload();
+            Choose(3);
+            break;
         default: break;
         }
         m_generation++;

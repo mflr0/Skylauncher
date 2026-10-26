@@ -1,8 +1,10 @@
 # The Collection page on the shared collection
 
 The launcher shows the same figures as the game and the Toy Box: SSARecomp's collection library (option A of
-`figures_overlap.md`, now done). The screens are the Toy Box's organisation (`docs/toybox_ux.md`, screen 14) in
-dorydev's look; her colours, fonts and widgets are untouched (`launcher_theme.h`).
+`figures_overlap.md`, now done). **One model for both apps** (SSARecomp's `docs/runtime/host/toybox_ux.md`, the
+2026-10-26 redesign): the portal's seats on top, the shelf below (every figure once, favourites first), the same cards
+and words, a sheet with three main actions. The look is dorydev's: her colours, fonts and widgets are untouched
+(`launcher_theme.h`).
 
 ## One engine
 
@@ -37,99 +39,123 @@ At the first visit to the page (`CollectionPage::Open`):
 3. The never-played starters the game made on its own (37 of them, one per character) are not the player's: My
    Skylanders hides them (the header counts them), Manage > Tidy moves them to the trash.
 
-## Seats (the next session)
+## The portal at the next start
 
-- What the game reads at start is `portal.txt` in its save folder (`SSA_SAVE_DIR`, else
-  `SDL_GetPrefPath("SSARecomp", "SSARecomp")`): `<slot> <path>` lines, rewritten by the game at every change. The launcher
-  writes it with seat *i* in slot *i* (`WriteSeats`) and reads it back (`ReadSeats`): a figure goes to its slot's seat when
-  it fits, else to the first seat that takes it (as the Toy Box does). `[portal] place` / `SSA_PORTAL_PLACE` are no longer
-  written. The seat file is per game (`catalogue.json` `games[].seats`); only games with a runtime (SSA today) can be
-  prepared, the others show their seats read-only.
-- Drag a card onto a seat, or double-click it, Enter, A (it goes to the focused seat); every way of taking it off a seat (issue #9; a player, the magic item and the adventure pack alike, the others stay):
-  the cross on the seat (**fixed**: the seat's own button, submitted first, kept the pointer, so the cross, drawn over it, never got
-  the click: `SetNextItemAllowOverlap()` before the seat's button lets the cross win where it is; `SSA_LAUNCHER_TEST_SEATX` checks
-  all four seats by mouse, keyboard and pad), Delete or the pad's X on the focused seat (or Delete with the mouse over it), the seat's right-click menu
-  ("Take it off the seat", "Figure page") and dragging it off the seat onto the list; a seat whose figure is gone from the
-  collection shows "Missing figure" and can be emptied the same way. The seats are read-only while the game runs.
-  Under the seats one line sums the portal up (`collection::PortalOverviewLine`: "P1 Gill Grunt · Item Anvil Rain"); a figure
-  held by a game, an unaccepted toy or a toy of a later game is refused with a message.
-- Live: figures a game holds (JSON lock of a live process) show "LIVE", "ON PORTAL" and "On the portal in Spyro's
-  Adventure"; the seats are read-only then and Edit/Rename-the-dump/Reset/Delete are disabled (metadata such as
-  favourites stays editable). "Mark as not in use" (held) breaks a stale lock.
+- What the game reads at start is `portal.txt` in its data folder (`SSA_SAVE_DIR` in tests, else the game's folder in
+  the data root): `<slot> <path>` lines, rewritten by the game at every change. The launcher writes it with seat *i* in
+  slot *i* (`WriteSeats`) and reads it back (`ReadSeats`): a figure goes to its slot's seat when it fits, else to the
+  first seat that takes it (as the Toy Box does). The seats are per game (`catalogue.json` `games[].seats`).
+- **Which games**: the selector next to "PORTAL AT THE NEXT START" lists the games that can start with prepared seats,
+  those with a runtime in the catalogue (`SessionFile` not empty): Spyro's Adventure and Giants (Giants: Player 1,
+  Player 2, Item or adventure). The page opens on the game chosen in the sidebar when it is one of them.
+- **Placing, two steps**: click a seat (A on it, or LB/RB), it lights up and the bar says "Choose a figure for Player 1 ·
+  only what Spyro's Adventure reads"; the shelf then shows only what goes there and the game reads; click a figure: it
+  goes on the seat ("Player 1: Gilou's"), and the choosing ends. Click the seat again, Cancel, B or Escape stops
+  choosing. Dragging a card onto a seat also works; a figure already on the other seat moves (it is on one seat only).
+- **Taking off**: the X on the tile (**fixed** in #9: `SetNextItemAllowOverlap()` before the tile's button lets the X win
+  where it is; `SSA_LAUNCHER_TEST_SEATX` checks all four seats by mouse, keyboard and pad), Delete or the pad's X on a
+  focused tile (or Delete with the mouse over it), the tile's right-click menu ("Take it off", "Choose another", "Open its
+  sheet"), or dragging the tile onto the shelf. A seat whose figure is gone shows "Missing figure" and can be emptied.
+- **A tile**: the seat's name (accent while choosing for it), the figure's picture, name and level for that game
+  ("Level 10 (15)"); empty: a `+`, "Empty", "Choose".
+- **Live**: figures a game holds (JSON lock of a live process) read "Playing now"; while the shown game runs the title is
+  "ON THE PORTAL NOW", the line says "Spyro's Adventure is running: change them in its Toy Box", the seats are
+  read-only and Edit, Reset, Delete are disabled for those figures (favourites and names stay editable). "Mark as not in
+  use" (held) breaks a stale lock.
 - Refresh: every 1.5 s the model compares a signature of the folder (names, sizes, times of dumps, locks,
-  `collection.json`, the session file) and whether each lock's process still runs; any change reloads the list, so a
-  game that wrote a dump, took a figure or quit shows at once. Note the launcher window closes when the game starts
-  (`main.cpp`), so this is seen when the launcher is opened beside a running game or after it.
+  `collection.json`, the session file) and whether each lock's process still runs; any change reloads the shelf. The
+  launcher window closes when the game starts (`main.cpp`), so this is seen when the launcher is opened beside a running
+  game or after it.
 
 ## The screens
 
-- **Header**: COLLECTION, counts, `+ Add a figure`, `Manage`, `View`.
-- **Left**: "Portal for the next session", the game selector, one card per seat (Player 1, Player 2, Magic item,
-  Adventure; Trap or Vehicle in later games).
-- **Right (My Skylanders)**: a search box, a strip of the sections (click, LB/RB, Page Up/Down), the cards cut into
-  sections by `collection::Group`: Smart is On the portal, Recent, Favourites, then by element; "Not for Spyro's
-  Adventure" folded at the end. The list follows the focused seat (a seat shows what fits it).
-- **View** (button, Y, F3): group by (Smart, Element, Game, Category, Series and variants, Level, Name), order, show
-  (Everything, Favourites, Played, Never played), foreign toys folded or hidden; saved per game in `collection.json`
-  (`views.<game>.launcher`).
-- **Figure page** (click a card, right click, X, F2): stats from the dump, level bar, last played, where it plays; Put
-  on a seat, Edit stats (level, XP, gold, hero points, nickname: refused for unreadable dumps; with the game selector's limits: in Spyro's Adventure level 1-10 on its own part of the experience, so a figure Giants took to level 15 keeps those levels; in Giants level 1-15 and a **hat picker** with the catalogue's 52 hat names), Rename (the label; the
-  nickname is in Edit stats), Favourite, Duplicate, Back up now, Restore (list with level and gold, confirmation),
-  Reset and Delete (held 1 s, the instruction in their tooltip; backed up first, Delete goes to the trash), Folder.
-  Edit stats' Save re-reads the figure and writes only the fields changed in the editor (a game may have played it
-  meanwhile); names are trimmed.
-- **Add a figure**: a game selector (the six games), category chips, search; one card per character, "owned x2";
-  the toys the game reads first, then "Later games" labelled "needs Giants". A side panel lists the versions
+- **Header**: COLLECTION, "14 figures · 3 favourites", the portal status; `+ Add a figure` and `...` (Trash, Backups,
+  Import and export, Unknown toys, Tidy the starters: Manage on that tab; Show the collection folder).
+- **The seats** (above).
+- **The bar**: "Search by name or nickname" (label, nickname, toy name, file name) and three menus, **Element**,
+  **Game** (the game a toy came with), **Type** (the types the collection has). A set filter shows its value, lit
+  ("Water v"). Nothing matches: "No figure matches" and "Clear the search and the filters".
+- **The shelf** (`CollectionModel::Shelf`, `collection::Group` Smart for the portal's game): every figure once,
+  favourites first, then the ones that game took (newest first), then by element; "Unknown toys" and "Not for
+  Spyro's Adventure" (greyed: they can't go on this portal) after it. The untouched starters the game made on its own
+  are left out (Manage > Tidy). A card: the picture, the name (the label, else the toy's name with the game's nickname:
+  "Gill Grunt (Gilou)"), the level line for the portal's game, the star, the variant's name, P1/P2/"On" for the seats.
+  The Toy Box draws the same card.
+- **The sheet** (a click on a card when no seat is being chosen, right click, X, F2): the picture with its element and
+  type; the name, the version, where it sits ("On Player 1 at the next start of Spyro's Adventure") or which game holds
+  it; "Level 10 (15)" with the bar to the next level, gold and play time, last played; **Details** (closed by default):
+  nickname, hero points, hat and upgrades, the games it plays in, toy type and variant, file and origin, backups.
+  **Three actions**: **Put on the portal** (a menu of the seats: "(replaces Bash)", disabled where it doesn't fit; Take
+  it off), **Edit**, **Favourite**; `...`: Duplicate, Back up now, Restore a backup (a submenu: date, level, gold),
+  Show in the folder, Reset to new..., Delete... (red: a bar over the actions asks to **Hold to reset / Hold to delete**,
+  1 s, backed up first; Delete goes to the trash). Close.
+- **Edit**: in two columns, the name in the lists (empty: the toy's name) and, for a figure that keeps them, the level in
+  the portal's game (Spyro's Adventure 1-10 on its own part of the experience, so a figure Giants took to 15 keeps those
+  levels; Giants 1-15), experience, Giants' **hat picker** (52 names), gold, hero points, the nickname the game shows.
+  Save re-reads the figure and writes only the fields changed (a game may have played it meanwhile); a name alone
+  writes no stats (and makes no backup).
+- **Add a figure**: a game selector (the six games), search, a **Type** menu (as the bar's), one card per character,
+  "owned x2"; the toys the game reads first, then "Later games" labelled "needs Giants". A side panel lists the versions
   (standard, variants, same-tag editions); name (optional) and Create; "Put it on Player 1" afterwards.
-- **Manage**: Trash (put back, delete for good (held); 30 days), Backups (per figure, restore), Import and export
-  (files, a folder, drop files or a folder on the window; export everything; show in folder), Unknown toys (name one:
+- **Manage**: Trash (put back, delete for good (held); 30 days), Backups (per figure, restore), Import and export (files,
+  a folder, drop files or a folder on the window; export everything; show in folder), Unknown toys (name one:
   `catalogue.json` of the collection, applied at the next start), Tidy (the starters).
-- **Gamepad**: the same verbs as the Toy Box: d-pad moves (ImGui navigation; left and right cross between the seats and
-  the list), A chooses (puts on the seat), B goes back (closes the overlay, one step; then out of the page), X opens the
-  Figure page (on a seat: takes its figure off), Y the View menu (focused as it opens), LB/RB the previous/next section.
-  Every card has its own ID (a figure shows twice when it is on the portal). Manage and the Figure page read the trash
-  and the backups once per change of the collection, not every frame; cards scrolled out of view aren't drawn.
+- **Pictures**: `collection::PortraitPath` (the shown game's disc, else the other's, else the toy's family picture from
+  a disc: SSA's potion, compass and paw icons), else `figures::GenerateIcon` (a shape, the element's colour, the
+  variant's badge, initials for characters, and the Toy Box's mark for items, packs and sidekicks:
+  `collection::KindGlyph`). Never an empty square.
+- **Gamepad**: d-pad moves (ImGui navigation; down from a seat to the shelf, up from its first row back to the seats), A
+  chooses (a seat: choose for it; a card: put it on the seat being chosen for, else its sheet), B goes back (closes the
+  overlay one step, stops choosing, clears the search; then out of the page), X opens the sheet (on a seat: takes its
+  figure off), Y the search, LB/RB choose for the previous/next seat. Cards scrolled out of view aren't drawn; Manage and
+  the sheet read the trash and the backups once per change of the collection.
 
 ## Files
 
-`collection_page.{h,cpp}` (page, seats, list, View), `collection_figure.cpp` (overlay, Figure page, Edit stats),
-`collection_add.cpp`, `collection_manage.cpp` (Manage, test seed), `collection_model.{h,cpp}` (no UI: seats, signature
-polling, settings move, naming unknown toys). `launcher_app.h` only holds a `CollectionPage` and makes it a friend;
-`launcher_ui.cpp` calls `Draw`, `Drop`, `ClearIcons` and the test hooks.
+`collection_page.{h,cpp}` (page, seats, bar, shelf), `collection_figure.cpp` (overlay, the sheet, Edit),
+`collection_add.cpp`, `collection_manage.cpp` (Manage, test seed and screens), `collection_model.{h,cpp}` (no UI: seats,
+`ShelfFilter` and `Shelf`, signature polling, settings move, naming unknown toys). `launcher_app.h` only holds a
+`CollectionPage` and makes it a friend; `launcher_ui.cpp` calls `Draw`, `Drop`, `ClearIcons` and the test hooks.
 
 ## Checks
 
 - `SkylauncherTest` (`CollectionChecks`): library, migration (originals intact, second pass copies none), stats,
   backups, restore, reset, duplicate, trash, import dedupe, JSON locks (live, stale), seats and `portal.txt`, live
-  refresh, settings move, unknown toy naming, icons for every catalogue toy. Everything runs in a scratch folder
-  (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
-- The Figure page shows the figure's real level (up to 15, total XP) and "level 10 in Spyro's Adventure" above 10;
-  the hat by name. Add a figure lists Giants' LightCore versions (create one: the variant `0x1206`, nothing else).
+  refresh, settings move, unknown toy naming, icons for every catalogue toy (and the family's mark on items and packs),
+  **the shelf** (every figure once, none left out, favourites first; choosing for the Magic item seat shows only the
+  item; for a player seat only characters; the Element, Game and search filters), the card's level ("Level 10"), and
+  that Giants can be prepared but not the games without a runtime. Seat X: 12 of 12. Everything runs in a scratch
+  folder (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
 - Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `33-add-lightcore` (`31-giants-figure`, `32-giants-edit-stats`: a level-15 Eruptor with a hat in Giants; `33-add-lightcore`) (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1` fakes a game's
-  locks for the last one).
+  refuses without it) and writes `20-collection` to `39-choose-empty`: the shelf, choosing for Player 1 and for the Magic
+  item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
+  backups), the live portal (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
+  its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on. Set `SKYLANDERS_DATA`
+  to a folder holding the discs' cached pictures to see them (else the drawn icons).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the
   locks while it runs and the stats after.
 
 ## Not done
 
-- Player 2 is a seat in the launcher; the game has no second pad yet.
+- Player 2 is a seat in the launcher; the game has no second pad yet ("needs a 2nd controller" in its Toy Box).
 - Names for figures are typed with the keyboard; no on-screen keyboard (the Toy Box has one for the TV).
 - Real-portal copies ("Save a copy") are a Toy Box action; the launcher shows them as `origin: portal` figures.
 - The launcher quits when the game starts, so live refresh is for a launcher opened next to a running game.
 - The Toy Box's wheel pins (`GetWheel`) and pad glyph hints are not drawn in the launcher.
+- The View menu is gone (2026-10-26): `collection::GetView`/`SetView` (`views.<game>.launcher` in `collection.json`) are
+  no longer read.
 
 ## Deleting a figure (issue #13)
 
 What was wrong:
-- The Delete button returned from the Figure page between `BeginDisabled` and `EndDisabled`. The disabled state leaked
+- The Delete button returned from the figure sheet between `BeginDisabled` and `EndDisabled`. The disabled state leaked
   into the rest of the frame: the page went grey and the launcher stayed unusable.
 - A hold button fired again every second while the mouse stayed down, so a refused action repeated its toast.
 - `collection::Delete` moved the dump first and ignored the index write. When `collection.json` did not load (the S-03
   guard refuses writes), the file sat in `trash/` with no entry: it was lost to Manage > Trash.
 
 Now: the index is written first and the move undone if it fails, so a refusal changes nothing and comes back as one
-toast with its reason. A hold button acts once per press. After a delete the page returns to the list, the focus on the
-next figure (`CollectionPage::DeleteFigure`, `CollectionModel::Delete`). Tested by `CollectionChecks` and screenshot
-`30-after-delete`.
+toast with its reason. A hold button acts once per press. After a delete the page returns to the shelf, the focus on the
+next figure (`CollectionPage::DeleteFigure`, `CollectionModel::Delete`). Tested by `CollectionChecks` and screenshots
+`26-figure-delete` (the hold bar) and `33-after-delete`.

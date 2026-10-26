@@ -80,6 +80,13 @@ namespace collection
         std::string LastUsedIn(const std::string& game) const;
     };
 
+    // Whether a toy keeps a level and gold (characters, minis and sidekicks), unlike items, adventure packs and traps.
+    bool HasProgress(const Figure& figure);
+    // The level a card shows for `game`, the same in the Toy Box and Skylauncher: "Level 6"; "Level 10 (15)" when the
+    // figure's own level is above the game's cap (a figure Giants took to 15, shown in Spyro's Adventure); "New" for a
+    // character never played; "Unreadable" for a damaged one; empty for toys without progress. French with `french`.
+    std::string LevelText(const Figure& figure, const std::string& game, bool french = false);
+
     struct Filter
     {
         std::string game;             // only toys this game reads ("ssa"); empty: all
@@ -180,7 +187,8 @@ namespace collection
 
     // --- Views and the wheel (collection.json "views") ------------------------------------------------------------------
 
-    // How My Skylanders is shown, per game and per app ("game", "launcher"). Values as in docs/toybox_ux.md section 3.
+    // How My Skylanders was shown, per game and per app ("game", "launcher"): the View menu of before the shelf. Kept
+    // in collection.json; the screens no longer read it since 2026-10-26 (docs/runtime/host/toybox_ux.md section 3).
     struct View
     {
         std::string group = "smart"; // smart, element, game, category, series, level, name
@@ -212,18 +220,18 @@ namespace collection
 
     struct Section
     {
-        enum class Kind { Portal, Recent, Favourites, Element, Game, Category, Series, Level, Letter, Unknown, Foreign };
+        enum class Kind { Shelf, Element, Game, Category, Series, Level, Letter, Unknown, Foreign };
         Kind kind;
         int value = 0;            // the element, category, variant kind, level or letter
         std::string game;         // Kind::Game
         std::vector<size_t> items; // indices into the list
     };
-    // Sections of `list` for `game`: Smart is On the portal (`onPortal` paths), Recent (the last 8 the game took),
-    // Favourites, then by element; every grouping ends with Unknown toys and the toys the game does not read
-    // (Foreign; empty when `game` is empty). A figure is in one section only, except Smart's Recent and Favourites,
-    // which repeat figures shown by element. Empty sections are left out.
-    std::vector<Section> Group(const std::vector<Figure>& list, GroupBy group, OrderBy order, const std::string& game,
-        const std::vector<std::string>& onPortal);
+    // Sections of `list` for `game`. Smart is the shelf (Toy Box and Skylauncher alike): one section where every figure
+    // shows once, favourites first, then the figures `game` took (newest first), then by element and category, a
+    // character's variants next to it. The other groupings cut the list by element, game, category, series, level or
+    // name. Every grouping ends with Unknown toys and the toys the game does not read (Foreign; none when `game` is
+    // empty). A figure is in one section only; empty sections are left out.
+    std::vector<Section> Group(const std::vector<Figure>& list, GroupBy group, OrderBy order, const std::string& game);
 
     // --- The portal at a glance ---------------------------------------------------------------------------------------
 
