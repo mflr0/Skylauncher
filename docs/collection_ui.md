@@ -116,6 +116,10 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Chevrons** are drawn, never typed: `App::DrawChevron` / `DrawLabelChevron` (`PillButton`'s `chevron` argument) draw
   two lines in the label's colour, down when closed and up when open (Details, Put on the portal, the Element / Game /
   Type menus). The combo boxes use ImGui's own arrow.
+- **Upgrades in Edit** (2026-10-26): `DrawUpgradeEditor`: the toy's upgrades by name (`collection::Upgrades`), the same
+  columns, rules and words as the Toy Box (`collection::ToggleUpgrade`...), All / None, the focused one's description;
+  the Edit fields scroll above the Save row. Save writes `upgrades` (and the Giants Wow Pow copy) only when they changed
+  (`MergeEditedStats`). The sheet shows a name once, and "Never" under Last played for a figure no game has written.
 - **Texts** (2026-10-26): one short sentence per help line, no path or file name in running text, no help when the
   label is clear, errors as what happened then what to do. The intro of Add a figure, the Edit sheet's backup note,
   the empty-state bodies and the portal selector's tooltip were removed; the rules are in `launcher_ui.md`, "Writing".

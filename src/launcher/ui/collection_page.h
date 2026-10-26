@@ -86,6 +86,7 @@ namespace launcher_ui
         void DrawFigureFacts(const collection::Figure& figure, float width);
         void DrawDetails(const collection::Figure& figure);
         void DrawEditStats(const collection::Figure& figure);
+        void DrawUpgradeEditor(const collection::Figure& figure);
         void OpenEdit(const collection::Figure& figure);
         void DeleteFigure(const std::string& path);
         void DrawAdd(ImVec2 size);

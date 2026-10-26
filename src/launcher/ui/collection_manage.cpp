@@ -327,6 +327,12 @@ namespace launcher_ui
         make(14, 0, 700, 90, ""); // a second Gill Grunt: "owned x2"
         std::string doomed = make(12, 0, 0, 0, ""), doomed2 = make(10, 0, 0, 0, ""); // two in the trash: one hold button each
         collection::SetLabel(gill, "Splash's");
+        {
+            Figure bought; // Gill Grunt: the first path chosen, two of its upgrades and two basic ones bought
+            collection::Read(gill, bought);
+            bought.stats.upgrades = 0x0075;
+            collection::WriteStats(gill, bought.stats);
+        }
         collection::SetFavourite(gill, true);
         collection::SetFavourite(spyro, true);
         collection::SetFavourite(legendary, true);
@@ -354,6 +360,7 @@ namespace launcher_ui
             figures::SetTotalExperience(high.stats, figures::LevelExperience[figures::MaxLevelGiants - 1]);
             high.stats.gold = 40000;
             high.stats.hat = 6;
+            high.stats.upgrades = 0x0645;
             collection::WriteStats(eruptor, high.stats);
             collection::Touch(eruptor, "giants");
         }
@@ -362,7 +369,7 @@ namespace launcher_ui
             for (const collection::Variant& variant : toy->variants)
                 if (variant.kind == collection::VariantKind::Series && !variant.sameTag)
                 {
-                    std::string series = collection::Create(9, variant.id);
+                    std::string series = make(9, variant.id, 12000, 3100, ""); // played: its level and "last played" agree
                     if (!series.empty())
                         collection::Touch(series, "giants");
                     break;

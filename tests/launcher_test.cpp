@@ -601,6 +601,15 @@ void EditChecks()
     figures::SetExperienceFor(edited, figures::LevelCap("ssa"), 13000);
     saved = MergeEditedStats(high, high, edited, "Splash", "Splash");
     EXPECT(saved.experience == 13000 && saved.giantsExperience == 63500);
+    // Upgrades: changed here they win, otherwise the game's stay.
+    edited = base;
+    edited.upgrades = 0x0075;
+    now.upgrades = 0x0004;
+    saved = MergeEditedStats(now, base, edited, "Splash", "Splash");
+    EXPECT(saved.upgrades == 0x0075);
+    edited = base;
+    edited.gold = 5;
+    EXPECT(MergeEditedStats(now, base, edited, "Splash", "Splash").upgrades == 0x0004);
 
     using launcher_ui::Trimmed;
     EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Splash's  ") == "Splash's" && Trimmed("A b") == "A b");

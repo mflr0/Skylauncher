@@ -360,6 +360,10 @@ namespace launcher_ui
             stats.gold = edited.gold;
         if (edited.heroPoints != base.heroPoints)
             stats.heroPoints = edited.heroPoints;
+        if (edited.upgrades != base.upgrades)
+            stats.upgrades = edited.upgrades;
+        if (edited.wowPow != base.wowPow)
+            stats.wowPow = edited.wowPow;
         if (nickname != baseNickname)
             figures::SetNicknameUtf8(stats, nickname);
         return stats;

@@ -3,6 +3,7 @@
 // restore, show the file, reset and delete, held), the technical details behind "Details".
 #include "launcher/ui/launcher_app.h"
 #include "launcher/ui/launcher_ui.h"
+#include "shared/collection/upgrades.h"
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -176,7 +177,7 @@ namespace launcher_ui
         std::vector<std::pair<std::string, std::string>> rows;
         if (collection::HasProgress(f) && f.state == figures::AreaState::Valid)
             rows.push_back({ Tr("Gold"), Tf("{}   ·   {} played", f.stats.gold, PlayTime(f.stats.playSeconds)) });
-        rows.push_back({ Tr("Last played"), f.lastGame.empty() ? std::string(Tr("Never")) : fmt::format("{} · {}", ShortGameName(f.lastGame), ShortDate(f.lastUsed)) });
+        rows.push_back({ Tr("Last played"), f.lastGame.empty() || f.state == figures::AreaState::Blank ? std::string(Tr("Never")) : fmt::format("{} · {}", ShortGameName(f.lastGame), ShortDate(f.lastUsed)) });
         FactRows("##facts", rows);
         ImGui::EndGroup();
     }
@@ -259,7 +260,8 @@ namespace launcher_ui
         ImGui::PushTextWrapPos(right + textW);
         m_app.Title(Name(f).c_str(), HeadlineSize - 6, Text);
         std::string what = f.toy != nullptr ? f.variantInfo.name : Tf("Toy type {}", f.type);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", what.c_str());
+        if (what != Name(f)) // the second line only when it says more (a nickname over the toy's name)
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", what.c_str());
         if (f.lock.Busy())
             ImGui::TextColored(ImColor(Rgb(Danger)), "%s", Tf("On the portal in {}: read-only", LiveGame(f)).c_str());
         else if (int seat = m_model.SeatOf(path); seat >= 0)
@@ -467,14 +469,104 @@ namespace launcher_ui
         CloseOverlay();
     }
 
+    // The toy's upgrades by name (collection::Upgrades): the basic ones, the two paths side by side (the chosen one lit, the
+    // other greyed), the Soul Gem and the Wow Pow under the basic ones; the focused one's description below. Same rules and
+    // order as the Toy Box (collection/upgrades.h).
+    void CollectionPage::DrawUpgradeEditor(const Figure& f)
+    {
+        if (f.toy == nullptr)
+            return;
+        std::string language = French() ? "fr" : "en";
+        collection::UpgradeTable table = collection::Upgrades(*f.toy, m_model.gameId, language);
+        if (table.upgrades.empty())
+            return;
+        auto setBits = [&](uint16_t bits) {
+            m_edit.upgrades = bits;
+            for (const collection::Upgrade& upgrade : table.upgrades)
+                if (upgrade.path == collection::UpgradePath::WowPow)
+                    m_edit.wowPow = uint8_t(bits >> collection::UpgradeWowPowBit & 1);
+        };
+        ImGui::Dummy(ImVec2(0, 10));
+        ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Upgrades"));
+        ImGui::SameLine(0, 12);
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{} of {}", collection::BoughtCount(m_edit.upgrades, table), table.upgrades.size()).c_str());
+        ImGui::SameLine(0, 16);
+        if (ImGui::SmallButton(Tr("All")))
+            setBits(collection::AllUpgrades(m_edit.upgrades, table));
+        ImGui::SameLine(0, 6);
+        if (ImGui::SmallButton(Tr("None")))
+            setBits(collection::NoUpgrades(m_edit.upgrades));
+        constexpr float Gap = 10, Row = 40;
+        float columnW = (ImGui::GetContentRegionAvail().x - 2 * Gap) / 3;
+        ImVec2 origin = ImGui::GetCursorScreenPos();
+        bool chosen = (m_edit.upgrades >> collection::UpgradePathChosenBit & 1) != 0, second = (m_edit.upgrades >> collection::UpgradePathSecondBit & 1) != 0;
+        const std::string titles[3] = { Tr("Basic"), table.pathNames[0], table.pathNames[1] };
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        ImGui::PushFont(m_app.m_boldFont, SmallSize);
+        for (int column = 0; column < 3; column++)
+        {
+            bool lit = column == 0 || (chosen && second == (column == 2));
+            draw->AddText(ImVec2(origin.x + column * (columnW + Gap), origin.y + 4), Rgb(lit ? Accent : TextDim), titles[column].c_str());
+        }
+        ImGui::PopFont();
+        int rows[3] = { 0, 0, 0 };
+        float bottom = origin.y;
+        std::string hint;
+        for (size_t i = 0; i < table.upgrades.size(); i++)
+        {
+            const collection::Upgrade& upgrade = table.upgrades[i];
+            using collection::UpgradePath;
+            int column = upgrade.path == UpgradePath::First ? 1 : upgrade.path == UpgradePath::Second ? 2 : 0;
+            ImVec2 at(origin.x + column * (columnW + Gap), origin.y + 26 + rows[column]++ * (Row + 6));
+            ImGui::SetCursorScreenPos(at);
+            ImGui::PushID(int(i));
+            if (ImGui::InvisibleButton("##upgrade", ImVec2(columnW, Row), ImGuiButtonFlags_EnableNav))
+                setBits(collection::ToggleUpgrade(m_edit.upgrades, upgrade));
+            ImGui::PopID();
+            bool hovered = ImGui::IsItemHovered(), focused = ImGui::IsItemFocused();
+            m_app.FocusRing(Radius);
+            bool bought = collection::UpgradeBought(m_edit.upgrades, upgrade), greyed = collection::UpgradeGreyed(m_edit.upgrades, upgrade);
+            draw->AddRectFilled(at, ImVec2(at.x + columnW, at.y + Row), Rgb(hovered || focused ? PanelRaised : Field), Radius);
+            ImVec2 mark(at.x + 20, at.y + Row / 2);
+            draw->AddCircleFilled(mark, 9, Rgb(bought ? Accent : PanelRaisedActive));
+            if (bought)
+            {
+                draw->AddLine(ImVec2(mark.x - 4, mark.y), ImVec2(mark.x - 1, mark.y + 3), Rgb(AccentInk), 2.0f);
+                draw->AddLine(ImVec2(mark.x - 1, mark.y + 3), ImVec2(mark.x + 5, mark.y - 4), Rgb(AccentInk), 2.0f);
+            }
+            std::string name = LauncherMiddleEllipsis(collection::UpgradeName(upgrade.name, language), 26);
+            std::string price = Tf("{} gold", upgrade.price);
+            ImGui::PushFont(nullptr, SmallSize);
+            float priceW = ImGui::CalcTextSize(price.c_str()).x;
+            draw->AddText(ImVec2(at.x + columnW - priceW - 10, at.y + (Row - ImGui::GetFontSize()) / 2), Rgb(bought ? Accent : TextDim), price.c_str());
+            ImGui::PopFont();
+            ImGui::PushFont(m_app.m_boldFont, SmallSize + 1);
+            draw->AddText(ImVec2(at.x + 38, at.y + (Row - ImGui::GetFontSize()) / 2), Rgb(greyed ? TextDim : Text), name.c_str());
+            ImGui::PopFont();
+            if (hovered || focused)
+                hint = collection::UpgradeLine(upgrade.description, language);
+            bottom = std::max(bottom, at.y + Row);
+        }
+        ImGui::SetCursorScreenPos(ImVec2(origin.x, bottom + 8));
+        ImGui::Dummy(ImVec2(columnW, 0));
+        ImGui::PushFont(nullptr, SmallSize);
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", hint.empty() ? " " : hint.c_str());
+        ImGui::PopFont();
+    }
+
     // Edit: the name the lists show, and for a figure that keeps them, its level, experience, gold, hero points, hat and
     // the nickname the game shows.
     void CollectionPage::DrawEditStats(const Figure& f)
     {
         bool stats = collection::HasProgress(f) && f.state != figures::AreaState::Damaged;
         m_app.Title(Tr("EDIT"), HeadlineSize - 6, Text);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s · %s", Name(f).c_str(), f.variantInfo.name.c_str());
+        if (f.variantInfo.name != Name(f))
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s · %s", Name(f).c_str(), f.variantInfo.name.c_str());
+        else
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Name(f).c_str());
         ImGui::Dummy(ImVec2(0, 8));
+        // The fields scroll above the Save row (the upgrades list makes the sheet taller than a small window).
+        ImGui::BeginChild("##editbody", ImVec2(0, std::max(200.0f, ImGui::GetContentRegionAvail().y - 64)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 8));
         auto label = [](const char* text) {
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", text);
@@ -540,7 +632,10 @@ namespace launcher_ui
             ImGui::EndGroup();
         }
         ImGui::PopStyleVar();
-        ImGui::Dummy(ImVec2(0, 14));
+        if (stats)
+            DrawUpgradeEditor(f);
+        ImGui::EndChild();
+        ImGui::Dummy(ImVec2(0, 8));
         if (m_app.PillButton(Tr("Save"), true, 140, true))
         {
             std::string error;
@@ -557,7 +652,7 @@ namespace launcher_ui
                 // Only the name changed: no write to the figure (and no backup of it).
                 bool changed = m_edit.experience != m_editBase.experience || m_edit.giantsExperience != m_editBase.giantsExperience ||
                     m_edit.gold != m_editBase.gold || m_edit.heroPoints != m_editBase.heroPoints || m_edit.hat != m_editBase.hat ||
-                    figures::NicknameUtf8(m_editBase) != Trimmed(m_nickname);
+                    m_edit.upgrades != m_editBase.upgrades || m_edit.wowPow != m_editBase.wowPow || figures::NicknameUtf8(m_editBase) != Trimmed(m_nickname);
                 if (changed)
                     saved = collection::WriteStats(f.path, edited, &error);
             }
