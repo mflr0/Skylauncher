@@ -67,10 +67,10 @@ namespace launcher_ui
         // The figure sheet's words that changed in the polish pass (the rest are still inline, for #4).
         namespace strings
         {
-            constexpr const char* ResetHint = N_("Hold to reset it to new. A backup is kept.");
-            constexpr const char* DeleteHint = N_("Hold to move it to the trash. Manage > Trash puts it back.");
+            constexpr const char* ResetHint = N_("Hold to reset it.");
+            constexpr const char* DeleteHint = N_("Hold to move it to the trash.");
             constexpr const char* Release = N_("Mark as not in use");
-            constexpr const char* ReleaseHint = N_("Hold if the game that took it has closed or crashed.");
+            constexpr const char* ReleaseHint = N_("Hold if its game has quit.");
         }
 
         // A hat's name from the first game whose catalogue lists it (Giants' "hats"), else its number.
@@ -149,9 +149,9 @@ namespace launcher_ui
         if (!collection::HasProgress(f) && f.toy != nullptr)
             ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{} keep no level or gold.", CategoryLabel(f.toy->category)).c_str());
         else if (f.state == figures::AreaState::Blank)
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("New: never played yet. Its level shows once a game has used it."));
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("New: never played."));
         else if (f.state == figures::AreaState::Damaged)
-            ImGui::TextColored(ImColor(Rgb(Danger)), "%s", Tr("Unreadable: its checksums don't match. Restore a backup, or reset it."));
+            ImGui::TextColored(ImColor(Rgb(Danger)), "%s", Tr("Unreadable. Restore a backup or reset it."));
         else
         {
             // "Level 10 (15)": the portal's game's cap first, the figure's own level (a later game's) in brackets. The
@@ -261,7 +261,7 @@ namespace launcher_ui
         std::string what = f.toy != nullptr ? f.variantInfo.name : Tf("Toy type {}", f.type);
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", what.c_str());
         if (f.lock.Busy())
-            ImGui::TextColored(ImColor(Rgb(Danger)), "%s", Tf("On the portal in {}. Read-only until the game lets it go.", LiveGame(f)).c_str());
+            ImGui::TextColored(ImColor(Rgb(Danger)), "%s", Tf("On the portal in {}: read-only", LiveGame(f)).c_str());
         else if (int seat = m_model.SeatOf(path); seat >= 0)
             ImGui::TextColored(ImColor(Rgb(Accent)), "%s", Tf("On {} at the next start of {}", SeatName(size_t(seat)), ShortGameName(m_model.gameId)).c_str());
         ImGui::PopTextWrapPos();
@@ -293,9 +293,9 @@ namespace launcher_ui
             draw->AddRectFilled(barAt, ImVec2(barAt.x + barW, barAt.y + 48), Rgb(Danger, 50), Radius);
             draw->AddRect(barAt, ImVec2(barAt.x + barW, barAt.y + 48), Rgb(Danger), Radius);
             bool restore = m_confirm.rfind("restore:", 0) == 0;
-            std::string text = restore ? Tf("Put back the copy from {}? The present state is backed up first.", BackupLabel(m_confirm.substr(8)))
-                : m_confirm == "reset" ? Tf("Reset {} to new? It loses its level, gold and upgrades; a backup is kept.", Name(f))
-                : Tf("Move {} to the trash? Manage > Trash puts it back for 30 days.", Name(f));
+            std::string text = restore ? Tf("Put back the copy from {}?", BackupLabel(m_confirm.substr(8)))
+                : m_confirm == "reset" ? Tf("Reset {} to new? Level, gold and upgrades are lost.", Name(f))
+                : Tf("Move {} to the trash?", Name(f));
             ImGui::PushFont(nullptr, SmallSize);
             draw->AddText(ImVec2(barAt.x + 16, barAt.y + 15), Rgb(Text), text.c_str());
             ImGui::PopFont();
@@ -315,7 +315,7 @@ namespace launcher_ui
                 if (m_app.HoldButton(Tr("Hold to reset"), 160, Tr(strings::ResetHint)))
                 {
                     std::string error;
-                    Toast(collection::ResetToNew(path, &error) ? Tr("Reset to new (a backup was kept)") : Tr("Couldn't reset it: ") + error);
+                    Toast(collection::ResetToNew(path, &error) ? Tr("Reset to new") : Tr("Couldn't reset it: ") + error);
                     m_confirm.clear();
                     Reload();
                 }
@@ -341,7 +341,7 @@ namespace launcher_ui
             ImGui::OpenPopup("##puton");
         ImGui::EndDisabled();
         if (!m_model.CanEditSeats() && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s", m_model.RunningGame().empty() ? Tr("This game can't start with prepared seats yet") : Tr("The game is running: use its Toy Box"));
+            ImGui::SetTooltip("%s", m_model.RunningGame().empty() ? Tr("Not available for this game yet") : Tr("The game is running: use its Toy Box"));
         ImGui::SetNextWindowPos(ImVec2(putAt.x, putAt.y), ImGuiCond_Always, ImVec2(0, 1));
         if (ImGui::BeginPopup("##puton"))
         {
@@ -384,7 +384,7 @@ namespace launcher_ui
         if (m_app.PillButton((std::string("...") + "##figuremore").c_str(), false, 52, true))
             ImGui::OpenPopup("##figuremenu");
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", Tr("Duplicate, back up, restore, reset, delete"));
+            ImGui::SetTooltip("%s", Tr("More actions"));
         ImGui::SetNextWindowPos(ImVec2(moreAt.x, moreAt.y), ImGuiCond_Always, ImVec2(0, 1));
         if (ImGui::BeginPopup("##figuremenu"))
         {
@@ -409,7 +409,7 @@ namespace launcher_ui
                         m_confirm = "restore:" + backup.path;
                 ImGui::EndMenu();
             }
-            if (ImGui::MenuItem(Tr("Show in the folder")))
+            if (ImGui::MenuItem(Tr("Show in folder")))
             {
                 std::string folder = collection::Folder();
                 OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end())));
@@ -462,7 +462,7 @@ namespace launcher_ui
         }
         m_selected = next;
         m_figure.clear();
-        Toast(Tr("Moved to the trash (Manage > Trash)"));
+        Toast(Tr("Moved to the trash"));
         m_generation++;
         CloseOverlay();
     }
@@ -473,7 +473,7 @@ namespace launcher_ui
     {
         bool stats = collection::HasProgress(f) && f.state != figures::AreaState::Damaged;
         m_app.Title(Tr("EDIT"), HeadlineSize - 6, Text);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s · %s%s", Name(f).c_str(), f.variantInfo.name.c_str(), stats ? Tr(". A backup is kept before the change.") : "");
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s · %s", Name(f).c_str(), f.variantInfo.name.c_str());
         ImGui::Dummy(ImVec2(0, 8));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 8));
         auto label = [](const char* text) {
@@ -482,7 +482,7 @@ namespace launcher_ui
         // Two columns: who it is (name, level, experience, hat), then what it carries (gold, hero points, nickname).
         constexpr float FieldW = 380, ColumnGap = 36;
         ImGui::BeginGroup();
-        label(Tr("Name in the lists (empty: the toy's name)"));
+        label(Tr("Name (empty: the toy's name)"));
         ImGui::SetNextItemWidth(FieldW);
         ImGui::InputTextWithHint("##label", f.variantInfo.name.c_str(), m_label, sizeof(m_label));
         if (stats)
@@ -534,7 +534,7 @@ namespace launcher_ui
             ImGui::SetNextItemWidth(FieldW);
             if (ImGui::InputInt("##hero", &hero, 1, 10))
                 m_edit.heroPoints = uint16_t(std::clamp(hero, 0, 100));
-            label(Tr("Nickname in the game (16 characters)"));
+            label(Tr("Nickname (16 max)"));
             ImGui::SetNextItemWidth(FieldW);
             ImGui::InputText("##nick", m_nickname, sizeof(m_nickname));
             ImGui::EndGroup();
@@ -563,7 +563,7 @@ namespace launcher_ui
             }
             if (saved)
             {
-                Toast(stats ? Tr("Saved (a backup was kept)") : Tr("Saved"));
+                Toast(stats ? Tr("Saved") : Tr("Saved"));
                 m_editing = false;
                 Reload();
             }

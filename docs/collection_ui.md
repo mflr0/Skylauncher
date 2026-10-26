@@ -103,6 +103,9 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Chevrons** are drawn, never typed: `App::DrawChevron` / `DrawLabelChevron` (`PillButton`'s `chevron` argument) draw
   two lines in the label's colour, down when closed and up when open (Details, Put on the portal, the Element / Game /
   Type menus). The combo boxes use ImGui's own arrow.
+- **Texts** (2026-10-26): one short sentence per help line, no path or file name in running text, no help when the
+  label is clear, errors as what happened then what to do. The intro of Add a figure, the Edit sheet's backup note,
+  the empty-state bodies and the portal selector's tooltip were removed; the rules are in `launcher_ui.md`, "Writing".
 - **Manage**: Trash (put back, delete for good (held); 30 days), Backups (per figure, restore), Import and export (files,
   a folder, drop files or a folder on the window; export everything; show in folder), Unknown toys (name one:
   `catalogue.json` of the collection, applied at the next start), Tidy (the starters).

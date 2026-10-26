@@ -228,8 +228,8 @@ namespace launcher_ui
         {
             collection::Migration migration = collection::Migrate(legacy);
             if (migration.copied > 0)
-                Toast(migration.copied == 1 ? Tf("{} figure copied into the shared collection", migration.copied)
-                                            : Tf("{} figures copied into the shared collection", migration.copied));
+                Toast(migration.copied == 1 ? Tf("{} figure copied", migration.copied)
+                                            : Tf("{} figures copied", migration.copied));
         }
         // The launcher's own favourites and portal list, from before the shared collection, move once.
         if (SettingGet(m_app.m_config, "collection", "moved") != "1")
@@ -379,8 +379,8 @@ namespace launcher_ui
             seat = -1;
         if (seat >= 0 && !m_model.CanEditSeats())
         {
-            Toast(SessionFile(*game).empty() ? Tf("{} can't start with prepared seats yet", ShortGameName(m_model.gameId))
-                                             : Tr("The game is running: change the seats from its Toy Box"));
+            Toast(SessionFile(*game).empty() ? Tf("Not available for {} yet", ShortGameName(m_model.gameId))
+                                             : Tr("The game is running: use its Toy Box"));
             seat = -1;
         }
         if (seat != m_choosing)
@@ -396,8 +396,8 @@ namespace launcher_ui
             return;
         if (!m_model.CanEditSeats())
         {
-            Toast(SessionFile(*game).empty() ? Tr("The game isn't installed yet: its seats can't be prepared")
-                                             : Tr("The game is running: change the seats from its Toy Box"));
+            Toast(SessionFile(*game).empty() ? Tr("The game isn't installed yet")
+                                             : Tr("The game is running: use its Toy Box"));
             return;
         }
         if (figure->toy != nullptr && !collection::Catalogue::Get().Accepts(m_model.gameId, figure->type))
@@ -464,7 +464,7 @@ namespace launcher_ui
         std::string what = m_model.seats[seat];
         const Figure* figure = m_model.Find(what);
         if (!m_model.CanEditSeats())
-            Toast(Tr("The game is running: change the seats from its Toy Box"));
+            Toast(Tr("The game is running: use its Toy Box"));
         else if (m_model.SetSeat(seat, ""))
         {
             m_generation++;
@@ -546,7 +546,7 @@ namespace launcher_ui
         if (m_app.PillButton((std::string("...") + "##collectionmore").c_str(), false, MoreW, true))
             ImGui::OpenPopup("##collectionmenu");
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", Tr("Manage: trash, backups, import and export"));
+            ImGui::SetTooltip("%s", Tr("Manage"));
         ImGui::SetNextWindowPos(ImVec2(moreAt.x + MoreW, moreAt.y + 46), ImGuiCond_Always, ImVec2(1, 0));
         if (ImGui::BeginPopup("##collectionmenu"))
         {
@@ -616,10 +616,8 @@ namespace launcher_ui
             ImGui::EndCombo();
         }
         ImGui::PopStyleVar();
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", Tr("The game whose portal you are preparing"));
-        std::string status = !live.empty() ? Tf("{} is running: change them in its Toy Box", ShortGameName(live))
-            : m_choosing >= 0 ? std::string(Tr("Pick a figure below, or click the seat again to stop"))
+        std::string status = !live.empty() ? Tf("{} is running: use its Toy Box", ShortGameName(live))
+            : m_choosing >= 0 ? std::string(Tr("Pick a figure below"))
             : std::string(Tr("Click a seat, then a figure"));
         ImGui::PushFont(nullptr, SmallSize);
         float statusW = ImGui::CalcTextSize(status.c_str()).x;
@@ -946,7 +944,7 @@ namespace launcher_ui
             else if (m_choosing >= 0)
                 tip += "\n" + Tf("Click: put it on {}", SeatName(size_t(m_choosing)));
             else
-                tip += std::string("\n") + Tr("Click: its sheet · drag it onto a seat");
+                tip += std::string("\n") + Tr("Click: sheet · drag to a seat");
             ImGui::SetTooltip("%s", tip.c_str());
         }
         return pressed;
@@ -965,12 +963,7 @@ namespace launcher_ui
             m_app.Title(title, TitleSize, Text);
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
             if (none)
-                ImGui::TextWrapped("%s", Tr("Add a figure from the catalogue, import your own dumps (.sky, .bin, .dmp: drop them on the window), or start with the three Skylanders of the starter pack."));
-            else if (m_choosing >= 0 && !filtered)
-                ImGui::TextWrapped("%s", Tf("None of your figures goes on {} in {}. Add a figure creates one.", SeatName(size_t(m_choosing)),
-                    ShortGameName(m_model.gameId)).c_str());
-            else
-                ImGui::TextWrapped("%s", Tr("Nothing matches the search and the filters."));
+                ImGui::TextWrapped("%s", Tr("Add a figure, or import your own."));
             ImGui::PopStyleColor();
             ImGui::Dummy(ImVec2(0, 6));
             if (none && m_app.PillButton(Tr("Start with Spyro, Gill Grunt, Trigger Happy"), true, 380, true))
@@ -1009,7 +1002,7 @@ namespace launcher_ui
                 if (foreign)
                 {
                     ImGui::SameLine(0, 10);
-                    ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("for other games: they can't go on this portal"));
+                    ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("For other games"));
                 }
                 ImGui::Dummy(ImVec2(0, 2));
             }

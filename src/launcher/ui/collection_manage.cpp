@@ -21,7 +21,7 @@ namespace launcher_ui
         namespace strings
         {
             constexpr const char* DeleteForGood = N_("Delete for good");
-            constexpr const char* DeleteForGoodHint = N_("Hold to delete it for good. This can't be undone.");
+            constexpr const char* DeleteForGoodHint = N_("Hold to delete it for good.");
         }
 
         struct DialogResult
@@ -121,7 +121,7 @@ namespace launcher_ui
     void CollectionPage::DrawTrash()
     {
         const std::vector<collection::TrashEntry> trash = m_trash; // a copy: the buttons below reload it
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Deleted figures stay here for 30 days. Their stats and name come back with them."));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Deleted figures are kept 30 days."));
         ImGui::Dummy(ImVec2(0, 6));
         if (trash.empty())
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("The trash is empty."));
@@ -149,7 +149,7 @@ namespace launcher_ui
 
     void CollectionPage::DrawBackups()
     {
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Every change makes a backup; the newest 10 of each figure are kept."));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("The latest 10 backups are kept."));
         ImGui::Dummy(ImVec2(0, 6));
         bool any = false;
         for (const Figure& figure : m_model.figures)
@@ -189,7 +189,7 @@ namespace launcher_ui
     void CollectionPage::DrawImportExport()
     {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop .sky, .bin or .dmp files (or a folder of them) on the window. Each is checked as a 1 KB tag and copied; a dump already in the collection is skipped."));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop figure files or a folder on the window."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         if (m_app.PillButton(Tr("Import files..."), true, 190, true))
@@ -219,7 +219,7 @@ namespace launcher_ui
     void CollectionPage::DrawUnknown()
     {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Toys the catalogue doesn't know. They stay usable; the game decides what to do with them. Naming one adds it to the collection's catalogue.json, shown at the next start."));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Toys missing from the catalogue. Name one to show it."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         bool any = false;
@@ -241,8 +241,8 @@ namespace launcher_ui
                 ImGui::SameLine(0, 8);
                 if (m_app.PillButton(Tr("Save"), true, 100, true) && m_unknownName[0] != 0)
                 {
-                    Toast(NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId) ? Tr("Named: shown with its name from the next start")
-                                                                                                                : Tr("Couldn't write catalogue.json"));
+                    Toast(NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId) ? Tr("Named: shown at the next start")
+                                                                                                                : Tr("Couldn't save the name"));
                     m_unknownType = 0xFFFF;
                     m_unknownName[0] = 0;
                 }
@@ -253,14 +253,14 @@ namespace launcher_ui
             ImGui::Dummy(ImVec2(0, 6));
         }
         if (!any)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Every toy of the collection is in the catalogue."));
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("No unknown toys."));
     }
 
     void CollectionPage::DrawTidy()
     {
         RefreshDisk();
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Older versions of the game made one never-played figure of every character at each start. They are not yours, so My Skylanders hides them. Tidy moves them to the trash (30 days, recoverable)."));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Blank figures made by old game versions. Tidy moves them to the trash."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         ImGui::BeginDisabled(m_starters == 0);

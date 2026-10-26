@@ -13,7 +13,6 @@ namespace launcher_ui
     {
         const collection::Catalogue& catalogue = collection::Catalogue::Get();
         m_app.Title(Tr("ADD A FIGURE"), HeadlineSize - 6, Text);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("A new figure is created as it leaves the box. Toys of later games can be created too; they wait for their game."));
         ImGui::Dummy(ImVec2(0, 2));
 
         // Game, search, category.
@@ -142,7 +141,7 @@ namespace launcher_ui
         ImGui::SameLine(0, 14);
         ImGui::BeginChild("##addversions", ImVec2(PanelW, listH), ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         if (chosen == nullptr)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Choose a figure to see its versions."));
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Pick a figure."));
         else
         {
             m_app.BoldText(chosen->name.c_str(), Text);
