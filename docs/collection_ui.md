@@ -50,7 +50,7 @@ At the first visit to the page (`CollectionPage::Open`):
   Player 2, Item or adventure). The page opens on the game chosen in the sidebar when it is one of them.
 - **Placing, two steps**: click a seat (A on it, or LB/RB), it lights up and the bar says "Choose a figure for Player 1 ·
   only what Spyro's Adventure reads"; the shelf then shows only what goes there and the game reads; click a figure: it
-  goes on the seat ("Player 1: Gilou's"), and the choosing ends. Click the seat again, Cancel, B or Escape stops
+  goes on the seat ("Player 1: Splash's"), and the choosing ends. Click the seat again, Cancel, B or Escape stops
   choosing. Dragging a card onto a seat also works; a figure already on the other seat moves (it is on one seat only).
 - **Taking off**: the X on the tile (**fixed** in #9: `SetNextItemAllowOverlap()` before the tile's button lets the X win
   where it is; `SSA_LAUNCHER_TEST_SEATX` checks all four seats by mouse, keyboard and pad), Delete or the pad's X on a
@@ -79,7 +79,7 @@ At the first visit to the page (`CollectionPage::Open`):
   favourites first, then the ones that game took (newest first), then by element; "Unknown toys" and "Not for
   Spyro's Adventure" (greyed: they can't go on this portal) after it. The untouched starters the game made on its own
   are left out (Manage > Tidy). A card: the picture, the name (the label, else the toy's name with the game's nickname:
-  "Gill Grunt (Gilou)"), the level line for the portal's game, the star, the variant's name, P1/P2/"On" for the seats.
+  "Gill Grunt (Splash)"), the level line for the portal's game, the star, the variant's name, P1/P2/"On" for the seats.
   The Toy Box draws the same card.
 - **The sheet** (a click on a card when no seat is being chosen, right click, X, F2): the picture with its element and
   type; the name, the version, where it sits ("On Player 1 at the next start of Spyro's Adventure") or which game holds
