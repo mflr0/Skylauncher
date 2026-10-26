@@ -3,10 +3,12 @@
 // docs/runtime/host/game_art.md, with the Giants logo composition.
 #include "game_art.h"
 #include "alchemy_archive.h"
+#include "game_text.h"
 #include "lux_images.h"
 #include "../collection/catalogue.h"
 #include "../collection/datadir.h"
 #include "../collection/json.h"
+#include "../collection/upgrades.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cctype>
@@ -329,6 +331,8 @@ namespace art
             // versus screen), named after the entry's picture ("ui_pvp_sprites/eruptorseries2.png/0x....igz").
             Source artworks;
             std::string artworksFolder;
+            // The toys' upgrades (game_text.cpp): the manifest's "upgrades" part as it is.
+            collection::Json upgrades;
         };
 
         Source ReadSource(const collection::Json& json)
@@ -361,6 +365,7 @@ namespace art
                     m.folder = json["portraits"]["folder"].AsString();
                     m.artworks = ReadSource(json["artworks"]);
                     m.artworksFolder = json["artworks"]["folder"].AsString();
+                    m.upgrades = json["upgrades"];
                     if (!m.game.empty())
                         out.push_back(std::move(m));
                 }
@@ -672,6 +677,18 @@ namespace art
             std::filesystem::path artworks = ArtworkFolder(game);
             std::filesystem::create_directories(artworks, error);
             result.artworks = AlchemyArtworks(*where, disc, artworks);
+        }
+        if ((parts & Upgrades) && where != nullptr && where->upgrades.IsObject())
+        {
+            // Read once: a later Extract keeps the file (delete it to read the disc again).
+            std::filesystem::path file = collection::UpgradeFile(game);
+            std::error_code exists;
+            if (!file.empty() && !std::filesystem::is_regular_file(file, exists))
+            {
+                std::filesystem::create_directories(file.parent_path(), error);
+                ExtractUpgrades(game, where->upgrades, disc, file);
+            }
+            result.upgrades = std::filesystem::is_regular_file(file, exists);
         }
         return result;
     }

@@ -85,17 +85,26 @@ namespace art::alchemy
 
         const std::vector<uint8_t>& Bytes() const { return m_bytes; }
 
+        // The objects themselves, for readers of other data than pictures (the scripts' toy tables: game_text.cpp).
+        // File offsets of every object, in file order.
+        std::vector<uint64_t> ObjectOffsets() const;
+        // The class name of the object at a file offset ("ScriptSet", "StringInfo"...); empty if unknown.
+        std::string TypeName(uint64_t object) const;
+        // Word `index` (big-endian u32) of the object at a file offset.
+        uint32_t Word(uint64_t object, int index) const { return Be32(object + 4 * uint64_t(index)); }
+        uint32_t Be32(uint64_t at) const;
+        // A serialized pointer to a file offset; nullopt when it points nowhere.
+        std::optional<uint64_t> Pointer(uint32_t value) const;
+        // The NUL-terminated text at a file offset (at most 512 bytes).
+        std::string String(uint64_t at) const;
+
     private:
         struct Fixup
         {
             uint32_t count = 0;
             size_t start = 0, end = 0; // file offsets of the record's data
         };
-        uint32_t Be32(uint64_t at) const;
-        std::optional<uint64_t> Pointer(uint32_t value) const;
-        std::string String(uint64_t at) const;
         const Fixup* FindFixup(uint32_t type) const;
-        std::vector<uint64_t> ObjectOffsets() const;
 
         size_t m_layout = 0; // the version's row in the .cpp's table
         std::vector<uint8_t> m_bytes;
