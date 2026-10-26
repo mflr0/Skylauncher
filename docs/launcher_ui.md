@@ -126,12 +126,13 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 | a folder, not an Xbox 360 game, damaged | Not a game disc | red | CHOOSE DISC |
 | the last install failed (no build); the last update failed (a build) | Install failed; Update failed | red | INSTALL; PLAY |
 | the install was interrupted | Interrupted | blue | INSTALL, or PLAY if built |
+| the copied game data is damaged, and no disc image to fall back on | Game data damaged | red | CHOOSE DISC |
 | a verified disc, no build yet | Ready to install | blue | INSTALL |
 | the kit moved on since the build | Update available | blue | PLAY |
 | verified disc and built (or an own runtime) | Ready to play | green | PLAY |
 
-"Ready to play" needs both the build and the verified disc: with no disc or a refused one the game says what the disc
-needs, even if it was built (the game reads the disc image while it runs). The Play page's disc line says more
+"Ready to play" needs both the build and a verified source: the disc image, **or the copied game data** ("Game data" below).
+With no source or a refused one the game says what it needs, even if it was built (the game reads the disc image while it runs). The Play page's disc line says more
 ("Disc verified: 8.1 GB", the refusal's reason, "Drop your disc image here..."), the install card is shown while
 `installView`, and the game settings' Disc tab shows the same `DiscState`. The window has one fixed title.
 
@@ -142,6 +143,41 @@ space, so nothing moves when the line changes. "Playing" is never shown: PLAY cl
 `SSA_LAUNCHER_TEST_SIDEBAR=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit and both games' `iso=`;
 `FAKE_SSABUILD_HOLD` keeps the build at 100 %) shoots and checks the line through an install and an update at 0, 50 and 100 %,
 with the other game shown meanwhile, then a failed build: `SkylauncherTest` runs it (`SidebarChecks`).
+
+## Game data (copy the disc's files, no disc image afterwards)
+Game settings > Disc has two sections: **Disc image** (choose, change, remove, show in folder) and **Game data**, which copies the
+disc's files (about the image's size, 8 GB) into `<data>/<Game>/gamedata/` so the disc image is no longer needed. The default is
+unchanged: nothing is copied and the game reads the disc image. The files, the manifest and the checks are SSARecomp's
+`game_data.{h,cpp}` (`docs/runtime/host/game_data.md` there); the job and the choice of source are `src/launcher/game_copy.{h,cpp}`;
+the window is `ui/game_data_page.cpp` (+ `game_settings_page.cpp` for the tab). What the player sees, by the copy's state:
+
+| Copy | Game data section | The game |
+|---|---|---|
+| none | **Copy the game data** (needs a verified disc image and no install running), how much room it takes | plays from the disc image |
+| running | a bar "Copying the game data: 3.2 GB of 8.1 GB", **Stop**; the disc image's buttons are off | plays from the disc image (a copy is never read before it is complete) |
+| stopped, failed or the launcher quit | "Interrupted: 3.2 GB of 8.1 GB copied", **Carry on copying**, **Remove the partial copy** | from the disc image; carrying on reads only the missing files |
+| complete | "Copied: 8.1 GB, 1142 files", **Remove the copy** (held), Show in folder | **from the copy**: the Play page says "GAME DATA: Game data copied: 8.1 GB", the Disc image section says it is not needed, "Change disc..." is hidden, the state is "Ready to play" (or "Ready to install") **with no disc image at all** |
+| damaged (a file is missing or changed since) | the first problem, **Repair the copy** (copies again, only what is wrong), **Remove the copy** | **falls back to the disc image** (the Play page says the copy is damaged); with no disc image the state is "Game data damaged" |
+
+- The copy is made on a worker thread, file by file: each file is written to `.part`, read back and compared with the disc, then renamed. The
+  room is checked first ("Not enough space: the copy needs 8.1 GB and this drive has 3.1 GB free.": nothing is written). It resumes
+  after a stop, a failure or a quit. When it ends the game is checked again, from the copy.
+- **At start** (`App::StartGameDisc`, `PickGameSource`): a complete copy is verified (`CheckGameSource` takes the folder: its `default.xex` must be a
+  known release) and used; else the remembered image. The remembered image (`[<game>] iso=`) is never forgotten for a copy: removing the copy
+  brings it back. A copy whose `default.xex` is refused counts as damaged. PLAY and INSTALL look at the copy again first (sizes only) and
+  fall back to the disc image if it changed. PLAY passes the copy's folder to the game, which reads it too if it is given an image
+  (`host/launcher.cpp`, `CopiedGameData`). INSTALL gives it to SSABuild as `--iso`.
+- **Uninstall keeps the copy** (like the disc image); only "Remove the copy" deletes it. Delete saves and data and Clear caches never touch it.
+- `SSA_LAUNCHER_TEST_COPY=1` (with `SSA_LAUNCHER_SHOTS`, the fake kit, `[giants] iso=` set to a stand-in SSA disc) drives all of it in an offscreen window
+  (`App::TestCopyScript`, run by `SkylauncherTest`): the wrong disc, not enough space, interrupted and carried on, played with no disc
+  image, damaged and the fall back, repaired, removed, and Giants' own copy. `SKYLAUNCHER_COPY_FREE_BYTES` fakes the room (tests only).
+
+## The wrong disc, offered to the right game
+When the check finds the other supported game's disc ("This disc image is Skylanders: Spyro's Adventure, not Skylanders: Giants.", status
+`WrongGame`, `GameSourceCheck::otherGame`), the Play page and the Disc tab add one button, **Use it for <that game>** (`App::UseDiscForOtherGame`):
+the window switches to that game, checks the image there, and remembers it as that game's disc once it is verified. The game it was chosen
+for goes back to the disc it had (or none); a stale `iso=` that was this image is dropped. Refused with a toast while the other game installs,
+copies or checks its own disc. A game that already plays from a copy only switches ("already plays from its copied game data").
 
 ## Each game's look
 What belongs to the game on its page is drawn in **the game's own colours**, taken from its logo (`GameStyle` in

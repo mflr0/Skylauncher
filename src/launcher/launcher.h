@@ -50,11 +50,13 @@ struct GameSourceCheck
     GameSourceStatus status{};
     std::string message; // why the source can't be used, for the player
     std::string xexSha256; // the verified default.xex (Ok only): which installed game belongs to this disc
+    std::string otherGame; // WrongGame, when the disc is another supported game: its id ("This disc is Spyro's Adventure")
 };
 
 std::string Sha256Hex(std::span<const uint8_t> data); // lowercase hex
 
-// Checks that `path` is a disc image of one of `game`'s known releases. `progress`, when set, receives
+// Checks that `path` is a disc image of one of `game`'s known releases, or the folder of the copied game data
+// (shared/collection/game_data.h). `progress`, when set, receives
 // a 0..1 fraction and a short description of the current step; it may be called from a worker thread.
 using GameSourceProgress = std::function<void(float, std::string_view)>;
 GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, const GameSourceProgress& progress = {});

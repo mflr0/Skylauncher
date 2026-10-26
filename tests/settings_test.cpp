@@ -238,6 +238,7 @@ namespace
         Write(folders.game / "SSARecomp.log", std::string(7, 'g'));
         Write(folders.game / "textures" / "t.dds", std::string(60, 't'));
         Write(folders.game / "figures" / "f.bin", std::string(8, 'f'));
+        Write(folders.game / "gamedata" / "default.xex", std::string(4000, 'x')); // the copied game data
         return folders;
     }
 
@@ -297,6 +298,7 @@ namespace
         SETTINGS_EXPECT(fs::exists(folders.saves / "a" / "GLOBAL.DAT") && fs::exists(folders.game / "saves-backup") && fs::exists(folders.game / "portal.txt") &&
             fs::exists(folders.game / "textures" / "t.dds") && fs::exists(folders.game / "figures" / "f.bin") &&
             fs::exists(folders.game / "launcher-cache" / "title_icon.png") && fs::exists(folders.game / "portraits" / "p.png"));
+        SETTINGS_EXPECT(fs::exists(folders.game / "gamedata" / "default.xex")); // the copy stays: it is the disc's files, removed from the Disc tab
         SETTINGS_EXPECT(config.count("install.aaaa") == 0 && config.count("install.bbbb") == 1 && config["giants"]["iso"] == "/discs/giants.iso" &&
             config["giants.video"]["fps_limit"] == "30");
 

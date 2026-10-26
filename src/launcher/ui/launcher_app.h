@@ -4,6 +4,7 @@
 // and collection_page.cpp (the figure collection). Nothing outside launcher/ui includes this; launcher_ui.h is the
 // public entry point.
 #include "assets/launcher_assets.h"
+#include "launcher/game_copy.h"
 #include "launcher/game_install.h"
 #include "launcher/game_run.h"
 #include "launcher/game_settings.h"
@@ -153,7 +154,7 @@ namespace launcher_ui
     // Everything a game can be in, read from its slot by App::SlotStatus: the one place that decides (docs/launcher_ui.md).
     enum class SlotState
     {
-        Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame,
+        Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame, DataDamaged,
         DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready
     };
     // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
@@ -195,6 +196,12 @@ namespace launcher_ui
         std::string discPath;
         uint64_t discSize = 0;
         VerifyJob verify;
+        // "Copy the game data" (game_copy.h): what the game's copy is, whether discPath is that copy (the game plays from
+        // it, the disc image is not needed), and the copy being made.
+        gamedata::Status copy;
+        bool fromCopy = false;
+        GameCopyJob copyJob;
+        std::string copyMessage; // why the last copy didn't finish
         GameSourceCheck check;
         TitleMetadata meta;
         LauncherAssets::Provider assets;
@@ -271,6 +278,10 @@ namespace launcher_ui
         void DrawGameVideo();
         void DrawGameLanguage();
         void DrawGameDisc();
+        void DrawGameData();     // game_data_page.cpp: the Disc tab's "Game data" section
+        void StartCopy();
+        void FinishCopy();
+        void RemoveCopy();
         void DrawSaveBackups();
         void RefreshSaveBackups();
         void RestoreSaveBackup(const std::string& stamp);
@@ -376,7 +387,9 @@ namespace launcher_ui
         bool AnyInstalling() const;
         bool AnyVerifying() const;
         void StartVerify(const std::string& path);
+        void StartGameDisc(); // the remembered disc image, or the game's copy when it is complete (game_data_page.cpp)
         void FinishVerify();
+        void UseDiscForOtherGame(); // the disc check found the other supported game's disc: switch to it and set the disc
         void Browse();
         bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
@@ -392,6 +405,7 @@ namespace launcher_ui
         void TestUpdateScript(uint64_t now);
         void TestNavScript(uint64_t now);
         void TestSwitchScript(uint64_t now);
+        void TestCopyScript(uint64_t now);
         void TestSidebarScript(uint64_t now);
         void TestSeatXScript(uint64_t now);
         void TestButtonsScript(uint64_t now);
@@ -475,6 +489,7 @@ namespace launcher_ui
         std::string m_testBuilt;                    // the sidebar test's built game, put back between the states it sets by hand
         std::map<std::string, std::string> m_drawn; // while testing: what the sidebar, Home and the main button drew ("sidebar:ssa", "home:ssa", "button")
         bool m_testSidebar = false;    // SSA_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
+        bool m_testCopy = false;       // SSA_LAUNCHER_TEST_COPY: copying the game data, playing from it, the wrong-disc button
         bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
         int m_testFailures = 0;
         uint64_t m_testBegan = 0;
