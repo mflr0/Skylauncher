@@ -1,6 +1,7 @@
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
 #include "shared/collection/datadir.h"
+#include "shared/collection/game_data.h"
 #include "shared/vfs.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -8,6 +9,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fmt/format.h>
 #include <image.h>
 #include <optional>
@@ -188,14 +190,19 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
     SDL_PathInfo info;
     if (!SDL_GetPathInfo(path.c_str(), &info))
         return { NotFound, fmt::format("\"{}\" doesn't exist. Was it moved, renamed, or is its drive disconnected?", path) };
-    if (info.type == SDL_PATHTYPE_DIRECTORY)
+    // A folder is only the copy of the game data (shared/collection/game_data.h); the disc reader reads it like an image.
+    const bool copy = info.type == SDL_PATHTYPE_DIRECTORY;
+    if (copy && !std::filesystem::exists(datadir::FromText(path) / gamedata::ManifestName))
         return { Folder, fmt::format("\"{}\" is a folder. Extracted game folders aren't supported yet: choose the disc image (.iso).", path) };
 
     report(0.10f, "Opening the disc image");
-    SDL_IOStream* file = SDL_IOFromFile(path.c_str(), "rb");
-    if (file == nullptr)
-        return { Unreadable, fmt::format("\"{}\" can't be read ({}).{}", path, SDL_GetError(), PermissionHint) };
-    SDL_CloseIO(file);
+    if (!copy)
+    {
+        SDL_IOStream* file = SDL_IOFromFile(path.c_str(), "rb");
+        if (file == nullptr)
+            return { Unreadable, fmt::format("\"{}\" can't be read ({}).{}", path, SDL_GetError(), PermissionHint) };
+        SDL_CloseIO(file);
+    }
 
     report(0.25f, "Reading the Xbox 360 disc layout");
     DiscFileSystem disc;
@@ -229,7 +236,7 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
     if (owner != &game)
     {
         std::string found = owner != nullptr ? owner->name : fmt::format("another game (title ID {:08X})", execution->titleId);
-        return { WrongGame, fmt::format("This disc image is {}, not {}.", found, game.name) };
+        return { WrongGame, fmt::format("This disc image is {}, not {}.", found, game.name), {}, owner != nullptr ? owner->id : "" };
     }
 
     report(0.84f, "Fingerprinting default.xex (SHA-256)");

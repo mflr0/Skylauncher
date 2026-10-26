@@ -16,7 +16,8 @@ namespace
     constexpr std::array<const char*, 3> SaveNames = { "saves", "saves-backup", "portal.txt" };
     constexpr std::array<const char*, 3> CacheNames = { "pipelines.bin", "launcher-cache", "portraits" };
     // Never removed by uninstalling: the player's data, and what comes from the disc and is cheap to keep.
-    constexpr std::array<const char*, 2> KeptNames = { "textures", "figures" };
+    // "gamedata" is the copied game data (game_copy.h): like the disc image it came from, it is only removed from the Disc tab.
+    constexpr std::array<const char*, 3> KeptNames = { "textures", "figures", "gamedata" };
 
     bool Named(const std::string& name, const auto& names)
     {

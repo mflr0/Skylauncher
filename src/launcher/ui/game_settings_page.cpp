@@ -161,46 +161,65 @@ namespace launcher_ui
     void App::DrawGameDisc()
     {
         Title("Disc image", TitleSize, Text);
-        ImGui::TextWrapped("%s", m_s->discPath.empty() ? "None chosen yet." : m_s->discPath.c_str());
-        switch (m_s->disc)
-        {
-        case DiscState::Ready:
-            ImGui::TextColored(ImColor(Rgb(Ok)), "Verified, %s", LauncherFormatSize(m_s->discSize).c_str());
-            break;
-        case DiscState::Verifying:
-            ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_s->verify.Stage().c_str());
-            break;
-        case DiscState::Failed:
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-            ImGui::TextWrapped("%s", m_s->check.message.c_str());
+        auto note = [](const char* text) {
+            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+            ImGui::TextWrapped("%s", text);
             ImGui::PopStyleColor();
-            break;
-        case DiscState::None:
-            break;
-        }
-        const bool busy = Installing() || m_s->disc == DiscState::Verifying;
-        ImGui::BeginDisabled(busy);
-        if (PillButton(m_s->discPath.empty() ? "Choose disc..." : "Change disc...", true, 200))
-            Browse();
-        ImGui::SameLine();
-        ImGui::BeginDisabled(m_s->discPath.empty());
-        if (PillButton("Remove disc", false, 200))
-            ForgetDisc();
-        ImGui::SameLine();
-        if (PillButton("Show in folder", false, 200))
+            ImGui::PopFont();
+        };
+        if (m_s->fromCopy)
         {
-            std::filesystem::path parent = std::filesystem::path(std::u8string(m_s->discPath.begin(), m_s->discPath.end())).parent_path();
-            if (!OpenFolder(parent))
-                Toast("Couldn't open the folder");
+            // The game plays from its copied game data: the image is not used, so its buttons are not offered.
+            std::string iso = SettingGet(m_config, m_s->game.id, "iso");
+            ImGui::TextWrapped("%s", iso.empty() ? "None chosen." : iso.c_str());
+            note("Not needed: the game plays from its copied game data, below. Remove the copy to use the disc image again.");
         }
-        ImGui::EndDisabled();
-        ImGui::EndDisabled();
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("Removing the disc only makes Skylauncher forget it: the file stays where it is, and so do the game "
-            "Skylauncher built and your saves. The game reads the disc image while it runs, so PLAY asks for it again.");
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
+        else
+        {
+            ImGui::TextWrapped("%s", m_s->discPath.empty() ? "None chosen yet." : m_s->discPath.c_str());
+            switch (m_s->disc)
+            {
+            case DiscState::Ready:
+                ImGui::TextColored(ImColor(Rgb(Ok)), "Verified, %s", LauncherFormatSize(m_s->discSize).c_str());
+                break;
+            case DiscState::Verifying:
+                ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_s->verify.Stage().c_str());
+                break;
+            case DiscState::Failed:
+                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
+                ImGui::TextWrapped("%s", m_s->check.message.c_str());
+                ImGui::PopStyleColor();
+                if (const GameInfo* other = FindGame(m_s->check.otherGame); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
+                    if (PillButton(fmt::format("Use it for {}", other->name).c_str(), true, 0, true))
+                        UseDiscForOtherGame();
+                break;
+            case DiscState::None:
+                break;
+            }
+            const bool busy = Installing() || m_s->disc == DiscState::Verifying || m_s->copyJob.Running();
+            ImGui::BeginDisabled(busy);
+            if (PillButton(m_s->discPath.empty() ? "Choose disc..." : "Change disc...", true, 200))
+                Browse();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(m_s->discPath.empty());
+            if (PillButton("Remove disc", false, 200))
+                ForgetDisc();
+            ImGui::SameLine();
+            if (PillButton("Show in folder", false, 200))
+            {
+                std::filesystem::path parent = std::filesystem::path(std::u8string(m_s->discPath.begin(), m_s->discPath.end())).parent_path();
+                if (!OpenFolder(parent))
+                    Toast("Couldn't open the folder");
+            }
+            ImGui::EndDisabled();
+            ImGui::EndDisabled();
+            note("Removing the disc only makes Skylauncher forget it: the file stays where it is, and so do the game "
+                "Skylauncher built and your saves. The game reads the disc image while it runs, so PLAY asks for it again, unless "
+                "you copy the game data below.");
+        }
+        ImGui::Dummy(ImVec2(0, 16));
+        DrawGameData();
     }
 
     // ---- Saves -------------------------------------------------------------------------------------------------------

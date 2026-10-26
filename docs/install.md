@@ -138,6 +138,8 @@ Restore uses) and **disabled while the game installs**. The sizes shown next to 
 After an uninstall the disc is still known, so INSTALL builds the game again and the saves are where they were. To remove
 everything the launcher keeps for a game, uninstall, then delete saves and data, then delete the game's folder by hand.
 **Remove disc** (Disc tab) only makes the launcher forget the image (`[<game>] iso=` goes): the file is not touched.
+The copied game data (`<Game>/gamedata/`, "Copy the game data" in the Disc tab, `docs/launcher_ui.md` "Game data") is kept by **Uninstall** and
+untouched by the two delete buttons, like the disc image: only **Remove the copy** (Disc tab) deletes it, and the disc image comes back.
 The code is `src/launcher/game_settings.{h,cpp}` (no UI; `SkylauncherTest` runs it on scratch folders, `tests/settings_test.cpp`).
 
 ### Housekeeping

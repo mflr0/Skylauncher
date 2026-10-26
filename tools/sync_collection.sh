@@ -19,7 +19,7 @@ pairs=()
 for f in figure_catalog figure_crypto figure_data figure_tag; do
     pairs+=("$lib/host/figures/$f.h:src/shared/figures/$f.h" "$lib/host/figures/$f.cpp:src/shared/figures/$f.cpp")
 done
-for f in json catalogue collection icons datadir save_backup; do
+for f in json catalogue collection icons datadir save_backup game_data; do
     pairs+=("$lib/host/collection/$f.h:src/shared/collection/$f.h" "$lib/host/collection/$f.cpp:src/shared/collection/$f.cpp")
 done
 if [[ -d "$from/$lib/host/art" ]]; then

@@ -116,6 +116,7 @@ add_library(SkylauncherCore STATIC
     src/shared/collection/catalogue.cpp
     src/shared/collection/collection.cpp
     src/shared/collection/datadir.cpp
+    src/shared/collection/game_data.cpp
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
     src/shared/collection/save_backup.cpp
@@ -137,8 +138,10 @@ target_sources(SkylauncherCore PRIVATE
     src/launcher/game_run.cpp
     src/launcher/portal_status.cpp
     src/launcher/game_settings.cpp
+    src/launcher/game_copy.cpp
     src/launcher/shortcut.cpp
     src/launcher/ui/game_settings_page.cpp
+    src/launcher/ui/game_data_page.cpp
     src/launcher/report.cpp
     src/launcher/updater.cpp
     src/shared/mini_json.cpp
@@ -200,5 +203,5 @@ add_dependencies(SkylauncherTest FakeSSABuild Skylauncher)
 target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit" SKYLAUNCHER_TEST_EXE="$<TARGET_FILE:Skylauncher>")
 
 # The launcher shell's checks (tests/shell_test.cpp), run by SkylauncherTest.
-target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp)
+target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp tests/copy_test.cpp)
 target_include_directories(SkylauncherTest PRIVATE lib/miniz)

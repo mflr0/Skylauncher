@@ -557,6 +557,7 @@ void EditChecks()
 
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
+int CopyChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso); // tests/copy_test.cpp
 
 // The launcher window switching games in place (App::TestSwitchScript, in an offscreen window): both discs checked, a
 // build of each made by the fake kit, the state of each kept across switches, PLAY returning the shown game's runtime.
@@ -667,6 +668,12 @@ int main(int argc, char** argv)
         return (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
     };
 
+    if (getenv("SKYLAUNCHER_TEST_COPY_ONLY") != nullptr) // only "Copy the game data" (quick to rerun)
+    {
+        int failures = CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
+        printf("%d failures\n", failures);
+        return failures == 0 ? 0 : 1;
+    }
     CollectionChecks(scratch);
     HoldChecks();
     EditChecks();
@@ -802,6 +809,8 @@ int main(int argc, char** argv)
         printf("The sidebar line through an install and an update:\n");
         SidebarChecks(scratch, iso.string(), giantsIso);
     }
+    printf("Copy the game data:\n");
+    g_failures += CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
     printf("The seats' X in the window:\n");
     SeatXChecks(scratch);
     printf("Command line without UI:\n");

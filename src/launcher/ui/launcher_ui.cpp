@@ -374,6 +374,7 @@ namespace launcher_ui
             m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
             m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
             m_testSidebar = SDL_getenv("SSA_LAUNCHER_TEST_SIDEBAR") != nullptr;
+            m_testCopy = SDL_getenv("SSA_LAUNCHER_TEST_COPY") != nullptr;
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
             m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
         }
@@ -416,8 +417,7 @@ namespace launcher_ui
         if (!m_s->started)
         {
             m_s->started = true;
-            if (std::string previous = SettingGet(m_config, game.id, "iso"); !previous.empty())
-                StartVerify(previous);
+            StartGameDisc();
         }
         m_s->saveBackupsLoaded = false;
         m_busyFrames = 2;
@@ -450,6 +450,8 @@ namespace launcher_ui
             SetActiveGame(m_s->game.id);
             if (m_s->disc == DiscState::Verifying && m_s->verify.done)
                 FinishVerify();
+            if (m_s->copyJob.Done())
+                FinishCopy();
             PollInstall();
         }
         m_s = shown;
@@ -496,10 +498,10 @@ namespace launcher_ui
             fprintf(stderr, "launcher: cannot open the window: %s\n", SDL_GetError());
             return {};
         }
-        if (std::string previous = SettingGet(m_config, m_s->game.id, "iso"); !previous.empty() && m_shots.empty())
+        if (m_shots.empty())
         {
             m_s->started = true;
-            StartVerify(previous);
+            StartGameDisc();
         }
         if (m_shots.empty() && SDL_getenv("SKYLAUNCHER_NO_UPDATE_CHECK") == nullptr)
         {
@@ -684,8 +686,11 @@ namespace launcher_ui
         m_s->disc = DiscState::Verifying;
         m_s->discPath = path;
         m_s->discSize = 0;
+        m_s->fromCopy = m_s->copy.state == gamedata::State::Complete && path == datadir::Text(gamedata::Folder(m_s->game.id));
         SDL_PathInfo info;
-        if (SDL_GetPathInfo(path.c_str(), &info))
+        if (m_s->fromCopy)
+            m_s->discSize = m_s->copy.total;
+        else if (SDL_GetPathInfo(path.c_str(), &info))
             m_s->discSize = info.size;
         if (m_s->icon != nullptr)
             SDL_DestroyTexture(m_s->icon);
@@ -698,6 +703,20 @@ namespace launcher_ui
     {
         m_s->verify.Join();
         m_s->check = m_s->verify.check;
+        if (m_s->check.status != GameSourceStatus::Ok && m_s->fromCopy)
+        {
+            // The copy is not this game's disc, or can't be read: the disc image takes over, if the player has one.
+            m_s->copy.state = gamedata::State::Damaged;
+            m_s->copy.problem = m_s->check.message;
+            m_s->fromCopy = false;
+            if (std::string iso = SettingGet(m_config, m_s->game.id, "iso"); !iso.empty())
+            {
+                StartVerify(iso);
+                return;
+            }
+            m_s->disc = DiscState::Failed;
+            return;
+        }
         if (m_s->check.status != GameSourceStatus::Ok)
         {
             m_s->disc = DiscState::Failed;
@@ -711,7 +730,8 @@ namespace launcher_ui
         ForgetCachedArt(m_s->game.id);  // the sidebar's and Home's copies too
         if (LauncherAssets::Asset logo = m_s->assets.Get(LauncherAssets::Role::Logo); logo.valid)
             m_s->logo = LoadArt(m_renderer, logo.path, true);
-        Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
+        if (!m_s->fromCopy)
+            Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
         m_s->disc = DiscState::Ready;
         RefreshInstall();
     }
@@ -719,6 +739,28 @@ namespace launcher_ui
     // PLAY and INSTALL check the image first: it may have been moved, or its drive unplugged, since it was verified.
     bool App::DiscStillThere()
     {
+        if (m_s->fromCopy)
+        {
+            // The copy is looked at again (sizes only): it may have been damaged since. The disc image takes over then.
+            m_s->copy = gamedata::Inspect(gamedata::Folder(m_s->game.id));
+            if (m_s->copy.state == gamedata::State::Complete)
+                return true;
+            m_s->fromCopy = false;
+            m_s->installView = m_s->kitUsed = false;
+            m_page = Page::Play;
+            if (std::string iso = SettingGet(m_config, m_s->game.id, "iso"); !iso.empty())
+            {
+                Toast("The copied game data is damaged: checking the disc image instead", true);
+                StartVerify(iso);
+            }
+            else
+            {
+                m_s->disc = DiscState::Failed;
+                m_s->check.status = GameSourceStatus::Damaged;
+                m_s->check.message = "The copied game data is damaged: " + m_s->copy.problem;
+            }
+            return false;
+        }
         SDL_PathInfo info;
         if (SDL_GetPathInfo(m_s->discPath.c_str(), &info) && info.type == SDL_PATHTYPE_FILE)
             return true;
@@ -736,7 +778,8 @@ namespace launcher_ui
             return;
         m_s->chosen = m_s->discPath;
         m_s->chosenRuntime = m_s->installed.runtime;
-        Set(m_s->game.id, "iso", m_s->chosen);
+        if (!m_s->fromCopy)
+            Set(m_s->game.id, "iso", m_s->chosen);
         m_running = false;
     }
 
@@ -1099,9 +1142,15 @@ namespace launcher_ui
         if (slot->disc == DiscState::Verifying)
             return line(S::Checking, "Checking your disc", Accent, "CHECKING...", false, -1);
         if (slot->disc == DiscState::None)
+        {
+            if (slot->copy.state == gamedata::State::Damaged)
+                return line(S::DataDamaged, "Game data damaged", Danger, strings::ChooseDisc);
             return line(S::NoDisc, "Needs your disc", Accent, strings::ChooseDisc);
+        }
         if (slot->disc == DiscState::Failed)
         {
+            if (slot->copy.state == gamedata::State::Damaged && slot->discPath == datadir::Text(gamedata::Folder(slot->game.id)))
+                return line(S::DataDamaged, "Game data damaged", Danger, strings::ChooseDisc);
             switch (slot->check.status)
             {
             case GameSourceStatus::NotFound: return line(S::DiscGone, "Disc not found", Danger, strings::ChooseDisc);
@@ -1486,13 +1535,14 @@ namespace launcher_ui
         {
             ImGui::BeginGroup();
             // The file name on top, then "DISC IMAGE:" and the status on the line below.
-            std::string file = m_s->discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
+            std::string file = m_s->fromCopy ? "Copied game data"
+                : m_s->discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
             ImGui::PushFont(nullptr, TitleSize);
             BoldText(file.c_str(), Text);
             ImGui::PopFont();
             if (!m_s->discPath.empty() && ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", m_s->discPath.c_str());
-            BoldText("DISC IMAGE:", TextDim);
+            BoldText(m_s->fromCopy ? "GAME DATA:" : "DISC IMAGE:", TextDim);
             ImGui::SameLine(0, 6);
             switch (m_s->disc)
             {
@@ -1504,7 +1554,13 @@ namespace launcher_ui
                 ImGui::ProgressBar(m_s->verify.progress, ImVec2(360, 8), "");
                 break;
             case DiscState::Ready:
-                ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_s->discSize).c_str());
+                ImGui::TextColored(ImColor(Rgb(Ready)), m_s->fromCopy ? "Game data copied: %s" : "Disc verified: %s", LauncherFormatSize(m_s->discSize).c_str());
+                if (!m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
+                    ImGui::TextWrapped("The copied game data is damaged, so the disc image is used. Repair or remove the copy in the game's settings.");
+                    ImGui::PopStyleColor();
+                }
                 if (NeedsInstall())
                 {
                     ImGui::PushTextWrapPos(available.x - 40); // window coordinates
@@ -1535,6 +1591,12 @@ namespace launcher_ui
                 ImGui::TextWrapped("%s", m_s->check.message.c_str());
                 ImGui::PopTextWrapPos();
                 ImGui::PopStyleColor();
+                // The other supported game's disc: one button to use it there.
+                if (const GameInfo* other = FindGame(m_s->check.otherGame); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
+                {
+                    if (PillButton(fmt::format("Use it for {}", other->name).c_str(), true, 0, true))
+                        UseDiscForOtherGame();
+                }
                 break;
         }
         ImGui::EndGroup();
@@ -1664,7 +1726,7 @@ namespace launcher_ui
 
         // "Change disc...", at the right of the disc's lines once a disc is verified; styled like the controller picker.
         // The game's other settings (video, languages, saves, data) are behind the gear next to the main button.
-        if (ready && !installing && !m_s->installView)
+        if (ready && !installing && !m_s->installView && !m_s->fromCopy) // the copy replaces the disc image
         {
             constexpr float ChangeDiscW = 160;
             ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112));
@@ -2110,7 +2172,7 @@ namespace launcher_ui
             static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-view-menu",
                 "45-nav-view-closed", "46-nav-card", "47-nav-figure-page", "48-nav-delete-hint", "49-nav-delete-held",
                 "50-nav-back-to-play", "51-nav-settings-controls", "52-nav-settings-back" };
-            if (m_testButtons || m_testSidebar)
+            if (m_testButtons || m_testSidebar || m_testCopy)
                 Screenshot(m_testShot.c_str());
             else if (m_testNav)
                 Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
@@ -2715,6 +2777,11 @@ namespace launcher_ui
         if (m_testSwitch)
         {
             TestSwitchScript(now);
+            return;
+        }
+        if (m_testCopy)
+        {
+            TestCopyScript(now);
             return;
         }
         if (m_testSeatX)
