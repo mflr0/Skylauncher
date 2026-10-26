@@ -283,11 +283,11 @@ namespace
         EXPECT(collection::UntouchedStarter(figure));
         figure.stats.experience = 2500;
         figure.stats.gold = 1234;
-        figures::SetNicknameUtf8(figure.stats, "Gilou");
+        figures::SetNicknameUtf8(figure.stats, "Splash");
         std::string error;
         EXPECT(collection::WriteStats(gill, figure.stats, &error));
         EXPECT(collection::Read(gill, figure) && figure.state == figures::AreaState::Valid && figure.level == 3 && figure.stats.gold == 1234 &&
-            figures::NicknameUtf8(figure.stats) == "Gilou");
+            figures::NicknameUtf8(figure.stats) == "Splash");
         EXPECT(!collection::Backups(gill).empty());
         std::string backup = collection::Backup(gill);
         EXPECT(!backup.empty() && collection::Backups(gill).size() >= 2);
@@ -297,8 +297,8 @@ namespace
         EXPECT(collection::ResetToNew(gill) && collection::Read(gill, figure) && figure.state == figures::AreaState::Blank);
 
         // The folder's other jobs: label, favourite, duplicate, trash, import.
-        EXPECT(collection::SetLabel(gill, "Gilou's") && collection::SetFavourite(gill, true));
-        EXPECT(collection::Read(gill, figure) && figure.label == "Gilou's" && figure.favourite && figure.DisplayName() == "Gilou's");
+        EXPECT(collection::SetLabel(gill, "Splash's") && collection::SetFavourite(gill, true));
+        EXPECT(collection::Read(gill, figure) && figure.label == "Splash's" && figure.favourite && figure.DisplayName() == "Splash's");
         std::string copy = collection::Duplicate(gill);
         EXPECT(!copy.empty() && fs::exists(copy));
         EXPECT(collection::Delete(copy) && !fs::exists(copy) && collection::Trash().size() == 1);
@@ -519,7 +519,7 @@ void EditChecks()
     base.gold = 2400;
     base.heroPoints = 3;
     base.playSeconds = 600;
-    figures::SetNicknameUtf8(base, "Gilou");
+    figures::SetNicknameUtf8(base, "Splash");
     // The game played it while the editor was open: more time, more gold.
     figures::FigureStats now = base;
     now.playSeconds = 4200;
@@ -527,12 +527,12 @@ void EditChecks()
     // The player changed the experience only: the game's gold and time stay.
     figures::FigureStats edited = base;
     edited.experience = 12000;
-    figures::FigureStats saved = MergeEditedStats(now, base, edited, "Gilou", "Gilou");
+    figures::FigureStats saved = MergeEditedStats(now, base, edited, "Splash", "Splash");
     EXPECT(saved.experience == 12000 && saved.gold == 2600 && saved.playSeconds == 4200 && saved.heroPoints == 3);
-    EXPECT(figures::NicknameUtf8(saved) == "Gilou");
+    EXPECT(figures::NicknameUtf8(saved) == "Splash");
     // The gold and the nickname changed here: they win over the game's.
     edited.gold = 100;
-    saved = MergeEditedStats(now, base, edited, "Gilou", "Gill");
+    saved = MergeEditedStats(now, base, edited, "Splash", "Gill");
     EXPECT(saved.gold == 100 && saved.playSeconds == 4200 && figures::NicknameUtf8(saved) == "Gill");
     // Edited for Giants (level 15 and a hat): Giants' part and the hat are saved, Spyro's Adventure's own hat stays.
     now.ssaHat = 4;
@@ -540,18 +540,18 @@ void EditChecks()
     edited = base;
     figures::SetExperienceFor(edited, figures::LevelCap("giants"), figures::LevelExperience[14]);
     edited.hat = 6;
-    saved = MergeEditedStats(now, base, edited, "Gilou", "Gilou");
+    saved = MergeEditedStats(now, base, edited, "Splash", "Splash");
     EXPECT(figures::TotalExperience(saved) == 96500 && saved.hat == 6 && saved.ssaHat == 4 && saved.gold == 2600);
     // Edited for Spyro's Adventure (cap 10): its part only; a figure Giants took to level 15 keeps those levels.
     figures::FigureStats high = base;
     figures::SetTotalExperience(high, 96500);
     edited = high;
     figures::SetExperienceFor(edited, figures::LevelCap("ssa"), 13000);
-    saved = MergeEditedStats(high, high, edited, "Gilou", "Gilou");
+    saved = MergeEditedStats(high, high, edited, "Splash", "Splash");
     EXPECT(saved.experience == 13000 && saved.giantsExperience == 63500);
 
     using launcher_ui::Trimmed;
-    EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Gilou's  ") == "Gilou's" && Trimmed("A b") == "A b");
+    EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Splash's  ") == "Splash's" && Trimmed("A b") == "A b");
     printf("Edit stats and names: merge and trim checked\n");
 }
 
