@@ -83,8 +83,7 @@ namespace
         }
     }
 
-    // The files whose strings the launcher translates. The collection page and the figure sheet follow after their redesign
-    // (docs/translations.md).
+    // The files whose strings the launcher translates: all of them.
     std::vector<fs::path> SourceFiles(const fs::path& root)
     {
         std::vector<fs::path> files;
@@ -99,7 +98,7 @@ namespace
             for (const fs::path& file : found)
             {
                 std::string name = file.filename().string(), extension = file.extension().string();
-                if ((extension == ".cpp" || extension == ".h") && name.rfind("collection_", 0) != 0 && name != "i18n.h" && name != "i18n.cpp")
+                if ((extension == ".cpp" || extension == ".h") && name != "i18n.h" && name != "i18n.cpp")
                     files.push_back(file);
             }
         }

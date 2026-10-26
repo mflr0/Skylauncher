@@ -73,9 +73,15 @@ namespace collection
         std::vector<std::string> acceptsGames;  // ...or every toy that first came with these games
         std::map<uint16_t, std::string> names;  // the game's internal character names (SSA: portraits)
         std::map<uint16_t, std::string> images; // other toys' pictures among the game's UI images
+        // One picture per toy family among the game's UI images (SSA's magic item, location and sidekick icons): the
+        // picture of a toy of that family that no game has a picture of. JSON: "kind_pictures", category id to name.
+        std::map<Category, std::string> kindPictures;
         // The game's portrait of a toy (Giants: one per Skylander, deco and item), by type << 16 | variant id (0: the
         // plain toy): the picture's file name in the game's portraits folder (art/game_art.h). JSON: "9", "9:0x1206".
         std::map<uint32_t, std::string> portraits;
+        // The game's large pictures of a toy or variant (Giants: the versus screen's character art, about 1000x960),
+        // keyed as `portraits`: files of the portraits folder's "artworks" subfolder (art/game_art.h). JSON: "artworks".
+        std::map<uint32_t, std::string> artworks;
         // The hats the game has, by the number a figure stores (0: none), with their English names. JSON: "hats".
         std::map<uint16_t, std::string> hats;
         std::string runtime;                    // the runtime's executable name ("SSARecomp"); its data is in datadir::Game(id)

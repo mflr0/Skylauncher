@@ -281,6 +281,28 @@ namespace collection
         return !edition.empty() ? edition : variantInfo.name;
     }
 
+    bool HasProgress(const Figure& figure)
+    {
+        return figure.toy != nullptr && figure.toy->category <= Category::Mini;
+    }
+
+    std::string LevelText(const Figure& figure, const std::string& game, bool french)
+    {
+        if (!HasProgress(figure))
+            return {};
+        if (figure.state == figures::AreaState::Blank)
+            return french ? "Nouveau" : "New";
+        if (figure.state != figures::AreaState::Valid)
+            return french ? "Illisible" : "Unreadable";
+        int cap = figures::LevelCap(game);
+        char text[48];
+        if (figure.level > cap)
+            snprintf(text, sizeof(text), french ? "Niveau %d (%d)" : "Level %d (%d)", cap, figure.level);
+        else
+            snprintf(text, sizeof(text), french ? "Niveau %d" : "Level %d", figure.level);
+        return text;
+    }
+
     std::string DefaultFolder()
     {
         std::filesystem::path folder = datadir::Root();
@@ -1140,8 +1162,7 @@ namespace collection
         }
     }
 
-    std::vector<Section> Group(const std::vector<Figure>& list, GroupBy group, OrderBy order, const std::string& game,
-        const std::vector<std::string>& onPortal)
+    std::vector<Section> Group(const std::vector<Figure>& list, GroupBy group, OrderBy order, const std::string& game)
     {
         const Catalogue& catalogue = Catalogue::Get();
         auto foreign = [&](const Figure& f) { return f.toy != nullptr && !game.empty() && !catalogue.Accepts(game, f.type); };
@@ -1232,23 +1253,29 @@ namespace collection
         {
         case GroupBy::Smart:
         {
-            std::vector<size_t> portal, recent, favourites;
-            for (size_t i : main)
-            {
-                if (std::find(onPortal.begin(), onPortal.end(), list[i].path) != onPortal.end())
-                    portal.push_back(i);
-                if (!list[i].LastUsedIn(game).empty())
-                    recent.push_back(i);
-                if (list[i].favourite)
-                    favourites.push_back(i);
-            }
-            std::stable_sort(recent.begin(), recent.end(), [&](size_t a, size_t b) { return list[a].LastUsedIn(game) > list[b].LastUsedIn(game); });
-            if (recent.size() > 8)
-                recent.resize(8);
-            add(Section::Kind::Portal, 0, {}, portal);
-            add(Section::Kind::Recent, 0, {}, recent, false);
-            add(Section::Kind::Favourites, 0, {}, favourites);
-            byElement();
+            // The shelf: every figure once. Favourites first, then the figures this game took (newest first), then the
+            // rest by element (the menus' order) and category; a character's variants next to it.
+            auto rank = [&](size_t i) {
+                const Toy* toy = list[i].toy;
+                for (size_t e = 0; e < std::size(ElementOrder); e++)
+                {
+                    if (toy->element == ElementOrder[e])
+                        return int(e);
+                }
+                return 100 + int(toy->category);
+            };
+            std::vector<size_t> items = main;
+            std::stable_sort(items.begin(), items.end(), [&](size_t a, size_t b) {
+                if (list[a].favourite != list[b].favourite)
+                    return list[a].favourite;
+                std::string ua = list[a].LastUsedIn(game), ub = list[b].LastUsedIn(game);
+                if (ua != ub)
+                    return ua > ub; // newest first; never taken ("") last
+                if (rank(a) != rank(b))
+                    return rank(a) < rank(b);
+                return before(a, b);
+            });
+            add(Section::Kind::Shelf, 0, {}, items, false);
             break;
         }
         case GroupBy::Element: byElement(); break;

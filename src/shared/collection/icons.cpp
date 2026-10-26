@@ -82,6 +82,8 @@ namespace collection
 
         Shape CategoryShape(Category category)
         {
+            if (HasKindGlyph(category))
+                return [category](float x, float y) { return KindGlyph(category, x, y); };
             switch (category)
             {
             case Category::Core: return Shield(0.8f, 0);
@@ -95,7 +97,6 @@ namespace collection
                 return [bolt](float x, float y) { return Polygon(x, y, bolt); };
             }
             case Category::Sensei: return [p = Star(5, 0.85f, 0.4f)](float x, float y) { return Polygon(x, y, p); };
-            case Category::Mini: return Shield(0.55f, 0.2f);
             case Category::Trap:
             {
                 std::vector<Point> crystal = { { 0, -0.85f }, { 0.45f, -0.4f }, { 0.45f, 0.4f }, { 0, 0.85f }, { -0.45f, 0.4f }, { -0.45f, -0.4f } };
@@ -117,14 +118,6 @@ namespace collection
                 std::vector<Point> gem = { { 0, -0.88f }, { 0.55f, -0.1f }, { 0, 0.88f }, { -0.55f, -0.1f } };
                 return [gem](float x, float y) { return Polygon(x, y, gem); };
             }
-            case Category::MagicItem: return [p = Star(4, 0.86f, 0.3f)](float x, float y) { return Polygon(x, y, p); };
-            case Category::Adventure:
-                // A map tile: a rounded square with a folded corner.
-                return [](float x, float y) {
-                    float tile = Box(x, y, 0, 0, 0.66f, 0.66f, 0.12f);
-                    float fold = (x + y - 0.75f) / std::sqrt(2.0f);
-                    return std::max(tile, fold);
-                };
             case Category::Trophy:
             {
                 std::vector<Point> cup = { { -0.7f, -0.75f }, { 0.7f, -0.75f }, { 0.4f, 0.0f }, { 0.12f, 0.15f }, { 0.12f, 0.5f },
@@ -254,6 +247,44 @@ namespace collection
         }
     }
 
+    // A few families get the mark Spyro's Adventure's menus use for them (a potion for magic items, a compass for
+    // locations, a paw for sidekicks), so a drawn icon reads like the disc's.
+    bool HasKindGlyph(Category category)
+    {
+        return category == Category::MagicItem || category == Category::Adventure || category == Category::Mini;
+    }
+
+    float KindGlyph(Category category, float x, float y)
+    {
+        switch (category)
+        {
+        case Category::MagicItem:
+        {
+            // A round flask with a neck and a lip, and a spark at its shoulder.
+            float flask = Circle(x, y, 0, 0.28f, 0.52f);
+            float neck = Box(x, y, 0, -0.34f, 0.16f, 0.24f, 0.04f);
+            float lip = Box(x, y, 0, -0.62f, 0.27f, 0.09f, 0.06f);
+            static const std::vector<Point> spark = Star(4, 0.26f, 0.07f, 0.6f, -0.52f);
+            return std::min({ flask, neck, lip, Polygon(x, y, spark) });
+        }
+        case Category::Adventure:
+        {
+            // A compass: a ring and a four-pointed rose.
+            static const std::vector<Point> rose = Star(4, 0.6f, 0.17f);
+            float ring = std::max(Circle(x, y, 0, 0, 0.86f), -Circle(x, y, 0, 0, 0.7f));
+            return std::min(ring, Polygon(x, y, rose));
+        }
+        case Category::Mini:
+        {
+            // A paw: the pad and four toes.
+            float pad = std::min(Circle(x, y, 0, 0.36f, 0.36f), Box(x, y, 0, 0.44f, 0.46f, 0.26f, 0.24f));
+            return std::min({ pad, Circle(x, y, -0.62f, -0.12f, 0.18f), Circle(x, y, -0.25f, -0.5f, 0.2f), Circle(x, y, 0.25f, -0.5f, 0.2f),
+                Circle(x, y, 0.62f, -0.12f, 0.18f) });
+        }
+        default: return 1;
+        }
+    }
+
     Image GeneratedIcon(const Toy* toy, int size, bool tile)
     {
         Image image{ size, size, std::vector<uint32_t>(size_t(size) * size) };
@@ -287,6 +318,28 @@ namespace collection
         Paint(image, x0, y0, extent, KindMark(kind), ink, ink, ink, 0);
     }
 
+    namespace
+    {
+        // The first of `names` cached in the game's portraits folder (SSA_PORTRAITS, else <data>/<Game>/portraits).
+        std::string FirstCached(const Game& game, const std::vector<std::string>& names)
+        {
+            std::string folder;
+            if (const char* portraits = getenv("SSA_PORTRAITS"))
+                folder = std::string(portraits) + "/";
+            else if (std::filesystem::path data = datadir::Game(game.id); !data.empty())
+                folder = datadir::Text(data / "portraits") + "/";
+            else
+                return {};
+            for (const std::string& name : names)
+            {
+                std::string path = folder + name + ".png";
+                if (SDL_GetPathInfo(path.c_str(), nullptr))
+                    return path;
+            }
+            return {};
+        }
+    }
+
     std::string GamePortraitPath(const std::string& gameId, const Toy& toy, uint16_t variant, bool large)
     {
         const Game* game = Catalogue::Get().FindGame(gameId);
@@ -309,20 +362,16 @@ namespace collection
             names.push_back(image->second);
         if (names.empty())
             return {};
-        std::string folder;
-        if (const char* portraits = getenv("SSA_PORTRAITS"))
-            folder = std::string(portraits) + "/";
-        else if (std::filesystem::path data = datadir::Game(game->id); !data.empty())
-            folder = datadir::Text(data / "portraits") + "/";
-        else
+        return FirstCached(*game, names);
+    }
+
+    std::string GameKindPicturePath(const std::string& gameId, Category category)
+    {
+        const Game* game = Catalogue::Get().FindGame(gameId);
+        if (game == nullptr)
             return {};
-        for (const std::string& name : names)
-        {
-            std::string path = folder + name + ".png";
-            if (SDL_GetPathInfo(path.c_str(), nullptr))
-                return path;
-        }
-        return {};
+        auto found = game->kindPictures.find(category);
+        return found != game->kindPictures.end() ? FirstCached(*game, { found->second }) : std::string();
     }
 
     std::string PortraitPath(const std::string& gameId, const Toy& toy, uint16_t variant, bool large)
@@ -333,7 +382,48 @@ namespace collection
             if (game.id != gameId)
                 if (std::string path = GamePortraitPath(game.id, toy, variant, large); !path.empty())
                     return path;
+        if (std::string path = GameKindPicturePath(gameId, toy.category); !path.empty())
+            return path;
+        for (const Game& game : Catalogue::Get().Games())
+            if (game.id != gameId)
+                if (std::string path = GameKindPicturePath(game.id, toy.category); !path.empty())
+                    return path;
         return {};
+    }
+
+    std::string BestPicturePath(const std::string& gameId, const Toy& toy, uint16_t variant)
+    {
+        std::vector<const Game*> games;
+        if (const Game* viewed = Catalogue::Get().FindGame(gameId))
+            games.push_back(viewed);
+        for (const Game& game : Catalogue::Get().Games())
+            if (game.id != gameId)
+                games.push_back(&game);
+        // A file the game names for `key` (type << 16 | variant) in `pictures`, under its portraits folder.
+        auto find = [](const Game& game, const std::map<uint32_t, std::string>& pictures, uint32_t key, const char* subfolder) -> std::string {
+            auto it = pictures.find(key);
+            if (it == pictures.end())
+                return {};
+            std::string folder;
+            if (const char* portraits = getenv("SSA_PORTRAITS"))
+                folder = std::string(portraits) + "/";
+            else if (std::filesystem::path data = datadir::Game(game.id); !data.empty())
+                folder = datadir::Text(data / "portraits") + "/";
+            else
+                return {};
+            std::string path = folder + subfolder + it->second + ".png";
+            return SDL_GetPathInfo(path.c_str(), nullptr) ? path : std::string();
+        };
+        uint32_t plain = uint32_t(toy.type) << 16;
+        if (variant != 0)
+            for (const Game* game : games)
+                for (auto [pictures, subfolder] : { std::pair{ &game->artworks, "artworks/" }, std::pair{ &game->portraits, "" } })
+                    if (std::string path = find(*game, *pictures, plain | variant, subfolder); !path.empty())
+                        return path;
+        for (const Game* game : games)
+            if (std::string path = find(*game, game->artworks, plain, "artworks/"); !path.empty())
+                return path;
+        return PortraitPath(gameId, toy, variant, true);
     }
 
     uint16_t VariantFor(const Toy& toy, VariantKind kind)

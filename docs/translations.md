@@ -54,7 +54,11 @@ Settings > Launcher > Language: **Same as the game**, or one language of the lis
 - Window text is translated where it is drawn, every frame; text made once and kept (a toast, a disc check's message) is
   translated when it is made.
 
-## Not yet translated
-The **Collection page and the figure sheet** (`ui/collection_*.cpp`) are being redesigned on another branch: their files are not
-touched here, so their text is still English in every language. They follow once that branch is merged: wrap their strings the
-same way, add them to the language files, and drop the exclusion in `tests/i18n_test.cpp` (`SourceFiles`).
+## The Collection page
+The Collection page, the figure sheet, Add a figure and Manage (`ui/collection_*.cpp`) go through `Tr` like the rest. Three
+things are particular to them:
+- **The library's names** (elements, types, versions) are English in the shared library; the page translates them with
+  `ElementName`, `CategoryLabel` and `KindLabel` (tables of `N_`). The library's own French (`LevelText`, `SeatTag`) is
+  asked for with `French()`.
+- **Data stays as it is**: the catalogue's toy and version names, Giants' hat names, and a figure's own label.
+- **A count with a plural** is two strings (`{} figure`, `{} figures`), as everywhere.

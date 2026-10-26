@@ -3,10 +3,12 @@
 // docs/runtime/host/game_art.md, with the Giants logo composition.
 #include "game_art.h"
 #include "alchemy_archive.h"
+#include "game_text.h"
 #include "lux_images.h"
 #include "../collection/catalogue.h"
 #include "../collection/datadir.h"
 #include "../collection/json.h"
+#include "../collection/upgrades.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cctype>
@@ -325,6 +327,12 @@ namespace art
             std::vector<std::string> pictures;
             bool images = false;
             std::string folder;
+            // Artworks [Alchemy]: the archive whose entries under `artworksFolder` are one large picture each (Giants'
+            // versus screen), named after the entry's picture ("ui_pvp_sprites/eruptorseries2.png/0x....igz").
+            Source artworks;
+            std::string artworksFolder;
+            // The toys' upgrades (game_text.cpp): the manifest's "upgrades" part as it is.
+            collection::Json upgrades;
         };
 
         Source ReadSource(const collection::Json& json)
@@ -355,6 +363,9 @@ namespace art
                         m.pictures.push_back(name.AsString());
                     m.images = json["portraits"]["images"].AsBool();
                     m.folder = json["portraits"]["folder"].AsString();
+                    m.artworks = ReadSource(json["artworks"]);
+                    m.artworksFolder = json["artworks"]["folder"].AsString();
+                    m.upgrades = json["upgrades"];
                     if (!m.game.empty())
                         out.push_back(std::move(m));
                 }
@@ -458,8 +469,12 @@ namespace art
                         wanted.insert(pattern);
                     }
                 if (m.images)
+                {
                     for (const auto& [type, name] : game->images)
                         wanted.insert(name);
+                    for (const auto& [category, name] : game->kindPictures)
+                        wanted.insert(name);
+                }
             }
             int present = 0;
             for (auto it = wanted.begin(); it != wanted.end();)
@@ -516,6 +531,43 @@ namespace art
             return present;
         }
 
+        // [Alchemy] Every entry of the artworks archive under the manifest's folder: one picture each, named after the
+        // entry ("eruptorseries2.png"). Done when every artwork the catalogue's "artworks" names is there.
+        int AlchemyArtworks(const Manifest& m, const Disc& disc, const std::filesystem::path& folder)
+        {
+            const collection::Game* game = collection::Catalogue::Get().FindGame(m.game);
+            bool complete = game != nullptr && !game->artworks.empty();
+            if (game != nullptr)
+                for (const auto& [key, name] : game->artworks)
+                    complete = complete && Exists(folder / (name + ".png"));
+            int present = CountPngs(folder);
+            if (complete || m.artworks.archive.empty() || m.artworksFolder.empty())
+                return present;
+            auto archive = OpenArchive(disc, m.artworks.archive);
+            if (!archive)
+            {
+                fprintf(stderr, "[art] cannot read %s of the disc\n", m.artworks.archive.c_str());
+                return present;
+            }
+            const std::string under = Lower(m.artworksFolder);
+            for (size_t i = 0; i < archive->Count(); i++)
+            {
+                std::string name = Lower(archive->Name(i));
+                size_t at = name.find(under), end = at == std::string::npos ? at : name.find(".png", at + under.size());
+                if (end == std::string::npos)
+                    continue;
+                std::filesystem::path path = folder / (name.substr(at + under.size(), end - at - under.size()) + ".png");
+                if (Exists(path))
+                    continue;
+                std::optional<alchemy::IgzFile> scene = alchemy::IgzFile::Parse(archive->Read(i));
+                std::vector<alchemy::IgzFile::Picture> pictures = scene ? scene->Pictures() : std::vector<alchemy::IgzFile::Picture>{};
+                Image image;
+                if (!pictures.empty() && alchemy::DecodePicture(*scene, pictures[0], image) && SavePng(image, path))
+                    present++;
+            }
+            return present;
+        }
+
         int ReadPortraits(const Manifest& m, const Disc& disc, const std::filesystem::path& folder)
         {
             if (!m.portraits.stream.empty())
@@ -560,6 +612,12 @@ namespace art
             return datadir::FromText(folder);
         std::filesystem::path data = datadir::Game(game);
         return data.empty() ? std::filesystem::path() : data / "portraits";
+    }
+
+    std::filesystem::path ArtworkFolder(std::string_view game)
+    {
+        std::filesystem::path portraits = PortraitFolder(game);
+        return portraits.empty() ? portraits : portraits / "artworks";
     }
 
     std::string CachedPath(std::string_view game, Role role)
@@ -617,6 +675,24 @@ namespace art
         {
             std::filesystem::create_directories(portraits, error);
             result.portraits = ReadPortraits(*where, disc, portraits);
+        }
+        if ((parts & Artworks) && where != nullptr && !where->artworks.archive.empty() && !portraits.empty())
+        {
+            std::filesystem::path artworks = ArtworkFolder(game);
+            std::filesystem::create_directories(artworks, error);
+            result.artworks = AlchemyArtworks(*where, disc, artworks);
+        }
+        if ((parts & Upgrades) && where != nullptr && where->upgrades.IsObject())
+        {
+            // Read once: a later Extract keeps the file (delete it to read the disc again).
+            std::filesystem::path file = collection::UpgradeFile(game);
+            std::error_code exists;
+            if (!file.empty() && !std::filesystem::is_regular_file(file, exists))
+            {
+                std::filesystem::create_directories(file.parent_path(), error);
+                ExtractUpgrades(game, where->upgrades, disc, file);
+            }
+            result.upgrades = std::filesystem::is_regular_file(file, exists);
         }
         return result;
     }

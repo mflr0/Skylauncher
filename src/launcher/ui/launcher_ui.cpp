@@ -937,29 +937,57 @@ namespace launcher_ui
         return pressed && enabled;
     }
 
-    bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive)
+    bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive, int chevron)
     {
+        unsigned ink = primary ? AccentInk : Text;
         ImGui::PushStyleColor(ImGuiCol_Button, Rgb(primary ? Accent : fill));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? AccentHover : fillHover));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? AccentDark : fillActive));
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(primary ? AccentInk : Text));
+        ImGui::PushStyleColor(ImGuiCol_Text, chevron != 0 ? IM_COL32(0, 0, 0, 0) : Rgb(ink));
         if (bold)
             ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        bool pressed = ImGui::Button(label, ImVec2(PillWidth(label, width, bold), 40));
+        bool pressed = ImGui::Button(label, ImVec2(PillWidth(label, width, bold, chevron), 40));
         if (bold)
             ImGui::PopFont();
         ImGui::PopStyleColor(4);
+        if (chevron != 0)
+            DrawLabelChevron(label, ink, chevron, bold);
         return pressed;
     }
 
-    float App::PillWidth(const char* label, float width, bool bold)
+    float App::PillWidth(const char* label, float width, bool bold, int chevron)
     {
         if (bold)
             ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
         float need = ImGui::CalcTextSize(label, nullptr, true).x + 2 * ImGui::GetStyle().FramePadding.x + 16;
+        if (chevron != 0)
+            need += ImGui::GetFontSize() * 0.9f;
         if (bold)
             ImGui::PopFont();
         return std::max(width, std::ceil(need));
+    }
+
+    void App::DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir)
+    {
+        float half = size / 2, rise = size / 4 * (dir > 0 ? 1 : -1);
+        ImVec2 points[3] = { ImVec2(centre.x - half, centre.y - rise), ImVec2(centre.x, centre.y + rise), ImVec2(centre.x + half, centre.y - rise) };
+        draw->AddPolyline(points, 3, Rgb(color), ImDrawFlags_None, std::max(1.5f, size / 6));
+    }
+
+    void App::DrawLabelChevron(const char* label, unsigned color, int dir, bool bold)
+    {
+        if (bold)
+            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
+        const char* end = std::strstr(label, "##");
+        ImVec2 text = ImGui::CalcTextSize(label, end);
+        float size = ImGui::GetFontSize() * 0.6f, gap = ImGui::GetFontSize() * 0.4f;
+        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
+        float left = (min.x + max.x - (text.x + gap + size)) / 2, middle = (min.y + max.y) / 2;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddText(ImVec2(left, middle - text.y / 2), Rgb(color), label, end);
+        DrawChevron(draw, ImVec2(left + text.x + gap + size / 2, middle), size, color, dir);
+        if (bold)
+            ImGui::PopFont();
     }
 
     bool App::Toggle(const char* id, bool* value)
@@ -2225,9 +2253,9 @@ namespace launcher_ui
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-quit-while-installing", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
-            static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-view-menu",
-                "45-nav-view-closed", "46-nav-card", "47-nav-figure-page", "48-nav-delete-hint", "49-nav-delete-held",
-                "50-nav-back-to-play", "51-nav-settings-controls", "52-nav-settings-back" };
+            static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-search",
+                "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
+                "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             if (m_testButtons || m_testSidebar || m_testCopy)
                 Screenshot(m_testShot.c_str());
             else if (m_testNav)
@@ -2660,18 +2688,18 @@ namespace launcher_ui
         static const std::vector<int> Steps[] = {
             {},                                                        // 40: the launcher opens, the focus in the sidebar
             { ImGuiKey_Escape },                                       // 41: B: the ring on the game's row
-            { ImGuiKey_DownArrow },                                    // 42: down: past the games coming later
+            { ImGuiKey_DownArrow, ImGuiKey_DownArrow },                // 42: down: past Giants and the games coming later
             { ImGuiKey_Space },                                        // 43: A: Collection, the ring on Add a figure
-            { ImGuiKey_GamepadFaceUp, ImGuiKey_DownArrow },            // 44: Y: the View menu, focused
-            { ImGuiKey_GamepadFaceRight },                             // 45: B: closed, the ring back on View
-            { ImGuiKey_LeftArrow, ImGuiKey_LeftArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow,
-              ImGuiKey_RightArrow },                                   // 46: a seat, then right: the list's first card
-            { ImGuiKey_GamepadFaceLeft },                              // 47: X: its Figure page
-            { ImGuiKey_DownArrow, ImGuiKey_RightArrow, ImGuiKey_RightArrow, ImGuiKey_RightArrow }, // 48: on Delete, its hint
-            { Hold | ImGuiKey_Space },                                 // 49: held for 1.5 s: in the trash, back to the list
-            { Release | ImGuiKey_Space, ImGuiKey_GamepadFaceRight },   // 50: B: back to Play, on the main button
-            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_GamepadR1 }, // 51: Settings > Controls
-            { ImGuiKey_Escape },                                       // 52: Escape: back to Play
+            { ImGuiKey_GamepadFaceUp },                                // 44: Y: the search box takes the keyboard
+            { ImGuiKey_Escape },                                       // 45: B: out of the search
+            { ImGuiKey_UpArrow },                                      // 46: up: to the seats, above the bar
+            { ImGuiKey_Space },                                        // 47: A: choosing for that seat (lit, the bar says so)
+            { ImGuiKey_DownArrow },                                    // 48: down: the shelf's first card
+            { ImGuiKey_Space },                                        // 49: A: it goes on the seat, the choosing ends
+            { ImGuiKey_GamepadFaceLeft },                              // 50: X: the focused card's sheet
+            { ImGuiKey_GamepadFaceRight, ImGuiKey_GamepadFaceRight },  // 51: B, B: closed, back to Play
+            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_GamepadR1 }, // 52: Settings > Controls
+            { ImGuiKey_Escape },                                       // 53: Escape: back to Play
         };
         if (m_testStep >= int(std::size(Steps)))
         {
