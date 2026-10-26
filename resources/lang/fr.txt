@@ -330,6 +330,8 @@ The game ({}) wasn't found next to Skylauncher.\n\nPut it in the same folder.	Le
 The game stopped unexpectedly	Le jeu s'est arrêté de façon inattendue
 Couldn't download the game tools. Check your connection.	Téléchargement des outils impossible. Vérifiez votre connexion.
 The game tools are incomplete.	Les outils du jeu sont incomplets.
+Same as text	Identique au texte
+These game tools can't build {}	Ces outils ne permettent pas de créer {}
 The game was made for 30 FPS; 60 is experimental.	Le jeu a été conçu pour 30 images par seconde ; 60 est expérimental.
 Choose the disc image first	Choisissez d'abord l'image disque
 Menus, subtitles and on-screen text.	Menus, sous-titres et textes à l'écran.

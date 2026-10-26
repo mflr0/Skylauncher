@@ -92,6 +92,8 @@ namespace launcher_ui
                 if (m_s->disc == DiscState::Ready && !Installing())
                     StartInstall(); // the new kit builds the game
             }
+            else if (state.phase == UpdateManager::Phase::Done && state.doing == "launcher" && state.restartNeeded)
+                RefreshKit(state.launcher.tag); // the kit of the release the launcher just became
         }
     }
 

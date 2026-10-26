@@ -372,6 +372,8 @@ namespace launcher_ui
             m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
             m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
             m_testSidebar = SDL_getenv("SSA_LAUNCHER_TEST_SIDEBAR") != nullptr;
+            if (const char* kit = SDL_getenv("SSA_LAUNCHER_TEST_KIT"))
+                m_testKit = kit;
             m_testCopy = SDL_getenv("SSA_LAUNCHER_TEST_COPY") != nullptr;
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
             m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
@@ -508,6 +510,8 @@ namespace launcher_ui
             int64_t last = SettingInt(m_config, "update", "last_check", 0), now = int64_t(std::time(nullptr));
             if (ParseBool(SettingGet(m_config, "update", "auto_check", "1")) && (last <= 0 || now - last > 86400 || last > now))
                 StartUpdateCheck(false);
+            if (ParseBool(SettingGet(m_config, "update", "auto_check", "1")))
+                RefreshKit("v" + LauncherVersion());
         }
         while (m_running)
         {
@@ -520,6 +524,7 @@ namespace launcher_ui
                 HandleEvent(event);
             PollSlots();
             PollUpdates();
+            PollKitRefresh();
             AutoPlay();
             Frame();
             TestScript();
@@ -1200,6 +1205,15 @@ namespace launcher_ui
         }
         // A verified disc. The page's button is INSTALL until the game is built, PLAY after.
         const char* button = NeedsInstall(*slot) ? Tr("INSTALL") : Tr("PLAY");
+        if (m_kitRefresh.Running())
+        {
+            // The launcher's own tools are coming: a built game can be played meanwhile, an install waits for them.
+            KitDownloader::Snapshot_ kit = m_kitRefresh.Snapshot();
+            float fraction = kit.total > 0 ? std::clamp(float(double(kit.done) / double(kit.total)), 0.0f, 1.0f) : 0.0f;
+            SlotLine result = line(S::DownloadingTools, "", Accent, button, !NeedsInstall(*slot), fraction);
+            result.text = Tf("{} {} %", Tr(N_("Downloading tools")), int(std::floor(fraction * 100)));
+            return result;
+        }
         if (slot->installView)
         {
             InstallProgress::State state = InstallSnapshot(*slot).state;
@@ -2314,6 +2328,102 @@ namespace launcher_ui
         { "ready", "Ready to play", "PLAY", [](GameSlot&) {} },
     };
 
+    // The kit follows the launcher (SSA_LAUNCHER_TEST_KIT, with SKYLAUNCHER_BASE_PATH holding an old kit and SKYLAUNCHER_UPDATE_URL a
+    // fake release of the launcher's own tag, its kit asset being the fake kit "kit-new"; both games' iso= for "old" and "giants"):
+    //  old     INSTALL with a kit next to the launcher from an older release: the kit of the launcher's release is fetched
+    //          first, and it is the one that builds the game;
+    //  giants  INSTALL of Giants with a kit that does not build it (no giants in games=): the right kit first;
+    //  start   at start, and right after the launcher became a newer release, the old kit is replaced in the background and the
+    //          sidebar says "Downloading tools".
+    void App::TestKitScript(uint64_t now)
+    {
+        const GameInfo& ssa = *FindGame("ssa");
+        const GameInfo& giants = *FindGame("giants");
+        const bool start = m_testKit == "start";
+        GameSlot& slot = SlotFor(m_testKit == "giants" ? giants : ssa);
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL kit step %d (%s): %s (line \"%s\")\n", m_testStep, m_testKit.c_str(), what, SlotStatus(&slot).text.c_str());
+                m_testFailures++;
+            }
+        };
+        const std::string tag = "v" + LauncherVersion();
+        if (m_testBegan == 0)
+            m_testBegan = now;
+        if (now - m_testBegan > 120000)
+        {
+            fprintf(stderr, "kit script: install error \"%s\", kit error \"%s\"\n", InstallSnapshot(slot).error.c_str(), slot.kitError.c_str());
+            expect(false, "timeout");
+            m_running = false;
+            return;
+        }
+        switch (m_testStep)
+        {
+        case 0: // the discs checked in the background
+            m_page = Page::Play;
+            if (m_testBegan == now)
+            {
+                if (!start)
+                    SelectGame(giants);
+                SelectGame(ssa);
+                return;
+            }
+            if (SlotFor(ssa).disc == DiscState::Verifying || (!start && SlotFor(giants).disc == DiscState::Verifying))
+                return;
+            if (start)
+            {
+                // The sidebar line while the tools come, on the launcher's own release; then the same for the release it becomes.
+                expect(slot.disc == DiscState::Ready, "the disc is ready");
+                std::optional<InstallKit> kit = FindInstallKit(m_config);
+                expect(kit && !kit->chosen && kit->tag.empty() && KitOlderThanLauncher(*kit, tag), "an old kit next to the launcher");
+                SemVer next = ParseSemVer(LauncherVersion());
+                m_testNextTag = fmt::format("v{}.{}.{}", next.major, next.minor, next.patch + 1);
+                RefreshKit(m_testNextTag);
+                expect(m_kitRefresh.Running(), "the refresh started");
+                std::string text = SlotStatus(&slot).text;
+                expect(text.rfind("Downloading tools", 0) == 0, "the sidebar says Downloading tools");
+                m_testStep = 2;
+                return;
+            }
+            expect(slot.disc == DiscState::Ready, "the disc is ready");
+            m_s = &slot;
+            SetActiveGame(slot.game.id);
+            RefreshInstall();
+            expect(slot.kit && !slot.kit->chosen && slot.kit->tag.empty() && slot.kit->version == "old", "the kit next to the launcher is in use");
+            expect(m_testKit == "old" ? KitOlderThanLauncher(*slot.kit, LauncherVersion()) : !slot.kit->Builds("giants"), "and it is not the one for this game");
+            expect(KitNeedsFetch(slot), "so INSTALL fetches the right kit first");
+            m_testStep++;
+            break;
+        case 1: // INSTALL: the download comes first, and the old kit never runs
+            StartInstall();
+            expect(slot.kitUsed && slot.kitDownload.Running() && !slot.installer.Running(), "the tools are downloaded before anything is built");
+            expect(SlotStatus(&slot).text.rfind("Downloading tools", 0) == 0, "the sidebar says Downloading tools");
+            m_testStep++;
+            break;
+        case 2:
+            if (start)
+            {
+                if (!m_kitRefreshTag.empty())
+                    return;
+                std::optional<InstallKit> kit = FindInstallKit(m_config);
+                expect(kit && kit->version == "kit-new" && kit->tag == m_testNextTag, "the kit of the new release is the one in use");
+                expect(SettingGet(m_config, "update", "kit_fetched") == m_testNextTag, "and remembered");
+                expect(std::filesystem::exists(DownloadedKitsFolder() / m_testNextTag / "kit.txt"), "in its own folder");
+                m_running = false;
+                return;
+            }
+            if (slot.installer.Running() || slot.kitDownload.Running() || slot.installView)
+                return;
+            expect(slot.kit && slot.kit->version == "kit-new" && slot.kit->tag == tag && slot.kit->Builds(slot.game.id), "the downloaded kit is the one in use");
+            expect(slot.kit && FindInstalledGame(m_config, slot.check.xexSha256).kitVersion == "kit-new", "the game was built by it");
+            expect(!slot.installed.runtime.empty(), "and is there");
+            expect(SettingGet(m_config, "update", "kit_fetched") == tag, "the fetch is remembered");
+            m_running = false;
+            break;
+        }
+    }
+
     // The sidebar's line through an install and an update (SSA_LAUNCHER_TEST_SIDEBAR, with a [launcher] kit= that is the fake
     // kit and both games' iso=): Spyro's Adventure ready, installing at 0, 50 and 100 %, Giants shown meanwhile (the other
     // game's line), ready, an update available, updating at 0, 50 and 100 %, then a build that fails. Each shot "<nn>-<state>"
@@ -2858,6 +2968,11 @@ namespace launcher_ui
             TestSidebarScript(now);
             return;
         }
+        if (!m_testKit.empty())
+        {
+            TestKitScript(now);
+            return;
+        }
         if (m_testSwitch)
         {
             TestSwitchScript(now);
@@ -3056,7 +3171,7 @@ std::span<const LauncherGameEntry> LauncherGameCatalog()
 std::string LauncherLanguageLabel(const LauncherConfig& config, const GameInfo& game)
 {
     std::string code = SettingGet(config, game.id, "language", "en");
-    for (const Choice& choice : LanguageChoices)
+    for (const Choice& choice : GiantsLanguageChoices) // a superset of the other game's
         if (code == choice.value)
             return choice.label;
     return code;
@@ -3064,8 +3179,11 @@ std::string LauncherLanguageLabel(const LauncherConfig& config, const GameInfo& 
 
 std::string LauncherVoiceLabel(const LauncherConfig& config, const GameInfo& game)
 {
-    std::string code = SettingGet(config, game.id, "voice_language", "en");
-    for (const Choice& choice : LanguageChoices)
+    const bool giants = game.id == std::string_view("giants");
+    std::string code = SettingGet(config, game.id, "voice_language", giants ? "" : "en");
+    if (code.empty())
+        return LauncherLanguageLabel(config, game); // Giants' voices follow the text
+    for (const Choice& choice : GiantsLanguageChoices)
         if (code == choice.value)
             return choice.label;
     return code;

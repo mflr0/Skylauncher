@@ -41,6 +41,24 @@ The kit is an asset of the launcher's own release: `ssa-kit-windows-x64.zip`, `s
   into `kit/<tag>/` (or over the kit next to the launcher, if that is the one in use) and, a disc being verified, the install
   runs again; SSABuild is incremental. `[update] repo=` changes where the launcher itself is looked up.
 
+## The kit follows the launcher
+
+A launcher never builds with a kit older than its own release, and never starts SSABuild on a disc its kit cannot build.
+(Without this a launcher that updated itself kept the kit next to it, and an old SSABuild refused the Giants disc.)
+
+- **At start**, and **right after the launcher replaced itself** (for the release it became), when the kit in use comes from an
+  older release than the launcher's version, the kit of that release (`v<launcher version>`) is fetched in the background, verified
+  as above, into `kit/<tag>/`. The game's line in the sidebar says "Downloading tools 42 %"; a built game can be played meanwhile,
+  a game still to install waits for it. It is not asked again for the same release (`[update] kit_fetched=<tag>`); a failure (offline)
+  is silent and tried again at the next start. Not done with `SKYLAUNCHER_NO_UPDATE_CHECK` or `[update] auto_check=0`.
+- **Before INSTALL or an update**, a missing kit, one from an older release, or one whose `games=` lacks the disc's game makes the
+  checklist start with "Downloading the game tools": the same fetch, then the build with the new kit.
+- **Which release a kit comes from**: the `kit/<tag>/` folder of a downloaded kit, else `version=` in `kit.txt`; a kit that says
+  nothing is left alone. A kit next to the launcher that is older than a downloaded one, or cannot build the game while the
+  downloaded one can, is not used. The kit the player chose with `SKYLAUNCHER_KIT` or `[launcher] kit=` is never replaced.
+- With no published release for the launcher's tag the latest release is used (a build of the development branch), and that is
+  then the best there is: `kit_fetched` stops it asking again.
+
 ## Releasing
 
 1. Bump `SKYLAUNCHER_VERSION` in `CMakeLists.txt` and commit.
@@ -62,5 +80,9 @@ then tag the commit. Branch builds publish nothing.
 
 `SkylauncherTest` builds fake releases in a scratch folder (`latest.json`, assets, `SHA256SUMS`, served as `file://` through
 `SKYLAUNCHER_UPDATE_URL`): version compare, the JSON, a good download, a damaged one, no `SHA256SUMS`, the swap and its
-rollback, zip path escapes, the kit install, the kit download (a fake release with a kit zip: good, bad hash, missing line, fallback to the latest) and the manager. `SSA_LAUNCHER_TEST_UPDATE=1` with `SKYLAUNCHER_UPDATE_URL` on a
+rollback, zip path escapes, the kit install, the kit download (a fake release with a kit zip: good, bad hash, missing line, fallback to the latest) and the manager. "The kit follows the launcher" has its own checks (`SkylauncherTest`; `SKYLAUNCHER_TEST_KIT_ONLY=1` runs only them):
+`kit.txt` `games=`, the release a kit comes from, a kit next to the launcher against a downloaded one
+(`SKYLAUNCHER_BASE_PATH` stands in for the folder the launcher is in), then the window against a fake release (a kit next to the
+launcher from an older release, replaced before INSTALL builds; a kit without `giants` and a Giants disc, the right kit first; at
+start and for the release the launcher becomes, the sidebar's "Downloading tools" and the kit in use). `SSA_LAUNCHER_TEST_UPDATE=1` with `SKYLAUNCHER_UPDATE_URL` on a
 fake `latest.json` takes the banner, What's new, About and failure screenshots.

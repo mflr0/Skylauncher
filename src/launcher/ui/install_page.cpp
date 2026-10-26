@@ -59,7 +59,7 @@ namespace launcher_ui
 
     void App::RefreshInstall()
     {
-        m_s->kit = FindInstallKit(m_config);
+        m_s->kit = FindInstallKit(m_config, m_s->game.id);
         m_s->installed = FindInstalledGame(m_config, m_s->check.xexSha256);
         m_s->ownRuntime = FindRuntime(m_s->game, m_config);
 
@@ -121,11 +121,32 @@ namespace launcher_ui
             Toast(Tr("Couldn't save the settings"), true);
     }
 
+    bool App::KitNeedsFetch(const GameSlot& slot) const
+    {
+        if (!slot.kit)
+            return true;
+        if (slot.kit->chosen)
+            return false;
+        // Once the launcher's own release was fetched (or the nearest one there is), an older tag is the best there is.
+        bool fetched = SettingGet(m_config, "update", "kit_fetched") == "v" + LauncherVersion();
+        return !slot.kit->Builds(slot.game.id) || (KitOlderThanLauncher(*slot.kit, LauncherVersion()) && !fetched);
+    }
+
     void App::StartInstall()
     {
         if (!DiscStillThere())
             return;
         RefreshInstall();
+        if (m_kitRefresh.Running())
+        {
+            Toast(Tr("Downloading tools")); // the install goes on with them: press again in a moment
+            return;
+        }
+        if (m_s->kit && m_s->kit->chosen && !m_s->kit->Builds(m_s->game.id))
+        {
+            Toast(Tf("These game tools can't build {}", m_s->game.name), true); // the player's own kit: not ours to replace
+            return;
+        }
         m_s->installSha = m_s->check.xexSha256;
         m_s->installKitVersion = m_s->kit ? m_s->kit->version : std::string();
         m_s->installView = true;
@@ -135,18 +156,47 @@ namespace launcher_ui
         m_s->kitUsed = false;
         m_s->kitError.clear();
         m_page = Page::Play;
-        if (m_s->kit)
-            StartInstaller();
-        else
+        if (KitNeedsFetch(*m_s))
             StartKitDownload();
+        else
+            StartInstaller();
     }
 
-    // No kit next to the launcher or downloaded yet: the first step of the install fetches it (docs/install.md).
+    // No kit, or one that is older than the launcher or can't build this game: the first step of the install fetches the
+    // launcher's own (docs/install.md).
     void App::StartKitDownload()
     {
         m_s->kitUsed = true;
         m_s->kitStep = { "kit", "Downloading the game tools", SDL_GetTicks(), 0 };
         m_s->kitDownload.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), "v" + LauncherVersion(), DownloadedKitsFolder());
+    }
+
+    // At start (and after the launcher replaced itself): a kit from an older release than the launcher's is replaced by
+    // the one of the launcher's release, in the background; the sidebar says "Downloading tools" meanwhile.
+    void App::RefreshKit(const std::string& tag)
+    {
+        if (m_kitRefresh.Running() || AnyInstalling())
+            return;
+        std::optional<InstallKit> kit = FindInstallKit(m_config);
+        if (!kit || !KitOlderThanLauncher(*kit, tag) || SettingGet(m_config, "update", "kit_fetched") == tag)
+            return;
+        m_kitRefresh.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), tag, DownloadedKitsFolder());
+        m_kitRefreshTag = tag;
+    }
+
+    void App::PollKitRefresh()
+    {
+        if (m_kitRefreshTag.empty() || m_kitRefresh.Running())
+            return;
+        KitDownloader::Snapshot_ kit = m_kitRefresh.Snapshot();
+        if (kit.state == KitDownloader::State::Done)
+        {
+            Set("update", "kit_tag", kit.tag);
+            Set("update", "kit_fetched", m_kitRefreshTag);
+            for (auto& slot : m_slots)
+                slot->kit = FindInstallKit(m_config, slot->game.id);
+        }
+        m_kitRefreshTag.clear(); // a failure is silent: INSTALL says so if it matters
     }
 
     void App::StartInstaller()
@@ -212,14 +262,15 @@ namespace launcher_ui
             {
                 m_s->kitStep.endedAt = SDL_GetTicks();
                 Set("update", "kit_tag", kit.tag);
+                Set("update", "kit_fetched", "v" + LauncherVersion());
                 RefreshInstall();
-                if (m_s->kit)
+                if (m_s->kit && m_s->kit->Builds(m_s->game.id))
                 {
                     m_s->installKitVersion = m_s->kit->version;
                     StartInstaller();
                 }
                 else
-                    m_s->kitError = Tr("The game tools are incomplete.");
+                    m_s->kitError = m_s->kit ? Tf("These game tools can't build {}", m_s->game.name) : Tr("The game tools are incomplete.");
             }
             else if (kit.state == KitDownloader::State::Cancelled)
             {
