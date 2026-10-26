@@ -82,7 +82,7 @@ namespace
         failed.state = InstallProgress::State::Failed;
         list = MakeInstallChecklist(failed, 3000);
         SHELL_EXPECT(list.rows[0].state == RowState::Failed && list.current == 0);
-        SHELL_EXPECT(InstallFailureHeadline(list, failed).find("couldn't be downloaded") != std::string::npos);
+        SHELL_EXPECT(InstallFailureHeadline(list, failed).find("Couldn't download") != std::string::npos);
         failed = Feed({ { "@step compile Compiling the game", 1000 }, { "@error 3 files didn't compile", 2000 } });
         failed.state = InstallProgress::State::Failed;
         list = MakeInstallChecklist(failed, 3000);
@@ -263,11 +263,11 @@ namespace
         MakeRelease(updates / "r2", "v99.0.0", { { "Skylauncher.exe", "exe bytes" } }, { { "Skylauncher.exe", std::string(64, 'a') } });
         ParseRelease(ReadBytes(updates / "r2" / "latest.json"), release);
         file = DownloadVerified(release, "Skylauncher.exe", updates / "got2", {}, nullptr, downloadError);
-        SHELL_EXPECT(file.empty() && downloadError.find("SHA-256") != std::string::npos && !std::filesystem::exists(updates / "got2" / "Skylauncher.exe"));
+        SHELL_EXPECT(file.empty() && downloadError.find("damaged") != std::string::npos && !std::filesystem::exists(updates / "got2" / "Skylauncher.exe"));
         MakeRelease(updates / "r3", "v99.0.0", { { "Skylauncher.exe", "exe bytes" } }, {}, false);
         ParseRelease(ReadBytes(updates / "r3" / "latest.json"), release);
         file = DownloadVerified(release, "Skylauncher.exe", updates / "got3", {}, nullptr, downloadError);
-        SHELL_EXPECT(file.empty() && downloadError.find("SHA256SUMS") != std::string::npos);
+        SHELL_EXPECT(file.empty() && downloadError.find("can't be verified") != std::string::npos);
         file = DownloadVerified(release, "Other.exe", updates / "got3", {}, nullptr, downloadError);
         SHELL_EXPECT(file.empty() && downloadError.find("Other.exe") != std::string::npos);
         HttpResult missing = HttpDownload(FileUrl(updates / "nowhere.bin"), updates / "got4" / "x");
@@ -294,7 +294,7 @@ namespace
         MakeZip(zip, { { "readme.txt", "no ssabuild here" } });
         SHELL_EXPECT(!InstallKitZip(zip, kitFolder, error) && error.find("kit") != std::string::npos && ReadBytes(kitFolder / "SSABuild") == "binary");
         MakeZip(zip, { { "../evil.txt", "x" } });
-        SHELL_EXPECT(!ExtractZip(zip, updates / "unz", error) && error.find("outside") != std::string::npos && !std::filesystem::exists(updates / "evil.txt"));
+        SHELL_EXPECT(!ExtractZip(zip, updates / "unz", error) && error.find("damaged") != std::string::npos && !std::filesystem::exists(updates / "evil.txt"));
         SHELL_EXPECT(!ExtractZip(updates / "r1" / "latest.json", updates / "unz2", error));
         MakeZip(zip, { { "SSABuild", "first install" }, { "SSABuild.exe", "first install" } });
         SHELL_EXPECT(InstallKitZip(zip, updates / "fresh" / "ssa-kit", error) && ReadBytes(updates / "fresh" / "ssa-kit" / "SSABuild") == "first install");
@@ -371,12 +371,12 @@ namespace
         MakeRelease(updates / "dl-bad", "v78.0.0", { { KitAssetName(), latestZip } }, { { KitAssetName(), std::string(64, 'b') } });
         setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-bad" / "latest.json"));
         kitDir = DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError);
-        SHELL_EXPECT(kitDir.empty() && kitError.find("SHA-256") != std::string::npos && !std::filesystem::exists(updates / "data3" / "kit" / "v78.0.0"));
+        SHELL_EXPECT(kitDir.empty() && kitError.find("damaged") != std::string::npos && !std::filesystem::exists(updates / "data3" / "kit" / "v78.0.0"));
         MakeRelease(updates / "dl-line", "v79.0.0", { { KitAssetName(), latestZip }, { "other.bin", "x" } }, {});
         WriteBytes(updates / "dl-line" / "SHA256SUMS", Sha("x") + "  other.bin\n");
         setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-line" / "latest.json"));
         kitDir = DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError);
-        SHELL_EXPECT(kitDir.empty() && kitError.find("doesn't list") != std::string::npos);
+        SHELL_EXPECT(kitDir.empty() && kitError.find("can't be verified") != std::string::npos);
         MakeRelease(updates / "dl-noasset", "v80.0.0", { { "Skylauncher.exe", "x" } }, {});
         setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-noasset" / "latest.json"));
         SHELL_EXPECT(DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError).empty() && kitError.find(KitAssetName()) != std::string::npos);

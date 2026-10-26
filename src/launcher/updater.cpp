@@ -398,7 +398,7 @@ fs::path DownloadVerified(const ReleaseInfo& release, std::string_view assetName
     }
     if (sums == nullptr)
     {
-        error = Tf("{} has no SHA256SUMS: the download can't be checked, so it isn't installed", release.tag);
+        error = Tf("{} can't be verified, so it wasn't installed", release.tag);
         return {};
     }
     std::error_code fsError;
@@ -413,7 +413,7 @@ fs::path DownloadVerified(const ReleaseInfo& release, std::string_view assetName
     fs::remove(sumsFile, fsError);
     if (expected.empty())
     {
-        error = Tf("SHA256SUMS doesn't list {}: the download can't be checked", assetName);
+        error = Tf("{} can't be verified, so it wasn't installed", assetName);
         return {};
     }
     fs::path file = folder / FromUtf8(std::string(assetName));
@@ -427,7 +427,7 @@ fs::path DownloadVerified(const ReleaseInfo& release, std::string_view assetName
     if (actual != expected)
     {
         fs::remove(file, fsError);
-        error = Tr("The download is damaged or isn't the published file (its SHA-256 doesn't match): nothing was installed");
+        error = Tr("The download is damaged: nothing was installed");
         return {};
     }
     return file;
@@ -497,7 +497,7 @@ bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
         std::string name = stat.m_filename;
         if (!SafeEntry(name))
         {
-            error = Tf("The zip file holds a path outside its folder: {}", name);
+            error = Tr("The zip file is damaged");
             ok = false;
             break;
         }
@@ -581,7 +581,7 @@ bool InstallKitZip(const fs::path& zip, const fs::path& kitFolder, std::string& 
     if (!fs::exists(SSABuildIn(fresh), fsError))
     {
         fs::remove_all(staging, fsError);
-        error = Tr("The download isn't a game kit (no SSABuild in it)");
+        error = Tr("The download isn't a game kit");
         return false;
     }
     bool ok;
@@ -815,7 +815,7 @@ void UpdateManager::UpdateLauncher()
                 SDL_OpenURL(("file://" + ToUtf8(dmg)).c_str());
                 std::lock_guard lock(m_mutex);
                 m_state.phase = Phase::Done;
-                m_state.note = Tr("The installer was opened: drag Skylauncher to Applications, replacing the old one.");
+                m_state.note = Tr("Drag Skylauncher to Applications, replacing the old one.");
             }
             m_busy = false;
             return;
@@ -826,7 +826,7 @@ void UpdateManager::UpdateLauncher()
             SDL_OpenURL(release.pageUrl.c_str());
             std::lock_guard lock(m_mutex);
             m_state.phase = Phase::Done;
-            m_state.note = Tr("This copy can't update itself: the release page was opened.");
+            m_state.note = Tr("Can't update here: the release page was opened.");
             m_busy = false;
             return;
         }
@@ -895,7 +895,7 @@ void UpdateManager::UpdateKit()
         }
         if (kitFolder.empty() || !Writable(kitFolder.parent_path()))
         {
-            Fail(Tr("The folder next to Skylauncher can't be written to: move Skylauncher somewhere you can write, then try again"));
+            Fail(Tr("Can't write next to Skylauncher: move it to a writable folder."));
             m_busy = false;
             return;
         }

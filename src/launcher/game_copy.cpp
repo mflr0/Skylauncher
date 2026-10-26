@@ -75,9 +75,9 @@ std::string CopyFailureText(const gamedata::CopyResult& result)
 {
     using Outcome = gamedata::CopyResult::Outcome;
     if (result.outcome == Outcome::NotEnoughSpace)
-        return Tf("Not enough space: the copy needs {} and this drive has {} free.", LauncherFormatSize(result.needed),
+        return Tf("Not enough space: {} needed, {} free.", LauncherFormatSize(result.needed),
             LauncherFormatSize(result.available));
     if (result.outcome == Outcome::Failed)
-        return Tf("The copy stopped: {}. Press the button again to carry on from there.", result.error);
+        return Tf("Copy stopped: {}. Press the button to carry on.", result.error);
     return {};
 }

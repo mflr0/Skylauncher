@@ -64,7 +64,7 @@ namespace
         if (error)
         {
             if (result.ok)
-                result.error = Tf("Couldn't delete {}: {}", datadir::Text(path), error.message());
+                result.error = Tf("Couldn't delete: {}", error.message());
             result.ok = false;
         }
         else

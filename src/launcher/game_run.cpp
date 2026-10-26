@@ -184,7 +184,7 @@ GameRunResult RunGame(const std::string& runtime, const std::string& iso, const 
     // On Linux SDL forks before it finds out that the program is missing: the child then only exits.
     if (!std::filesystem::exists(Path(runtime), error))
     {
-        result.error = Tf("Couldn't start {}: the file doesn't exist", runtime);
+        result.error = Tr("Couldn't start the game: the file is missing");
         return result;
     }
     std::vector<std::string> arguments{ runtime, iso };
@@ -192,7 +192,7 @@ GameRunResult RunGame(const std::string& runtime, const std::string& iso, const 
     SDL_Process* process = Spawn(arguments, result.error);
     if (process == nullptr)
     {
-        result.error = Tf("Couldn't start {}: {}", runtime, result.error);
+        result.error = Tf("Couldn't start the game: {}", result.error);
         return result;
     }
     result.started = true;
