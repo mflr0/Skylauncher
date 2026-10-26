@@ -1,6 +1,6 @@
 #pragma once
 
-// The player's Skylanders collection, shared by every game and the launcher (docs/collection.md, docs/collection_api.md):
+// The player's Skylanders collection, shared by every game and the launcher (docs/runtime/host/collection.md, docs/runtime/host/collection_api.md):
 // one folder of figure dumps (the source of truth for each figure's progress), collection.json beside them for what
 // the dumps do not hold (labels, favourites, editions, last use, migrations), a <dump>.lock file while a game has
 // the figure on its portal, and backups/<dump>/ for saved copies.
@@ -109,7 +109,7 @@ namespace collection
     // Returns how many.
     int CreateMissing(const std::vector<uint16_t>& types);
 
-    // Writes progress into the dump (both areas, docs/figures.md). Refused while another process uses it.
+    // Writes progress into the dump (both areas, docs/runtime/host/figures.md). Refused while another process uses it.
     bool WriteStats(const std::string& path, const figures::FigureStats& stats, std::string* error = nullptr);
     bool SetNickname(const std::string& path, const std::string& utf8, std::string* error = nullptr);
     // Renames the dump (and its metadata and backups). `file` is a bare file name; the extension is kept if missing.
@@ -211,7 +211,7 @@ namespace collection
     std::vector<WheelPlace> GetWheel(const std::string& game, const std::string& seat);
     bool SetWheel(const std::string& game, const std::string& seat, const std::vector<WheelPlace>& places);
 
-    // --- Sections (docs/toybox_ux.md section 3) -----------------------------------------------------------------------
+    // --- Sections (docs/runtime/host/toybox_ux.md section 3) -----------------------------------------------------------------------
 
     enum class GroupBy { Smart, Element, Game, Category, Series, Level, Name };
     enum class OrderBy { Recent, Level, Name, Toy };

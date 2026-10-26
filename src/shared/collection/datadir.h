@@ -1,6 +1,6 @@
 #pragma once
 
-// Where everything of the player's lives (docs/settings.md): one folder per OS, "Skylanders", shared by the game, the
+// Where everything of the player's lives (docs/getting-started/settings.md): one folder per OS, "Skylanders", shared by the game, the
 // launcher and SSABuild. Plain C++ and the C library only (no SDL), so SSABuild can use it too.
 //
 //   <root>/Collection/      the figures, shared by every game          (collection.h)

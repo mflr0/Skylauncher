@@ -1,4 +1,4 @@
-// The plain facts of a figure's tag that every part of the figure code needs (docs/figures.md).
+// The plain facts of a figure's tag that every part of the figure code needs (docs/runtime/host/figures.md).
 #include "figure_data.h"
 #include <cstring>
 #include <random>

@@ -1,6 +1,6 @@
 #pragma once
 
-// A picture for any toy: the one the player's own disc has (cached as PNG by the game, docs/figures.md), else one drawn
+// A picture for any toy: the one the player's own disc has (cached as PNG by the game, docs/runtime/host/figures.md), else one drawn
 // here: a shape per category in the element's colour. Variants get a badge (Legendary star, Dark crescent...).
 // Nothing is shipped or downloaded: the shapes are code.
 #include "catalogue.h"

@@ -1,7 +1,7 @@
 #pragma once
 
 // Every Skylanders toy of the six games, as data (resources/collection/catalogue.json, built into the program;
-// docs/collection.md). A catalogue.json in the collection folder replaces or adds toys by toy type, and games by id.
+// docs/runtime/host/collection.md). A catalogue.json in the collection folder replaces or adds toys by toy type, and games by id.
 #include <cstdint>
 #include <map>
 #include <string>
@@ -57,7 +57,7 @@ namespace collection
         std::vector<Variant> variants;
     };
 
-    // A place on the portal as the game's menus show it (docs/toybox_ux.md section 4): Player 1, Magic item...
+    // A place on the portal as the game's menus show it (docs/runtime/host/toybox_ux.md section 4): Player 1, Magic item...
     struct Seat
     {
         std::string id;                   // "p1", "p2", "item", "adventure", "trap", "vehicle1"
@@ -88,7 +88,7 @@ namespace collection
         std::vector<Seat> seats;                // in the order the menus show them
     };
 
-    // How a variant id reads: its catalogue entry, or a name worked out from the id's bits (docs/collection.md).
+    // How a variant id reads: its catalogue entry, or a name worked out from the id's bits (docs/runtime/host/collection.md).
     struct VariantInfo
     {
         std::string name;    // full display name ("Series 2 Gill Grunt"); the toy's name for variant 0
