@@ -118,6 +118,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: dist
@@ -128,6 +129,12 @@ jobs:
         run: |
           # The launcher's updater checks every download against this file (docs/updates.md): one line per asset.
           (cd dist && sha256sum Skylauncher.exe Skylauncher-x86_64.AppImage Skylauncher-macOS.dmg Skylauncher-macOS.zip > SHA256SUMS && cat SHA256SUMS)
-          notes="Built from ${GITHUB_SHA::7}. You need your own copy of the game and the SSARecomp runtime next to the launcher; see the README."
-          gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-            --title "Skylauncher $VERSION" --notes "$notes"
+          # The notes are docs/releases/<tag>.md when it exists.
+          if [ -f "docs/releases/$VERSION.md" ]; then
+            gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Skylauncher $VERSION" --notes-file "docs/releases/$VERSION.md"
+          else
+            notes="Built from ${GITHUB_SHA::7}. You need your own copy of the game; see the README."
+            gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Skylauncher $VERSION" --notes "$notes"
+          fi

@@ -1,14 +1,14 @@
 # Skylauncher
 
-A launcher for the native PC port of *Skylanders: Spyro's Adventure*. You give it your own disc image, it builds the
-game on your computer, and you play.
+A launcher for the native PC ports of *Skylanders: Spyro's Adventure* and *Skylanders: Giants*. You give it your own disc
+image, it builds the game on your computer, and you play.
 
 Skylauncher contains no game code and no game art. Everything shown from the game is read from your own disc and stays
 on your computer.
 
 ## What you need
 
-- Your own copy of *Skylanders: Spyro's Adventure* for Xbox 360, as a disc image (`.iso`).
+- Your own copy of *Skylanders: Spyro's Adventure* or *Skylanders: Giants* for Xbox 360, as a disc image (`.iso`).
 - Windows 10 or 11 (64-bit), a Mac with Apple Silicon, or a Linux PC (below).
 - An internet connection the first time: INSTALL downloads the game tools (about 30 to 40 MB) and the compiler.
 - **Linux:** an x86_64 PC with a Vulkan driver (Mesa or NVIDIA), about 6 GB free, and a distribution from 2022 or later
@@ -30,7 +30,8 @@ on your computer.
    - **Mac:** `Skylauncher-macOS.dmg`. The app is not notarized: the first time, right-click it and choose Open.
    - **Linux:** `Skylauncher-x86_64.AppImage`, after `chmod +x`.
 2. Drop your `.iso` on the window, or click the button to choose it. The disc is checked.
-3. Click **INSTALL**. The game is built from your disc. It takes 5 to 15 minutes and happens once.
+3. Click **INSTALL**. The game is built from your disc. It takes about 10 minutes for Spyro's Adventure and 15 for
+   Giants, and happens once.
 4. Click **PLAY**.
 
 ## Controls
@@ -81,7 +82,8 @@ Portal of Power. Then click **Test the portal**.
 
 - **Resolution scale:** Auto picks x1 on integrated graphics and x2 on dedicated cards. If the game is slow, use x1.
 - **Frame rate:** 30 is the original. 60 is experimental.
-- The launcher and the game share one settings file, `launcher.ini`.
+- The launcher and the games share one settings file, `launcher.ini`.
+- **Language:** the launcher is available in English and French (Settings, Launcher tab).
 
 ## If something goes wrong
 
