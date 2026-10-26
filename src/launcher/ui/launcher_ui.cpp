@@ -40,24 +40,24 @@ namespace launcher_ui
         // The window's words that changed in the polish pass (the rest are still inline, for #4).
         namespace strings
         {
-            constexpr const char* ChooseDisc = "Choose disc";
-            constexpr const char* PlayWith = "PLAY WITH";
-            constexpr const char* DiscGone = "\"{}\" isn't there any more. Was it moved, renamed, or is its drive disconnected? Choose it again.";
-            constexpr const char* LauncherLanguageHint = "Skylauncher is in English for now; its translation is planned (#4). The game's own text "
-                                                         "and voice languages are in each game's settings.";
-            constexpr const char* DataFolderHint = "Settings, saves, figures, the games Skylauncher built and its logs. The same folder for both games.";
-            constexpr const char* GameSettings = "Game settings";
-            constexpr const char* ResetKeys = "Reset to defaults";
-            constexpr const char* ResetKeysHint = "Hold to put every key back to its default.";
-            constexpr const char* NoGamepad = "No gamepad connected.";
-            constexpr const char* OneGamepad = "1 gamepad connected.";
-            constexpr const char* Gamepads = "{} gamepads connected.";
-            constexpr const char* PortalTip = "Without a real portal the game uses the virtual portal (its Toy Box).\n"
-                                              "Settings > Controls > Test the portal checks that the game sees it.";
-            constexpr const char* QuitTitle = "The game is still installing";
-            constexpr const char* QuitText = "If you quit now, the install stops. It carries on from this step next time.";
-            constexpr const char* KeepInstalling = "Keep installing";
-            constexpr const char* Quit = "Quit";
+            constexpr const char* ChooseDisc = N_("Choose disc");
+            constexpr const char* PlayWith = N_("PLAY WITH");
+            constexpr const char* DiscGone = N_("\"{}\" isn't there any more. Was it moved, renamed, or is its drive disconnected? Choose it again.");
+            constexpr const char* LauncherLanguageHint = N_("The language of Skylauncher's own text. \"Same as the game\" follows the game's text language, "
+                                                         "which is set in that game's settings (Language tab).");
+            constexpr const char* DataFolderHint = N_("Settings, saves, figures, the games Skylauncher built and its logs. The same folder for both games.");
+            constexpr const char* GameSettings = N_("Game settings");
+            constexpr const char* ResetKeys = N_("Reset to defaults");
+            constexpr const char* ResetKeysHint = N_("Hold to put every key back to its default.");
+            constexpr const char* NoGamepad = N_("No gamepad connected.");
+            constexpr const char* OneGamepad = N_("1 gamepad connected.");
+            constexpr const char* Gamepads = N_("{} gamepads connected.");
+            constexpr const char* PortalTip = N_("Without a real portal the game uses the virtual portal (its Toy Box).\n"
+                                              "Settings > Controls > Test the portal checks that the game sees it.");
+            constexpr const char* QuitTitle = N_("The game is still installing");
+            constexpr const char* QuitText = N_("If you quit now, the install stops. It carries on from this step next time.");
+            constexpr const char* KeepInstalling = N_("Keep installing");
+            constexpr const char* Quit = N_("Quit");
         }
     }
 
@@ -151,7 +151,7 @@ namespace launcher_ui
         SDL_PropertiesID properties = SDL_CreateProperties();
         SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_FILTERS_POINTER, const_cast<SDL_DialogFileFilter*>(filters));
         SDL_SetNumberProperty(properties, SDL_PROP_FILE_DIALOG_NFILTERS_NUMBER, 1);
-        std::string title = std::string("Choose your ") + game.name + " disc image";
+        std::string title = Tf("Choose your {} disc image", game.name);
         SDL_SetStringProperty(properties, SDL_PROP_FILE_DIALOG_TITLE_STRING, title.c_str());
         SDL_SetPointerProperty(properties, SDL_PROP_FILE_DIALOG_WINDOW_POINTER, window);
         if (!previous.empty())
@@ -227,7 +227,7 @@ namespace launcher_ui
         Join();
         done = false;
         progress = 0;
-        { std::lock_guard lock(mutex); stage = "Opening the disc image"; check = {}; meta = {}; assets = {}; }
+        { std::lock_guard lock(mutex); stage = Tr("Opening the disc image"); check = {}; meta = {}; assets = {}; }
         thread = std::thread([this, image, &game] {
             auto report = [this](float fraction, std::string_view text) {
                 progress = fraction;
@@ -239,7 +239,7 @@ namespace launcher_ui
             LauncherAssets::Provider art;
             if (result.status == GameSourceStatus::Ok)
             {
-                report(0.96f, "Reading the title and icon");
+                report(0.96f, Tr("Reading the title and icon"));
                 DiscFileSystem disc;
                 if (disc.Open(image.c_str()))
                 {
@@ -247,7 +247,7 @@ namespace launcher_ui
                         metadata = ReadTitleMetadata(xex);
                     // The game's own art and its toys' portraits, decoded from the player's disc into the game's data
                     // folder (never shipped); a second time, only what is missing.
-                    report(0.98f, "Reading the game's pictures");
+                    report(0.98f, Tr("Reading the game's pictures"));
                     art.Init(game.id);
                     art.ExtractFromDisc(disc, metadata);
                 }
@@ -374,6 +374,7 @@ namespace launcher_ui
             m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
             m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
             m_testSidebar = SDL_getenv("SSA_LAUNCHER_TEST_SIDEBAR") != nullptr;
+            m_testCopy = SDL_getenv("SSA_LAUNCHER_TEST_COPY") != nullptr;
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
             m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
         }
@@ -416,8 +417,7 @@ namespace launcher_ui
         if (!m_s->started)
         {
             m_s->started = true;
-            if (std::string previous = SettingGet(m_config, game.id, "iso"); !previous.empty())
-                StartVerify(previous);
+            StartGameDisc();
         }
         m_s->saveBackupsLoaded = false;
         m_busyFrames = 2;
@@ -450,6 +450,8 @@ namespace launcher_ui
             SetActiveGame(m_s->game.id);
             if (m_s->disc == DiscState::Verifying && m_s->verify.done)
                 FinishVerify();
+            if (m_s->copyJob.Done())
+                FinishCopy();
             PollInstall();
         }
         m_s = shown;
@@ -496,10 +498,10 @@ namespace launcher_ui
             fprintf(stderr, "launcher: cannot open the window: %s\n", SDL_GetError());
             return {};
         }
-        if (std::string previous = SettingGet(m_config, m_s->game.id, "iso"); !previous.empty() && m_shots.empty())
+        if (m_shots.empty())
         {
             m_s->started = true;
-            StartVerify(previous);
+            StartGameDisc();
         }
         if (m_shots.empty() && SDL_getenv("SKYLAUNCHER_NO_UPDATE_CHECK") == nullptr)
         {
@@ -577,7 +579,7 @@ namespace launcher_ui
             float scale = std::clamp(std::round((m_uiScale + (bigger ? 0.25f : -0.25f)) * 4) / 4, MinUiScale, MaxUiScale);
             Set("launcher", "ui_scale", reset ? "auto" : fmt::format("{:g}", scale));
             UpdateUiScale(false);
-            Toast(reset ? "Zoom: automatic" : fmt::format("Zoom: {:g}%", m_uiScale * 100));
+            Toast(reset ? Tr("Zoom: automatic") : Tf("Zoom: {:g}%", m_uiScale * 100));
             return;
         }
         // ImGui works in the launcher's points: the window's coordinates divided by the UI scale.
@@ -616,7 +618,7 @@ namespace launcher_ui
                 (m_page == Page::Collection && std::filesystem::is_directory(event.drop.data))) && m_s->collection->Drop(event.drop.data))
                 m_page = Page::Collection;
             else if (event.drop.data != nullptr && Installing())
-                Toast("Wait for the installation to finish");
+                Toast(Tr("Wait for the installation to finish"));
             else if (event.drop.data != nullptr)
             {
                 m_page = Page::Play;
@@ -666,6 +668,8 @@ namespace launcher_ui
                 w = std::min(w, usable.w);
                 h = std::min(h, usable.h - 40);
             }
+            if (const char* size = SDL_getenv("SSA_LAUNCHER_TEST_SIZE")) // screenshot test: "1024x680", the smallest window
+                std::sscanf(size, "%dx%d", &w, &h);
             SDL_SetWindowSize(m_window, w, h);
             SDL_DisplayID display = SDL_GetDisplayForWindow(m_window);
             SDL_SetWindowPosition(m_window, SDL_WINDOWPOS_CENTERED_DISPLAY(display), SDL_WINDOWPOS_CENTERED_DISPLAY(display));
@@ -676,7 +680,7 @@ namespace launcher_ui
     {
         m_config[section][key] = value;
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast("Couldn't save the settings");
+            Toast(Tr("Couldn't save the settings"), true);
     }
 
     void App::StartVerify(const std::string& path)
@@ -684,8 +688,11 @@ namespace launcher_ui
         m_s->disc = DiscState::Verifying;
         m_s->discPath = path;
         m_s->discSize = 0;
+        m_s->fromCopy = m_s->copy.state == gamedata::State::Complete && path == datadir::Text(gamedata::Folder(m_s->game.id));
         SDL_PathInfo info;
-        if (SDL_GetPathInfo(path.c_str(), &info))
+        if (m_s->fromCopy)
+            m_s->discSize = m_s->copy.total;
+        else if (SDL_GetPathInfo(path.c_str(), &info))
             m_s->discSize = info.size;
         if (m_s->icon != nullptr)
             SDL_DestroyTexture(m_s->icon);
@@ -698,6 +705,20 @@ namespace launcher_ui
     {
         m_s->verify.Join();
         m_s->check = m_s->verify.check;
+        if (m_s->check.status != GameSourceStatus::Ok && m_s->fromCopy)
+        {
+            // The copy is not this game's disc, or can't be read: the disc image takes over, if the player has one.
+            m_s->copy.state = gamedata::State::Damaged;
+            m_s->copy.problem = m_s->check.message;
+            m_s->fromCopy = false;
+            if (std::string iso = SettingGet(m_config, m_s->game.id, "iso"); !iso.empty())
+            {
+                StartVerify(iso);
+                return;
+            }
+            m_s->disc = DiscState::Failed;
+            return;
+        }
         if (m_s->check.status != GameSourceStatus::Ok)
         {
             m_s->disc = DiscState::Failed;
@@ -711,7 +732,8 @@ namespace launcher_ui
         ForgetCachedArt(m_s->game.id);  // the sidebar's and Home's copies too
         if (LauncherAssets::Asset logo = m_s->assets.Get(LauncherAssets::Role::Logo); logo.valid)
             m_s->logo = LoadArt(m_renderer, logo.path, true);
-        Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
+        if (!m_s->fromCopy)
+            Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
         m_s->disc = DiscState::Ready;
         RefreshInstall();
     }
@@ -719,12 +741,34 @@ namespace launcher_ui
     // PLAY and INSTALL check the image first: it may have been moved, or its drive unplugged, since it was verified.
     bool App::DiscStillThere()
     {
+        if (m_s->fromCopy)
+        {
+            // The copy is looked at again (sizes only): it may have been damaged since. The disc image takes over then.
+            m_s->copy = gamedata::Inspect(gamedata::Folder(m_s->game.id));
+            if (m_s->copy.state == gamedata::State::Complete)
+                return true;
+            m_s->fromCopy = false;
+            m_s->installView = m_s->kitUsed = false;
+            m_page = Page::Play;
+            if (std::string iso = SettingGet(m_config, m_s->game.id, "iso"); !iso.empty())
+            {
+                Toast(Tr("The copied game data is damaged: checking the disc image instead"), true);
+                StartVerify(iso);
+            }
+            else
+            {
+                m_s->disc = DiscState::Failed;
+                m_s->check.status = GameSourceStatus::Damaged;
+                m_s->check.message = Tf("The copied game data is damaged: {}", m_s->copy.problem);
+            }
+            return false;
+        }
         SDL_PathInfo info;
         if (SDL_GetPathInfo(m_s->discPath.c_str(), &info) && info.type == SDL_PATHTYPE_FILE)
             return true;
         m_s->disc = DiscState::Failed;
         m_s->check.status = GameSourceStatus::NotFound;
-        m_s->check.message = fmt::format(fmt::runtime(strings::DiscGone), m_s->discPath);
+        m_s->check.message = Tf(strings::DiscGone, m_s->discPath);
         m_s->installView = m_s->kitUsed = false;
         m_page = Page::Play;
         return false;
@@ -736,7 +780,8 @@ namespace launcher_ui
             return;
         m_s->chosen = m_s->discPath;
         m_s->chosenRuntime = m_s->installed.runtime;
-        Set(m_s->game.id, "iso", m_s->chosen);
+        if (!m_s->fromCopy)
+            Set(m_s->game.id, "iso", m_s->chosen);
         m_running = false;
     }
 
@@ -750,7 +795,7 @@ namespace launcher_ui
         if (m_s->disc == DiscState::Ready && !NeedsInstall() && !Installing())
             PlayNow();
         else
-            Toast(m_s->disc == DiscState::Ready ? "The game isn't built yet: INSTALL it first" : "The game's disc image is needed first");
+            Toast(m_s->disc == DiscState::Ready ? Tr("The game isn't built yet: INSTALL it first") : Tr("The game's disc image is needed first"));
     }
 
     void App::Browse()
@@ -774,13 +819,13 @@ namespace launcher_ui
     // The device the game listens to: "auto", "keyboard" or "gamepad:<SDL GUID>" ([input] device= and gamepad=).
     std::vector<std::pair<std::string, std::string>> App::DeviceOptions() const
     {
-        std::vector<std::pair<std::string, std::string>> options = { { "auto", "Automatic (first gamepad, else keyboard)" }, { "keyboard", "Keyboard" } };
+        std::vector<std::pair<std::string, std::string>> options = { { "auto", Tr("Automatic (first gamepad, else keyboard)") }, { "keyboard", Tr("Keyboard") } };
         for (SDL_JoystickID id : m_gamepads)
         {
             char text[64];
             SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), text, sizeof(text));
             const char* name = SDL_GetGamepadNameForID(id);
-            options.emplace_back(std::string("gamepad:") + text, name != nullptr ? name : "Gamepad");
+            options.emplace_back(std::string("gamepad:") + text, name != nullptr ? name : Tr("Gamepad"));
         }
         return options;
     }
@@ -797,7 +842,7 @@ namespace launcher_ui
         for (const auto& [value, label] : DeviceOptions())
             if (value == current)
                 return label;
-        return current.starts_with("gamepad:") ? "Saved gamepad (not connected)" : "Automatic (first gamepad, else keyboard)";
+        return current.starts_with("gamepad:") ? Tr("Saved gamepad (not connected)") : Tr("Automatic (first gamepad, else keyboard)");
     }
 
     void App::SetDevice(const std::string& value)
@@ -902,11 +947,21 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(primary ? AccentInk : Text));
         if (bold)
             ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        bool pressed = ImGui::Button(label, ImVec2(width, 40));
+        bool pressed = ImGui::Button(label, ImVec2(PillWidth(label, width, bold), 40));
         if (bold)
             ImGui::PopFont();
         ImGui::PopStyleColor(4);
         return pressed;
+    }
+
+    float App::PillWidth(const char* label, float width, bool bold)
+    {
+        if (bold)
+            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
+        float need = ImGui::CalcTextSize(label, nullptr, true).x + 2 * ImGui::GetStyle().FramePadding.x + 16;
+        if (bold)
+            ImGui::PopFont();
+        return std::max(width, std::ceil(need));
     }
 
     bool App::Toggle(const char* id, bool* value)
@@ -937,7 +992,7 @@ namespace launcher_ui
 
     bool App::HoldButton(const char* label, float width, const char* hint)
     {
-        ImVec2 at = ImGui::GetCursorScreenPos(), size(width, 40);
+        ImVec2 at = ImGui::GetCursorScreenPos(), size(PillWidth(label, width, true), 40);
         ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
         // Held: pressed and, for the mouse, still under the pointer (leaving cancels). Space, Enter and the pad's A hold it too.
         bool mouse = ImGui::IsMouseDown(ImGuiMouseButton_Left);
@@ -1082,7 +1137,7 @@ namespace launcher_ui
             return SlotLine{ text, dot, progress, state, button, enabled };
         };
         if (slot == nullptr)
-            return line(S::Closed, "Open", Accent, strings::ChooseDisc);
+            return line(S::Closed, Tr("Open"), Accent, Tr(strings::ChooseDisc));
         const bool built = !slot->installed.runtime.empty();
         if (slot->installer.Running() || slot->kitDownload.Running())
         {
@@ -1091,41 +1146,47 @@ namespace launcher_ui
             bool kit = slot->kitDownload.Running();
             bool finishing = list.current >= 0 && list.rows[size_t(list.current)].id == "finish";
             S state = kit ? S::DownloadingTools : finishing ? S::Finishing : built ? S::Updating : S::Installing;
-            const char* verb = kit ? "Downloading tools" : finishing ? "Finishing" : built ? "Updating" : "Installing";
-            SlotLine result = line(state, "", Accent, built ? "UPDATING..." : "INSTALLING...", false, list.overall);
-            result.text = fmt::format("{} {} %", verb, int(std::floor(std::clamp(list.overall, 0.0f, 1.0f) * 100)));
+            const char* verb = Tr(kit ? N_("Downloading tools") : finishing ? N_("Finishing") : built ? N_("Updating") : N_("Installing"));
+            SlotLine result = line(state, "", Accent, built ? Tr("UPDATING...") : Tr("INSTALLING..."), false, list.overall);
+            result.text = Tf("{} {} %", verb, int(std::floor(std::clamp(list.overall, 0.0f, 1.0f) * 100)));
             return result;
         }
         if (slot->disc == DiscState::Verifying)
-            return line(S::Checking, "Checking your disc", Accent, "CHECKING...", false, -1);
+            return line(S::Checking, Tr("Checking your disc"), Accent, Tr("CHECKING..."), false, -1);
         if (slot->disc == DiscState::None)
-            return line(S::NoDisc, "Needs your disc", Accent, strings::ChooseDisc);
+        {
+            if (slot->copy.state == gamedata::State::Damaged)
+                return line(S::DataDamaged, Tr("Game data damaged"), Danger, Tr(strings::ChooseDisc));
+            return line(S::NoDisc, Tr("Needs your disc"), Accent, Tr(strings::ChooseDisc));
+        }
         if (slot->disc == DiscState::Failed)
         {
+            if (slot->copy.state == gamedata::State::Damaged && slot->discPath == datadir::Text(gamedata::Folder(slot->game.id)))
+                return line(S::DataDamaged, Tr("Game data damaged"), Danger, Tr(strings::ChooseDisc));
             switch (slot->check.status)
             {
-            case GameSourceStatus::NotFound: return line(S::DiscGone, "Disc not found", Danger, strings::ChooseDisc);
-            case GameSourceStatus::Unreadable: return line(S::DiscUnreadable, "Can't read the disc", Danger, strings::ChooseDisc);
-            case GameSourceStatus::WrongGame: return line(S::DiscWrong, "Wrong disc", Danger, strings::ChooseDisc);
-            case GameSourceStatus::WrongVersion: return line(S::DiscUnknown, "Unknown release", Danger, strings::ChooseDisc);
-            default: return line(S::DiscNotGame, "Not a game disc", Danger, strings::ChooseDisc);
+            case GameSourceStatus::NotFound: return line(S::DiscGone, Tr("Disc not found"), Danger, Tr(strings::ChooseDisc));
+            case GameSourceStatus::Unreadable: return line(S::DiscUnreadable, Tr("Can't read the disc"), Danger, Tr(strings::ChooseDisc));
+            case GameSourceStatus::WrongGame: return line(S::DiscWrong, Tr("Wrong disc"), Danger, Tr(strings::ChooseDisc));
+            case GameSourceStatus::WrongVersion: return line(S::DiscUnknown, Tr("Unknown release"), Danger, Tr(strings::ChooseDisc));
+            default: return line(S::DiscNotGame, Tr("Not a game disc"), Danger, Tr(strings::ChooseDisc));
             }
         }
         // A verified disc. The page's button is INSTALL until the game is built, PLAY after.
-        const char* button = NeedsInstall(*slot) ? "INSTALL" : "PLAY";
+        const char* button = NeedsInstall(*slot) ? Tr("INSTALL") : Tr("PLAY");
         if (slot->installView)
         {
             InstallProgress::State state = InstallSnapshot(*slot).state;
             if (state == InstallProgress::State::Failed)
-                return line(S::Failed, built ? "Update failed" : "Install failed", Danger, button);
+                return line(S::Failed, built ? Tr("Update failed") : Tr("Install failed"), Danger, button);
             if (state == InstallProgress::State::Interrupted)
-                return line(S::Interrupted, "Interrupted", Accent, button);
+                return line(S::Interrupted, Tr("Interrupted"), Accent, button);
         }
         if (NeedsInstall(*slot))
-            return line(S::ReadyToInstall, "Ready to install", Accent, button);
+            return line(S::ReadyToInstall, Tr("Ready to install"), Accent, button);
         if (UpdateAvailable(*slot))
-            return line(S::UpdateAvailable, "Update available", Accent, button);
-        return line(S::Ready, "Ready to play", Ready, button);
+            return line(S::UpdateAvailable, Tr("Update available"), Accent, button);
+        return line(S::Ready, Tr("Ready to play"), Ready, button);
     }
 
     void App::DrawSidebar()
@@ -1178,11 +1239,11 @@ namespace launcher_ui
             ImGui::PopFont();
         }
         ImGui::PushFont(nullptr, SidebarSmallSize);
-        ImGui::TextColored(ImColor(Rgb(TextDim)), "Native PC ports");
+        ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Native PC ports"));
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 16));
         ImGui::PushFont(nullptr, CaptionSize + 1);
-        BoldText("YOUR GAMES", TextDim);
+        BoldText(Tr("YOUR GAMES"), TextDim);
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 2));
 
@@ -1234,7 +1295,7 @@ namespace launcher_ui
             draw->AddText(ImVec2(nameX, position.y + 9), Rgb(entry.enabled ? SidebarInk : TextDim), entry.name);
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SidebarSmallSize - 2);
-            SlotLine line = entry.enabled ? SlotStatus(slot) : SlotLine{ "Coming later", Accent };
+            SlotLine line = entry.enabled ? SlotStatus(slot) : SlotLine{ Tr("Coming later"), Accent };
             float statusX = nameX, statusY = position.y + 32;
             if (entry.enabled)
             {
@@ -1285,8 +1346,9 @@ namespace launcher_ui
                 draw->AddRect(ImVec2(card.x - 7, card.y - 10), ImVec2(card.x + 7, card.y + 10), Rgb(Sidebar), 3, 0, 1.5f);
             }
             ImGui::PushFont(m_titleFont, 19);
-            ImVec2 label = ImGui::CalcTextSize("COLLECTION");
-            draw->AddText(ImVec2(at.x + GameTextX, center.y - label.y / 2), Rgb(SidebarInk), "COLLECTION");
+            const char* name = Tr("COLLECTION");
+            ImVec2 label = ImGui::CalcTextSize(name);
+            draw->AddText(ImVec2(at.x + GameTextX, center.y - label.y / 2), Rgb(SidebarInk), name);
             ImGui::PopFont();
         }
         bool open = m_page == Page::Settings;
@@ -1299,8 +1361,9 @@ namespace launcher_ui
         draw->AddCircleFilled(center, GearButton / 2, Rgb(SidebarInk), 32);
         DrawGear(draw, center, GearButton * 0.32f, Rgb(Sidebar), Rgb(SidebarInk));
         ImGui::PushFont(m_titleFont, 19);
-        ImVec2 label = ImGui::CalcTextSize("SETTINGS");
-        draw->AddText(ImVec2(at.x + GameTextX, center.y - label.y / 2), Rgb(SidebarInk), "SETTINGS");
+        const char* name = Tr("SETTINGS");
+        ImVec2 label = ImGui::CalcTextSize(name);
+        draw->AddText(ImVec2(at.x + GameTextX, center.y - label.y / 2), Rgb(SidebarInk), name);
         ImGui::PopFont();
 
         ImGui::End();
@@ -1319,9 +1382,9 @@ namespace launcher_ui
         ImVec2 origin = ImGui::GetCursorScreenPos();
         float width = ImGui::GetContentRegionAvail().x;
 
-        Title("LIBRARY", HeadlineSize, Text);
+        Title(Tr("LIBRARY"), HeadlineSize, Text);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted("Each game's art comes from your own disc, once it has been checked.");
+        ImGui::TextUnformatted(Tr("Each game's art comes from your own disc, once it has been checked."));
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 10));
 
@@ -1400,7 +1463,7 @@ namespace launcher_ui
 
         // The games still to come: their names, in their colours, quietly.
         ImGui::PushFont(nullptr, CaptionSize + 1);
-        BoldText("COMING LATER", TextDim);
+        BoldText(Tr("COMING LATER"), TextDim);
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
         ImVec2 chip = ImGui::GetCursorScreenPos();
@@ -1421,10 +1484,10 @@ namespace launcher_ui
 
         ImVec2 iconAt(size.x - Pad - Icon, size.y - Pad - Icon);
         ImGui::SetCursorScreenPos(ImVec2(iconAt.x - 14 - ReportW, iconAt.y));
-        if (PillButton("Report a bug", false, ReportW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+        if (PillButton(Tr("Report a bug"), false, ReportW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
             SDL_OpenURL((std::string(Project) + "/issues/new").c_str());
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Opens a new issue on GitHub");
+            ImGui::SetTooltip("%s", Tr("Opens a new issue on GitHub"));
 
         ImGui::SetCursorScreenPos(iconAt);
         if (ImGui::InvisibleButton("##github", ImVec2(Icon, Icon), ImGuiButtonFlags_EnableNav))
@@ -1434,7 +1497,7 @@ namespace launcher_ui
         if (hovered)
         {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("Skylauncher on GitHub");
+            ImGui::SetTooltip("%s", Tr("Skylauncher on GitHub"));
         }
         if (m_github != nullptr)
             ImGui::GetWindowDrawList()->AddImage(Ref(m_github), iconAt, ImVec2(iconAt.x + Icon, iconAt.y + Icon), ImVec2(0, 0), ImVec2(1, 1),
@@ -1486,44 +1549,52 @@ namespace launcher_ui
         {
             ImGui::BeginGroup();
             // The file name on top, then "DISC IMAGE:" and the status on the line below.
-            std::string file = m_s->discPath.empty() ? "No disc image yet" : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
+            std::string file = m_s->fromCopy ? Tr("Copied game data")
+                : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
             ImGui::PushFont(nullptr, TitleSize);
             BoldText(file.c_str(), Text);
             ImGui::PopFont();
             if (!m_s->discPath.empty() && ImGui::IsItemHovered())
                 ImGui::SetTooltip("%s", m_s->discPath.c_str());
-            BoldText("DISC IMAGE:", TextDim);
+            BoldText(m_s->fromCopy ? Tr("GAME DATA:") : Tr("DISC IMAGE:"), TextDim);
             ImGui::SameLine(0, 6);
             switch (m_s->disc)
             {
             case DiscState::None:
-                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Drop your disc image (.iso) here, or choose it below.");
+                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop your disc image (.iso) here, or choose it below."));
                 break;
             case DiscState::Verifying:
                 ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_s->verify.Stage().c_str());
                 ImGui::ProgressBar(m_s->verify.progress, ImVec2(360, 8), "");
                 break;
             case DiscState::Ready:
-                ImGui::TextColored(ImColor(Rgb(Ready)), "Disc verified: %s", LauncherFormatSize(m_s->discSize).c_str());
+                ImGui::TextColored(ImColor(Rgb(Ready)), "%s", (m_s->fromCopy ? Tf("Game data copied: {}", LauncherFormatSize(m_s->discSize))
+                                                                 : Tf("Disc verified: {}", LauncherFormatSize(m_s->discSize))).c_str());
+                if (!m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
+                {
+                    ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
+                    ImGui::TextWrapped("%s", Tr("The copied game data is damaged, so the disc image is used. Repair or remove the copy in the game's settings."));
+                    ImGui::PopStyleColor();
+                }
                 if (NeedsInstall())
                 {
                     ImGui::PushTextWrapPos(available.x - 40); // window coordinates
                     ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-                    ImGui::TextWrapped("Install builds the game on your PC from your disc: about %d minutes and %d GB, internet needed "
-                        "once for the compiler.", InstallMinutesFor(m_s->game.id), InstallGigabytes);
+                    ImGui::TextWrapped("%s", Tf("Install builds the game on your PC from your disc: about {} minutes and {} GB, internet needed "
+                        "once for the compiler.", InstallMinutesFor(m_s->game.id), InstallGigabytes).c_str());
                     ImGui::PopStyleColor();
                     ImGui::PopTextWrapPos();
                 }
                 else if (UpdateAvailable())
                 {
-                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "A new version of the game is ready to build.");
+                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("A new version of the game is ready to build."));
                     ImGui::SameLine(0, 10);
                     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 2));
                     ImGui::PushStyleColor(ImGuiCol_Button, Rgb(Accent));
                     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(AccentHover));
                     ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(AccentDark));
                     ImGui::PushStyleColor(ImGuiCol_Text, Rgb(AccentInk));
-                    if (ImGui::Button("Update the game"))
+                    if (ImGui::Button(Tr("Update the game")))
                         StartInstall();
                     ImGui::PopStyleColor(4);
                     ImGui::PopStyleVar();
@@ -1535,6 +1606,12 @@ namespace launcher_ui
                 ImGui::TextWrapped("%s", m_s->check.message.c_str());
                 ImGui::PopTextWrapPos();
                 ImGui::PopStyleColor();
+                // The other supported game's disc: one button to use it there.
+                if (const GameInfo* other = FindGame(m_s->check.otherGame); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
+                {
+                    if (PillButton(Tf("Use it for {}", other->name).c_str(), true, 0, true))
+                        UseDiscForOtherGame();
+                }
                 break;
         }
         ImGui::EndGroup();
@@ -1598,15 +1675,15 @@ namespace launcher_ui
         float controllerMid = controllerAt.y + controllerSize.y / 2;
         DrawGamepad(draw, ImVec2(controllerAt.x + 34, controllerMid), 38, Rgb(BottomBarInk), Rgb(pickerHovered || pickerOpen ? BottomBarRaisedHover : BottomBarRaised));
         std::string device = CurrentDevice();
-        std::string deviceName = device == "auto" ? "Automatic" : device == "keyboard" ? "Keyboard" : LauncherMiddleEllipsis(DeviceLabel(), 13);
+        std::string deviceName = device == "auto" ? Tr("Automatic") : device == "keyboard" ? Tr("Keyboard") : LauncherMiddleEllipsis(DeviceLabel(), 13);
         ImGui::PushFont(nullptr, SmallSize);
-        AddBoldText(draw, ImVec2(controllerAt.x + 64, controllerMid - 20), Rgb(BottomBarInk), "CONTROLLER");
+        AddBoldText(draw, ImVec2(controllerAt.x + 64, controllerMid - 20), Rgb(BottomBarInk), Tr("CONTROLLER"));
         ImGui::PopFont();
         AddBoldText(draw, ImVec2(controllerAt.x + 64, controllerMid - 1), Rgb(BottomBarInk), deviceName.c_str(), BolderPasses);
         ImVec2 chevron(controllerEnd.x - 20, controllerMid);
         draw->AddTriangleFilled(ImVec2(chevron.x - 6, chevron.y + 3), ImVec2(chevron.x + 6, chevron.y + 3), ImVec2(chevron.x, chevron.y - 4), Rgb(SidebarInk));
         if (pickerHovered && !pickerOpen)
-            ImGui::SetTooltip("Controller: %s", DeviceLabel().c_str());
+            ImGui::SetTooltip("%s", Tf("Controller: {}", DeviceLabel()).c_str());
 
         // PLAY WITH, above the picker: rows of one height, the radio and its label centred on the row, the heading on the
         // labels' column; an opaque surface with a border over the art behind it.
@@ -1621,13 +1698,13 @@ namespace launcher_ui
         {
             constexpr float RowH = 38, Dot = 6, DotX = 12 + Dot, LabelX = DotX + Dot + 12;
             std::vector<std::pair<std::string, std::string>> options = DeviceOptions();
-            float labelsW = ImGui::CalcTextSize(strings::PlayWith).x;
+            float labelsW = ImGui::CalcTextSize(Tr(strings::PlayWith)).x;
             for (const auto& [value, name] : options)
                 labelsW = std::max(labelsW, ImGui::CalcTextSize(name.c_str()).x);
             float rowW = std::max(ControllerW - 12, LabelX + labelsW + 16);
             ImGui::PushFont(nullptr, SmallSize);
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + LabelX);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", strings::PlayWith);
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr(strings::PlayWith));
             ImGui::PopFont();
             ImGui::Dummy(ImVec2(0, 2));
             ImDrawList* popup = ImGui::GetWindowDrawList();
@@ -1664,12 +1741,12 @@ namespace launcher_ui
 
         // "Change disc...", at the right of the disc's lines once a disc is verified; styled like the controller picker.
         // The game's other settings (video, languages, saves, data) are behind the gear next to the main button.
-        if (ready && !installing && !m_s->installView)
+        if (ready && !installing && !m_s->installView && !m_s->fromCopy) // the copy replaces the disc image
         {
             constexpr float ChangeDiscW = 160;
             ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
-            if (PillButton("Change disc...", false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+            if (PillButton(Tr("Change disc..."), false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
                 Browse();
             ImGui::PopStyleVar();
         }
@@ -1682,13 +1759,13 @@ namespace launcher_ui
             return;
         ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", line.c_str());
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", strings::PortalTip);
+            ImGui::SetTooltip("%s", Tr(strings::PortalTip));
     }
 
     void App::DrawControls()
     {
         std::string current = CurrentDevice();
-        Title("Controller", TitleSize, Text);
+        Title(Tr("Controller"), TitleSize, Text);
         ImGui::SetNextItemWidth(440);
         if (ImGui::BeginCombo("##device", DeviceLabel().c_str()))
         {
@@ -1699,43 +1776,43 @@ namespace launcher_ui
         }
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
         size_t gamepads = m_gamepads.size();
-        std::string connected = gamepads == 0 ? strings::NoGamepad : gamepads == 1 ? strings::OneGamepad : fmt::format(fmt::runtime(strings::Gamepads), gamepads);
-        ImGui::Text("%s Xbox, PlayStation, Switch and most other controllers work.", connected.c_str());
+        std::string connected = gamepads == 0 ? Tr(strings::NoGamepad) : gamepads == 1 ? Tr(strings::OneGamepad) : Tf(strings::Gamepads, gamepads);
+        ImGui::Text("%s", Tf("{} Xbox, PlayStation, Switch and most other controllers work.", connected).c_str());
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 12));
 
-        Title("Portal of Power", TitleSize, Text);
+        Title(Tr("Portal of Power"), TitleSize, Text);
         Combo("##portal", "portal", "mode", PortalChoices, 0, 440);
         bool autoOpen = ParseBool(SettingGet(m_config, "portal", "toybox_auto_open", "1"));
         if (Toggle("##toyboxautoopen", &autoOpen))
             Set("portal", "toybox_auto_open", autoOpen ? "1" : "0");
         ImGui::SameLine(0, 14);
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Open the Toy Box when the game asks for a figure");
+        ImGui::TextUnformatted(Tr("Open the Toy Box when the game asks for a figure"));
         DrawPortalTest();
         ImGui::Dummy(ImVec2(0, 12));
 
-        Title("Button glyphs", TitleSize, Text);
+        Title(Tr("Button glyphs"), TitleSize, Text);
         Combo("##glyphs", "input", "glyphs", GlyphChoices, 0, 440);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted("The button pictures the game shows in its menus and prompts.");
+        ImGui::TextUnformatted(Tr("The button pictures the game shows in its menus and prompts."));
         ImGui::PopStyleColor();
         ImGui::Dummy(ImVec2(0, 12));
 
         // Keyboard bindings, two columns of actions.
-        Title("Keyboard", TitleSize, Text);
+        Title(Tr("Keyboard"), TitleSize, Text);
         ImGui::SameLine(0, 24);
-        if (HoldButton(strings::ResetKeys, 200, strings::ResetKeysHint))
+        if (HoldButton(Tr(strings::ResetKeys), 200, Tr(strings::ResetKeysHint)))
         {
             for (const KeyAction& action : KeyActions)
                 m_config["input"].erase(std::string("key_") + action.id);
             Set("input", "device", SettingGet(m_config, "input", "device", "auto"));
-            Toast("Keyboard bindings reset");
+            Toast(Tr("Keyboard bindings reset"));
         }
         if (m_capturing != nullptr)
-            ImGui::TextColored(ImColor(Rgb(Accent)), "Press a key for \"%s\" (Escape cancels)", m_capturing->label);
+            ImGui::TextColored(ImColor(Rgb(Accent)), "%s", Tf("Press a key for \"{}\" (Escape cancels)", Tr(m_capturing->label)).c_str());
         else
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "Click a key to change it.");
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Click a key to change it."));
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
         if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingFixedFit))
         {
@@ -1750,7 +1827,7 @@ namespace launcher_ui
                     ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(action.label);
+                ImGui::TextUnformatted(Tr(action.label));
                 ImGui::TableNextColumn();
                 std::string key = SettingGet(m_config, "input", std::string("key_") + action.id, SDL_GetKeyName(action.fallback));
                 bool duplicate = false;
@@ -1764,14 +1841,14 @@ namespace launcher_ui
                     m_capturing = &action;
                 ImGui::PopStyleColor(2);
                 if (duplicate && ImGui::IsItemHovered())
-                    ImGui::SetTooltip("This key is used by another action");
+                    ImGui::SetTooltip("%s", Tr("This key is used by another action"));
                 ImGui::PopID();
             }
             ImGui::EndTable();
         }
         ImGui::PopStyleVar();
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted("F6/Tab opens the Toy Box, F7 places the next figure, F8 removes them all.");
+        ImGui::TextUnformatted(Tr("F6/Tab opens the Toy Box, F7 places the next figure, F8 removes them all."));
         ImGui::PopStyleColor();
     }
 
@@ -1793,7 +1870,7 @@ namespace launcher_ui
         ImGui::PushFont(nullptr, SidebarTextSize);
         for (int i = 0; i < count; i++)
         {
-            const char* label = labels[i];
+            const char* label = Tr(labels[i]);
             bool active = *current == i;
             ImVec2 at = ImGui::GetCursorScreenPos(), text = ImGui::CalcTextSize(label);
             ImVec2 size(text.x + BoldOffset, text.y + 10 + TabUnderlineH);
@@ -1838,11 +1915,11 @@ namespace launcher_ui
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
         ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
 
-        static const char* const Tabs[] = { "Controls", "Launcher", "Support", "About" };
-        Title("LAUNCHER SETTINGS", HeadlineSize, Text);
+        static const char* const Tabs[] = { N_("Controls"), N_("Launcher"), N_("Support"), N_("About") };
+        Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted("For Skylauncher and what both games share. Each game has its own settings on its page.");
+        ImGui::TextUnformatted(Tr("For Skylauncher and what both games share. Each game has its own settings on its page."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
@@ -1863,23 +1940,14 @@ namespace launcher_ui
 
     void App::DrawLauncherTab()
     {
-        // The launcher's own language: the slot for #4 (translating Skylauncher). Until then it is English only.
-        Title("Language", TitleSize, Text);
-        ImGui::BeginDisabled();
-        ImGui::SetNextItemWidth(440);
-        if (ImGui::BeginCombo("##launcherlanguage", "English"))
-            ImGui::EndCombo();
-        ImGui::EndDisabled();
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextWrapped("%s", strings::LauncherLanguageHint);
-        ImGui::PopStyleColor();
+        DrawLauncherLanguage();
         ImGui::Dummy(ImVec2(0, 16));
-        Title("Updates", TitleSize, Text);
+        Title(Tr("Updates"), TitleSize, Text);
         DrawUpdates();
         ImGui::Dummy(ImVec2(0, 16));
-        Title("Data folder", TitleSize, Text);
+        Title(Tr("Data folder"), TitleSize, Text);
         ImGui::TextWrapped("%s", datadir::Text(LauncherDataFolder()).c_str());
-        if (PillButton("Open data folder", false, 260))
+        if (PillButton(Tr("Open data folder"), false, 260))
         {
             std::error_code error;
             std::filesystem::create_directories(LauncherDataFolder(), error);
@@ -1887,14 +1955,69 @@ namespace launcher_ui
         }
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", strings::DataFolderHint);
+        ImGui::TextWrapped("%s", Tr(strings::DataFolderHint));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
 
+    namespace
+    {
+        // The system's languages as the launcher's codes, most wanted first ("nb" and "nn" are the disc's "no").
+        std::vector<std::string> SystemLanguages()
+        {
+            std::vector<std::string> codes;
+            int count = 0;
+            if (SDL_Locale** locales = SDL_GetPreferredLocales(&count))
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    std::string code = locales[i]->language != nullptr ? locales[i]->language : "";
+                    codes.push_back(code == "nb" || code == "nn" ? "no" : code);
+                }
+                SDL_free(locales);
+            }
+            return codes;
+        }
+    }
+
+    // The language of the launcher's text: SKYLAUNCHER_LANGUAGE (tests, screenshots), else [launcher] language: "game" follows
+    // the shown game's text language, a code is that language, and nothing (the default) is the system's.
+    void App::UpdateLanguage()
+    {
+        static const std::vector<std::string> system = SystemLanguages();
+        const char* forced = SDL_getenv("SKYLAUNCHER_LANGUAGE");
+        std::string setting = forced != nullptr && *forced != 0 ? forced : SettingGet(m_config, "launcher", "language");
+        std::string gameLanguage = SettingGet(m_config, m_s->game.id, "language");
+        i18n::SetLanguage(i18n::Resolve(setting, gameLanguage.empty() ? "en" : gameLanguage, system));
+    }
+
+    void App::DrawLauncherLanguage()
+    {
+        Title(Tr("Language"), TitleSize, Text);
+        const std::string setting = SettingGet(m_config, "launcher", "language");
+        const bool follows = setting == "game";
+        std::string shown = follows ? std::string(Tr("Same as the game")) : i18n::Current();
+        for (const i18n::Language& language : i18n::Languages())
+            if (!follows && language.code == i18n::Current())
+                shown = language.name;
+        ImGui::SetNextItemWidth(440);
+        if (ImGui::BeginCombo("##launcherlanguage", shown.c_str()))
+        {
+            if (ImGui::Selectable(Tr("Same as the game"), follows))
+                Set("launcher", "language", "game");
+            for (const i18n::Language& language : i18n::Languages())
+                if (ImGui::Selectable(language.name.c_str(), !follows && language.code == i18n::Current()))
+                    Set("launcher", "language", language.code);
+            ImGui::EndCombo();
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
+        ImGui::TextWrapped("%s", Tr(strings::LauncherLanguageHint));
+        ImGui::PopStyleColor();
+    }
+
     void App::DrawSupport()
     {
-        Title("Support", TitleSize, Text);
+        Title(Tr("Support"), TitleSize, Text);
         DrawLogs();
     }
 
@@ -2021,16 +2144,16 @@ namespace launcher_ui
         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, RadiusLarge);
         if (ImGui::BeginPopupModal("##quit", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
         {
-            Title(strings::QuitTitle, TitleSize, Text);
+            Title(Tr(strings::QuitTitle), TitleSize, Text);
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-            ImGui::TextWrapped("%s", strings::QuitText);
+            ImGui::TextWrapped("%s", Tr(strings::QuitText));
             ImGui::PopStyleColor();
             ImGui::Dummy(ImVec2(0, 8));
-            bool keep = PillButton(strings::KeepInstalling, true, 200, true);
+            bool keep = PillButton(Tr(strings::KeepInstalling), true, 200, true);
             if (ImGui::IsWindowAppearing())
                 ImGui::SetItemDefaultFocus();
             ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
-            bool quit = PillButton(strings::Quit, false, 120, true);
+            bool quit = PillButton(Tr(strings::Quit), false, 120, true);
             if (keep || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
                 m_quitPrompt = false;
@@ -2046,6 +2169,7 @@ namespace launcher_ui
 
     void App::Frame()
     {
+        UpdateLanguage();
         ImGui_ImplSDLRenderer3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         // The launcher's points are m_uiScale window units: a smaller page, drawn (and its fonts rasterized) denser.
@@ -2110,7 +2234,7 @@ namespace launcher_ui
             static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-search",
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
-            if (m_testButtons || m_testSidebar)
+            if (m_testButtons || m_testSidebar || m_testCopy)
                 Screenshot(m_testShot.c_str());
             else if (m_testNav)
                 Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
@@ -2329,10 +2453,10 @@ namespace launcher_ui
                 expect(m_drawn["home:ssa"] == StateCases[Cases - 1].text, "Home's card says the same");
                 a.verify.done = true;
                 m_page = Page::Play;
-                Toast("Game installed: press PLAY");
-                Toast("Log copied");
-                Toast("Couldn't save the settings");
-                Toast("Saves restored from 2026-10-26 09:30");
+                Toast(Tr("Game installed: press PLAY"));
+                Toast(Tr("Log copied"));
+                Toast(Tr("Couldn't save the settings"), true);
+                Toast(Tf("Saves restored from {}", "2026-10-26 09:30"));
                 shoot("toasts-stacked", 400);
                 break;
             }
@@ -2717,6 +2841,11 @@ namespace launcher_ui
             TestSwitchScript(now);
             return;
         }
+        if (m_testCopy)
+        {
+            TestCopyScript(now);
+            return;
+        }
         if (m_testSeatX)
         {
             TestSeatXScript(now);
@@ -2929,12 +3058,12 @@ std::string LauncherFormatSize(uint64_t bytes)
 {
     constexpr double KB = 1024, MB = KB * 1024, GB = MB * 1024;
     if (bytes >= uint64_t(GB))
-        return fmt::format("{:.1f} GB", double(bytes) / GB);
+        return Tf("{:.1f} GB", double(bytes) / GB);
     if (bytes >= uint64_t(MB))
-        return fmt::format("{:.0f} MB", double(bytes) / MB);
+        return Tf("{:.0f} MB", double(bytes) / MB);
     if (bytes >= uint64_t(KB))
-        return fmt::format("{:.0f} KB", double(bytes) / KB);
-    return fmt::format("{} bytes", bytes);
+        return Tf("{:.0f} KB", double(bytes) / KB);
+    return Tf("{} bytes", bytes);
 }
 
 std::string LauncherMiddleEllipsis(std::string_view text, size_t max)

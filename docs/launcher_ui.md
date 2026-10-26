@@ -36,9 +36,8 @@ is easy to iterate without touching the game runtime.
 
 ## Layout
 The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
-GitHub issue) and the GitHub link bottom right. The top right is kept for the launcher's own language (#4): its slot is
-Settings > Launcher > Language (English only, disabled, for now); the game's text and voice languages are in that game's
-settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
+GitHub issue) and the GitHub link bottom right. The launcher's own language is in Settings > Launcher > Language
+(`docs/translations.md`); the game's text and voice languages are in that game's settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
    SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
    and its live state ("Open" until the game is first shown, then the states in "A game's states"); the
@@ -74,8 +73,8 @@ Controls tab moves to the game pages the way Video did (`GameVideoKeys` shows ho
 The launcher opens on **Home**, the menu page (the SKYLAUNCHER title goes back to it): the **library**, a card per
 playable game (its painting from the disc behind its logo, its name and state; the game's colours before its disc was
 ever read), then the games **coming later** as quiet chips in their colours; "Report a bug" (a new GitHub issue) and the
-GitHub link bottom right. A card opens its game's page. The top right is kept for the launcher's own language (#4): the
-game's text and voice languages are in Settings > Language ("Game text", "Game voices"). The game shown last is selected
+GitHub link bottom right. A card opens its game's page. The launcher's own language is in Settings > Launcher > Language
+(`docs/translations.md`); the game's text and voice languages are in that game's settings ("Game text", "Game voices"). The game shown last is selected
 in the sidebar (`[launcher] game=`); the other is one click away.
 1. **Left sidebar** (grey, fixed width).
    - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.3.1`, from
@@ -126,12 +125,13 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 | a folder, not an Xbox 360 game, damaged | Not a game disc | red | CHOOSE DISC |
 | the last install failed (no build); the last update failed (a build) | Install failed; Update failed | red | INSTALL; PLAY |
 | the install was interrupted | Interrupted | blue | INSTALL, or PLAY if built |
+| the copied game data is damaged, and no disc image to fall back on | Game data damaged | red | CHOOSE DISC |
 | a verified disc, no build yet | Ready to install | blue | INSTALL |
 | the kit moved on since the build | Update available | blue | PLAY |
 | verified disc and built (or an own runtime) | Ready to play | green | PLAY |
 
-"Ready to play" needs both the build and the verified disc: with no disc or a refused one the game says what the disc
-needs, even if it was built (the game reads the disc image while it runs). The Play page's disc line says more
+"Ready to play" needs both the build and a verified source: the disc image, **or the copied game data** ("Game data" below).
+With no source or a refused one the game says what it needs, even if it was built (the game reads the disc image while it runs). The Play page's disc line says more
 ("Disc verified: 8.1 GB", the refusal's reason, "Drop your disc image here..."), the install card is shown while
 `installView`, and the game settings' Disc tab shows the same `DiscState`. The window has one fixed title.
 
@@ -142,6 +142,41 @@ space, so nothing moves when the line changes. "Playing" is never shown: PLAY cl
 `SSA_LAUNCHER_TEST_SIDEBAR=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit and both games' `iso=`;
 `FAKE_SSABUILD_HOLD` keeps the build at 100 %) shoots and checks the line through an install and an update at 0, 50 and 100 %,
 with the other game shown meanwhile, then a failed build: `SkylauncherTest` runs it (`SidebarChecks`).
+
+## Game data (copy the disc's files, no disc image afterwards)
+Game settings > Disc has two sections: **Disc image** (choose, change, remove, show in folder) and **Game data**, which copies the
+disc's files (about the image's size, 8 GB) into `<data>/<Game>/gamedata/` so the disc image is no longer needed. The default is
+unchanged: nothing is copied and the game reads the disc image. The files, the manifest and the checks are SSARecomp's
+`game_data.{h,cpp}` (`docs/runtime/host/game_data.md` there); the job and the choice of source are `src/launcher/game_copy.{h,cpp}`;
+the window is `ui/game_data_page.cpp` (+ `game_settings_page.cpp` for the tab). What the player sees, by the copy's state:
+
+| Copy | Game data section | The game |
+|---|---|---|
+| none | **Copy the game data** (needs a verified disc image and no install running), how much room it takes | plays from the disc image |
+| running | a bar "Copying the game data: 3.2 GB of 8.1 GB", **Stop**; the disc image's buttons are off | plays from the disc image (a copy is never read before it is complete) |
+| stopped, failed or the launcher quit | "Interrupted: 3.2 GB of 8.1 GB copied", **Carry on copying**, **Remove the partial copy** | from the disc image; carrying on reads only the missing files |
+| complete | "Copied: 8.1 GB, 1142 files", **Remove the copy** (held), Show in folder | **from the copy**: the Play page says "GAME DATA: Game data copied: 8.1 GB", the Disc image section says it is not needed, "Change disc..." is hidden, the state is "Ready to play" (or "Ready to install") **with no disc image at all** |
+| damaged (a file is missing or changed since) | the first problem, **Repair the copy** (copies again, only what is wrong), **Remove the copy** | **falls back to the disc image** (the Play page says the copy is damaged); with no disc image the state is "Game data damaged" |
+
+- The copy is made on a worker thread, file by file: each file is written to `.part`, read back and compared with the disc, then renamed. The
+  room is checked first ("Not enough space: the copy needs 8.1 GB and this drive has 3.1 GB free.": nothing is written). It resumes
+  after a stop, a failure or a quit. When it ends the game is checked again, from the copy.
+- **At start** (`App::StartGameDisc`, `PickGameSource`): a complete copy is verified (`CheckGameSource` takes the folder: its `default.xex` must be a
+  known release) and used; else the remembered image. The remembered image (`[<game>] iso=`) is never forgotten for a copy: removing the copy
+  brings it back. A copy whose `default.xex` is refused counts as damaged. PLAY and INSTALL look at the copy again first (sizes only) and
+  fall back to the disc image if it changed. PLAY passes the copy's folder to the game, which reads it too if it is given an image
+  (`host/launcher.cpp`, `CopiedGameData`). INSTALL gives it to SSABuild as `--iso`.
+- **Uninstall keeps the copy** (like the disc image); only "Remove the copy" deletes it. Delete saves and data and Clear caches never touch it.
+- `SSA_LAUNCHER_TEST_COPY=1` (with `SSA_LAUNCHER_SHOTS`, the fake kit, `[giants] iso=` set to a stand-in SSA disc) drives all of it in an offscreen window
+  (`App::TestCopyScript`, run by `SkylauncherTest`): the wrong disc, not enough space, interrupted and carried on, played with no disc
+  image, damaged and the fall back, repaired, removed, and Giants' own copy. `SKYLAUNCHER_COPY_FREE_BYTES` fakes the room (tests only).
+
+## The wrong disc, offered to the right game
+When the check finds the other supported game's disc ("This disc image is Skylanders: Spyro's Adventure, not Skylanders: Giants.", status
+`WrongGame`, `GameSourceCheck::otherGame`), the Play page and the Disc tab add one button, **Use it for <that game>** (`App::UseDiscForOtherGame`):
+the window switches to that game, checks the image there, and remembers it as that game's disc once it is verified. The game it was chosen
+for goes back to the disc it had (or none); a stale `iso=` that was this image is dropped. Refused with a toast while the other game installs,
+copies or checks its own disc. A game that already plays from a copy only switches ("already plays from its copied game data").
 
 ## Each game's look
 What belongs to the game on its page is drawn in **the game's own colours**, taken from its logo (`GameStyle` in
@@ -201,7 +236,7 @@ always animates (`docs/settings.md`).
   leaving, cancels; it acts once per press; Space, Enter and the pad's A hold it too. The label is a plain verb, the
   instruction is the tooltip (shown on keyboard and pad focus too). Buttons are told apart by their ImGui ID.
 - **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
-- **Toasts.** Top right, stacked downwards (newest at the bottom, at most 4), each at most 420 points wide, 20 points from the window's top and right edges, over the page. 2.5 s, longer for a long message (up to 6 s); the same message again refreshes the one shown. A failure (`Toast(text, true)`, or a text starting "Couldn't") stays until it is closed, with a cross; a click on any message closes it and does not reach what is under it. Texts are short, sober, English, no full stop.
+- **Toasts.** Top right, stacked downwards (newest at the bottom, at most 4), each at most 420 points wide, 20 points from the window's top and right edges, over the page. 2.5 s, longer for a long message (up to 6 s); the same message again refreshes the one shown. A failure (`Toast(text, true)`, or a text starting "Couldn't") stays until it is closed, with a cross; a click on any message closes it and does not reach what is under it. Texts are short, sober, no full stop; they are English in the code and go through the string table (`docs/translations.md`). An error is a `Toast(text, true)` (a text starting "Couldn't" is one too, as the collection page's English toasts still are).
 - **Idle.** The loop sleeps in `SDL_WaitEventTimeout` (`App::IdleWait`): every frame only while something moves (a disc
   check, an install, an update, a held button, a text cursor, the logo's fall) and for three frames after an input; 30 fps for the night
   sky's stars; else it wakes every 0.5 s to poll the jobs, the portal and the collection.

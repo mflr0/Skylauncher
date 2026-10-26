@@ -88,6 +88,16 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_art_manifests.cpp
     DEPENDS ${CMAKE_SOURCE_DIR}/cmake/join_json.cmake ${CMAKE_SOURCE_DIR}/cmake/embed_file.cmake ${SKYLAUNCHER_ART_MANIFESTS}
     COMMENT "Embedding the art manifests" VERBATIM)
 
+# The launcher's languages: resources/lang/<code>.txt, one file each (docs/translations.md).
+file(GLOB SKYLAUNCHER_LANGUAGES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/resources/lang/*.txt)
+list(SORT SKYLAUNCHER_LANGUAGES)
+string(REPLACE ";" "|" SKYLAUNCHER_LANGUAGE_LIST "${SKYLAUNCHER_LANGUAGES}")
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_languages.cpp
+    COMMAND ${CMAKE_COMMAND} "-DINPUTS=${SKYLAUNCHER_LANGUAGE_LIST}" -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_languages.cpp
+        -P ${CMAKE_SOURCE_DIR}/cmake/embed_languages.cmake
+    DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_languages.cmake ${SKYLAUNCHER_LANGUAGES}
+    COMMENT "Embedding the languages" VERBATIM)
+
 # Dear ImGui (MIT) with its SDL 3 platform and SDL_Renderer backends.
 set(IMGUI_ROOT ${CMAKE_SOURCE_DIR}/lib/imgui)
 add_library(imgui STATIC ${IMGUI_ROOT}/imgui.cpp ${IMGUI_ROOT}/imgui_draw.cpp ${IMGUI_ROOT}/imgui_tables.cpp
@@ -99,6 +109,7 @@ target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
 add_library(SkylauncherCore STATIC
     src/launcher/launcher.cpp
     src/launcher/launcher_games.cpp
+    src/launcher/i18n.cpp
     src/launcher/game_install.cpp
     src/launcher/ui/launcher_ui.cpp
     src/launcher/ui/collection_page.cpp
@@ -116,6 +127,7 @@ add_library(SkylauncherCore STATIC
     src/shared/collection/catalogue.cpp
     src/shared/collection/collection.cpp
     src/shared/collection/datadir.cpp
+    src/shared/collection/game_data.cpp
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
     src/shared/collection/save_backup.cpp
@@ -130,15 +142,18 @@ add_library(SkylauncherCore STATIC
     lib/miniz/miniz.c
     ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
     ${CMAKE_BINARY_DIR}/embedded_catalogue.cpp
-    ${CMAKE_BINARY_DIR}/embedded_art_manifests.cpp)
+    ${CMAKE_BINARY_DIR}/embedded_art_manifests.cpp
+    ${CMAKE_BINARY_DIR}/embedded_languages.cpp)
 # The launcher shell: install progress, game runs and logs, updates, About (kept apart from the list above).
 target_sources(SkylauncherCore PRIVATE
     src/launcher/install_checklist.cpp
     src/launcher/game_run.cpp
     src/launcher/portal_status.cpp
     src/launcher/game_settings.cpp
+    src/launcher/game_copy.cpp
     src/launcher/shortcut.cpp
     src/launcher/ui/game_settings_page.cpp
+    src/launcher/ui/game_data_page.cpp
     src/launcher/report.cpp
     src/launcher/updater.cpp
     src/shared/mini_json.cpp
@@ -200,5 +215,6 @@ add_dependencies(SkylauncherTest FakeSSABuild Skylauncher)
 target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit" SKYLAUNCHER_TEST_EXE="$<TARGET_FILE:Skylauncher>")
 
 # The launcher shell's checks (tests/shell_test.cpp), run by SkylauncherTest.
-target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp)
+target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp tests/copy_test.cpp tests/i18n_test.cpp)
+target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_include_directories(SkylauncherTest PRIVATE lib/miniz)

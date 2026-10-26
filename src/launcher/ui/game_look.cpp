@@ -366,7 +366,7 @@ namespace launcher_ui
         DrawGear(draw, m_testGearAt, PlayButtonH * 0.22f, Rgb(InkOn(middle, style.outline)), Rgb(Shade(middle, gear)));
         ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s settings", m_s->game.name);
+            ImGui::SetTooltip("%s", Tf("{} settings", m_s->game.name).c_str());
 
         // One ring around the whole button for the keyboard and pad focus, 4 points outside.
         if (mainFocused || gearFocused)

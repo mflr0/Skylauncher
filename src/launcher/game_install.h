@@ -73,8 +73,9 @@ void MarkGameLayout(const std::filesystem::path& gameFolder);
 bool IsOlderLayoutBuild(const std::filesystem::path& runtime, const std::filesystem::path& gameFolder);
 
 // Rough figures shown before installing.
-inline constexpr int InstallMinutes = 15;
-inline constexpr int GiantsInstallMinutes = 25; // 4394 shaders to translate instead of 1118
+// Kit 0.5.0 on an M1 Pro: SSA 193 s, Giants 563 s (4443 shaders instead of 1118); slower PCs take longer.
+inline constexpr int InstallMinutes = 10;
+inline constexpr int GiantsInstallMinutes = 15;
 inline int InstallMinutesFor(std::string_view gameId) { return gameId == "giants" ? GiantsInstallMinutes : InstallMinutes; }
 inline constexpr int InstallGigabytes = 6;
 
@@ -92,6 +93,7 @@ struct InstallProgress
     std::vector<Step> steps;
     uint64_t done = 0, total = 0;  // the current step's @progress
     std::string error;             // @error, or why SSABuild stopped
+    bool startFailed = false;      // the installer never started (the kit, the folder): `error` is in the launcher's language
     std::string runtime;           // @done
     std::string action;            // the current step's last @log line
     std::vector<std::string> log;  // every line, @log text and anything else SSABuild printed

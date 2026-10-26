@@ -49,14 +49,14 @@ namespace launcher_ui
                 opened = opened || entry.opened;
             good = opened || mode == "emulated";
             if (mode == "emulated")
-                return "Virtual portal, as chosen: no portal needed.";
+                return Tr("Virtual portal, as chosen: no portal needed.");
             if (opened)
-                return "Real portal: the game will use it.";
+                return Tr("Real portal: the game will use it.");
             if (result.portals.empty())
-                return mode == "real" ? "No portal found: the game will wait for one to be plugged in."
-                                      : "No portal found: the game will use the virtual portal.";
-            return mode == "real" ? "The portal can't be opened: the game will wait for it."
-                                  : "The portal can't be opened: the game will use the virtual portal.";
+                return mode == "real" ? Tr("No portal found: the game will wait for one to be plugged in.")
+                                      : Tr("No portal found: the game will use the virtual portal.");
+            return mode == "real" ? Tr("The portal can't be opened: the game will wait for it.")
+                                  : Tr("The portal can't be opened: the game will use the virtual portal.");
         }
     }
 
@@ -88,12 +88,12 @@ namespace launcher_ui
             std::lock_guard lock(g_saveMutex);
             if (g_saveOk)
             {
-                Toast("Report saved to " + g_savedPath);
+                Toast(Tf("Report saved to {}", g_savedPath));
                 g_saveOk = false;
             }
             else if (g_saveFailed)
             {
-                Toast("Couldn't save the report");
+                Toast(Tr("Couldn't save the report"), true);
                 g_saveFailed = false;
             }
         }
@@ -110,11 +110,11 @@ namespace launcher_ui
         {
             if (!m_reportOpen)
                 ImGui::CloseCurrentPopup();
-            Title("Report a problem", TitleSize, Text);
+            Title(Tr("Report a problem"), TitleSize, Text);
             ImGui::PushFont(nullptr, SmallSize);
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)),
-                "This is everything the report holds. Your account, your computer's name and your home folder are replaced. "
-                "Nothing is sent: save it, or copy it into an issue.");
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s",
+                Tr("This is everything the report holds. Your account, your computer's name and your home folder are replaced. "
+                   "Nothing is sent: save it, or copy it into an issue."));
             ImGui::PopFont();
             ImGui::Dummy(ImVec2(0, 6));
             ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
@@ -132,7 +132,7 @@ namespace launcher_ui
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor();
-            if (PillButton("Save as...", true, 160, true))
+            if (PillButton(Tr("Save as..."), true, 160, true))
             {
                 std::filesystem::path folder = GameLogFolder();
                 std::string name = launcher_report::FileName();
@@ -141,14 +141,14 @@ namespace launcher_ui
                 SDL_ShowSaveFileDialog(SaveReport, new std::string(m_reportText), m_window, Filters, 1, start.c_str());
             }
             ImGui::SameLine();
-            if (PillButton("Copy", false, 140))
+            if (PillButton(Tr("Copy"), false, 140))
             {
                 SDL_SetClipboardText(m_reportText.c_str());
-                Toast("Report copied");
+                Toast(Tr("Report copied"));
             }
             ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
             // B / Escape close it, as every dialog (A presses the focused button).
-            if (PillButton("Close", false, 120) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
+            if (PillButton(Tr("Close"), false, 120) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
                 m_reportOpen = false;
                 ImGui::CloseCurrentPopup();
@@ -164,7 +164,7 @@ namespace launcher_ui
         std::string runtime = !m_s->installed.runtime.empty() ? m_s->installed.runtime : m_s->ownRuntime;
         bool testing = !m_probe.done;
         ImGui::BeginDisabled(testing || runtime.empty());
-        if (PillButton(testing ? "Testing..." : "Test the portal", false, 200))
+        if (PillButton(testing ? Tr("Testing...") : Tr("Test the portal"), false, 200))
             m_probe.Start(runtime);
         ImGui::EndDisabled();
         float buttonY = ImGui::GetItemRectMin().y, buttonH = ImGui::GetItemRectSize().y;
@@ -172,9 +172,9 @@ namespace launcher_ui
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, buttonY + (buttonH - ImGui::GetTextLineHeight()) / 2)); // centred on the button
         if (runtime.empty())
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "The test is part of the game: install it first.");
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("The test is part of the game: install it first."));
         else if (!m_probe.ran)
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Plug the portal in, then check that the game sees it.");
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Plug the portal in, then check that the game sees it."));
         ImGui::PopFont();
         if (!m_probe.ran || testing)
             return;
@@ -188,20 +188,20 @@ namespace launcher_ui
         }
         for (const PortalProbeEntry& entry : result.portals)
         {
-            std::string name = entry.product.empty() ? std::string(entry.kind == "usb" ? "Xbox portal" : "Portal") : entry.product;
-            ImGui::TextColored(ImColor(Rgb(entry.opened ? Ok : Danger)), "%s", entry.opened ? "Found" : "Found, not usable");
+            std::string name = entry.product.empty() ? std::string(entry.kind == "usb" ? Tr("Xbox portal") : Tr("Portal")) : entry.product;
+            ImGui::TextColored(ImColor(Rgb(entry.opened ? Ok : Danger)), "%s", entry.opened ? Tr("Found") : Tr("Found, not usable"));
             ImGui::SameLine(0, 8);
-            ImGui::Text("%s (%s %s:%s)", name.c_str(), entry.kind == "usb" ? "USB" : "HID", entry.vid.c_str(), entry.pid.c_str());
+            ImGui::TextUnformatted(fmt::format("{} ({} {}:{})", name, entry.kind == "usb" ? "USB" : "HID", entry.vid, entry.pid).c_str());
             if (!entry.model.empty())
             {
                 // The model from the id the portal answered to the game's reset, and what the game thinks of it.
                 ImGui::PushFont(nullptr, SmallSize);
-                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "Model: %s (id %s)", entry.model.c_str(), entry.id.c_str());
+                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Model: {} (id {})", entry.model, entry.id).c_str());
                 if (entry.verdict == "works")
-                    ImGui::TextColored(ImColor(Rgb(Ok)), "Spyro's Adventure accepts this portal.");
+                    ImGui::TextColored(ImColor(Rgb(Ok)), "%s", Tr("Spyro's Adventure accepts this portal."));
                 else if (entry.verdict == "warns" || entry.verdict == "rejected")
-                    ImGui::TextColored(ImColor(Rgb(Danger)), "Spyro's Adventure %s this portal: %s.", entry.verdict == "rejected" ? "rejects" : "warns about",
-                        entry.verdictReason.c_str());
+                    ImGui::TextColored(ImColor(Rgb(Danger)), "%s", (entry.verdict == "rejected" ? Tf("Spyro's Adventure rejects this portal: {}.", entry.verdictReason)
+                                                           : Tf("Spyro's Adventure warns about this portal: {}.", entry.verdictReason)).c_str());
                 ImGui::PopFont();
             }
             if (!entry.opened)
@@ -228,25 +228,25 @@ namespace launcher_ui
         std::filesystem::path folder = GameLogFolder();
         std::error_code error;
         bool any = std::filesystem::exists(RuntimeLogFolder() / RuntimeLogName, error) || std::filesystem::exists(folder / CaptureLogName, error);
-        if (PillButton("Report a problem", true, 220, true))
+        if (PillButton(Tr("Report a problem"), true, 220, true))
             OpenProblemReport();
         ImGui::SameLine();
         ImGui::BeginDisabled(!any);
-        if (PillButton("Copy game log", false, 220))
+        if (PillButton(Tr("Copy game log"), false, 220))
         {
             SDL_SetClipboardText(GameLogText().c_str());
-            Toast("Game log copied");
+            Toast(Tr("Game log copied"));
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        if (PillButton("Open logs folder", false, 220) && !OpenFolder(folder))
-            Toast("Couldn't open the folder");
+        if (PillButton(Tr("Open logs folder"), false, 220) && !OpenFolder(folder))
+            Toast(Tr("Couldn't open the folder"), true);
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped(any ? "The log of the last time the game ran, to send with a bug report. It stays on your computer until you paste it."
-                               : "No game log yet: it appears after the game has run once.");
-        ImGui::TextWrapped("Report a problem makes one text file with the last logs, your settings and your versions, with your "
-                           "account, computer and folder names replaced. It is shown before you save or copy it; nothing is sent.");
+        ImGui::TextWrapped("%s", any ? Tr("The log of the last time the game ran, to send with a bug report. It stays on your computer until you paste it.")
+                                     : Tr("No game log yet: it appears after the game has run once."));
+        ImGui::TextWrapped("%s", Tr("Report a problem makes one text file with the last logs, your settings and your versions, with your "
+                                    "account, computer and folder names replaced. It is shown before you save or copy it; nothing is sent."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }

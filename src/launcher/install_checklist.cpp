@@ -1,4 +1,5 @@
 #include "launcher/install_checklist.h"
+#include "launcher/i18n.h"
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -15,15 +16,15 @@ namespace
         float weight;
     };
     constexpr KnownStep KnownSteps[] = {
-        { "kit", "Downloading the game tools", 6 }, // only when the launcher fetched the kit itself
-        { "toolchain", "Preparing the compiler", 8 },
-        { "disc", "Reading the disc", 2 },
-        { "recompile", "Translating the game code", 6 },
-        { "shaders", "Translating the shaders", 14 },
-        { "compile", "Compiling the game", 42 },
-        { "link", "Linking the game", 4 },
-        { "movies", "Adding the movie shaders", 12 },
-        { "finish", "Finishing", 12 },
+        { "kit", N_("Downloading the game tools"), 6 }, // only when the launcher fetched the kit itself
+        { "toolchain", N_("Preparing the compiler"), 8 },
+        { "disc", N_("Reading the disc"), 2 },
+        { "recompile", N_("Translating the game code"), 6 },
+        { "shaders", N_("Translating the shaders"), 14 },
+        { "compile", N_("Compiling the game"), 42 },
+        { "link", N_("Linking the game"), 4 },
+        { "movies", N_("Adding the movie shaders"), 12 },
+        { "finish", N_("Finishing"), 12 },
     };
     constexpr float UnknownWeight = 4;
 }
@@ -37,7 +38,7 @@ InstallChecklist MakeInstallChecklist(const InstallProgress& progress, uint64_t 
     {
         if (!downloadedKit && std::string_view(step.id) == "kit")
             continue;
-        list.rows.push_back({ step.id, step.title });
+        list.rows.push_back({ step.id, Tr(step.title) });
         weights.push_back(step.weight);
     }
     auto rowOf = [&](const std::string& id) -> int {
@@ -147,9 +148,9 @@ InstallChecklist MakeInstallChecklist(const InstallProgress& progress, uint64_t 
     {
         list.action = progress.action;
         if (list.action.empty() && progress.total > 0)
-            list.action = fmt::format("{} of {}", progress.done, progress.total);
+            list.action = Tf("{} of {}", progress.done, progress.total);
         if (list.action.empty())
-            list.action = progress.steps.empty() ? "Starting the installer" : "Working";
+            list.action = progress.steps.empty() ? Tr("Starting the installer") : Tr("Working");
     }
     return list;
 }
@@ -159,11 +160,11 @@ std::string InstallTimeLeft(int64_t ms)
     if (ms < 0)
         return {};
     if (ms < 60000)
-        return "less than a minute left";
+        return Tr("less than a minute left");
     int64_t minutes = (ms + 30000) / 60000;
     if (minutes < 60)
-        return fmt::format("about {} min left", minutes);
-    return fmt::format("about {} h {:02} min left", minutes / 60, minutes % 60);
+        return Tf("about {} min left", minutes);
+    return Tf("about {0} h {1:02} min left", minutes / 60, minutes % 60);
 }
 
 std::string InstallDuration(uint64_t ms)
@@ -182,25 +183,25 @@ std::string InstallFailureHeadline(const InstallChecklist& list, const InstallPr
             c = char(std::tolower(static_cast<unsigned char>(c)));
         return lower.find(text) != std::string::npos;
     };
-    if (has("kit wasn't found") || has("couldn't start"))
-        return "The installer couldn't start.";
+    if (progress.startFailed || has("kit wasn't found") || has("couldn't start"))
+        return Tr("The installer couldn't start.");
     if (has("space") || has("no room") || has("disk full"))
-        return "There isn't enough free space on the drive (about 6 GB are needed).";
+        return Tr("There isn't enough free space on the drive (about 6 GB are needed).");
     if (has("cannot write") || has("couldn't create") || has("permission") || has("access is denied"))
-        return "A file of the game folder couldn't be written.";
+        return Tr("A file of the game folder couldn't be written.");
     std::string step = list.current >= 0 ? list.rows[size_t(list.current)].id : std::string();
     if (step == "kit")
-        return "The game tools couldn't be downloaded. Check the internet connection.";
+        return Tr("The game tools couldn't be downloaded. Check the internet connection.");
     if (step == "toolchain" && (has("download") || has("curl") || has("http") || has("sha-256") || has("checksum")))
-        return "The compiler couldn't be downloaded. Check the internet connection.";
+        return Tr("The compiler couldn't be downloaded. Check the internet connection.");
     if (step == "disc")
-        return "The disc image couldn't be read. Check that the file is complete.";
+        return Tr("The disc image couldn't be read. Check that the file is complete.");
     if (list.current >= 0)
     {
         std::string title = list.rows[size_t(list.current)].title;
         if (!title.empty())
             title[0] = char(std::tolower(static_cast<unsigned char>(title[0])));
-        return "Something went wrong while " + title + ".";
+        return Tf("Something went wrong while {}.", title);
     }
-    return "The installer stopped before it could build the game.";
+    return Tr("The installer stopped before it could build the game.");
 }

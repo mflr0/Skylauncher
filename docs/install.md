@@ -8,7 +8,7 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
 
 1. The player drops the ISO; the launcher verifies it (`CheckGameSource`) and keeps the SHA-256 of its `default.xex`.
 2. No game built for that disc, and no runtime set up by hand (below): **INSTALL** replaces PLAY, with one line
-   saying the game is built from the disc, about 15 minutes and 6 GB, and internet is needed once for the compiler
+   saying the game is built from the disc, about 10 minutes and 6 GB, and internet is needed once for the compiler
    (`InstallMinutes`, `InstallGigabytes` in `game_install.h`).
 3. With no kit (below), INSTALL first downloads it: the checklist starts with **Downloading the game tools** (a bar in MB,
    retry with **Retry**; a failure says "The game tools couldn't be downloaded"). Linux (from 0.3.1) gets
@@ -57,7 +57,7 @@ disc (`[ssa] iso=`, `[giants] iso=`), its own built game and its own install log
   (workshop `docs/release/launcher/kit_contract.md`, "Several games in one kit"). The built game is `SSARecomp` for Spyro's
   Adventure and **`SGRecomp`** (`SGRecomp.app`, `SGRecomp.exe`) for Giants, `GameInfo::runtime` in the game table. Both log to
   `SSARecomp.log` in their own folder.
-- The Giants install is about 25 minutes (4394 shaders to translate instead of 1118): `InstallMinutesFor()`.
+- The Giants install is about 15 minutes (4443 shaders to translate instead of 1118): `InstallMinutesFor()`. Measured with kit 0.5.0 on an M1 Pro: SSA 193 s, Giants 563 s (the second shader pass is incremental since 0.5.0).
 - The shared figure collection serves both games (the catalogue already holds all six games' toys).
 - Verify: `SkylauncherTest <spyro iso> <scratch>` checks the table and folders; with `SKYLAUNCHER_TEST_GIANTS_ISO=<giants iso>` it
   also checks that each disc is accepted by its own game and refused by the other. End to end: see "Testing without the kit".
@@ -138,6 +138,8 @@ Restore uses) and **disabled while the game installs**. The sizes shown next to 
 After an uninstall the disc is still known, so INSTALL builds the game again and the saves are where they were. To remove
 everything the launcher keeps for a game, uninstall, then delete saves and data, then delete the game's folder by hand.
 **Remove disc** (Disc tab) only makes the launcher forget the image (`[<game>] iso=` goes): the file is not touched.
+The copied game data (`<Game>/gamedata/`, "Copy the game data" in the Disc tab, `docs/launcher_ui.md` "Game data") is kept by **Uninstall** and
+untouched by the two delete buttons, like the disc image: only **Remove the copy** (Disc tab) deletes it, and the disc image comes back.
 The code is `src/launcher/game_settings.{h,cpp}` (no UI; `SkylauncherTest` runs it on scratch folders, `tests/settings_test.cpp`).
 
 ### Housekeeping

@@ -1,4 +1,5 @@
 #include "launcher/game_run.h"
+#include "launcher/i18n.h"
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include <SDL3/SDL.h>
@@ -183,7 +184,7 @@ GameRunResult RunGame(const std::string& runtime, const std::string& iso, const 
     // On Linux SDL forks before it finds out that the program is missing: the child then only exits.
     if (!std::filesystem::exists(Path(runtime), error))
     {
-        result.error = fmt::format("Couldn't start {}: the file doesn't exist", runtime);
+        result.error = Tf("Couldn't start {}: the file doesn't exist", runtime);
         return result;
     }
     std::vector<std::string> arguments{ runtime, iso };
@@ -191,7 +192,7 @@ GameRunResult RunGame(const std::string& runtime, const std::string& iso, const 
     SDL_Process* process = Spawn(arguments, result.error);
     if (process == nullptr)
     {
-        result.error = fmt::format("Couldn't start {}: {}", runtime, result.error);
+        result.error = Tf("Couldn't start {}: {}", runtime, result.error);
         return result;
     }
     result.started = true;
@@ -251,7 +252,7 @@ PortalProbeResult ParsePortalProbe(const std::string& output)
                 std::string why = get("status");
                 if (why.starts_with("error: "))
                     why.erase(0, 7);
-                result.notes.push_back(std::string(get("transport") == "usb" ? "USB (Xbox) portals" : "HID portals") + " can't be used: " + why);
+                result.notes.push_back(Tf("{} can't be used: {}", get("transport") == "usb" ? Tr("USB (Xbox) portals") : Tr("HID portals"), why));
             }
             else if (get("done") == "true")
                 result.ran = true;
@@ -272,7 +273,7 @@ PortalProbeResult ParsePortalProbe(const std::string& output)
         begin = end + 1;
     }
     if (!result.ran)
-        result.error = "The game didn't finish the portal test.";
+        result.error = Tr("The game didn't finish the portal test.");
     return result;
 }
 
@@ -283,7 +284,7 @@ PortalProbeResult RunPortalProbe(const std::string& runtime, uint32_t timeoutMs)
     SDL_Process* process = Spawn({ runtime, "--portal-probe" }, error);
     if (process == nullptr)
     {
-        result.error = fmt::format("Couldn't start the game: {}", error);
+        result.error = Tf("Couldn't start the game: {}", error);
         return result;
     }
     std::string output;
@@ -292,8 +293,8 @@ PortalProbeResult RunPortalProbe(const std::string& runtime, uint32_t timeoutMs)
     SDL_DestroyProcess(process);
     result = ParsePortalProbe(output);
     if (!result.ran)
-        result.error = timedOut ? "The portal test took too long and was stopped."
-            : code == 2 ? "This version of the game doesn't have the portal test yet. Update the game."
-                        : "The game didn't finish the portal test.";
+        result.error = timedOut ? Tr("The portal test took too long and was stopped.")
+            : code == 2 ? Tr("This version of the game doesn't have the portal test yet. Update the game.")
+                        : Tr("The game didn't finish the portal test.");
     return result;
 }

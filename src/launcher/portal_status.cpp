@@ -1,5 +1,6 @@
 // The portal status: the VID:PID table, the line the launcher shows, and the background watcher (portal_status.h).
 #include "launcher/portal_status.h"
+#include "launcher/i18n.h"
 #include <SDL3/SDL.h>
 #include <cstdio>
 
@@ -40,8 +41,8 @@ namespace launcher_portal
         if (!available)
             return {};
         if (connected)
-            return "Portal: " + model;
-        return "Portal: not detected";
+            return Tf("Portal: {}", model);
+        return Tr("Portal: not detected");
     }
 
     Status MakeStatus(const Scan& scan)

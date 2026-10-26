@@ -311,7 +311,7 @@ namespace launcher_ui
             collection::WriteStats(path, figure.stats);
             return path;
         };
-        std::string gill = make(14, 0, 9000, 2400, "Gilou");
+        std::string gill = make(14, 0, 9000, 2400, "Splash");
         std::string spyro = make(16, 0, 31000, 18500, "");
         std::string legendary = make(416, 0, 3000, 600, "");
         std::string trigger = make(19, 0, 1200, 300, "");
@@ -323,7 +323,7 @@ namespace launcher_ui
         std::string dark = make(28, 0, 0, 0, "");
         make(14, 0, 700, 90, ""); // a second Gill Grunt: "owned x2"
         std::string doomed = make(12, 0, 0, 0, ""), doomed2 = make(10, 0, 0, 0, ""); // two in the trash: one hold button each
-        collection::SetLabel(gill, "Gilou's");
+        collection::SetLabel(gill, "Splash's");
         collection::SetFavourite(gill, true);
         collection::SetFavourite(spyro, true);
         collection::SetFavourite(legendary, true);

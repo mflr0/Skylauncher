@@ -284,11 +284,11 @@ namespace
         EXPECT(collection::UntouchedStarter(figure));
         figure.stats.experience = 2500;
         figure.stats.gold = 1234;
-        figures::SetNicknameUtf8(figure.stats, "Gilou");
+        figures::SetNicknameUtf8(figure.stats, "Splash");
         std::string error;
         EXPECT(collection::WriteStats(gill, figure.stats, &error));
         EXPECT(collection::Read(gill, figure) && figure.state == figures::AreaState::Valid && figure.level == 3 && figure.stats.gold == 1234 &&
-            figures::NicknameUtf8(figure.stats) == "Gilou");
+            figures::NicknameUtf8(figure.stats) == "Splash");
         EXPECT(!collection::Backups(gill).empty());
         std::string backup = collection::Backup(gill);
         EXPECT(!backup.empty() && collection::Backups(gill).size() >= 2);
@@ -298,8 +298,8 @@ namespace
         EXPECT(collection::ResetToNew(gill) && collection::Read(gill, figure) && figure.state == figures::AreaState::Blank);
 
         // The folder's other jobs: label, favourite, duplicate, trash, import.
-        EXPECT(collection::SetLabel(gill, "Gilou's") && collection::SetFavourite(gill, true));
-        EXPECT(collection::Read(gill, figure) && figure.label == "Gilou's" && figure.favourite && figure.DisplayName() == "Gilou's");
+        EXPECT(collection::SetLabel(gill, "Splash's") && collection::SetFavourite(gill, true));
+        EXPECT(collection::Read(gill, figure) && figure.label == "Splash's" && figure.favourite && figure.DisplayName() == "Splash's");
         std::string copy = collection::Duplicate(gill);
         EXPECT(!copy.empty() && fs::exists(copy));
         EXPECT(collection::Delete(copy) && !fs::exists(copy) && collection::Trash().size() == 1);
@@ -570,7 +570,7 @@ void EditChecks()
     base.gold = 2400;
     base.heroPoints = 3;
     base.playSeconds = 600;
-    figures::SetNicknameUtf8(base, "Gilou");
+    figures::SetNicknameUtf8(base, "Splash");
     // The game played it while the editor was open: more time, more gold.
     figures::FigureStats now = base;
     now.playSeconds = 4200;
@@ -578,12 +578,12 @@ void EditChecks()
     // The player changed the experience only: the game's gold and time stay.
     figures::FigureStats edited = base;
     edited.experience = 12000;
-    figures::FigureStats saved = MergeEditedStats(now, base, edited, "Gilou", "Gilou");
+    figures::FigureStats saved = MergeEditedStats(now, base, edited, "Splash", "Splash");
     EXPECT(saved.experience == 12000 && saved.gold == 2600 && saved.playSeconds == 4200 && saved.heroPoints == 3);
-    EXPECT(figures::NicknameUtf8(saved) == "Gilou");
+    EXPECT(figures::NicknameUtf8(saved) == "Splash");
     // The gold and the nickname changed here: they win over the game's.
     edited.gold = 100;
-    saved = MergeEditedStats(now, base, edited, "Gilou", "Gill");
+    saved = MergeEditedStats(now, base, edited, "Splash", "Gill");
     EXPECT(saved.gold == 100 && saved.playSeconds == 4200 && figures::NicknameUtf8(saved) == "Gill");
     // Edited for Giants (level 15 and a hat): Giants' part and the hat are saved, Spyro's Adventure's own hat stays.
     now.ssaHat = 4;
@@ -591,23 +591,25 @@ void EditChecks()
     edited = base;
     figures::SetExperienceFor(edited, figures::LevelCap("giants"), figures::LevelExperience[14]);
     edited.hat = 6;
-    saved = MergeEditedStats(now, base, edited, "Gilou", "Gilou");
+    saved = MergeEditedStats(now, base, edited, "Splash", "Splash");
     EXPECT(figures::TotalExperience(saved) == 96500 && saved.hat == 6 && saved.ssaHat == 4 && saved.gold == 2600);
     // Edited for Spyro's Adventure (cap 10): its part only; a figure Giants took to level 15 keeps those levels.
     figures::FigureStats high = base;
     figures::SetTotalExperience(high, 96500);
     edited = high;
     figures::SetExperienceFor(edited, figures::LevelCap("ssa"), 13000);
-    saved = MergeEditedStats(high, high, edited, "Gilou", "Gilou");
+    saved = MergeEditedStats(high, high, edited, "Splash", "Splash");
     EXPECT(saved.experience == 13000 && saved.giantsExperience == 63500);
 
     using launcher_ui::Trimmed;
-    EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Gilou's  ") == "Gilou's" && Trimmed("A b") == "A b");
+    EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Splash's  ") == "Splash's" && Trimmed("A b") == "A b");
     printf("Edit stats and names: merge and trim checked\n");
 }
 
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
+int I18nChecks(); // tests/i18n_test.cpp
+int CopyChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso); // tests/copy_test.cpp
 
 // The launcher window switching games in place (App::TestSwitchScript, in an offscreen window): both discs checked, a
 // build of each made by the fake kit, the state of each kept across switches, PLAY returning the shown game's runtime.
@@ -707,6 +709,8 @@ int main(int argc, char** argv)
         fprintf(stderr, "usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]\n");
         return 2;
     }
+    // The text the windows are checked against is English, whatever language the computer is in.
+    SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LANGUAGE", "en", true);
     std::filesystem::path iso = argv[1];
     std::filesystem::path scratch = std::filesystem::path(argv[2]) / "launcher_test";
     std::filesystem::remove_all(scratch);
@@ -718,6 +722,17 @@ int main(int argc, char** argv)
         return (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
     };
 
+    if (getenv("SKYLAUNCHER_TEST_I18N_ONLY") != nullptr) // only the languages (quick to rerun)
+    {
+        int failures = I18nChecks();
+        return failures == 0 ? 0 : 1;
+    }
+    if (getenv("SKYLAUNCHER_TEST_COPY_ONLY") != nullptr) // only "Copy the game data" (quick to rerun)
+    {
+        int failures = CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
+        printf("%d failures\n", failures);
+        return failures == 0 ? 0 : 1;
+    }
     CollectionChecks(scratch);
     HoldChecks();
     EditChecks();
@@ -725,6 +740,7 @@ int main(int argc, char** argv)
     InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);
     g_failures += SettingsChecks(scratch / "settings");
+    g_failures += I18nChecks();
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };
@@ -853,6 +869,8 @@ int main(int argc, char** argv)
         printf("The sidebar line through an install and an update:\n");
         SidebarChecks(scratch, iso.string(), giantsIso);
     }
+    printf("Copy the game data:\n");
+    g_failures += CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
     printf("The seats' X in the window:\n");
     SeatXChecks(scratch);
     printf("Command line without UI:\n");
