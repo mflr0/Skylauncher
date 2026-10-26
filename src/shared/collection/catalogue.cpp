@@ -160,15 +160,16 @@ namespace collection
             ReadMap(item["names"], game.names);
             ReadMap(item["images"], game.images);
             ReadMap(item["hats"], game.hats);
-            for (const auto& [key, value] : item["portraits"].Members())
-            {
-                // "<type>" or "<type>:<variant id>"
-                char* end = nullptr;
-                uint32_t type = uint32_t(strtoul(key.c_str(), &end, 0)), variant = 0;
-                if (end != nullptr && *end == ':')
-                    variant = uint32_t(strtoul(end + 1, nullptr, 0));
-                game.portraits[(type & 0xFFFF) << 16 | (variant & 0xFFFF)] = value.AsString();
-            }
+            for (auto [field, pictures] : { std::pair{ "portraits", &game.portraits }, std::pair{ "artworks", &game.artworks } })
+                for (const auto& [key, value] : item[field].Members())
+                {
+                    // "<type>" or "<type>:<variant id>"
+                    char* end = nullptr;
+                    uint32_t type = uint32_t(strtoul(key.c_str(), &end, 0)), variant = 0;
+                    if (end != nullptr && *end == ':')
+                        variant = uint32_t(strtoul(end + 1, nullptr, 0));
+                    (*pictures)[(type & 0xFFFF) << 16 | (variant & 0xFFFF)] = value.AsString();
+                }
             games.push_back(std::move(game));
         }
 
@@ -253,6 +254,16 @@ namespace collection
                 if (!known.sameTag && known.id == variant)
                     return { known.name, known.kind, true };
             }
+            // The same decoration with another year in the high nibble: Giants reads only the low 12 bits (the deco id
+            // and the repose, alternate-deco and LightCore flags, docs/runtime/host/figures.md), so it is that variant
+            // for the game. Only when one listed variant fits, and not for trap shapes (their ids are not decos).
+            const Variant* same = nullptr;
+            int fits = 0;
+            for (const Variant& known : toy->variants)
+                if (!known.sameTag && toy->category != Category::Trap && (known.id & 0x0FFF) == (variant & 0x0FFF))
+                    same = &known, fits++;
+            if (fits == 1)
+                return { same->name, same->kind, false };
         }
 
         // Not listed: the id's bits as public descriptions give them [?]: the high nibble is the year of the
