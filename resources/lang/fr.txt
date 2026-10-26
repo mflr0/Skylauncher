@@ -4,25 +4,23 @@
 @code fr
 @name Français
 
-\n\nIf the file is there, allow access in System Settings > Privacy & Security > Files and Folders.	\n\nSi le fichier est bien là, autorisez l'accès dans Réglages Système > Confidentialité et sécurité > Fichiers et dossiers.
+\n\nAllow access in System Settings > Privacy & Security > Files and Folders.	\n\nAutorisez l'accès dans Réglages Système > Confidentialité et sécurité > Fichiers et dossiers.
 \n- {} (media ID {:08X}, version {})	\n- {} (ID du média {:08X}, version {})
- (up to {})	 (jusqu'à {})
-"{}" can't be read ({}).{}	Impossible de lire « {} » ({}).{}
-"{}" doesn't exist. Was it moved, renamed, or is its drive disconnected?	« {} » n'existe pas. A-t-il été déplacé, renommé, ou son disque est-il déconnecté ?
-"{}" is a folder. Extracted game folders aren't supported yet: choose the disc image (.iso).	« {} » est un dossier. Les dossiers de jeu extraits ne sont pas encore pris en charge : choisissez l'image disque (.iso).
-"{}" isn't an Xbox 360 disc image, or the file is incomplete.	« {} » n'est pas une image disque Xbox 360, ou le fichier est incomplet.
-"{}" isn't there any more. Was it moved, renamed, or is its drive disconnected? Choose it again.	« {} » n'est plus là. A-t-il été déplacé, renommé, ou son disque est-il déconnecté ? Choisissez-le à nouveau.
-({} earlier lines: Copy log has them all)	({} lignes précédentes : « Copier le journal » les contient toutes)
+Can't read the disc image ({}).{}	Impossible de lire l'image disque ({}).{}
+The disc image isn't there. Choose it again.	L'image disque est introuvable. Choisissez-la à nouveau.
+That's a folder: choose the disc image (.iso).	C'est un dossier : choisissez l'image disque (.iso).
+Not an Xbox 360 disc image, or the file is incomplete.	Ce n'est pas une image disque Xbox 360, ou le fichier est incomplet.
+({} earlier lines in Copy log)	({} lignes précédentes dans « Copier le journal »)
 1 gamepad connected.	1 manette connectée.
 16:9 (with bars)	16:9 (avec bandes)
 30 (original)	30 (d'origine)
 60 (experimental)	60 (expérimental)
 A (jump, confirm)	A (saut, valider)
-A check asks github.com for the latest release of Skylauncher: no account, no identifier, nothing else is sent. Updates are checked against the release's SHA-256 before they are installed.	La vérification interroge github.com pour connaître la dernière version de Skylauncher : ni compte, ni identifiant, rien d'autre n'est envoyé. Chaque mise à jour est comparée au SHA-256 de la version publiée avant d'être installée.
-A file of the game folder couldn't be written.	Un fichier du dossier du jeu n'a pas pu être écrit.
-A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown from the game is read from your own disc and kept on this computer.	Un lanceur pour les portages PC natifs des jeux Skylanders. Il ne contient ni code ni graphismes des jeux : tout ce qui vient du jeu est lu depuis votre propre disque et conservé sur cet ordinateur.
-A new version of the game is available	Une nouvelle version du jeu est disponible
-A new version of the game is ready to build.	Une nouvelle version du jeu est prête à être construite.
+Only asks github.com for the latest version. Nothing else is sent.	Interroge seulement github.com pour connaître la dernière version. Rien d'autre n'est envoyé.
+Couldn't write to the game folder.	Impossible d'écrire dans le dossier du jeu.
+A launcher for the native PC ports of Skylanders. It has no game code or art: all of it comes from your own disc.	Un lanceur pour les portages PC natifs de Skylanders. Il ne contient ni code ni images du jeu : tout vient de votre propre disque.
+Game update available	Mise à jour du jeu disponible
+A game update is ready.	Une mise à jour du jeu est prête.
 About	À propos
 Adding the movie shaders	Ajout des shaders des vidéos
 Advanced	Avancé
@@ -30,18 +28,17 @@ Anisotropic 16x	Anisotrope 16x
 Anisotropic 2x	Anisotrope 2x
 Anisotropic 4x	Anisotrope 4x
 Anisotropic 8x	Anisotrope 8x
-Anisotropic filtering keeps ground textures sharp at an angle.	Le filtrage anisotrope garde les textures du sol nettes en vue oblique.
+Keeps textures sharp at an angle.	Garde les textures nettes en biais.
 Auto	Auto
 Auto (follows the window)	Auto (suit la fenêtre)
-Auto picks x1 on integrated graphics. x2 or x3 need a dedicated graphics card.	Auto choisit x1 sur une carte graphique intégrée. x2 ou x3 demandent une carte graphique dédiée.
-Auto shows more to the sides on a window wider than 16:9. 16:9 keeps the game's picture, with bars.	Auto montre davantage sur les côtés dans une fenêtre plus large que 16:9. 16:9 garde l'image du jeu, avec des bandes.
+Higher scales need a dedicated graphics card.	Les échelles élevées demandent une carte graphique dédiée.
+Auto shows more on wide windows; 16:9 adds bars.	Auto montre plus sur les fenêtres larges ; 16:9 ajoute des bandes.
 Auto: a real portal if plugged in, else virtual	Auto : un vrai portail s'il est branché, sinon virtuel
 Automatic	Automatique
-Automatic (first gamepad, else keyboard)	Automatique (première manette, sinon clavier)
-Automatic (follows what you play with)	Automatique (suit ce que vous utilisez)
+Automatic (gamepad first)	Automatique (manette d'abord)
 B (back)	B (retour)
 Back	Retour
-Built on this computer for this disc: {}	Construit sur cet ordinateur pour ce disque : {}
+Built for this disc.	Construit pour ce disque.
 Button glyphs	Icônes des boutons
 CHECKING...	VÉRIFICATION...
 COLLECTION	COLLECTION
@@ -56,22 +53,21 @@ Can't read the disc	Disque illisible
 Cancel	Annuler
 Carry on copying	Reprendre la copie
 Change disc...	Changer de disque...
-Check for updates	Rechercher des mises à jour
-Check for updates when Skylauncher starts (once a day)	Rechercher les mises à jour au démarrage de Skylauncher (une fois par jour)
+Check now	Vérifier maintenant
+Check at startup	Vérifier au démarrage
 Checking Skylauncher	Vérification de Skylauncher
 Checking the Xbox 360 executable	Vérification de l'exécutable Xbox 360
 Checking the game kit	Vérification du kit du jeu
 Checking your disc	Vérification du disque
 Checking...	Vérification...
-Choose and verify the disc first: the shortcut takes the game's icon from it.	Choisissez et vérifiez d'abord le disque : le raccourci en tire l'icône du jeu.
-Choose and verify the disc image first.	Choisissez et vérifiez d'abord l'image disque.
-Choose and verify the disc image to carry on. The game reads the disc image until the copy is complete.	Choisissez et vérifiez l'image disque pour continuer. Le jeu lit l'image disque tant que la copie n'est pas terminée.
-Choose and verify the disc image to repair it: the game needs the disc image or an intact copy.	Choisissez et vérifiez l'image disque pour réparer la copie : le jeu a besoin de l'image disque ou d'une copie intacte.
+Choose the disc image first.	Choisissez d'abord l'image disque.
+Choose the disc image to carry on.	Choisissez l'image disque pour reprendre.
+Choose the disc image to repair.	Choisissez l'image disque pour réparer.
 Choose disc	Choisir le disque
-Choose disc...	Choisir un disque...
+Choose...	Choisir...
 Choose your {} disc image	Choisissez l'image disque de {}
 Clear caches	Vider les caches
-Clear caches frees {} (the shader cache, the art cache, the logs): the game makes them again. Delete saves and data frees {} more: the saves, their backups and the seats of the next session. Kept: the game and the disc, your settings, the textures folder, and the figure collection, which both games share.	Vider les caches libère {} (cache des shaders, cache des images, journaux) : le jeu les recrée. Supprimer les sauvegardes et données libère {} de plus : les sauvegardes, leurs copies de secours et les emplacements de la prochaine session. Conservés : le jeu et le disque, vos réglages, le dossier des textures et la collection de figurines, commune aux deux jeux.
+Clearing caches frees {}; deleting saves and data frees {} more.	Vider les caches libère {} ; supprimer sauvegardes et données en libère {} de plus.
 Click a key to change it.	Cliquez sur une touche pour la modifier.
 Close	Fermer
 Coming later	Bientôt
@@ -83,19 +79,19 @@ Controls	Commandes
 Copied game data	Données du jeu copiées
 Copied: {}, 1 file	Copié : {}, 1 fichier
 Copied: {}, {} files	Copié : {}, {} fichiers
-Copies the disc's files{0} into {1} so the game no longer needs the disc image. Each file is checked against the disc. Nothing changes if you don't: the game reads the disc image, and nothing is duplicated.{2}	Copie les fichiers du disque{0} dans {1} pour que le jeu n'ait plus besoin de l'image disque. Chaque fichier est comparé au disque. Rien ne change si vous ne le faites pas : le jeu lit l'image disque et rien n'est dupliqué.{2}
+Copies the disc's files ({}) so the disc image is no longer needed.	Copie les fichiers du disque ({}) : l'image disque ne sera plus nécessaire.
 Copy	Copier
 Copy game log	Copier le journal du jeu
 Copy log	Copier le journal
 Copy removed: {} freed	Copie supprimée : {} libérés
-Copy stopped: copy again to carry on from there	Copie arrêtée : relancez-la pour reprendre où elle s'est arrêtée
-Copy the game data	Copier les données du jeu
-Copying the game data...	Copie des données du jeu...
-Copying the game data: {} of {}	Copie des données du jeu : {} sur {}
+Copy stopped	Copie arrêtée
+Copy files	Copier les fichiers
+Copying...	Copie...
+Copying: {} of {}	Copie : {} sur {}
 Couldn't check: {}	Vérification impossible : {}
-Couldn't create the game folder {}: {}	Impossible de créer le dossier du jeu {} : {}
-Couldn't delete {}: {}	Impossible de supprimer {} : {}
-Couldn't make {}: {}	Impossible de créer {} : {}
+Couldn't create the game folder: {}	Impossible de créer le dossier du jeu : {}
+Couldn't delete: {}	Suppression impossible : {}
+Couldn't create the shortcut: {}	Impossible de créer le raccourci : {}
 Couldn't move {} aside: {}	Impossible de mettre {} de côté : {}
 Couldn't open the folder	Impossible d'ouvrir le dossier
 Couldn't put the kit in place: {}	Impossible de mettre le kit en place : {}
@@ -107,11 +103,10 @@ Couldn't save the download: {}	Impossible d'enregistrer le téléchargement : {
 Couldn't save the report	Impossible d'enregistrer le rapport
 Couldn't save the settings	Impossible d'enregistrer les réglages
 Couldn't start the game: {}	Impossible de lancer le jeu : {}
-Couldn't start {}: the file doesn't exist	Impossible de lancer {} : le fichier n'existe pas
-Couldn't start {}: {}	Impossible de lancer {} : {}
+Couldn't start the game: the file is missing	Impossible de lancer le jeu : le fichier est introuvable
 Couldn't unpack {}	Impossible de décompresser {}
-Couldn't write {}	Impossible d'écrire {}
-Create a desktop shortcut	Créer un raccourci sur le bureau
+Couldn't create the shortcut	Impossible de créer le raccourci
+Create	Créer
 Credits	Crédits
 D-pad down	Croix bas
 D-pad left	Croix gauche
@@ -119,9 +114,9 @@ D-pad right	Croix droite
 D-pad up	Croix haut
 DISC IMAGE:	IMAGE DISQUE :
 Data folder	Dossier de données
-Delete data	Supprimer des données
+Clean up	Nettoyage
 Delete saves and data	Supprimer sauvegardes et données
-Deletes the game Skylauncher built, {}. Kept: your saves and their backups, the textures folder, the disc image and your settings. INSTALL builds it again.	Supprime le jeu construit par Skylauncher, {}. Conservés : vos sauvegardes et leurs copies de secours, le dossier des textures, l'image disque et vos réglages. INSTALLER le reconstruit.
+Frees {}. Saves and settings are kept.	Libère {}. Les sauvegardes et les réglages sont gardés.
 Desktop shortcut	Raccourci sur le bureau
 Disc	Disque
 Disc image	Image disque
@@ -131,16 +126,16 @@ Downloading Skylauncher	Téléchargement de Skylauncher
 Downloading the game kit	Téléchargement du kit du jeu
 Downloading the game tools	Téléchargement des outils du jeu
 Downloading tools	Téléchargement des outils
-Drop your disc image (.iso) here, or choose it below.	Déposez votre image disque (.iso) ici, ou choisissez-la ci-dessous.
-Dump textures (for pack makers)	Extraire les textures (pour les créateurs de packs)
-Each file is read back and compared with the disc before it counts. You can stop at any time: the files already copied stay, and copying again carries on from there. Quitting Skylauncher stops it the same way.	Chaque fichier est relu et comparé au disque avant d'être compté. Vous pouvez arrêter à tout moment : les fichiers déjà copiés restent, et la copie reprend là où elle s'était arrêtée. Quitter Skylauncher l'arrête de la même façon.
-Each game's art comes from your own disc, once it has been checked.	Les images de chaque jeu viennent de votre propre disque, une fois celui-ci vérifié.
-F6/Tab opens the Toy Box, F7 places the next figure, F8 removes them all.	F6/Tab ouvre la Toy Box, F7 pose la figurine suivante, F8 les retire toutes.
+Drop your disc image (.iso) here.	Déposez votre image disque (.iso) ici.
+Dump textures	Extraire les textures
+Stopping keeps the files already copied.	Arrêter garde les fichiers déjà copiés.
+Game art comes from your own disc.	Les images viennent de votre propre disque.
+F6 or Tab opens the Toy Box, F7 adds a figure, F8 clears them.	F6 ou Tab ouvre la Toy Box, F7 ajoute une figurine, F8 les retire.
 Finding default.xex	Recherche de default.xex
 Fingerprinting default.xex (SHA-256)	Calcul de l'empreinte de default.xex (SHA-256)
 Finishing	Finalisation
 Folders	Dossiers
-For Skylauncher and what both games share. Each game has its own settings on its page.	Pour Skylauncher et ce que les deux jeux partagent. Chaque jeu a ses propres réglages sur sa page.
+For Skylauncher and both games.	Pour Skylauncher et les deux jeux.
 Found	Détecté
 Found, not usable	Détecté, inutilisable
 Frame rate limit	Limite d'images par seconde
@@ -161,21 +156,20 @@ GitHub says: {}	GitHub répond : {}
 HD texture packs	Packs de textures HD
 HID portals	Portails HID
 Hide details	Masquer
-Hold to build the game again from your disc.	Maintenez pour reconstruire le jeu à partir de votre disque.
-Hold to delete the copied game data.	Maintenez pour supprimer les données du jeu copiées.
-Hold to delete the copied game data. The game reads the disc image again.	Maintenez pour supprimer les données du jeu copiées. Le jeu relira l'image disque.
-Hold to delete the files copied so far.	Maintenez pour supprimer les fichiers déjà copiés.
-Hold to delete the game Skylauncher built. Your saves and the disc stay.	Maintenez pour supprimer le jeu construit par Skylauncher. Vos sauvegardes et le disque restent.
-Hold to delete this game's saves, their backups, the next session's seats and its caches.	Maintenez pour supprimer les sauvegardes de ce jeu, leurs copies de secours, les emplacements de la prochaine session et ses caches.
-Hold to put every key back to its default.	Maintenez pour remettre toutes les touches par défaut.
-Hold to restore this backup. The saves you have now are backed up first.	Maintenez pour restaurer cette copie. Vos sauvegardes actuelles sont d'abord mises de côté.
+Hold to rebuild the game.	Maintenez pour reconstruire le jeu.
+Hold to delete the copy.	Maintenez pour supprimer la copie.
+Hold to delete the partial copy.	Maintenez pour supprimer la copie partielle.
+Hold to delete the built game. Saves are kept.	Maintenez pour supprimer le jeu construit. Les sauvegardes sont gardées.
+Hold to delete saves, backups and caches.	Maintenez pour supprimer sauvegardes, copies de secours et caches.
+Hold to reset every key.	Maintenez pour réinitialiser toutes les touches.
+Hold to restore; your current saves are kept first.	Maintenez pour restaurer ; vos sauvegardes actuelles sont gardées d'abord.
 INSTALL	INSTALLER
 INSTALLATION INTERRUPTED	INSTALLATION INTERROMPUE
 INSTALLATION STOPPED	INSTALLATION ARRÊTÉE
 INSTALLING THE GAME	INSTALLATION DU JEU
 INSTALLING...	INSTALLATION...
-If you quit now, the install stops. It carries on from this step next time.	Si vous quittez maintenant, l'installation s'arrête. Elle reprendra à cette étape la prochaine fois.
-Install builds the game on your PC from your disc: about {} minutes and {} GB, internet needed once for the compiler.	L'installation construit le jeu sur votre PC à partir de votre disque : environ {} minutes et {} Go, avec Internet une fois pour le compilateur.
+The install stops and can resume later.	L'installation s'arrête ; vous pourrez la reprendre.
+Builds the game on your PC: about {} min, {} GB, internet needed once.	Construit le jeu sur votre PC : environ {} min, {} Go, internet requis une fois.
 Install failed	Échec de l'installation
 Installation cancelled	Installation annulée
 Installing	Installation
@@ -198,7 +192,7 @@ Licences	Licences
 Linking the game	Assemblage du jeu
 Log copied	Journal copié
 Looking for the disc image	Recherche de l'image disque
-Made with SDL 3 (zlib), Dear ImGui, {fmt}, stb, miniz and XenonRecomp's XEX readers (MIT), and the Outfit and Bungee fonts (SIL Open Font License). Skylauncher is MIT licensed.	Réalisé avec SDL 3 (zlib), Dear ImGui, {fmt}, stb, miniz et les lecteurs XEX de XenonRecomp (MIT), ainsi que les polices Outfit et Bungee (SIL Open Font License). Skylauncher est sous licence MIT.
+Built with SDL 3, Dear ImGui, {fmt}, stb, miniz, XenonRecomp, Outfit and Bungee. MIT licensed.	Construit avec SDL 3, Dear ImGui, {fmt}, stb, miniz, XenonRecomp, Outfit et Bungee. Licence MIT.
 Model: {} (id {})	Modèle : {} (id {})
 Move down	Déplacement bas
 Move left	Déplacement gauche
@@ -208,35 +202,31 @@ Native PC ports	Portages PC natifs
 Needs your disc	Disque requis
 No backups yet.	Aucune copie de secours pour l'instant.
 No disc image yet	Aucune image disque
-No game log yet: it appears after the game has run once.	Pas encore de journal du jeu : il apparaît après un premier lancement.
+No game log yet.	Pas encore de journal du jeu.
 No gamepad connected.	Aucune manette connectée.
 No notes were published with this version.	Aucune note n'a été publiée avec cette version.
-No portal found: the game will use the virtual portal.	Aucun portail trouvé : le jeu utilisera le portail virtuel.
-No portal found: the game will wait for one to be plugged in.	Aucun portail trouvé : le jeu attendra qu'on en branche un.
+No portal found: using the virtual portal.	Aucun portail trouvé : le portail virtuel est utilisé.
+No portal found: the game will wait for one.	Aucun portail trouvé : le jeu en attendra un.
 None chosen yet.	Aucun choisi pour l'instant.
 None chosen.	Aucun choisi.
 Not a game disc	Ce n'est pas un disque de jeu
-Not built on this computer yet.	Pas encore construit sur cet ordinateur.
-Not enough space: the copy needs {} and this drive has {} free.	Espace insuffisant : la copie demande {} et ce disque dispose de {} libres.
-Not needed: the game plays from its copied game data, below. Remove the copy to use the disc image again.	Inutile : le jeu fonctionne avec ses données copiées, ci-dessous. Supprimez la copie pour réutiliser l'image disque.
+Not built yet.	Pas encore construit.
+Not enough space: {} needed, {} free.	Espace insuffisant : {} requis, {} libres.
+Not needed: the game plays from its copied data.	Inutile : le jeu utilise ses données copiées.
 OK	OK
 One file	Un fichier
 Open	Ouvrir
-Open data folder	Ouvrir le dossier de données
-Open figures folder	Ouvrir le dossier des figurines
+Figures	Figurines
 Open logs folder	Dossier des journaux
-Open saves folder	Ouvrir le dossier des sauvegardes
-Open texture packs folder	Ouvrir le dossier des packs de textures
-Open the Toy Box when the game asks for a figure	Ouvrir la Toy Box quand le jeu demande une figurine
-Open the game folder	Ouvrir le dossier du jeu
+Auto-open Toy Box	Toy Box automatique
+Game files	Fichiers du jeu
 Opening the disc image	Ouverture de l'image disque
 Opens a new issue on GitHub	Ouvre un nouveau ticket sur GitHub
 PLAY	JOUER
 PLAY WITH	JOUER AVEC
-Play in fullscreen instead of a window.	Jouer en plein écran plutôt que dans une fenêtre.
 Play {}	Jouer à {}
 Play {} with Skylauncher	Jouer à {} avec Skylauncher
-Plug the portal in, then check that the game sees it.	Branchez le portail, puis vérifiez que le jeu le détecte.
+Plug in the portal, then test it.	Branchez le portail, puis testez-le.
 Portal	Portail
 Portal of Power	Portail des Pouvoirs
 Portal: not detected	Portail : non détecté
@@ -244,7 +234,6 @@ Portal: {}	Portail : {}
 Preparing the compiler	Préparation du compilateur
 Press a key for "{}" (Escape cancels)	Appuyez sur une touche pour « {} » (Échap pour annuler)
 Project page	Page du projet
-Puts this game on your Desktop with its icon. It opens Skylauncher on this game and starts it.	Place ce jeu sur votre bureau avec son icône. Il ouvre Skylauncher sur ce jeu et le lance.
 Quit	Quitter
 Quit the game before restoring a backup	Quittez le jeu avant de restaurer une copie de secours
 Reading default.xex	Lecture de default.xex
@@ -256,20 +245,19 @@ Ready to install	Prêt à installer
 Ready to play	Prêt à jouer
 Real portal (Wii, PlayStation, Xbox)	Vrai portail (Wii, PlayStation, Xbox)
 Real portal: the game will use it.	Vrai portail : le jeu l'utilisera.
-Reinstall the game	Réinstaller le jeu
+Reinstall	Réinstaller
 Release page	Page de la version
-Remove disc	Retirer le disque
+Remove	Retirer
 Remove the copy	Supprimer la copie
-Remove the partial copy	Supprimer la copie partielle
-Removing the disc only makes Skylauncher forget it: the file stays where it is, and so do the game Skylauncher built and your saves. The game reads the disc image while it runs, so PLAY asks for it again, unless you copy the game data below.	Retirer le disque fait seulement oublier l'image à Skylauncher : le fichier reste où il est, ainsi que le jeu construit par Skylauncher et vos sauvegardes. Le jeu lit l'image disque pendant qu'il tourne, donc JOUER la redemandera, sauf si vous copiez les données du jeu ci-dessous.
+Forgets the disc; the file stays where it is.	Oublie le disque ; le fichier reste en place.
 Repair the copy	Réparer la copie
-Replaces the game's textures with the files of the textures folder.	Remplace les textures du jeu par les fichiers du dossier des textures.
+Replaces the game's textures with your pack.	Remplace les textures du jeu par celles de votre pack.
 Report	Signaler
 Report a bug	Signaler un bug
 Report a problem	Signaler un problème
-Report a problem makes one text file with the last logs, your settings and your versions, with your account, computer and folder names replaced. It is shown before you save or copy it; nothing is sent.	« Signaler un problème » crée un fichier texte avec les derniers journaux, vos réglages et vos versions, où les noms de votre compte, de votre ordinateur et de vos dossiers sont remplacés. Il s'affiche avant d'être enregistré ou copié ; rien n'est envoyé.
+You see the report before saving it; nothing is sent.	Vous voyez le rapport avant de l'enregistrer ; rien n'est envoyé.
 Report copied	Rapport copié
-Report saved to {}	Rapport enregistré dans {}
+Report saved	Rapport enregistré
 Reset to defaults	Valeurs par défaut
 Resolution scale	Échelle de résolution
 Restart now	Redémarrer maintenant
@@ -279,7 +267,7 @@ Retry	Réessayer
 Right bumper	Bouton d'épaule droit
 Right trigger	Gâchette droite
 SETTINGS	RÉGLAGES
-SHA256SUMS doesn't list {}: the download can't be checked	SHA256SUMS ne mentionne pas {} : le téléchargement ne peut pas être vérifié
+{} can't be verified, so it wasn't installed	{} ne peut pas être vérifié : rien n'a été installé
 Same as the game	Identique au jeu
 Save as...	Enregistrer sous...
 Save backups	Copies de secours des sauvegardes
@@ -287,20 +275,19 @@ Saved gamepad (not connected)	Manette enregistrée (non connectée)
 Saves	Sauvegardes
 Saves and data deleted	Sauvegardes et données supprimées
 Saves restored from {}	Sauvegardes restaurées : copie du {}
-Settings of this game only. The controller and keys are in the launcher's settings, for both games.	Réglages de ce jeu uniquement. La manette et les touches sont dans les réglages du lanceur, pour les deux jeux.
-Settings, saves, figures, the games Skylauncher built and its logs. The same folder for both games.	Réglages, sauvegardes, figurines, jeux construits par Skylauncher et journaux. Le même dossier pour les deux jeux.
-Shortcut added to the Desktop: {}	Raccourci ajouté au bureau : {}
+For this game only.	Pour ce jeu seulement.
+Settings, saves, figures and builds, shared by both games.	Réglages, sauvegardes, figurines et jeux construits, communs aux deux jeux.
+Shortcut added to the Desktop	Raccourci ajouté au bureau
 Show details	Détails
 Show in folder	Afficher dans le dossier
 Skip intro movies	Passer les vidéos d'intro
-Skips the start-up logos; the story movies still play.	Passe les logos de démarrage ; les vidéos de l'histoire sont conservées.
+Skips the start-up logos.	Passe les logos de démarrage.
 Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision.	Skylanders est une marque d'Activision. Ce projet n'est ni affilié à Activision ni approuvé par Activision.
 Skylauncher couldn't find its own file.	Skylauncher n'a pas trouvé son propre fichier.
 Skylauncher is up to date.	Skylauncher est à jour.
-Skylauncher is up to date. A new version of the game is available.	Skylauncher est à jour. Une nouvelle version du jeu est disponible.
+Skylauncher is up to date. A game update is available.	Skylauncher est à jour. Une mise à jour du jeu est disponible.
 Skylauncher on GitHub	Skylauncher sur GitHub
-Skylauncher starts the game it built for the disc, else the game runtime ({}) next to it, or the one set as runtime= in the [launcher] section of {}.	Skylauncher lance le jeu qu'il a construit pour le disque, sinon l'exécutable du jeu ({}) placé à côté de lui, ou celui indiqué par runtime= dans la section [launcher] de {}.
-Skylauncher was closed before the game was built. Resume carries on where it stopped.	Skylauncher a été fermé avant la fin de la construction du jeu. « Reprendre » repart de là où elle s'est arrêtée.
+Skylauncher closed during the install. Resume carries on.	Skylauncher a été fermé pendant l'installation. Reprendre continue.
 Skylauncher {} is installed. Restart to use it.	Skylauncher {} est installé. Redémarrez pour l'utiliser.
 Something went wrong while {}.	Un problème est survenu pendant l'étape « {} ».
 Spyro's Adventure accepts this portal.	Spyro's Adventure accepte ce portail.
@@ -314,72 +301,67 @@ Support	Assistance
 Test the portal	Tester le portail
 Testing...	Test en cours...
 Texture filtering	Filtrage des textures
-The Desktop folder {} can't be written.	Impossible d'écrire dans le dossier Bureau {}.
+Can't write to the Desktop folder.	Impossible d'écrire dans le dossier Bureau.
 The address isn't a secure one (https)	L'adresse n'est pas sécurisée (https)
 The answer has no release in it	La réponse ne contient aucune version
 The answer isn't valid JSON ({})	La réponse n'est pas un JSON valide ({})
-The button pictures the game shows in its menus and prompts.	Les images de boutons affichées par le jeu dans ses menus et ses invites.
-The compiler couldn't be downloaded. Check the internet connection.	Le compilateur n'a pas pu être téléchargé. Vérifiez la connexion Internet.
-The copied game data is damaged, so the disc image is used. Repair or remove the copy in the game's settings.	Les données copiées du jeu sont endommagées : l'image disque est utilisée. Réparez ou supprimez la copie dans les réglages du jeu.
-The copied game data is damaged: checking the disc image instead	Les données copiées du jeu sont endommagées : vérification de l'image disque à la place
-The copied game data is damaged: {}	Les données copiées du jeu sont endommagées : {}
-The copied game data is damaged: {}.	Les données copiées du jeu sont endommagées : {}.
-The copy stopped: {}. Press the button again to carry on from there.	La copie s'est arrêtée : {}. Appuyez de nouveau sur le bouton pour reprendre à cet endroit.
-The disc image couldn't be read. Check that the file is complete.	L'image disque n'a pas pu être lue. Vérifiez que le fichier est complet.
+Couldn't download the compiler. Check your connection.	Téléchargement du compilateur impossible. Vérifiez votre connexion.
+Game data damaged: using the disc image.	Données du jeu endommagées : l'image disque est utilisée.
+Game data damaged: using the disc image	Données du jeu endommagées : l'image disque est utilisée
+Game data damaged: {}	Données du jeu endommagées : {}
+Copy stopped: {}. Press the button to carry on.	Copie arrêtée : {}. Appuyez sur le bouton pour reprendre.
+Couldn't read the disc image. Check that it's complete.	Lecture de l'image disque impossible. Vérifiez qu'elle est complète.
 The download failed: {}	Le téléchargement a échoué : {}
 The download holds no Skylauncher.app	Le téléchargement ne contient pas Skylauncher.app
-The download is damaged or isn't the published file (its SHA-256 doesn't match): nothing was installed	Le téléchargement est endommagé ou n'est pas le fichier publié (son SHA-256 ne correspond pas) : rien n'a été installé
-The download isn't a game kit (no SSABuild in it)	Le téléchargement n'est pas un kit de jeu (pas de SSABuild dedans)
+The download is damaged: nothing was installed	Le téléchargement est endommagé : rien n'a été installé
+The download isn't a game kit	Le téléchargement n'est pas un kit de jeu
 The download isn't a zip file	Le téléchargement n'est pas un fichier zip
-The folder next to Skylauncher can't be written to: move Skylauncher somewhere you can write, then try again	Impossible d'écrire dans le dossier à côté de Skylauncher : déplacez Skylauncher dans un dossier modifiable, puis réessayez
+Can't write next to Skylauncher: move it to a writable folder.	Écriture impossible à côté de Skylauncher : déplacez-le vers un dossier accessible en écriture.
 The game didn't finish the portal test.	Le jeu n'a pas terminé le test du portail.
 The game is running: quit it first.	Le jeu est en cours d'exécution : quittez-le d'abord.
 The game is running: quit it to restore a backup.	Le jeu est en cours d'exécution : quittez-le pour restaurer une copie de secours.
 The game is still installing	Le jeu est encore en cours d'installation
-The game isn't built yet: INSTALL it first	Le jeu n'est pas encore construit : INSTALLEZ-le d'abord
-The game keeps the previous version of a save here before it overwrites it. Restoring one keeps the saves you have now first.	Le jeu garde ici la version précédente d'une sauvegarde avant de l'écraser. Restaurer une copie met d'abord de côté vos sauvegardes actuelles.
+Press INSTALL first	Appuyez d'abord sur INSTALLER
+Earlier versions of your saves.	Versions précédentes de vos sauvegardes.
 The game kit is up to date: update the game to use it.	Le kit du jeu est à jour : mettez le jeu à jour pour l'utiliser.
-The game plays from these files: the disc image isn't needed to play, update or reinstall. Removing the copy frees the space and brings the disc image back.	Le jeu fonctionne avec ces fichiers : l'image disque n'est plus nécessaire pour jouer, mettre à jour ou réinstaller. Supprimer la copie libère l'espace et remet l'image disque en service.
-The game reads the disc image instead. Repairing copies again only the files that are missing or changed.	Le jeu lit l'image disque à la place. La réparation ne recopie que les fichiers manquants ou modifiés.
-The game runtime ({}) was not found next to the launcher.\n\nPut it in the same folder, or set its path with "runtime=" in the [launcher] section of:\n{}	L'exécutable du jeu ({}) est introuvable à côté du lanceur.\n\nPlacez-le dans le même dossier, ou indiquez son chemin avec « runtime= » dans la section [launcher] de :\n{}
-The game still reads the disc image until the copy is complete.	Le jeu lit encore l'image disque tant que la copie n'est pas terminée.
+No disc image needed.	Plus besoin de l'image disque.
+The game uses the disc image instead.	Le jeu utilise l'image disque à la place.
+The game ({}) wasn't found next to Skylauncher.\n\nPut it in the same folder.	Le jeu ({}) est introuvable à côté de Skylauncher.\n\nPlacez-le dans le même dossier.
 The game stopped unexpectedly	Le jeu s'est arrêté de façon inattendue
-The game tools couldn't be downloaded. Check the internet connection.	Les outils du jeu n'ont pas pu être téléchargés. Vérifiez la connexion Internet.
-The game tools were downloaded but SSABuild wasn't found in them.	Les outils du jeu ont été téléchargés, mais SSABuild est introuvable dedans.
+Couldn't download the game tools. Check your connection.	Téléchargement des outils impossible. Vérifiez votre connexion.
+The game tools are incomplete.	Les outils du jeu sont incomplets.
 The game was made for 30 FPS; 60 is experimental.	Le jeu a été conçu pour 30 images par seconde ; 60 est expérimental.
-The game's disc image is needed first	L'image disque du jeu est d'abord nécessaire
-The game's menus, subtitles and on-screen text. Skylauncher's own language is in its settings.	Les menus, sous-titres et textes à l'écran du jeu. La langue de Skylauncher se règle dans ses propres réglages.
-The game's spoken lines and cutscenes. They can differ from the text.	Les dialogues parlés et les cinématiques du jeu. Elles peuvent différer des textes.
+Choose the disc image first	Choisissez d'abord l'image disque
+Menus, subtitles and on-screen text.	Menus, sous-titres et textes à l'écran.
+Spoken lines and cutscenes.	Voix et cinématiques.
 The installer couldn't start.	L'installateur n'a pas pu démarrer.
-The installer kit wasn't found. Put the ssa-kit folder (the one with SSABuild in it) next to Skylauncher, then press Retry.	Le kit d'installation est introuvable. Placez le dossier ssa-kit (celui qui contient SSABuild) à côté de Skylauncher, puis appuyez sur Réessayer.
-The installer started earlier is still stopping. Resume will be possible in a moment.	L'installateur lancé précédemment est encore en train de s'arrêter. Vous pourrez reprendre dans un instant.
-The installer stopped before it could build the game.	L'installateur s'est arrêté avant d'avoir pu construire le jeu.
+Game kit not found. Put the ssa-kit folder next to Skylauncher, then press Retry.	Kit du jeu introuvable. Placez le dossier ssa-kit à côté de Skylauncher, puis appuyez sur Réessayer.
+The earlier install is still stopping. Resume in a moment.	L'installation précédente s'arrête encore. Reprenez dans un instant.
 The installer stopped before the game was built.	L'installateur s'est arrêté avant la fin de la construction du jeu.
 The installer stopped with exit code {}.	L'installateur s'est arrêté avec le code de sortie {}.
-The installer was opened: drag Skylauncher to Applications, replacing the old one.	L'installateur a été ouvert : faites glisser Skylauncher dans Applications, en remplaçant l'ancien.
-The language of Skylauncher's own text. "Same as the game" follows the game's text language, which is set in that game's settings (Language tab).	La langue des textes de Skylauncher. « Identique au jeu » suit la langue des textes du jeu, réglée dans les réglages de ce jeu (onglet Langue).
-The launcher's look, colours, fonts, background and layout are dorydev's design.	L'aspect du lanceur, ses couleurs, ses polices, son fond et sa mise en page sont l'œuvre de dorydev.
-The log of the last time the game ran, to send with a bug report. It stays on your computer until you paste it.	Le journal de la dernière exécution du jeu, à joindre à un rapport de bug. Il reste sur votre ordinateur tant que vous ne le collez pas.
-The portal can't be opened: the game will use the virtual portal.	Le portail ne peut pas être ouvert : le jeu utilisera le portail virtuel.
-The portal can't be opened: the game will wait for it.	Le portail ne peut pas être ouvert : le jeu l'attendra.
+Drag Skylauncher to Applications, replacing the old one.	Glissez Skylauncher dans Applications, en remplaçant l'ancien.
+Skylauncher's own language. "Same as the game" follows its text language.	La langue de Skylauncher. « Identique au jeu » suit la langue des textes du jeu.
+Designed by dorydev.	Conçu par dorydev.
+The game's last log, for a bug report.	Le dernier journal du jeu, pour un rapport de bug.
+The portal can't be opened: using the virtual portal.	Le portail ne s'ouvre pas : le portail virtuel est utilisé.
+The portal can't be opened: the game will wait.	Le portail ne s'ouvre pas : le jeu attendra.
 The portal test took too long and was stopped.	Le test du portail a duré trop longtemps et a été arrêté.
 The release {} has no {}	La version {} ne contient pas {}
-The test is part of the game: install it first.	Le test fait partie du jeu : installez-le d'abord.
+Install the game first.	Installez d'abord le jeu.
 The update failed: {}	La mise à jour a échoué : {}
-The zip file holds a path outside its folder: {}	Le fichier zip contient un chemin hors de son dossier : {}
 The zip file is damaged	Le fichier zip est endommagé
-There isn't enough free space on the drive (about 6 GB are needed).	Il n'y a pas assez d'espace libre sur le disque (environ 6 Go nécessaires).
+Not enough free space: about 6 GB needed.	Espace libre insuffisant : environ 6 Go requis.
 This computer has no Desktop folder.	Cet ordinateur n'a pas de dossier Bureau.
-This copy can't update itself: the release page was opened.	Cette copie ne peut pas se mettre à jour toute seule : la page de la version a été ouverte.
-This disc image has no default.xex: it isn't an Xbox 360 game, or the image is incomplete.	Cette image disque n'a pas de default.xex : ce n'est pas un jeu Xbox 360, ou l'image est incomplète.
-This disc image is damaged: its default.xex isn't a valid Xbox 360 executable.	Cette image disque est endommagée : son default.xex n'est pas un exécutable Xbox 360 valide.
-This disc image is incomplete: default.xex is cut short. Copy or dump the disc again.	Cette image disque est incomplète : default.xex est tronqué. Copiez ou extrayez à nouveau le disque.
+Can't update here: the release page was opened.	Mise à jour impossible ici : la page de la version est ouverte.
+Not an Xbox 360 game, or the image is incomplete.	Ce n'est pas un jeu Xbox 360, ou l'image est incomplète.
+The disc image is damaged. Copy the disc again.	L'image disque est endommagée. Copiez à nouveau le disque.
+The disc image is incomplete. Copy the disc again.	L'image disque est incomplète. Copiez à nouveau le disque.
 This disc image is {}, not {}.	Cette image disque est celle de {}, pas de {}.
 This game has no folder.	Ce jeu n'a pas de dossier.
-This is everything the report holds. Your account, your computer's name and your home folder are replaced. Nothing is sent: save it, or copy it into an issue.	Voici tout le contenu du rapport. Votre compte, le nom de votre ordinateur et votre dossier personnel sont remplacés. Rien n'est envoyé : enregistrez-le ou copiez-le dans un ticket.
-This is {}, but a disc version this build doesn't support (media ID {:08X}, version {}). The game code is recompiled from one exact default.xex, so other regions and revisions can't run yet.\n\nSupported:{}	C'est {}, mais dans une version de disque que cette build ne prend pas en charge (ID du média {:08X}, version {}). Le code du jeu est recompilé à partir d'un default.xex précis : les autres régions et révisions ne peuvent pas encore fonctionner.\n\nPrises en charge :{}
+Your names are removed and nothing is sent.	Vos noms sont retirés et rien n'est envoyé.
+This is {}, but this disc version isn't supported yet (media ID {:08X}, version {}).\n\nSupported:{}	C'est {}, mais cette version du disque n'est pas encore prise en charge (ID du média {:08X}, version {}).\n\nPrises en charge :{}
 This key is used by another action	Cette touche est déjà utilisée par une autre action
-This looks like the {} disc of {}, but its default.xex isn't the original one: the image is damaged or modified. Copy or dump the disc again.	Cela ressemble au disque {} de {}, mais son default.xex n'est pas l'original : l'image est endommagée ou modifiée. Copiez ou extrayez à nouveau le disque.
+This looks like the {} disc of {}, but it's damaged or modified. Copy the disc again.	On dirait le disque {} de {}, mais il est endommagé ou modifié. Copiez à nouveau le disque.
 This version of the game doesn't have the portal test yet. Update the game.	Cette version du jeu n'a pas encore le test du portail. Mettez le jeu à jour.
 Translating the game code	Traduction du code du jeu
 Translating the shaders	Traduction des shaders
@@ -387,7 +369,7 @@ Trilinear	Trilinéaire
 UPDATING...	MISE À JOUR...
 USB (Xbox) portals	Portails USB (Xbox)
 Uninstall	Désinstaller
-Uninstall the game	Désinstaller le jeu
+Remove game	Retirer le jeu
 Unknown release	Version inconnue
 Update available	Mise à jour disponible
 Update available: {}	Mise à jour disponible : {}
@@ -404,17 +386,16 @@ Version {} is available.	La version {} est disponible.
 Version {}, {}	Version {}, {}
 Video	Vidéo
 Virtual (no portal needed)	Virtuel (aucun portail nécessaire)
-Virtual portal, as chosen: no portal needed.	Portail virtuel, comme choisi : aucun portail nécessaire.
+Virtual portal chosen.	Portail virtuel choisi.
 Wait for the installation to finish	Attendez la fin de l'installation
-Waits for the screen's refresh: no tearing, a little more latency.	Attend le rafraîchissement de l'écran : pas de déchirement d'image, un peu plus de latence.
-What was already built is kept: Retry carries on from this step.	Ce qui était déjà construit est conservé : « Réessayer » repart de cette étape.
+No tearing, a little more latency.	Pas de déchirure, un peu plus de latence.
+Retry carries on from this step.	Réessayer reprend à cette étape.
 What's new	Nouveautés
 What's new in {}	Nouveautés de {}
 Widescreen	Écran large
-Windows couldn't make the shortcut {}	Windows n'a pas pu créer le raccourci {}
-Without a real portal the game uses the virtual portal (its Toy Box).\nSettings > Controls > Test the portal checks that the game sees it.	Sans vrai portail, le jeu utilise le portail virtuel (sa Toy Box).\nRéglages > Commandes > Tester le portail vérifie que le jeu le détecte.
+Without a real portal, the game uses its virtual one (the Toy Box).	Sans vrai portail, le jeu utilise son portail virtuel (la Toy Box).
 Working	En cours
-Writes the game's textures as DDS files into the textures folder, to make a pack from.	Écrit les textures du jeu en fichiers DDS dans le dossier des textures, pour créer un pack.
+For pack makers: saves the textures as DDS files.	Pour les créateurs de packs : enregistre les textures en DDS.
 Wrong disc	Mauvais disque
 X (attack)	X (attaque)
 Xbox One / Series	Xbox One / Series
@@ -435,7 +416,7 @@ nothing yet	0 octet
 {:.0f} KB	{:.0f} Ko
 {:.0f} MB	{:.0f} Mo
 {:.1f} GB	{:.1f} Go
-{} Xbox, PlayStation, Switch and most other controllers work.	{} Les manettes Xbox, PlayStation, Switch et la plupart des autres fonctionnent.
+{} Xbox, PlayStation and Switch pads work.	{} Les manettes Xbox, PlayStation et Switch fonctionnent.
 {} already plays from its copied game data	{} fonctionne déjà avec ses données copiées
 {} bytes	{} octets
 {} can't be used: {}	{} inutilisables : {}
@@ -443,15 +424,16 @@ nothing yet	0 octet
 {} elapsed	Temps écoulé : {}
 {} gamepads connected.	{} manettes connectées.
 {} h ago	il y a {} h
-{} has no SHA256SUMS: the download can't be checked, so it isn't installed	{} n'a pas de SHA256SUMS : le téléchargement ne peut pas être vérifié, il n'est donc pas installé
 {} has no {} for this computer	{} n'a pas de {} pour cet ordinateur
 {} is busy: try again when it is done	{} est occupé : réessayez quand il aura terminé
 {} min ago	il y a {} min
 {} of {}	{} sur {}
 {} of {} steps done	{} étapes sur {} terminées
 {} settings	Réglages de {}
-{} stopped unexpectedly (exit code {}).\n\nIts log has what happened: press Copy log, then Report to tell us about it. The log stays on your computer until you paste it.\n\nLogs folder: {}	{} s'est arrêté de façon inattendue (code de sortie {}).\n\nSon journal explique ce qui s'est passé : appuyez sur « Copier le journal », puis sur « Signaler » pour nous en informer. Le journal reste sur votre ordinateur tant que vous ne le collez pas.\n\nDossier des journaux : {}
+{} stopped unexpectedly (exit code {}).\n\nPress Copy log, then Report.	{} s'est arrêté de façon inattendue (code {}).\n\nAppuyez sur « Copier le journal », puis sur « Signaler ».
 {} x {} for the 3D scene	{} x {} pour la scène 3D
 {} {} %	{} {} %
 {}: game data copied	{} : données du jeu copiées
 {}: {} freed	{} : {} libérés
+Change...	Changer...
+Copies the disc's files so the disc image is no longer needed.	Copie les fichiers du disque : l'image disque ne sera plus nécessaire.

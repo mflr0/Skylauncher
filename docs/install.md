@@ -25,16 +25,16 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
      steps that really ran for the next ones; "up to date" steps say nothing about the machine);
    - **one line** under the steps with SSABuild's last `@log` of the step: it replaces itself, it is never a log;
    - **Show details**: the log in a scrollable monospace panel, the current step above it;
-   - on **failure**: a human headline ("The compiler couldn't be downloaded. Check the internet connection."), SSABuild's
-     `@error`, "What was already built is kept", and **Copy log**, **Open logs folder**, **Retry**;
+   - on **failure**: a human headline ("Couldn't download the compiler. Check your connection."), SSABuild's
+     `@error`, "Retry carries on from this step", and **Copy log**, **Open logs folder**, **Retry**;
    - **across a restart**: `[install.<sha256>] state=running|failed` and `pid=` are kept in `launcher.ini` while an install
      runs or after it failed. Next start, with the disc verified, the card comes back with the steps read from
      `install.log` ("Installation interrupted", **Resume**; Resume waits for an SSABuild that is still running).
 4. `@done <path>` and exit code 0: the path is saved for that disc and PLAY appears. On Windows SDL cannot report the
    exit code of a process started without a console window, so there `@done` alone means success.
 5. When the kit changes (another `build=` in its `kit.txt`), the Play page offers **Update the game**; the game's settings
-   (Settings button on its Play page) > Game has **Reinstall the game** (held a second), **Uninstall the game** and
-   **Open the game folder**. SSABuild is incremental, so a reinstall is quick when little changed.
+   (Settings button on its Play page) > Game has **Reinstall** (held a second), **Remove game** and
+   **Game files**. SSABuild is incremental, so a reinstall is quick when little changed.
 
 Cancel stops only the process the launcher started: SIGTERM then SIGKILL after 3 s on macOS and Linux; on Windows
 SSABuild runs in a job object, so the compilers it started stop with it (also when the launcher is closed).
@@ -95,7 +95,7 @@ The launcher, the game and SSABuild keep everything under one root per OS, chose
 | `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `saves-backup/`, `pipelines.bin`, `portal.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Giants has its own folder, `Giants/`, with the same layout (`SGRecomp.app` / `SGRecomp.exe`). |
 
 `SKYLANDERS_DATA` replaces the root (tests, portable use). `SKYLAUNCHER_DATA` still replaces the launcher's part of it
-(the game folder, the kits, the logs). The launcher settings (the gear) > Launcher > **Open data folder** opens the root, and each game's settings > Game > **Open the game folder** opens its own folder.
+(the game folder, the kits, the logs). The launcher settings (the gear) > Launcher > **Show in folder** opens the root, and each game's settings > Game > Folders > **Game files** opens its own folder.
 
 **Save backups.** The game's settings > Saves lists the backups the game keeps of its saves (`SSA/saves-backup/<time>/`, see
 SSARecomp's `docs/settings.md`): date, time and size, newest first. **Restore** (held a second) first keeps the saves the player has now
@@ -132,13 +132,13 @@ Restore uses) and **disabled while the game installs**. The sizes shown next to 
 | --- | --- | --- |
 | **Clear caches** (plain button) | `pipelines.bin` (shader cache), `launcher-cache/` (the disc's art), `portraits/`, the game's `*.log` | everything else: the saves too |
 | **Delete saves and data** (held a second) | the saves (`saves/`, or `SSA_SAVE_DIR`), `saves-backup/`, `portal.txt` (the seats of the next session), and the caches above | the built game, the disc image, the settings in `launcher.ini`, `textures/`, `figures/`, the shared figure collection |
-| **Uninstall the game** (held a second) | the built game (`SSARecomp.app` or `.exe`, its libraries and shaders), `install.log` and `install-logs/`, `pipelines.bin`, the game's logs; and `[install.<sha256>]` in `launcher.ini`, so the Play page offers INSTALL again | the saves and their backups, `portal.txt`, `textures/`, `figures/`, `launcher-cache/`, `portraits/`, the disc image, the settings |
-| **Reinstall the game** (held a second) | nothing is deleted: SSABuild builds again (incremental) | all of it |
+| **Remove game** (held a second) | the built game (`SSARecomp.app` or `.exe`, its libraries and shaders), `install.log` and `install-logs/`, `pipelines.bin`, the game's logs; and `[install.<sha256>]` in `launcher.ini`, so the Play page offers INSTALL again | the saves and their backups, `portal.txt`, `textures/`, `figures/`, `launcher-cache/`, `portraits/`, the disc image, the settings |
+| **Reinstall** (held a second) | nothing is deleted: SSABuild builds again (incremental) | all of it |
 
 After an uninstall the disc is still known, so INSTALL builds the game again and the saves are where they were. To remove
 everything the launcher keeps for a game, uninstall, then delete saves and data, then delete the game's folder by hand.
-**Remove disc** (Disc tab) only makes the launcher forget the image (`[<game>] iso=` goes): the file is not touched.
-The copied game data (`<Game>/gamedata/`, "Copy the game data" in the Disc tab, `docs/launcher_ui.md` "Game data") is kept by **Uninstall** and
+**Remove** (Disc tab) only makes the launcher forget the image (`[<game>] iso=` goes): the file is not touched.
+The copied game data (`<Game>/gamedata/`, "Copy files" in the Disc tab, `docs/launcher_ui.md` "Game data") is kept by **Uninstall** and
 untouched by the two delete buttons, like the disc image: only **Remove the copy** (Disc tab) deletes it, and the disc image comes back.
 The code is `src/launcher/game_settings.{h,cpp}` (no UI; `SkylauncherTest` runs it on scratch folders, `tests/settings_test.cpp`).
 

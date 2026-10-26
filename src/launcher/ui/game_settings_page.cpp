@@ -13,18 +13,18 @@ namespace launcher_ui
         namespace strings
         {
             constexpr const char* GameText = N_("Game text");
-            constexpr const char* GameTextHint = N_("The game's menus, subtitles and on-screen text. Skylauncher's own language is in its settings.");
+            constexpr const char* GameTextHint = N_("Menus, subtitles and on-screen text.");
             constexpr const char* GameVoices = N_("Game voices");
-            constexpr const char* GameVoicesHint = N_("The game's spoken lines and cutscenes. They can differ from the text.");
+            constexpr const char* GameVoicesHint = N_("Spoken lines and cutscenes.");
             constexpr const char* RestoreSaves = N_("Restore");
-            constexpr const char* RestoreSavesHint = N_("Hold to restore this backup. The saves you have now are backed up first.");
-            constexpr const char* Reinstall = N_("Reinstall the game");
-            constexpr const char* ReinstallHint = N_("Hold to build the game again from your disc.");
+            constexpr const char* RestoreSavesHint = N_("Hold to restore; your current saves are kept first.");
+            constexpr const char* Reinstall = N_("Reinstall");
+            constexpr const char* ReinstallHint = N_("Hold to rebuild the game.");
             constexpr const char* DeleteData = N_("Delete saves and data");
-            constexpr const char* DeleteDataHint = N_("Hold to delete this game's saves, their backups, the next session's seats and its caches.");
-            constexpr const char* Uninstall = N_("Uninstall the game");
-            constexpr const char* UninstallHint = N_("Hold to delete the game Skylauncher built. Your saves and the disc stay.");
-            constexpr const char* OpenFigures = N_("Open figures folder");
+            constexpr const char* DeleteDataHint = N_("Hold to delete saves, backups and caches.");
+            constexpr const char* Uninstall = N_("Remove game");
+            constexpr const char* UninstallHint = N_("Hold to delete the built game. Saves are kept.");
+            constexpr const char* OpenFigures = N_("Figures");
         }
 
         // "12.3 GB" for what a button would free, nothing for less than a megabyte of noise.
@@ -47,7 +47,7 @@ namespace launcher_ui
             GoTo(Page::Play);
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("Settings of this game only. The controller and keys are in the launcher's settings, for both games."));
+        ImGui::TextUnformatted(Tr("For this game only."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
@@ -83,10 +83,10 @@ namespace launcher_ui
                 Set(video, key, value ? "1" : "0");
         };
 
-        SettingRow(Tr("Fullscreen"), Tr("Play in fullscreen instead of a window."));
+        SettingRow(Tr("Fullscreen"), nullptr);
         toggle("##fullscreen", "fullscreen", "0");
 
-        SettingRow(Tr("Resolution scale"), Tr("Auto picks x1 on integrated graphics. x2 or x3 need a dedicated graphics card."));
+        SettingRow(Tr("Resolution scale"), Tr("Higher scales need a dedicated graphics card."));
         Combo("##scale", video, "resolution_scale", ScaleChoices, 0);
         if (int scale = SettingInt(m_config, video, "resolution_scale", 0); scale >= 1)
         {
@@ -98,21 +98,21 @@ namespace launcher_ui
         SettingRow(Tr("Frame rate limit"), Tr("The game was made for 30 FPS; 60 is experimental."));
         Combo("##fps", video, "fps_limit", FpsChoices, 0);
 
-        SettingRow(Tr("Skip intro movies"), Tr("Skips the start-up logos; the story movies still play."));
+        SettingRow(Tr("Skip intro movies"), Tr("Skips the start-up logos."));
         toggle("##skipintromovies", "skip_intro_movies", "0");
 
-        SettingRow(Tr("VSync"), Tr("Waits for the screen's refresh: no tearing, a little more latency."));
+        SettingRow(Tr("VSync"), Tr("No tearing, a little more latency."));
         toggle("##vsync", "vsync", "1");
 
-        SettingRow(Tr("Texture filtering"), Tr("Anisotropic filtering keeps ground textures sharp at an angle."));
+        SettingRow(Tr("Texture filtering"), Tr("Keeps textures sharp at an angle."));
         Combo("##filter", video, "anisotropy", FilterChoices, 0);
 
-        SettingRow(Tr("Widescreen"), Tr("Auto shows more to the sides on a window wider than 16:9. 16:9 keeps the game's picture, with bars."));
+        SettingRow(Tr("Widescreen"), Tr("Auto shows more on wide windows; 16:9 adds bars."));
         Combo("##aspect", video, "aspect", AspectChoices, 0);
 
-        SettingRow(Tr("HD texture packs"), Tr("Replaces the game's textures with the files of the textures folder."));
+        SettingRow(Tr("HD texture packs"), Tr("Replaces the game's textures with your pack."));
         toggle("##texturepacks", "texture_packs", "1");
-        if (PillButton(Tr("Open texture packs folder"), false, 300))
+        if (PillButton(Tr("Show in folder"), false, 300))
         {
             std::error_code error;
             std::filesystem::create_directories(GameInstallFolder({}) / "textures", error);
@@ -123,7 +123,7 @@ namespace launcher_ui
 
         if (ImGui::CollapsingHeader(Tr("Advanced")) && BeginSettingsTable("##graphicsadvanced"))
         {
-            SettingRow(Tr("Dump textures (for pack makers)"), Tr("Writes the game's textures as DDS files into the textures folder, to make a pack from."));
+            SettingRow(Tr("Dump textures"), Tr("For pack makers: saves the textures as DDS files."));
             toggle("##texturedump", "texture_dump", "0");
             EndSettingsTable();
         }
@@ -172,12 +172,12 @@ namespace launcher_ui
         {
             // The game plays from its copied game data: the image is not used, so its buttons are not offered.
             std::string iso = SettingGet(m_config, m_s->game.id, "iso");
-            ImGui::TextWrapped("%s", iso.empty() ? Tr("None chosen.") : iso.c_str());
-            note(Tr("Not needed: the game plays from its copied game data, below. Remove the copy to use the disc image again."));
+            ImGui::TextWrapped("%s", iso.empty() ? Tr("None chosen.") : LauncherMiddleEllipsis(std::filesystem::path(std::u8string(iso.begin(), iso.end())).filename().string(), 60).c_str());
+            note(Tr("Not needed: the game plays from its copied data."));
         }
         else
         {
-            ImGui::TextWrapped("%s", m_s->discPath.empty() ? Tr("None chosen yet.") : m_s->discPath.c_str());
+            ImGui::TextWrapped("%s", m_s->discPath.empty() ? Tr("None chosen yet.") : LauncherMiddleEllipsis(std::filesystem::path(std::u8string(m_s->discPath.begin(), m_s->discPath.end())).filename().string(), 60).c_str());
             switch (m_s->disc)
             {
             case DiscState::Ready:
@@ -199,11 +199,11 @@ namespace launcher_ui
             }
             const bool busy = Installing() || m_s->disc == DiscState::Verifying || m_s->copyJob.Running();
             ImGui::BeginDisabled(busy);
-            if (PillButton(m_s->discPath.empty() ? Tr("Choose disc...") : Tr("Change disc..."), true, 200))
+            if (PillButton(m_s->discPath.empty() ? Tr("Choose...") : Tr("Change..."), true, 200))
                 Browse();
             ImGui::SameLine();
             ImGui::BeginDisabled(m_s->discPath.empty());
-            if (PillButton(Tr("Remove disc"), false, 200))
+            if (PillButton(Tr("Remove"), false, 200))
                 ForgetDisc();
             ImGui::SameLine();
             if (PillButton(Tr("Show in folder"), false, 200))
@@ -214,9 +214,7 @@ namespace launcher_ui
             }
             ImGui::EndDisabled();
             ImGui::EndDisabled();
-            note(Tr("Removing the disc only makes Skylauncher forget it: the file stays where it is, and so do the game "
-                "Skylauncher built and your saves. The game reads the disc image while it runs, so PLAY asks for it again, unless "
-                "you copy the game data below."));
+            note(Tr("Forgets the disc; the file stays where it is."));
         }
         ImGui::Dummy(ImVec2(0, 16));
         DrawGameData();
@@ -251,7 +249,7 @@ namespace launcher_ui
         if (!m_s->saveBackupsLoaded)
             RefreshSaveBackups();
         const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id));
-        if (PillButton(Tr("Open saves folder"), false, 260))
+        if (PillButton(Tr("Show in folder"), false, 260))
         {
             std::filesystem::path saves = savebackup::Root(m_s->game.id);
             std::error_code error;
@@ -262,8 +260,7 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
         ImGui::TextWrapped("%s", running ? Tr("The game is running: quit it to restore a backup.")
-            : Tr("The game keeps the previous version of a save here before it overwrites it. Restoring one keeps the saves you have now "
-                 "first."));
+            : Tr("Earlier versions of your saves."));
         ImGui::PopTextWrapPos();
         ImGui::PopStyleColor();
         if (m_s->saveBackups.empty())
@@ -343,7 +340,7 @@ namespace launcher_ui
         spec.folder = DesktopFolder();
         spec.iconFolder = GameInstallFolder({});
         ShortcutResult result = CreateDesktopShortcut(spec);
-        Toast(result.ok ? Tf("Shortcut added to the Desktop: {}", datadir::Text(result.file.filename())) : result.error, !result.ok);
+        Toast(result.ok ? Tr("Shortcut added to the Desktop") : result.error, !result.ok);
     }
 
     void App::DrawGameTab()
@@ -362,15 +359,15 @@ namespace launcher_ui
 
         Title(Tr("Desktop shortcut"), TitleSize, Text);
         ImGui::BeginDisabled(m_s->disc != DiscState::Ready);
-        if (PillButton(Tr("Create a desktop shortcut"), true, 300, true))
+        if (PillButton(Tr("Create"), true, 300, true))
             CreateShortcut();
         ImGui::EndDisabled();
-        note(m_s->disc == DiscState::Ready ? Tr("Puts this game on your Desktop with its icon. It opens Skylauncher on this game and starts it.")
-                                           : Tr("Choose and verify the disc first: the shortcut takes the game's icon from it."));
+        if (m_s->disc != DiscState::Ready)
+            note(Tr("Choose the disc image first."));
         ImGui::Dummy(ImVec2(0, 16));
 
         Title(Tr("Folders"), TitleSize, Text);
-        if (PillButton(Tr("Open the game folder"), false, 260))
+        if (PillButton(Tr("Game files"), false, 260))
         {
             std::error_code error;
             std::filesystem::create_directories(folders.game, error);
@@ -389,19 +386,17 @@ namespace launcher_ui
         Title(Tr("Game"), TitleSize, Text);
         if (!m_s->installed.runtime.empty())
         {
-            ImGui::TextWrapped("%s", Tf("Built on this computer for this disc: {}", m_s->installed.runtime).c_str());
+            ImGui::TextWrapped("%s", Tr("Built for this disc."));
             ImGui::BeginDisabled(busy || running);
             if (HoldButton(Tr(strings::Reinstall), 260, Tr(strings::ReinstallHint)) && !Installing())
                 StartInstall();
             ImGui::EndDisabled();
         }
         else
-            ImGui::TextWrapped("%s", Tr("Not built on this computer yet."));
-        note(Tf("Skylauncher starts the game it built for the disc, else the game runtime ({}) next to it, or the one set as "
-            "runtime= in the [launcher] section of {}.", m_s->game.runtime, m_configPath).c_str());
+            ImGui::TextWrapped("%s", Tr("Not built yet."));
         ImGui::Dummy(ImVec2(0, 16));
 
-        Title(Tr("Delete data"), TitleSize, Text);
+        Title(Tr("Clean up"), TitleSize, Text);
         ImGui::BeginDisabled(busy || running);
         if (PillButton(Tr("Clear caches"), false, 200))
             RunDataAction(ClearGameCaches(folders), N_("Caches cleared"));
@@ -410,9 +405,7 @@ namespace launcher_ui
             RunDataAction(DeleteGameData(folders), N_("Saves and data deleted"));
         ImGui::EndDisabled();
         note(running ? Tr("The game is running: quit it first.")
-                     : Tf("Clear caches frees {} (the shader cache, the art cache, the logs): the game makes them again. Delete saves and data "
-                                   "frees {} more: the saves, their backups and the seats of the next session. Kept: the game and the disc, your "
-                                   "settings, the textures folder, and the figure collection, which both games share.",
+                     : Tf("Clearing caches frees {}; deleting saves and data frees {} more.",
                            Freed(m_s->dataSizes.caches), Freed(m_s->dataSizes.saves)).c_str());
         ImGui::Dummy(ImVec2(0, 16));
 
@@ -421,7 +414,6 @@ namespace launcher_ui
         if (HoldButton(Tr(strings::Uninstall), 300, Tr(strings::UninstallHint)))
             RunUninstall(UninstallGame(folders, m_config));
         ImGui::EndDisabled();
-        note(Tf("Deletes the game Skylauncher built, {}. Kept: your saves and their backups, the textures folder, the disc image and "
-                         "your settings. INSTALL builds it again.", Freed(m_s->dataSizes.installed)).c_str());
+        note(Tf("Frees {}. Saves and settings are kept.", Freed(m_s->dataSizes.installed)).c_str());
     }
 }

@@ -244,7 +244,7 @@ ShortcutResult WriteMacApp(const ShortcutSpec& spec)
     fs::create_directories(app / "Contents" / "MacOS", error);
     fs::create_directories(app / "Contents" / "Resources", error);
     if (error)
-        return Fail(Tf("Couldn't make {}: {}", datadir::Text(app), error.message()));
+        return Fail(Tf("Couldn't create the shortcut: {}", error.message()));
     std::vector<uint8_t> icns = MacIcns(spec.iconPng);
     bool ok = WriteText(app / "Contents" / "Info.plist", MacInfoPlist(spec.gameName, spec.gameId, !icns.empty())) &&
         WriteText(app / "Contents" / "MacOS" / "launch", MacLaunchScript(spec.launcher, spec.gameId)) &&
@@ -252,7 +252,7 @@ ShortcutResult WriteMacApp(const ShortcutSpec& spec)
     fs::permissions(app / "Contents" / "MacOS" / "launch", fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec |
         fs::perms::others_read | fs::perms::others_exec, error);
     if (!ok)
-        return Fail(Tf("Couldn't write {}", datadir::Text(app)));
+        return Fail(Tr("Couldn't create the shortcut"));
     fs::last_write_time(app, fs::file_time_type::clock::now(), error); // the Finder looks at the icon again
     ShortcutResult result;
     result.ok = true;
@@ -272,7 +272,7 @@ ShortcutResult WriteLinuxDesktop(const ShortcutSpec& spec)
     fs::create_directories(spec.folder, error);
     fs::path file = spec.folder / (lower + ".desktop");
     if (!WriteText(file, LinuxDesktopEntry(spec.gameName, spec.launcher, spec.gameId, icon)))
-        return Fail(Tf("Couldn't write {}", datadir::Text(file)));
+        return Fail(Tr("Couldn't create the shortcut"));
     // Desktops launch a .desktop file only when it is executable.
     fs::permissions(file, fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec | fs::perms::others_read | fs::perms::others_exec, error);
     ShortcutResult result;
@@ -319,7 +319,7 @@ namespace
         if (SUCCEEDED(init))
             CoUninitialize();
         if (!ok)
-            return Fail(Tf("Windows couldn't make the shortcut {}", datadir::Text(file)));
+            return Fail(Tr("Couldn't create the shortcut"));
         ShortcutResult result;
         result.ok = true;
         result.file = file;
@@ -337,7 +337,7 @@ ShortcutResult CreateDesktopShortcut(const ShortcutSpec& spec)
     std::error_code error;
     fs::create_directories(spec.folder, error);
     if (!fs::is_directory(spec.folder, error))
-        return Fail(Tf("The Desktop folder {} can't be written.", datadir::Text(spec.folder)));
+        return Fail(Tr("Can't write to the Desktop folder."));
 #if defined(__APPLE__)
     return WriteMacApp(spec);
 #elif defined(_WIN32)

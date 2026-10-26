@@ -186,16 +186,16 @@ std::string InstallFailureHeadline(const InstallChecklist& list, const InstallPr
     if (progress.startFailed || has("kit wasn't found") || has("couldn't start"))
         return Tr("The installer couldn't start.");
     if (has("space") || has("no room") || has("disk full"))
-        return Tr("There isn't enough free space on the drive (about 6 GB are needed).");
+        return Tr("Not enough free space: about 6 GB needed.");
     if (has("cannot write") || has("couldn't create") || has("permission") || has("access is denied"))
-        return Tr("A file of the game folder couldn't be written.");
+        return Tr("Couldn't write to the game folder.");
     std::string step = list.current >= 0 ? list.rows[size_t(list.current)].id : std::string();
     if (step == "kit")
-        return Tr("The game tools couldn't be downloaded. Check the internet connection.");
+        return Tr("Couldn't download the game tools. Check your connection.");
     if (step == "toolchain" && (has("download") || has("curl") || has("http") || has("sha-256") || has("checksum")))
-        return Tr("The compiler couldn't be downloaded. Check the internet connection.");
+        return Tr("Couldn't download the compiler. Check your connection.");
     if (step == "disc")
-        return Tr("The disc image couldn't be read. Check that the file is complete.");
+        return Tr("Couldn't read the disc image. Check that it's complete.");
     if (list.current >= 0)
     {
         std::string title = list.rows[size_t(list.current)].title;
@@ -203,5 +203,5 @@ std::string InstallFailureHeadline(const InstallChecklist& list, const InstallPr
             title[0] = char(std::tolower(static_cast<unsigned char>(title[0])));
         return Tf("Something went wrong while {}.", title);
     }
-    return Tr("The installer stopped before it could build the game.");
+    return Tr("The installer stopped before the game was built.");
 }

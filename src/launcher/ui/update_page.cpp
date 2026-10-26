@@ -1,5 +1,5 @@
 // Updates in the window: the check at start, the banner ("Update available" and its progress), What's new, and the About
-// page (version, "Check for updates", credits and licences). The logic is in launcher/updater.cpp (docs/updates.md).
+// page (version, "Check now", credits and licences). The logic is in launcher/updater.cpp (docs/updates.md).
 #include "launcher/ui/launcher_app.h"
 #include <ctime>
 #include <fmt/format.h>
@@ -82,7 +82,7 @@ namespace launcher_ui
                 if (m_updateManual)
                     m_updateDoneNote = !state.checked ? Tf("Couldn't check: {}", state.checkError)
                         : state.launcherNewer          ? Tf("Version {} is available.", state.launcher.tag)
-                        : state.kitNewer               ? Tr("Skylauncher is up to date. A new version of the game is available.")
+                        : state.kitNewer               ? Tr("Skylauncher is up to date. A game update is available.")
                                                        : Tr("Skylauncher is up to date.");
             }
             else if (state.phase == UpdateManager::Phase::Done && state.doing == "kit")
@@ -160,7 +160,7 @@ namespace launcher_ui
         }
         else
         {
-            text = Tr("A new version of the game is available");
+            text = Tr("Game update available");
             buttons = { { Tr("Update the game"), true, 170, UpdateKit }, { Tr("Later"), false, 100, KitLater } };
         }
 
@@ -292,7 +292,7 @@ namespace launcher_ui
         UpdateManager::State state = m_updates.Snapshot();
         bool busy = m_updates.Busy();
         ImGui::BeginDisabled(busy);
-        if (PillButton(state.phase == UpdateManager::Phase::Checking ? Tr("Checking...") : Tr("Check for updates"), false, 220))
+        if (PillButton(state.phase == UpdateManager::Phase::Checking ? Tr("Checking...") : Tr("Check now"), false, 220))
             StartUpdateCheck(true);
         ImGui::EndDisabled();
         ImGui::SameLine(0, 14);
@@ -307,11 +307,10 @@ namespace launcher_ui
             Set("update", "auto_check", automatic ? "1" : "0");
         ImGui::SameLine(0, 12);
         ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(Tr("Check for updates when Skylauncher starts (once a day)"));
+        ImGui::TextUnformatted(Tr("Check at startup"));
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", Tr("A check asks github.com for the latest release of Skylauncher: no account, no identifier, nothing else is sent. "
-            "Updates are checked against the release's SHA-256 before they are installed."));
+        ImGui::TextWrapped("%s", Tr("Only asks github.com for the latest version. Nothing else is sent."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
@@ -321,15 +320,13 @@ namespace launcher_ui
         Title("Skylauncher", HeadlineSize);
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Version {}, {}", LauncherVersion(), PlatformName()).c_str());
         ImGui::Dummy(ImVec2(0, 6));
-        ImGui::TextWrapped("%s", Tr("A launcher for the native PC ports of the Skylanders games. It contains no game code or art: everything shown "
-            "from the game is read from your own disc and kept on this computer."));
+        ImGui::TextWrapped("%s", Tr("A launcher for the native PC ports of Skylanders. It has no game code or art: all of it comes from your own disc."));
 
         ImGui::Dummy(ImVec2(0, 14));
         Title(Tr("Credits"), TitleSize, Text);
-        ImGui::TextWrapped("%s", Tr("The launcher's look, colours, fonts, background and layout are dorydev's design."));
+        ImGui::TextWrapped("%s", Tr("Designed by dorydev."));
         ImGui::Dummy(ImVec2(0, 4));
-        ImGui::TextWrapped("%s", Tr("Made with SDL 3 (zlib), Dear ImGui, {fmt}, stb, miniz and XenonRecomp's XEX readers (MIT), and the Outfit and "
-            "Bungee fonts (SIL Open Font License). Skylauncher is MIT licensed."));
+        ImGui::TextWrapped("%s", Tr("Built with SDL 3, Dear ImGui, {fmt}, stb, miniz, XenonRecomp, Outfit and Bungee. MIT licensed."));
         ImGui::Dummy(ImVec2(0, 6));
         if (PillButton(Tr("Project page"), false, 180))
             SDL_OpenURL(Project);
