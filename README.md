@@ -8,20 +8,23 @@ on your computer.
 
 | Game | Status |
 |---|---|
-| Spyro's Adventure | ![code recompiled: 100% (31k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2831k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: playable](https://img.shields.io/badge/Windows-playable-brightgreen) ![Linux: not tested](https://img.shields.io/badge/Linux-not%20tested-lightgrey) |
-| Giants | ![code recompiled: 100% (23k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2823k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: not tested](https://img.shields.io/badge/Windows-not%20tested-lightgrey) ![Linux: not tested](https://img.shields.io/badge/Linux-not%20tested-lightgrey) |
-| Swap Force | ![code recompiled: 100% (81k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2881k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: not tested](https://img.shields.io/badge/Windows-not%20tested-lightgrey) ![Linux: not tested](https://img.shields.io/badge/Linux-not%20tested-lightgrey) |
+| Spyro's Adventure | ![code recompiled: 100% (31k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2831k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: playable](https://img.shields.io/badge/Windows-playable-brightgreen) ![Linux: container only](https://img.shields.io/badge/Linux-container%20only-yellow) |
+| Giants | ![code recompiled: 100% (23k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2823k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: Wine only](https://img.shields.io/badge/Windows-Wine%20only-yellow) ![Linux: container only](https://img.shields.io/badge/Linux-container%20only-yellow) |
+| Swap Force | ![code recompiled: 100% (81k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2881k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: Wine only](https://img.shields.io/badge/Windows-Wine%20only-yellow) ![Linux: container only](https://img.shields.io/badge/Linux-container%20only-yellow) |
 
 ## The games
 
 | Game | Mac | Windows | Linux | Played so far |
 |---|---|---|---|---|
-| Spyro's Adventure | ✅ | ✅ | ⚠️ not tested on a real PC | The story and the Heroic Challenges; a complete playthrough is not confirmed yet |
-| Giants | ✅ | ⚠️ not tested on a real PC | ⚠️ not tested on a real PC | Chapter 1, and 78 of its 91 levels in an automatic tour (the other 13 are challenge levels the tour cannot start) |
-| Swap Force | ✅ new | ⚠️ not tested on a real PC | ⚠️ not tested on a real PC | The tutorial, the first area of the story and the two-player arenas |
+| Spyro's Adventure | ✅ | ✅ | ⚠️ tested in a container only | The story and the Heroic Challenges; a complete playthrough is not confirmed yet |
+| Giants | ✅ | ⚠️ tested in Wine only | ⚠️ tested in a container only | Chapter 1, and 78 of its 91 levels in an automatic tour (the other 13 are challenge levels the tour cannot start) |
+| Swap Force | ✅ new | ⚠️ tested in Wine only | ⚠️ tested in a container only | The tutorial, the first area of the story and the two-player arenas |
 
 Finished a game, or played one on Windows or Linux? Please say so in an
 [issue](https://github.com/mflr0/Skylauncher/issues): it is how this table gets filled.
+
+**Testers wanted.** Above all on a real Windows or Linux PC (and the Steam Deck), and with a real Portal of Power. Play a
+game as far as you like and tell us in an issue what worked and what did not (Settings > Support > Copy game log helps).
 
 ## What you need
 
@@ -127,7 +130,8 @@ The developer docs are in `docs/`: `launcher_ui.md` covers the screens and theme
 
 ## Known issues
 
-- Giants and Swap Force have not been tested on a real Windows or Linux PC yet.
+- On a real Windows PC only Spyro's Adventure has been played; the other games were run in Wine. On Linux every game was
+  run in a container, none on a real PC yet.
 - Swap Force is new: not every mode has been played through yet.
 - The 60 fps option is experimental.
 - The Mac app is not notarized, and Windows SmartScreen may warn about the launcher (see Get started).
@@ -139,7 +143,11 @@ Vulkan and Direct3D 12 shaders, on your computer, from your disc. A runtime writ
 (memory, threads, files, graphics, audio, controllers, the Portal of Power). This is an independent project: it is not a
 fork of other Skylanders recompilation projects, even where an executable shares a name with one of them.
 
-The reverse engineering is the author's own work; AI tools assist with the reimplementation.
+Every change is checked by automatic tests: each game is built from its disc, started and played for a few minutes by a
+script (frame rate, sound, the picture compared with a reference, saves, figures), and scripted tours load the games'
+levels one by one. Before a release, the Windows and Linux builds of every game are run too, in Wine and in a container.
+
+The reverse engineering is the author's own work; AI tools assist with the reimplementation and run these tests.
 
 ## Credits and licence
 
