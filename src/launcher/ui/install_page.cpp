@@ -523,6 +523,7 @@ namespace launcher_ui
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 8));
             ImGui::BeginChild("##installlog", ImVec2(0, logH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                 ImGuiWindowFlags_HorizontalScrollbar);
+            ImGui::SetScrollX(0.0f);
             bool atBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4;
             ImGui::PushFont(m_monoFont, SmallSize);
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));

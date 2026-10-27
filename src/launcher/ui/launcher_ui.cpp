@@ -1100,6 +1100,7 @@ namespace launcher_ui
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusLarge);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
         ImGui::BeginChild(id, size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_NavFlattened | flags);
+        ImGui::SetScrollX(0.0f);
     }
 
     void App::EndCard()
@@ -1991,6 +1992,7 @@ namespace launcher_ui
         float width = std::min(available, 940.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
         ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
 
         static const char* const Tabs[] = { N_("Controls"), N_("Launcher"), N_("Support"), N_("About") };
         Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);

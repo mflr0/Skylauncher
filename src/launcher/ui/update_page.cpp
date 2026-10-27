@@ -242,6 +242,7 @@ namespace launcher_ui
             UpdateManager::State state = m_updates.Snapshot();
             Title(Tf("What's new in {}", state.launcher.tag).c_str(), TitleSize, Text);
             ImGui::BeginChild("##notes", ImVec2(0, -52), ImGuiChildFlags_None);
+            ImGui::SetScrollX(0.0f);
             std::string notes = state.launcher.notes.empty() ? std::string(Tr("No notes were published with this version.")) : state.launcher.notes;
             ImGui::PushTextWrapPos(0);
             ImGui::TextUnformatted(notes.c_str()); // plain text: the release's Markdown as written

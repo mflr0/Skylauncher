@@ -117,6 +117,7 @@ namespace launcher_ui
         }
         ImGui::Dummy(ImVec2(0, 6));
         ImGui::BeginChild("##managebody", ImVec2(0, size.y - ImGui::GetCursorPosY() - Pad - 50), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
         switch (m_manageTab)
         {
         case 0: DrawTrash(); break;
