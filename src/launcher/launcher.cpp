@@ -1,4 +1,5 @@
 #include "launcher/launcher.h"
+#include "launcher/env.h"
 #include "launcher/i18n.h"
 #include "launcher/ui/launcher_ui.h"
 #include "shared/collection/datadir.h"
@@ -323,7 +324,7 @@ LauncherArguments ParseLauncherArguments(int argc, const char* const* argv)
 
 const char* LauncherUsage()
 {
-    return "Skylauncher [--game <id>] [--play]\n\n"
+    return "Arkeyan Launcher [--game <id>] [--play]\n\n"
            "  --game <id>  open on that game's page: ssa (Spyro's Adventure), giants (Giants) or swapforce (Swap Force)\n"
            "  --play       start the game as soon as its disc is checked (what a desktop shortcut runs)\n"
            "  --help       show this";
@@ -332,7 +333,7 @@ const char* LauncherUsage()
 std::string LauncherConfigPath()
 {
     // Tests point the launcher and the game at the same scratch file (the runtime reads this name too).
-    if (const char* file = SDL_getenv("SSA_LAUNCHER_INI"))
+    if (const char* file = LauncherEnv("SKY_LAUNCHER_INI"))
         return file;
     return datadir::Text(datadir::LauncherIni());
 }
@@ -389,6 +390,74 @@ bool SaveLauncherConfig(const std::string& path, const LauncherConfig& config)
     return SDL_SaveFile(path.c_str(), text.data(), text.size());
 }
 
+namespace
+{
+    // SSA_LAUNCHER_X, SKYLAUNCHER_X and SSA_X are the older spellings of SKY_LAUNCHER_X and SKY_X.
+    std::string CurrentVariableName(const std::string& name)
+    {
+        for (const auto& [older, current] : { std::pair<const char*, const char*>{ "SSA_LAUNCHER_", "SKY_LAUNCHER_" },
+                 { "SKYLAUNCHER_", "SKY_LAUNCHER_" }, { "SSA_", "SKY_" } })
+            if (name.rfind(older, 0) == 0 && name.size() > strlen(older))
+                return current + name.substr(strlen(older));
+        return name;
+    }
+
+    // The current name and its older ones.
+    std::vector<std::string> AllNamesOf(const std::string& current)
+    {
+        std::string first, second;
+        skyenv::OlderNames(current, first, second);
+        std::vector<std::string> names{ current };
+        for (const std::string& name : { first, second })
+            if (!name.empty())
+                names.push_back(name);
+        return names;
+    }
+}
+
+SDL_Environment* CreateGameEnvironment()
+{
+    SDL_Environment* environment = SDL_CreateEnvironment(false);
+    if (environment == nullptr)
+        return nullptr;
+    char** variables = SDL_GetEnvironmentVariables(SDL_GetEnvironment());
+    if (variables == nullptr)
+        return environment;
+    for (int i = 0; variables[i] != nullptr; i++)
+    {
+        std::string entry = variables[i];
+        size_t equals = entry.find('=');
+        if (equals != std::string::npos && equals > 0)
+            SDL_SetEnvironmentVariable(environment, entry.substr(0, equals).c_str(), entry.c_str() + equals + 1, true);
+    }
+    // The aliases, after every variable is in: one that is set under its own name is never replaced by another's value.
+    for (int i = 0; variables[i] != nullptr; i++)
+    {
+        std::string entry = variables[i];
+        size_t equals = entry.find('=');
+        if (equals == std::string::npos || equals == 0)
+            continue;
+        std::string current = CurrentVariableName(entry.substr(0, equals));
+        if (current.rfind("SKY_", 0) == 0)
+            for (const std::string& name : AllNamesOf(current))
+                SDL_SetEnvironmentVariable(environment, name.c_str(), entry.c_str() + equals + 1, false);
+    }
+    SDL_free(variables);
+    return environment;
+}
+
+void SetGameVariable(const char* currentName, const char* value)
+{
+    for (const std::string& name : AllNamesOf(currentName))
+        SDL_setenv_unsafe(name.c_str(), value, 1);
+}
+
+void UnsetGameVariable(const char* currentName)
+{
+    for (const std::string& name : AllNamesOf(currentName))
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name.c_str()), SDL_unsetenv_unsafe(name.c_str());
+}
+
 LanguageChoice ResolveLanguages(const GameInfo& game)
 {
     LauncherConfig config = LoadLauncherConfig(LauncherConfigPath());
@@ -397,7 +466,7 @@ LanguageChoice ResolveLanguages(const GameInfo& game)
         const char* value = getenv(variable);
         return value != nullptr ? std::string(value) : config[game.id][key];
     };
-    return { pick("SSA_LANGUAGE", "language"), pick("SSA_VOICE_LANGUAGE", "voice_language") };
+    return { pick("SKY_LANGUAGE", "language"), pick("SKY_VOICE_LANGUAGE", "voice_language") };
 }
 
 std::string ResolveGameSource(int argc, char** argv, const GameInfo& game, bool interactive)

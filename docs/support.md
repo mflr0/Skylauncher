@@ -9,12 +9,12 @@ In the "Skylanders" data folder (`%APPDATA%\Skylanders\` on Windows, `~/Library/
 | --- | --- | --- |
 | `SSA/SSARecomp.log` (`.prev.log`: the run before) | the game runtime | its own log: version, OS, CPU, GPU, settings, `[perf]` |
 | `logs/skylauncher-game.log` (`.prev.log`) | the launcher | the runtime's stdout and stderr, from its first byte: early crashes, a missing DLL's message |
-| `SSA/install.log` (`.prev.log`), `SSA/install-logs/` | the launcher, SSABuild | what SSABuild printed during the install, and its own step logs kept after the build (docs/install.md) |
+| `SSA/install.log` (`.prev.log`), `SSA/install-logs/` | the launcher, SkyBuild | what SkyBuild printed during the install, and its own step logs kept after the build (docs/install.md) |
 | `logs/migration.log` | the first start after an update | what was moved from the older folders |
 
 Settings (the gear) > Support: **Report a problem** (one text file with the last logs, the settings and the versions;
 see below), **Copy game log** (the end of `SSARecomp.log`, then of `skylauncher-game.log`, each under a heading) and
-**Open logs folder** (`logs/`). `SKYLAUNCHER_LOG_DIR` replaces both log folders (tests).
+**Open logs folder** (`logs/`). `SKY_LAUNCHER_LOG_DIR` replaces both log folders (tests).
 
 ## Report a problem
 
@@ -34,7 +34,7 @@ Missing files are named as empty or not found, never skipped silently. Before it
 `/Users/<name>`, `C:\Users\<name>`, `C:/Users/<name>` and `/home/<name>` become `<home>`, and the folder holding the
 disc image becomes `<iso folder>`. The replacement is case-insensitive, whole names only, one pass; everything else is
 kept byte for byte. The window has **Save as...** (the extension is `.txt`, the name
-`Skylauncher-report-<yyyymmdd-hhmmss>.txt`) and **Copy**; nothing is uploaded. Unit tests for the redaction and the
+`ArkeyanLauncher-report-<yyyymmdd-hhmmss>.txt`) and **Copy**; nothing is uploaded. Unit tests for the redaction and the
 report are in `tests/shell_test.cpp` (`Report: ...`).
 
 ## The launcher stays while the game runs
@@ -75,5 +75,5 @@ reset command: "Model: Spyro's Adventure portal (Xbox 360) (id 01 28)", then "Sp
 the game would reject or warn about it; the contract is the runtime's `docs/portal_probe.md`). A runtime without `--portal-probe` exits with code 2: "This
 version of the game doesn't have the portal test yet". Parser and tests: `ParsePortalProbe`, `tests/shell_test.cpp`.
 
-Portal mode is `[portal] mode` = `auto`, `emulated` (Virtual) or `real`; the launcher passes it as `SSA_PORTAL`. Older
+Portal mode is `[portal] mode` = `auto`, `emulated` (Virtual) or `real`; the launcher passes it as `SKY_PORTAL`. Older
 `hid` and `usb` values still work and show as "Real portal".

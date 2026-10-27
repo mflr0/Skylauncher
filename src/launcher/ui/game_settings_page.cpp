@@ -1,5 +1,5 @@
 // A game's own settings (the Settings button on its Play page): Video, Language, Disc, Saves and Game (shortcut, folders,
-// reinstall, delete data, uninstall). Skylauncher's own settings and what both games share (the controller, the keys) are in
+// reinstall, delete data, uninstall). Arkeyan Launcher's own settings and what both games share (the controller, the keys) are in
 // the gear's Settings (launcher_ui.cpp). The video keys are the game's own copy in [<game>.video] (game_settings.h).
 #include "launcher/ui/launcher_app.h"
 #include "launcher/shortcut.h"
@@ -342,7 +342,7 @@ namespace launcher_ui
         RunDataAction(result, N_("Game uninstalled"));
     }
 
-    // A shortcut on the Desktop that opens Skylauncher on this game and starts it, with the game's icon from its disc.
+    // A shortcut on the Desktop that opens Arkeyan Launcher on this game and starts it, with the game's icon from its disc.
     void App::CreateShortcut()
     {
         ShortcutSpec spec;

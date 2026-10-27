@@ -1,10 +1,11 @@
-// Skylauncher: shows the launcher, then starts the game runtime with the disc image the player chose.
+// Arkeyan Launcher: shows the launcher, then starts the game runtime with the disc image the player chose.
 #include "launcher/game_install.h"
 #include "launcher/game_settings.h"
 #include "launcher/i18n.h"
 #include "shared/collection/datadir.h"
 #include "launcher/game_run.h"
 #include "launcher/launcher.h"
+#include "launcher/shortcut.h"
 #include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -58,7 +59,7 @@ int main(int argc, char** argv)
     {
         fprintf(stderr, "%s\n", LauncherUsage());
 #ifdef _WIN32
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Skylauncher", LauncherUsage(), nullptr); // a Windows app has no console
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "Arkeyan Launcher", LauncherUsage(), nullptr); // a Windows app has no console
 #endif
         return 0;
     }
@@ -67,6 +68,14 @@ int main(int argc, char** argv)
     datadir::MigrateOnce(); // the older folders into <data root> (docs/install.md), before any path is used
     std::string configPath = LauncherConfigPath();
     LauncherConfig config = LoadLauncherConfig(configPath);
+
+    // Shortcuts made by a launcher called Skylauncher start this one and carry its name.
+    {
+        std::vector<std::pair<std::string, std::string>> shortcutGames;
+        for (const GameInfo& info : g_games)
+            shortcutGames.emplace_back(info.id, info.name);
+        RefreshShortcuts(DesktopFolder(), shortcutGames, SelfExecutable());
+    }
 
     // The game last shown ([launcher] game=), else Spyro's Adventure. Picking another game in the sidebar switches the
     // window to it in place; the game that was shown when PLAY was pressed is the one that runs.
@@ -87,13 +96,13 @@ int main(int argc, char** argv)
     if (chosen.empty())
         return 0;
 
-    // SKYLAUNCHER_RUNTIME, else the game built for this disc, else the player's own runtime.
+    // SKY_LAUNCHER_RUNTIME, else the game built for this disc, else the player's own runtime.
     std::string runtime = FindRuntime(*game, config, true);
     if (runtime.empty())
         runtime = !installed.empty() ? installed : FindRuntime(*game, config);
     if (runtime.empty())
     {
-        std::string message = Tf("The game ({}) wasn't found next to Skylauncher.\n\nPut it in the same folder.", game->runtime);
+        std::string message = Tf("The game ({}) wasn't found next to Arkeyan Launcher.\n\nPut it in the same folder.", game->runtime);
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, message.c_str(), nullptr);
         return 1;
     }
@@ -105,15 +114,15 @@ int main(int argc, char** argv)
             return;
         auto value = entry->second.find(key);
         if (value != entry->second.end() && !value->second.empty())
-            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), variable, value->second.c_str(), true);
+            SetGameVariable(variable, value->second.c_str());
     };
     // The video settings of this game are what the runtime reads from [video] (game_settings.h).
     ApplyGameVideo(config, game->id);
     SaveLauncherConfig(configPath, config);
-    pass("SSA_PORTAL", "portal", "mode");
-    pass("SSA_PORTAL_PLACE", "portal", "place");
-    pass("SSA_LANGUAGE", game->id, "language");
-    pass("SSA_VOICE_LANGUAGE", game->id, "voice_language");
+    pass("SKY_PORTAL", "portal", "mode");
+    pass("SKY_PORTAL_PLACE", "portal", "place");
+    pass("SKY_LANGUAGE", game->id, "language");
+    pass("SKY_VOICE_LANGUAGE", game->id, "voice_language");
 
     // A game built before the one data folder would look for its saves and settings in the older folders, which the
     // migration emptied: point it at the new ones until "Update the game" rebuilds it (docs/install.md, "Older builds").
@@ -122,12 +131,12 @@ int main(int argc, char** argv)
     {
         auto set = [](const char* variable, const std::filesystem::path& path) {
             std::u8string text = path.u8string();
-            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), variable, std::string(text.begin(), text.end()).c_str(), true);
+            SetGameVariable(variable, std::string(text.begin(), text.end()).c_str());
         };
-        set("SSA_LAUNCHER_INI", std::filesystem::path(std::u8string(configPath.begin(), configPath.end())));
-        set("SSA_SAVE_DIR", gameFolder / "saves");
-        set("SSA_LOG", gameFolder / "SSARecomp.log");
-        set("SSA_PORTRAITS", gameFolder / "portraits");
+        set("SKY_LAUNCHER_INI", std::filesystem::path(std::u8string(configPath.begin(), configPath.end())));
+        set("SKY_SAVE_DIR", gameFolder / "saves");
+        set("SKY_LOG", gameFolder / "SSARecomp.log");
+        set("SKY_PORTRAITS", gameFolder / "portraits");
     }
 
     // The launcher stays until the game ends: it keeps the game's output in skylauncher-game.log, and says so if the game

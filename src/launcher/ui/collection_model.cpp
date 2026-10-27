@@ -1,4 +1,5 @@
 #include "launcher/ui/collection_model.h"
+#include "launcher/env.h"
 #include "launcher/launcher.h"
 #include "shared/dir_list.h"
 #include "shared/collection/datadir.h"
@@ -19,7 +20,7 @@ namespace launcher_ui
     {
         if (FindGame(game.id) == nullptr) // no runtime of ours yet
             return {};
-        if (const char* saves = getenv("SSA_SAVE_DIR"))
+        if (const char* saves = skyenv::Get("SKY_SAVE_DIR"))
             return std::string(saves) + "/portal.txt";
         // The game's folder in the data root, as host/portal.cpp asks for it.
         std::filesystem::path folder = datadir::Game(game.id);

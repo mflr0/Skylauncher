@@ -26,7 +26,7 @@ struct InstallKit
     std::vector<std::string> games; // "games=" in kit.txt: what the kit builds ("ssa", "giants", "swapforce"); a kit before 0.5.0 has none: SSA only
     std::map<std::string, std::string> gameVersions; // "game_version.<id>=" in kit.txt: the version of each game the kit builds ("0.8.2"); a kit before 0.5.2 has none
     std::string tag;                // the release it was downloaded from (its kit/<tag>/ folder), "" for any other kit
-    bool chosen = false;            // SKYLAUNCHER_KIT or "[launcher] kit=": the player's own, never replaced by the launcher
+    bool chosen = false;            // SKY_LAUNCHER_KIT or "[launcher] kit=": the player's own, never replaced by the launcher
 
     bool Builds(std::string_view gameId) const;
     std::string GameVersion(std::string_view gameId) const; // "" when the kit does not say
@@ -36,24 +36,24 @@ struct InstallKit
 // False for a kit that says nothing about it, and for the player's own (`chosen`).
 bool KitOlderThanLauncher(const InstallKit& kit, std::string_view launcherVersion);
 
-// Where Skylauncher keeps what it makes: the "Skylanders" data folder shared with the games (datadir.h: SKYLANDERS_DATA, else
+// Where Arkeyan Launcher keeps what it makes: the "Skylanders" data folder shared with the games (datadir.h: SKYLANDERS_DATA, else
 // %APPDATA%\Skylanders on Windows, ~/Library/Application Support/Skylanders on macOS, ~/.local/share/Skylanders on Linux), or
-// SKYLAUNCHER_DATA (tests). The built games are in <game>/ (SSA/), the downloaded kits in kit/, the compiler in toolchains/.
+// SKY_LAUNCHER_DATA (tests). The built games are in <game>/ (SSA/), the downloaded kits in kit/, the compiler in toolchains/.
 std::filesystem::path LauncherDataFolder();
 std::filesystem::path DownloadedKitsFolder(); // kit/<release tag>/ folders, each holding SSABuild
 
-// The kit in `folder`: empty when it holds no SSABuild.
+// The kit in `folder`: empty when it holds no SkyBuild (or SSABuild, in a kit for older launchers).
 std::optional<InstallKit> InstallKitIn(const std::filesystem::path& folder);
 
-// The kit: SKYLAUNCHER_KIT, else "[launcher] kit=", else a folder next to the launcher (or its macOS app bundle) named
-// ssa-kit, kit, or starting with ssa-kit (an unzipped "ssa-kit-windows-x64") unless a downloaded kit comes from a newer
+// The kit: SKY_LAUNCHER_KIT, else "[launcher] kit=", else a folder next to the launcher (or its macOS app bundle) named
+// skylanders-kit, ssa-kit, kit, or starting with skylanders-kit or ssa-kit (an unzipped "skylanders-kit-windows-x64") unless a downloaded kit comes from a newer
 // release (or when it cannot build `gameId`, if one is given and the downloaded kit can), else the newest downloaded kit.
-// Empty when none holds SSABuild.
+// Empty when none holds SkyBuild or SSABuild.
 std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::string_view gameId = {});
 
-// A runtime the player set up themselves: SKYLAUNCHER_RUNTIME, else "[launcher] runtime=" in the settings file, else
+// A runtime the player set up themselves: SKY_LAUNCHER_RUNTIME, else "[launcher] runtime=" in the settings file, else
 // the game's runtime executable next to the launcher (or inside its macOS app bundle). Empty when none exists.
-// `overrideOnly` keeps only SKYLAUNCHER_RUNTIME, which wins over an installed game.
+// `overrideOnly` keeps only SKY_LAUNCHER_RUNTIME, which wins over an installed game.
 std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly = false);
 
 // The game the launcher is showing ("ssa", "giants", "swapforce": GameInfo::id). Set by main() before a game's window opens; the

@@ -2,9 +2,11 @@ name: Build
 
 # Every push to main or feat/** builds Windows, Linux and macOS. Pushing a tag vX.Y.Z (the version in CMakeLists.txt)
 # publishes a release with:
-# Skylauncher.exe, Skylauncher-x86_64.AppImage, Skylauncher-macOS.dmg and Skylauncher-macOS.zip (the .app), and SHA256SUMS
-# (their SHA-256, which the launcher's updater checks). Branches and pull requests only build, with the version in
-# CMakeLists.txt.
+# ArkeyanLauncher.exe, ArkeyanLauncher-x86_64.AppImage, ArkeyanLauncher-macOS.dmg and ArkeyanLauncher-macOS.zip (the .app),
+# the same four under the names of releases before 0.6.0 (Skylauncher.exe, Skylauncher-x86_64.AppImage,
+# Skylauncher-macOS.dmg, Skylauncher-macOS.zip holding Skylauncher.app) so that an older launcher can update itself, and
+# SHA256SUMS (their SHA-256, which the launcher's updater checks; docs/updates.md). Branches and pull requests only build,
+# with the version in CMakeLists.txt.
 on:
   push:
     branches: [main, 'feat/**']
@@ -32,11 +34,12 @@ jobs:
         run: |
           $extra = @()
           $version = $env:VERSION.TrimStart('v')
-          if ($version) { $extra += "-DSKYLAUNCHER_VERSION=$version" }
+          if ($version) { $extra += "-DLAUNCHER_VERSION=$version" }
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl @extra
-          cmake --build build --target Skylauncher
+          cmake --build build --target ArkeyanLauncher
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item build/Skylauncher.exe dist/Skylauncher.exe
+          Copy-Item build/ArkeyanLauncher.exe dist/ArkeyanLauncher.exe
+          Copy-Item build/ArkeyanLauncher.exe dist/Skylauncher.exe
       - uses: actions/upload-artifact@v4
         with:
           name: windows
@@ -59,18 +62,19 @@ jobs:
         # XenonUtils' headers rely on Clang (anonymous structs with non-trivial members), as XenonRecomp does.
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-15 -DCMAKE_CXX_COMPILER=clang++-15 \
-            ${VERSION:+"-DSKYLAUNCHER_VERSION=${VERSION#v}"}
-          cmake --build build --target Skylauncher
+            ${VERSION:+"-DLAUNCHER_VERSION=${VERSION#v}"}
+          cmake --build build --target ArkeyanLauncher
           cmake --install build --prefix AppDir/usr
       - name: AppImage
         run: |
           rsvg-convert -w 256 -h 256 resources/icons/skylauncher.svg -o skylauncher.png
           curl -fsSL -o linuxdeploy https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy
-          ./linuxdeploy --appimage-extract-and-run --appdir AppDir -e AppDir/usr/bin/Skylauncher \
+          ./linuxdeploy --appimage-extract-and-run --appdir AppDir -e AppDir/usr/bin/ArkeyanLauncher \
             -d resources/linux/skylauncher.desktop -i skylauncher.png --output appimage
           mkdir -p dist
-          mv Skylauncher*.AppImage dist/Skylauncher-x86_64.AppImage
+          mv Arkeyan*.AppImage dist/ArkeyanLauncher-x86_64.AppImage
+          cp dist/ArkeyanLauncher-x86_64.AppImage dist/Skylauncher-x86_64.AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -87,24 +91,10 @@ jobs:
       - name: Build (Apple Silicon + Intel)
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ${VERSION:+"-DSKYLAUNCHER_VERSION=${VERSION#v}"}
-          cmake --build build --target Skylauncher
-      - name: Icon, signature, .dmg and .zip
-        run: |
-          app=build/Skylauncher.app
-          mkdir -p icon.iconset
-          for size in 16 32 128 256 512; do
-            rsvg-convert -w $size -h $size resources/icons/skylauncher.svg -o icon.iconset/icon_${size}x${size}.png
-            rsvg-convert -w $((size * 2)) -h $((size * 2)) resources/icons/skylauncher.svg -o icon.iconset/icon_${size}x${size}@2x.png
-          done
-          iconutil -c icns icon.iconset -o "$app/Contents/Resources/Skylauncher.icns"
-          /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile Skylauncher" "$app/Contents/Info.plist" || /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string Skylauncher" "$app/Contents/Info.plist"
-          codesign --force --deep --sign - "$app"   # ad hoc: not notarized, see the README
-          mkdir -p dist dmg
-          cp -R "$app" dmg/
-          ln -s /Applications dmg/Applications
-          hdiutil create -volname Skylauncher -srcfolder dmg -ov -format UDZO dist/Skylauncher-macOS.dmg
-          ditto -c -k --keepParent "$app" dist/Skylauncher-macOS.zip
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ${VERSION:+"-DLAUNCHER_VERSION=${VERSION#v}"}
+          cmake --build build --target ArkeyanLauncher
+      - name: Icon, signature, .dmg and .zip (new and older names)
+        run: tools/package_macos.sh build/ArkeyanLauncher.app resources/icons/skylauncher.svg dist
       - uses: actions/upload-artifact@v4
         with:
           name: macos
@@ -128,13 +118,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # The launcher's updater checks every download against this file (docs/updates.md): one line per asset.
-          (cd dist && sha256sum Skylauncher.exe Skylauncher-x86_64.AppImage Skylauncher-macOS.dmg Skylauncher-macOS.zip > SHA256SUMS && cat SHA256SUMS)
+          (cd dist && sha256sum ArkeyanLauncher.exe ArkeyanLauncher-x86_64.AppImage ArkeyanLauncher-macOS.dmg ArkeyanLauncher-macOS.zip \
+            Skylauncher.exe Skylauncher-x86_64.AppImage Skylauncher-macOS.dmg Skylauncher-macOS.zip > SHA256SUMS && cat SHA256SUMS)
           # The notes are docs/releases/<tag>.md when it exists.
           if [ -f "docs/releases/$VERSION.md" ]; then
             gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "Skylauncher $VERSION" --notes-file "docs/releases/$VERSION.md"
+              --title "Arkeyan Launcher $VERSION" --notes-file "docs/releases/$VERSION.md"
           else
             notes="Built from ${GITHUB_SHA::7}. You need your own copy of the game; see the README."
             gh release create "$VERSION" dist/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "Skylauncher $VERSION" --notes "$notes"
+              --title "Arkeyan Launcher $VERSION" --notes "$notes"
           fi

@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
-project(Skylauncher LANGUAGES C CXX)
-set(SKYLAUNCHER_VERSION "0.4.2" CACHE STRING "Version shown in the app bundle")
+project(ArkeyanLauncher LANGUAGES C CXX)
+set(LAUNCHER_VERSION "0.6.0" CACHE STRING "Version shown in the app bundle")
+# SKYLAUNCHER_VERSION is the name before 0.6.0: still accepted.
+if(SKYLAUNCHER_VERSION)
+    set(LAUNCHER_VERSION "${SKYLAUNCHER_VERSION}")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -106,7 +110,7 @@ target_include_directories(imgui PUBLIC ${IMGUI_ROOT} ${IMGUI_ROOT}/backends)
 target_link_libraries(imgui PUBLIC SDL3::SDL3-static)
 
 # Everything but the window: disc checks, settings, title metadata. Shared by the app and the test.
-add_library(SkylauncherCore STATIC
+add_library(ArkeyanLauncherCore STATIC
     src/launcher/launcher.cpp
     src/launcher/launcher_games.cpp
     src/launcher/i18n.cpp
@@ -148,7 +152,7 @@ add_library(SkylauncherCore STATIC
     ${CMAKE_BINARY_DIR}/embedded_art_manifests.cpp
     ${CMAKE_BINARY_DIR}/embedded_languages.cpp)
 # The launcher shell: install progress, game runs and logs, updates, About (kept apart from the list above).
-target_sources(SkylauncherCore PRIVATE
+target_sources(ArkeyanLauncherCore PRIVATE
     src/launcher/install_checklist.cpp
     src/launcher/game_run.cpp
     src/launcher/portal_status.cpp
@@ -165,14 +169,14 @@ target_sources(SkylauncherCore PRIVATE
     src/launcher/ui/install_page.cpp
     src/launcher/ui/support_page.cpp
     src/launcher/ui/update_page.cpp)
-target_include_directories(SkylauncherCore PUBLIC src PRIVATE lib/stb lib/miniz)
-target_link_libraries(SkylauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
-target_compile_definitions(SkylauncherCore PRIVATE SKYLAUNCHER_VERSION_STRING="${SKYLAUNCHER_VERSION}" SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
+target_include_directories(ArkeyanLauncherCore PUBLIC src PRIVATE lib/stb lib/miniz)
+target_link_libraries(ArkeyanLauncherCore PUBLIC SDL3::SDL3-static fmt::fmt XenonXex imgui)
+target_compile_definitions(ArkeyanLauncherCore PRIVATE SKYLAUNCHER_VERSION_STRING="${LAUNCHER_VERSION}" SSA_SOURCE_FONT_DIR="${CMAKE_SOURCE_DIR}/resources/fonts")
 if(APPLE)
-    target_link_libraries(SkylauncherCore PUBLIC "-framework CoreGraphics" "-framework CoreFoundation")
+    target_link_libraries(ArkeyanLauncherCore PUBLIC "-framework CoreGraphics" "-framework CoreFoundation")
 endif()
 if(WIN32)
-    target_link_libraries(SkylauncherCore PUBLIC ole32 uuid) # the desktop shortcut (IShellLink)
+    target_link_libraries(ArkeyanLauncherCore PUBLIC ole32 uuid) # the desktop shortcut (IShellLink)
 endif()
 
 # Fonts are data, not game content: Outfit and Bungee (SIL Open Font License, licence files next to them).
@@ -183,43 +187,55 @@ set(SKYLAUNCHER_FONTS
     ${CMAKE_SOURCE_DIR}/resources/fonts/OFL-Outfit.txt
     ${CMAKE_SOURCE_DIR}/resources/fonts/OFL-Bungee.txt)
 
-add_executable(Skylauncher WIN32 MACOSX_BUNDLE src/main.cpp)
-target_link_libraries(Skylauncher PRIVATE SkylauncherCore)
+add_executable(ArkeyanLauncher WIN32 MACOSX_BUNDLE src/main.cpp)
+target_link_libraries(ArkeyanLauncher PRIVATE ArkeyanLauncherCore)
 # Windows: the manifest declares per-monitor v2 DPI awareness. MSVC's linker merges a .manifest source; mingw links it
 # as a resource.
 if(MINGW)
-    target_sources(Skylauncher PRIVATE resources/windows/skylauncher.rc)
+    # The version information (Explorer's Details tab) and the manifest and icon, as resources.
+    string(REGEX MATCHALL "[0-9]+" LAUNCHER_VERSION_PARTS "${LAUNCHER_VERSION}")
+    list(LENGTH LAUNCHER_VERSION_PARTS LAUNCHER_VERSION_PART_COUNT)
+    foreach(index RANGE 0 3)
+        if(index LESS LAUNCHER_VERSION_PART_COUNT)
+            list(GET LAUNCHER_VERSION_PARTS ${index} LAUNCHER_VERSION_PART_${index})
+        else()
+            set(LAUNCHER_VERSION_PART_${index} 0)
+        endif()
+    endforeach()
+    configure_file(resources/windows/skylauncher.rc.in ${CMAKE_BINARY_DIR}/skylauncher.rc @ONLY)
+    target_sources(ArkeyanLauncher PRIVATE ${CMAKE_BINARY_DIR}/skylauncher.rc)
 elseif(WIN32)
-    target_sources(Skylauncher PRIVATE resources/windows/skylauncher.manifest)
+    target_sources(ArkeyanLauncher PRIVATE resources/windows/skylauncher.manifest)
 endif()
-set_target_properties(Skylauncher PROPERTIES
-    MACOSX_BUNDLE_BUNDLE_NAME Skylauncher
+# The bundle id stays the one of the first releases (a new one would only make macOS ask again for folder permissions).
+set_target_properties(ArkeyanLauncher PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_NAME "Arkeyan Launcher"
     MACOSX_BUNDLE_GUI_IDENTIFIER io.github.mflr0.skylauncher
-    MACOSX_BUNDLE_SHORT_VERSION_STRING "${SKYLAUNCHER_VERSION}"
-    MACOSX_BUNDLE_BUNDLE_VERSION "${SKYLAUNCHER_VERSION}")
-install(TARGETS Skylauncher BUNDLE DESTINATION . RUNTIME DESTINATION bin)
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${LAUNCHER_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${LAUNCHER_VERSION}")
+install(TARGETS ArkeyanLauncher BUNDLE DESTINATION . RUNTIME DESTINATION bin)
 if(NOT APPLE)
     install(DIRECTORY ${CMAKE_SOURCE_DIR}/resources/fonts/ DESTINATION share/skylauncher/fonts)
 endif()
 if(APPLE)
     set_source_files_properties(${SKYLAUNCHER_FONTS} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/fonts)
-    target_sources(Skylauncher PRIVATE ${SKYLAUNCHER_FONTS})
+    target_sources(ArkeyanLauncher PRIVATE ${SKYLAUNCHER_FONTS})
 else()
-    add_custom_command(TARGET Skylauncher POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/resources/fonts $<TARGET_FILE_DIR:Skylauncher>/fonts)
+    add_custom_command(TARGET ArkeyanLauncher POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/resources/fonts $<TARGET_FILE_DIR:ArkeyanLauncher>/fonts)
 endif()
 
-# Checks against the player's own disc image: SkylauncherTest <game disc .iso> <scratch dir> [<damaged copy>...]
-add_executable(SkylauncherTest EXCLUDE_FROM_ALL tests/launcher_test.cpp)
-target_link_libraries(SkylauncherTest PRIVATE SkylauncherCore)
-# A stand-in for the kit's SSABuild, in <build>/fake-kit: the install screens and SkylauncherTest run against it.
-add_executable(FakeSSABuild EXCLUDE_FROM_ALL tests/fake_ssabuild.c)
-set_target_properties(FakeSSABuild PROPERTIES OUTPUT_NAME SSABuild RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fake-kit)
+# Checks against the player's own disc image: ArkeyanLauncherTest <game disc .iso> <scratch dir> [<damaged copy>...]
+add_executable(ArkeyanLauncherTest EXCLUDE_FROM_ALL tests/launcher_test.cpp)
+target_link_libraries(ArkeyanLauncherTest PRIVATE ArkeyanLauncherCore)
+# A stand-in for the kit's SkyBuild, in <build>/fake-kit: the install screens and ArkeyanLauncherTest run against it.
+add_executable(FakeSkyBuild EXCLUDE_FROM_ALL tests/fake_skybuild.c)
+set_target_properties(FakeSkyBuild PROPERTIES OUTPUT_NAME SkyBuild RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fake-kit)
 file(WRITE ${CMAKE_BINARY_DIR}/fake-kit/kit.txt "version=0.0\nbuild=fake-1\ngames=ssa,giants\n")
-add_dependencies(SkylauncherTest FakeSSABuild Skylauncher)
-target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit" SKYLAUNCHER_TEST_EXE="$<TARGET_FILE:Skylauncher>")
+add_dependencies(ArkeyanLauncherTest FakeSkyBuild ArkeyanLauncher)
+target_compile_definitions(ArkeyanLauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit" SKYLAUNCHER_TEST_EXE="$<TARGET_FILE:ArkeyanLauncher>")
 
-# The launcher shell's checks (tests/shell_test.cpp), run by SkylauncherTest.
-target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp tests/copy_test.cpp tests/i18n_test.cpp tests/uninstall_test.cpp)
-target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
-target_include_directories(SkylauncherTest PRIVATE lib/miniz)
+# The launcher shell's checks (tests/shell_test.cpp), run by ArkeyanLauncherTest.
+target_sources(ArkeyanLauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp tests/copy_test.cpp tests/i18n_test.cpp tests/uninstall_test.cpp)
+target_compile_definitions(ArkeyanLauncherTest PRIVATE SKYLAUNCHER_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+target_include_directories(ArkeyanLauncherTest PRIVATE lib/miniz)

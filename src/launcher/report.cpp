@@ -316,7 +316,7 @@ launcher_report::Versions launcher_report::ReadVersions(const std::string& launc
 std::string launcher_report::BuildReport(const Sources& sources)
 {
     std::string report;
-    report += "Skylauncher problem report\n";
+    report += "Arkeyan Launcher problem report\n";
     report += "Generated: " + Stamp() + "\n";
     report += "Launcher: " + (sources.versions.launcher.empty() ? "(unknown)" : sources.versions.launcher) + "\n";
     report += "Kit: " + (sources.versions.kit.empty() ? "(no kit)" : sources.versions.kit) + "\n";
@@ -360,5 +360,5 @@ std::string launcher_report::BuildReport(const Sources& sources)
 
 std::string launcher_report::FileName()
 {
-    return "Skylauncher-report-" + FileStamp() + ".txt";
+    return "ArkeyanLauncher-report-" + FileStamp() + ".txt";
 }

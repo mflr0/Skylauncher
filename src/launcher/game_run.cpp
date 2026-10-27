@@ -1,4 +1,5 @@
 #include "launcher/game_run.h"
+#include "launcher/env.h"
 #include "launcher/i18n.h"
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
@@ -40,8 +41,13 @@ namespace
 #if defined(_WIN32)
         SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true); // no console window
 #endif
+        SDL_Environment* environment = CreateGameEnvironment(); // both names of every variable: older and newer games
+        if (environment != nullptr)
+            SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, environment);
         SDL_Process* process = SDL_CreateProcessWithProperties(properties);
         SDL_DestroyProperties(properties);
+        if (environment != nullptr)
+            SDL_DestroyEnvironment(environment);
         if (process == nullptr)
             error = SDL_GetError();
         return process;
@@ -160,14 +166,14 @@ namespace
 
 std::filesystem::path GameLogFolder()
 {
-    if (const char* override = SDL_getenv("SKYLAUNCHER_LOG_DIR"); override != nullptr && *override != 0) // tests
+    if (const char* override = LauncherEnv("SKY_LAUNCHER_LOG_DIR"); override != nullptr && *override != 0) // tests
         return Path(override);
     return LauncherDataFolder() / "logs";
 }
 
 std::filesystem::path RuntimeLogFolder()
 {
-    if (const char* override = SDL_getenv("SKYLAUNCHER_LOG_DIR"); override != nullptr && *override != 0) // tests
+    if (const char* override = LauncherEnv("SKY_LAUNCHER_LOG_DIR"); override != nullptr && *override != 0) // tests
         return Path(override);
     return GameInstallFolder({});
 }

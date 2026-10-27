@@ -7,7 +7,7 @@ is easy to iterate without touching the game runtime.
 - `src/launcher/theme/launcher_theme.h` - every colour, size, radius and font size, plus the ImGui style (`Apply`). Change the look here first.
 - `src/main.cpp` - picks the game and disc, shows the launcher, starts the runtime.
 - `src/launcher/` - the launcher: `launcher.{h,cpp}` (disc checks, settings file), `launcher_games.cpp` (the game table),
-  `game_install.{h,cpp}` (installing the game with the kit's SSABuild, `docs/install.md`),
+  `game_install.{h,cpp}` (installing the game with the kit's SkyBuild, `docs/install.md`),
   `ui/`, `theme/`.
 - `src/assets/` - the art read from the player's disc (`launcher_assets`).
 - `src/launcher/game_settings.{h,cpp}`, `shortcut.{h,cpp}`, `ui/game_settings_page.cpp` - a game's own settings: its per-game video copy,
@@ -35,7 +35,7 @@ is easy to iterate without touching the game runtime.
 - `docs/settings.md` - the settings file the launcher writes and the game reads.
 
 ## Layout
-The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
+The launcher opens on Home, the menu page (the ARKEYAN LAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
 GitHub issue) and the GitHub link bottom right. The launcher's own language is in Settings > Launcher > Language
 (`docs/translations.md`); the game's text and voice languages are in that game's settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure, Giants and Swap Force enabled, the others "Coming later",
@@ -49,7 +49,7 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
    stays the main button while there is no disc.
 3. Collection - see below.
 4. Settings (the gear) - **the launcher's own settings and what both games share**, in four tabs: Controls (device, portal, glyphs,
-   keyboard bindings), Launcher (language slot, updates, data folder, **Remove Skylauncher**: "Uninstall everything", below), Support (report a problem, logs), About (version, credits).
+   keyboard bindings), Launcher (language slot, updates, data folder, **Remove Arkeyan Launcher**: "Uninstall everything", below), Support (report a problem, logs), About (version, credits).
    Clicking a game goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
 5. Game settings (the Settings button on a game's Play page) - **that game's own settings**, five tabs (the sidebar keeps the
    game selected; B / Escape or **Back** return to its Play page):
@@ -73,15 +73,15 @@ the button glyphs and the portal stay in the launcher's settings** because both 
 sections and the same hardware: a game page would only show the same values twice. If the games ever need different keys, the
 Controls tab moves to the game pages the way Video did (`GameVideoKeys` shows how).
 
-The launcher opens on **Home**, the menu page (the SKYLAUNCHER title goes back to it): the **library**, a card per
+The launcher opens on **Home**, the menu page (the ARKEYAN LAUNCHER title goes back to it): the **library**, a card per
 playable game (its painting from the disc behind its logo, its name and state; the game's colours before its disc was
 ever read), then the games **coming later** as quiet chips in their colours; "Report a bug" (a new GitHub issue) and the
 GitHub link bottom right. A card opens its game's page. The launcher's own language is in Settings > Launcher > Language
 (`docs/translations.md`); the game's text and voice languages are in that game's settings ("Game text", "Game voices"). The game shown last is selected
 in the sidebar (`[launcher] game=`); the other is one click away.
 1. **Left sidebar** (grey, fixed width).
-   - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.4.2`, from
-     `SKYLAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" and YOUR GAMES.
+   - The title, **ARKEYAN LAUNCHER**, with the launcher's version beside it, small and dim (`v0.4.2`, from
+     `LAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" and YOUR GAMES.
    - The seven games as full-width rows (Spyro's Adventure, Giants and Swap Force enabled, the others "Coming later", SuperChargers
      Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
      art with "Skylanders" on it, in the row's left column (`GameLogoW` x `GameLogoH`); before that, and for the games
@@ -135,7 +135,7 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 
 **UPDATE** (`docs/updates.md`): the page says the version built and the one on offer ("Update 0.8.0 to 0.8.1: no download, up to
 about 15 min.", the release's notes for the game under it) and the main button reads UPDATE; one click fetches the kit if it is
-needed, rebuilds the game (SSABuild is incremental) and PLAY is back. Under the button a small link, **Play without updating**,
+needed, rebuilds the game (SkyBuild is incremental) and PLAY is back. Under the button a small link, **Play without updating**,
 plays what is built (offline, in a hurry): it sets the offer aside until the launcher is closed. The game's version is small, in the
 secondary text colour, after its name in the sidebar ("Giants · 0.8.2"); nothing on the page moves for it. While UPDATE runs the progress card is titled
 "UPDATING THE GAME" ("INSTALLING THE GAME" for a first install). No tools are ever downloaded without a click on INSTALL or UPDATE.
@@ -149,9 +149,9 @@ The percentage is the install card's overall fraction (`MakeInstallChecklist`), 
 cut with "..." to the column (the sidebar is a fixed width at every window size) and the bar is drawn over the row's own
 space, so nothing moves when the line changes. "Playing" is never shown: PLAY closes the launcher until the game ends.
 
-`SSA_LAUNCHER_TEST_SIDEBAR=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit and both games' `iso=`;
+`SKY_LAUNCHER_TEST_SIDEBAR=1` (with `SKY_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit and both games' `iso=`;
 `FAKE_SSABUILD_HOLD` keeps the build at 100 %) shoots and checks the line through an install and an update at 0, 50 and 100 %,
-with the other game shown meanwhile, then a failed build: `SkylauncherTest` runs it (`SidebarChecks`).
+with the other game shown meanwhile, then a failed build: `ArkeyanLauncherTest` runs it (`SidebarChecks`).
 
 ## Game data (copy the disc's files, no disc image afterwards)
 Game settings > Disc has two sections: **Disc image** (choose, change, remove, show in folder) and **Game data**, which copies the
@@ -175,11 +175,11 @@ the window is `ui/game_data_page.cpp` (+ `game_settings_page.cpp` for the tab). 
   known release) and used; else the remembered image. The remembered image (`[<game>] iso=`) is never forgotten for a copy: removing the copy
   brings it back. A copy whose `default.xex` is refused counts as damaged. PLAY and INSTALL look at the copy again first (sizes only) and
   fall back to the disc image if it changed. PLAY passes the copy's folder to the game, which reads it too if it is given an image
-  (`host/launcher.cpp`, `CopiedGameData`). INSTALL gives it to SSABuild as `--iso`.
+  (`host/launcher.cpp`, `CopiedGameData`). INSTALL gives it to SkyBuild as `--iso`.
 - **Uninstall keeps the copy** (like the disc image); only "Remove the copy" deletes it. Delete saves and data and Clear caches never touch it.
-- `SSA_LAUNCHER_TEST_COPY=1` (with `SSA_LAUNCHER_SHOTS`, the fake kit, `[giants] iso=` set to a stand-in SSA disc) drives all of it in an offscreen window
-  (`App::TestCopyScript`, run by `SkylauncherTest`): the wrong disc, not enough space, interrupted and carried on, played with no disc
-  image, damaged and the fall back, repaired, removed, and Giants' own copy. `SKYLAUNCHER_COPY_FREE_BYTES` fakes the room (tests only).
+- `SKY_LAUNCHER_TEST_COPY=1` (with `SKY_LAUNCHER_SHOTS`, the fake kit, `[giants] iso=` set to a stand-in SSA disc) drives all of it in an offscreen window
+  (`App::TestCopyScript`, run by `ArkeyanLauncherTest`): the wrong disc, not enough space, interrupted and carried on, played with no disc
+  image, damaged and the fall back, repaired, removed, and Giants' own copy. `SKY_LAUNCHER_COPY_FREE_BYTES` fakes the room (tests only).
 
 ## The wrong disc, offered to the right game
 When the check finds the other supported game's disc ("This disc image is Skylanders: Spyro's Adventure, not Skylanders: Giants.", status
@@ -218,7 +218,7 @@ crisp"): one split button, `PlayButtonW` + `PlayGearW` by `PlayButtonH` (300 + 6
   never mix.
 - A new game: add its `GameStyle` and a line in `StyleOf`.
 
-`SSA_LAUNCHER_TEST_BUTTONS=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=`)
+`SKY_LAUNCHER_TEST_BUTTONS=1` (with `SKY_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=`)
 shoots the button's states: for each game `00-install`, `01-hover`, `02-pressed`, `03-focused`, `04-settings-hover`,
 `05-disabled`, `06-installing`, `07-play`, `08-play-hover`, then `09-small` (1024x680), `10-scale150` and `11-scale200`,
 named `<game>-<nn>-<state>.png`.
@@ -255,25 +255,25 @@ always animates (`docs/settings.md`).
 
 ## Desktop shortcut
 Game settings > Game > Desktop shortcut > **Create** (enabled once the disc is verified: the icon comes from it) puts a launcher for
-that game on the Desktop. It starts Skylauncher as `Skylauncher --game <id> --play`: the window opens on that game's page, checks the
+that game on the Desktop. It starts Arkeyan Launcher as `ArkeyanLauncher --game <id> --play`: the window opens on that game's page, checks the
 disc, and starts the game as soon as it is ready. If it can't (no disc, a failed check, the game not built yet) the window stays
 open and says why, so the shortcut never leaves the player with nothing. Made again, it replaces the old one.
 The icon is the game's title icon decoded from the player's disc (`GameSlot::meta.iconPng`, memory only until the player asks).
 
 | System | File on the Desktop | Icon |
 | --- | --- | --- |
-| macOS | `Skylanders Giants.app`: `Contents/MacOS/launch` (a two-line `sh` script: `exec '<Skylauncher>' --game giants --play`), `Info.plist` | `Contents/Resources/icon.icns`, the PNG as an `icp6` (64 px; the type follows the width) |
-| Windows | `Skylanders Giants.lnk` (IShellLink: target Skylauncher.exe, arguments, working folder) | `<data>\Giants\shortcut.ico`, the PNG inside an .ico (Vista and later) |
-| Linux | `skylanders-giants.desktop`, executable (`Exec="<Skylauncher>" --game giants --play`, `Categories=Game;`) | `<data>/Giants/shortcut-icon.png` (some desktops ask "Allow launching" once) |
+| macOS | `Skylanders Giants.app`: `Contents/MacOS/launch` (a two-line `sh` script: `exec '<launcher>' --game giants --play`), `Info.plist` | `Contents/Resources/icon.icns`, the PNG as an `icp6` (64 px; the type follows the width) |
+| Windows | `Skylanders Giants.lnk` (IShellLink: target ArkeyanLauncher.exe, arguments, working folder) | `<data>\Giants\shortcut.ico`, the PNG inside an .ico (Vista and later) |
+| Linux | `skylanders-giants.desktop`, executable (`Exec="<launcher>" --game giants --play`, `Categories=Game;`) | `<data>/Giants/shortcut-icon.png` (some desktops ask "Allow launching" once) |
 
-`<Skylauncher>` is the running file (`SelfExecutable()`: the executable, or the `.AppImage` on Linux, not its temporary mount).
-If Skylauncher is moved afterwards the shortcut needs making again. On macOS the first write to the Desktop may ask for permission
-to access it. The Desktop is `SKYLAUNCHER_DESKTOP` when set (tests: nothing writes the real one), else the system's folder.
+`<launcher>` is the running file (`SelfExecutable()`: the executable, or the `.AppImage` on Linux, not its temporary mount).
+If Arkeyan Launcher is moved afterwards the shortcut needs making again. On macOS the first write to the Desktop may ask for permission
+to access it. The Desktop is `SKY_LAUNCHER_DESKTOP` when set (tests: nothing writes the real one), else the system's folder.
 Windows is not built or run here: its `.ico` bytes and every name and argument are tested on every system; the `.lnk` itself is
 the one standard COM call (`#ifdef _WIN32`, checked to compile with MinGW) and needs a look on a real PC.
 
 ## Command line
-`Skylauncher [--game <id>] [--play] [--help]`: `--game ssa|giants|swapforce` opens that game's page (else the game shown last),
+`Arkeyan Launcher [--game <id>] [--play] [--help]`: `--game ssa|giants|swapforce` opens that game's page (else the game shown last),
 `--play` starts it once its disc is checked and it is built. Anything else is ignored with a line on stderr.
 
 ## Collection
@@ -343,10 +343,10 @@ The launcher's texts are short. A player reads them to decide or to know what to
 Developer details (the runtime's name, an option's file, the SHA-256 a check uses) belong in these docs, not in the window.
 
 ## Uninstall everything
-Settings > Launcher > **Remove Skylauncher** > **Uninstall everything...** opens, in the tab, the list of what goes (`ui/uninstall_page.cpp`;
+Settings > Launcher > **Remove Arkeyan Launcher** > **Uninstall everything...** opens, in the tab, the list of what goes (`ui/uninstall_page.cpp`;
 what it removes and the safety rules are in `docs/install.md`, "Uninstall everything"):
 
-- **What goes**: one row per built game, then Game data copies, Game tools, Caches and logs, Settings, Desktop shortcuts and Skylauncher,
+- **What goes**: one row per built game, then Game data copies, Game tools, Caches and logs, Settings, Desktop shortcuts and Arkeyan Launcher,
   each with its size, and the **Total**. "Your disc images are never touched." sits under the title.
 - **Also delete my saves and my figures** (a toggle, off by default) adds Saves and Figures to the list and to the Total; **Export first**
   beside it is the collection's export of every figure (a folder to choose). Under it: "Saves X, figures Y."
@@ -355,12 +355,12 @@ what it removes and the safety rules are in `docs/install.md`, "Uninstall everyt
   runs, installs or is being checked, and the reason is said in red above them.
 - After it ran, the tab shows the result: "Everything is removed", or "Removed, except" with one line for each thing that stayed
   (a disc image in a game's folder, a game the player moved, a link, a file the system refused), the size freed, and where the launcher
-  goes ("Skylauncher goes to the Trash when you quit." on macOS, "...deletes itself when you quit." elsewhere). **Quit** closes the window. Until
+  goes ("Arkeyan Launcher goes to the Trash when you quit." on macOS, "...deletes itself when you quit." elsewhere). **Quit** closes the window. Until
   then the window does nothing else: the sidebar and the tabs are off and the settings file is no longer written (`FreezeLauncherConfig`).
 
-The screenshot test is `SSA_LAUNCHER_TEST_UNINSTALL=1` with `SSA_LAUNCHER_SHOTS` on a scratch data tree (`SKYLANDERS_DATA`, `SKYLAUNCHER_DATA`,
-`SSA_LAUNCHER_INI`, `SSA_COLLECTION`); `SKYLAUNCHER_UNINSTALL_SELF` names a dummy bundle to stand for the launcher and, on macOS,
-`SKYLAUNCHER_UNINSTALL_TRASH` a scratch folder to stand for the Trash (without them a scratch run never removes the launcher).
+The screenshot test is `SKY_LAUNCHER_TEST_UNINSTALL=1` with `SKY_LAUNCHER_SHOTS` on a scratch data tree (`SKYLANDERS_DATA`, `SKY_LAUNCHER_DATA`,
+`SKY_LAUNCHER_INI`, `SKY_COLLECTION`); `SKY_LAUNCHER_UNINSTALL_SELF` names a dummy bundle to stand for the launcher and, on macOS,
+`SKY_LAUNCHER_UNINSTALL_TRASH` a scratch folder to stand for the Trash (without them a scratch run never removes the launcher).
 
 ## Size on high-DPI screens
 Every size is in launcher points. `App::UpdateUiScale` picks how many window units a point is: `[launcher] ui_scale`, else
@@ -375,7 +375,7 @@ The Windows executable declares per-monitor v2 DPI awareness in its manifest (`r
   game's own colours (its action button) are its `GameStyle` there.
 - Spacing and sizes: `SidebarW`, `Pad`, `Radius*`, `PlayButtonW/H`, `PlayGearW` and the font sizes in the same file.
 - Fonts: put an OFL- or Apache-licensed font in `resources/fonts/` and load it in `App::LoadFonts`
-  (`SSA_LAUNCHER_FONT_DIR` overrides the folder while trying fonts).
+  (`SKY_LAUNCHER_FONT_DIR` overrides the folder while trying fonts).
 - Widgets: add them next to `BigButton` and `Toggle` in `launcher_ui.cpp`, taking every colour from the theme.
 
 ## Screenshot test
@@ -384,30 +384,30 @@ The launcher can drive itself without opening a visible window:
 SDL_VIDEO_DRIVER=offscreen \
 CFFIXED_USER_HOME="$PWD/private/launcher-home" \
 HOME="$PWD/private/launcher-home" \
-SSA_LAUNCHER_INI="$PWD/private/launcher-home/launcher.ini" \
-SSA_LAUNCHER_SHOTS="$PWD/private/launcher-shots" \
-SSA_LAUNCHER_TEST_DROP="/path/to/game.iso" \
-SSA_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
-./build/Skylauncher.app/Contents/MacOS/Skylauncher
+SKY_LAUNCHER_INI="$PWD/private/launcher-home/launcher.ini" \
+SKY_LAUNCHER_SHOTS="$PWD/private/launcher-shots" \
+SKY_LAUNCHER_TEST_DROP="/path/to/game.iso" \
+SKY_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
+./build/ArkeyanLauncher.app/Contents/MacOS/ArkeyanLauncher
 ```
 It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
 `07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-game-disc.png`,
 `12-game-saves.png`, `13-game-data.png`, `14-launcher-settings.png` and `15-disc-gone.png` (INSTALL on an image that moved; `03-` is the
-game's Video tab, `04-` the launcher's Controls) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
+game's Video tab, `04-` the launcher's Controls) (it creates a few figures in `SKY_COLLECTION` first: set it to a scratch folder). With `SKY_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
 
 `07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-disc-gone.png`
-(INSTALL on an image that moved) and `12-logo-drop.png` (the logo early in its fall) (it creates a few figures in `SSA_COLLECTION` first: set it to a scratch folder). With `SSA_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
-With `SSA_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `53-`): B to the sidebar, A into Collection, Y for
+(INSTALL on an image that moved) and `12-logo-drop.png` (the logo early in its fall) (it creates a few figures in `SKY_COLLECTION` first: set it to a scratch folder). With `SKY_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
+With `SKY_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `53-`): B to the sidebar, A into Collection, Y for
 the search, the D-pad to a seat, A to choose for it, down and A to put the first card there, X for a card's sheet, B back,
 RB in Settings.
-With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
+With `SKY_LAUNCHER_TEST_INSTALL=1` and `SKY_LAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
 (`docs/install.md`).
 
 ## Other screenshot variables
-`SSA_LAUNCHER_TEST_LOGO=1` shoots each game's page (`logo-ssa`, `logo-giants`, `logo-swapforce`) from the art already cached in
-`SKYLANDERS_DATA`; `SSA_LAUNCHER_TEST_SIZE=<w>x<h>` sets the window (the default one, a large one).
-`SSA_LAUNCHER_TEST_UPDATE=1` with `SKYLAUNCHER_UPDATE_URL=file://<fake latest.json>` shows the update screens (`20-` to `24-`).
-`SSA_LAUNCHER_TEST_INSTALL=real` runs the real kit. `private/shoot.sh <out dir> [VAR=value...]` is the wrapper used in this
+`SKY_LAUNCHER_TEST_LOGO=1` shoots each game's page (`logo-ssa`, `logo-giants`, `logo-swapforce`) from the art already cached in
+`SKYLANDERS_DATA`; `SKY_LAUNCHER_TEST_SIZE=<w>x<h>` sets the window (the default one, a large one).
+`SKY_LAUNCHER_TEST_UPDATE=1` with `SKY_LAUNCHER_UPDATE_URL=file://<fake latest.json>` shows the update screens (`20-` to `24-`).
+`SKY_LAUNCHER_TEST_INSTALL=real` runs the real kit. `private/shoot.sh <out dir> [VAR=value...]` is the wrapper used in this
 repository's working copy (its own HOME, the offscreen driver).
 
 ## Notes
@@ -424,16 +424,16 @@ repository's working copy (its own HOME, the offscreen driver).
   and its own build, and `main()` runs that game's runtime (SSARecomp or SGRecomp) with its language settings. The settings
   pages (language, game data, reinstall) follow the shown game. Since 0.4 the game page arrives with its logo's fall and
   its own look ("Each game's look").
-- `SSA_LAUNCHER_TEST_SWITCH=1` (with `SSA_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=` in
-  the config) runs the switch script: SSA and Giants checked, an install of each with the fake SSABuild (SSA shown while
+- `SKY_LAUNCHER_TEST_SWITCH=1` (with `SKY_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=` in
+  the config) runs the switch script: SSA and Giants checked, an install of each with the fake SkyBuild (SSA shown while
   Giants builds), a switch back and forth with each state kept, and PLAY on each returning its game and build. It is run by
-  `SkylauncherTest` when `SKYLAUNCHER_TEST_GIANTS_ISO` is set.
-- `SSA_LAUNCHER_TEST_SEATX=1` (with `SSA_LAUNCHER_SHOTS`, `SSA_COLLECTION`, `SSA_SAVE_DIR` on scratch paths) runs the seat X script
+  `ArkeyanLauncherTest` when `SKY_LAUNCHER_TEST_GIANTS_ISO` is set.
+- `SKY_LAUNCHER_TEST_SEATX=1` (with `SKY_LAUNCHER_SHOTS`, `SKY_COLLECTION`, `SKY_SAVE_DIR` on scratch paths) runs the seat X script
   (`App::TestSeatXScript`): the Collection page's four seat tiles (player 1, player 2, item, adventure) each emptied by the mouse on the X,
-  by Delete and by the pad's X, checking after every try that only that seat is empty. It is run by `SkylauncherTest`.
-- `SkylauncherTest` checks verification, settings (`tests/settings_test.cpp`: per-game video, the command line, the shortcut files,
+  by Delete and by the pad's X, checking after every try that only that seat is empty. It is run by `ArkeyanLauncherTest`.
+- `ArkeyanLauncherTest` checks verification, settings (`tests/settings_test.cpp`: per-game video, the command line, the shortcut files,
   delete data and uninstall on scratch folders), font/text helpers, the disc texture decoder, the seat X and the in-place game switch
-  (build it with `--target SkylauncherTest FakeSSABuild`; set `SKYLAUNCHER_TEST_GIANTS_ISO` for the switch, and
-  `SKYLAUNCHER_TEST_SWAPFORCE_ISO` for the Swap Force disc and its pictures). A swapper in the Collection is one card
+  (build it with `--target ArkeyanLauncherTest FakeSkyBuild`; set `SKY_LAUNCHER_TEST_GIANTS_ISO` for the switch, and
+  `SKY_LAUNCHER_TEST_SWAPFORCE_ISO` for the Swap Force disc and its pictures). A swapper in the Collection is one card
   (`docs/collection_ui.md`, "Swappers").
 - `launcher: ui scale` is logged once, then only when the scale changes (a display change, Ctrl +/-/0), not at every window event.

@@ -1,7 +1,7 @@
 #pragma once
 
 // Hold to confirm: a button that acts once it has been held for a second (reset, delete...). The state lives here,
-// without ImGui, so SkylauncherTest can drive it; App::HoldButton draws it. One state for the window: one button is held
+// without ImGui, so ArkeyanLauncherTest can drive it; App::HoldButton draws it. One state for the window: one button is held
 // at a time.
 #include <algorithm>
 #include <cstdint>

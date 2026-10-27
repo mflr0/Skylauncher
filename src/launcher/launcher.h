@@ -78,8 +78,19 @@ bool SaveLauncherConfig(const std::string& path, const LauncherConfig& config);
 // After "Uninstall everything" has removed the settings file: SaveLauncherConfig writes nothing any more.
 void FreezeLauncherConfig();
 
+// The environment a game or a builder is started with: the launcher's own, and every variable of the SKY_ family set under one of
+// its names also under the others (SKY_X, SSA_X; SKY_LAUNCHER_X, SKYLAUNCHER_X, SSA_LAUNCHER_X), without replacing one already set. A
+// game built by an older kit reads only the SSA_ names, a newer one the SKY_ names (shared/env.h). The launcher's own environment is
+// not changed. The caller passes it as SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER and destroys it (SDL_DestroyEnvironment).
+struct SDL_Environment;
+SDL_Environment* CreateGameEnvironment();
+// Sets a variable under all its names, replacing what they held.
+void SetGameVariable(const char* currentName, const char* value);
+// Removes a variable under all its names ("SKY_LAUNCHER_SHOTS" also removes SKYLAUNCHER_SHOTS and SSA_LAUNCHER_SHOTS).
+void UnsetGameVariable(const char* currentName);
+
 // The command line: `--game <id>` opens that game, `--play` starts it once its disc is checked (the desktop shortcut runs
-// `Skylauncher --game <id> --play`), `--help` shows the options. Anything else is listed in `unknown` and ignored.
+// `Arkeyan Launcher --game <id> --play`), `--help` shows the options. Anything else is listed in `unknown` and ignored.
 struct LauncherArguments
 {
     std::string game;
@@ -90,7 +101,7 @@ struct LauncherArguments
 LauncherArguments ParseLauncherArguments(int argc, const char* const* argv);
 const char* LauncherUsage();
 
-// The game's text and voice language codes (see language.h): SSA_LANGUAGE and SSA_VOICE_LANGUAGE, else the
+// The game's text and voice language codes (see language.h): SKY_LANGUAGE and SKY_VOICE_LANGUAGE, else the
 // "language" and "voice_language" keys of the game's section in the settings file. Empty where neither picks one.
 struct LanguageChoice
 {

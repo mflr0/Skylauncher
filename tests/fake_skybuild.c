@@ -1,6 +1,6 @@
-/* A stand-in for the player kit's SSABuild (docs/install.md): prints its events with delays, so the launcher's install
- * screens can be tried without the real kit. Built as fake-kit/SSABuild in the build folder (target FakeSSABuild);
- * point the launcher at that folder with SKYLAUNCHER_KIT.
+/* A stand-in for the player kit's SkyBuild (docs/install.md): prints its events with delays, so the launcher's install
+ * screens can be tried without the real kit. Built as fake-kit/SkyBuild in the build folder (target FakeSkyBuild);
+ * point the launcher at that folder with SKY_LAUNCHER_KIT.
  * Same steps, titles and order as the real one: toolchain, disc, recompile, shaders, compile, link, movies, then the
  * second shaders/compile/link pass that follows the movie shaders.
  *   FAKE_SSABUILD_FAIL=<step id>  fail half way through that step (toolchain, disc, recompile, shaders, compile, link,
@@ -62,11 +62,11 @@ int main(int argc, char** argv)
         g_delay = (int)(atof(getenv("FAKE_SSABUILD_DELAY")) * 1000);
     if (iso == NULL || out == NULL)
     {
-        printf("@error usage: SSABuild --iso <iso> --out <game dir>\n");
+        printf("@error usage: SkyBuild --iso <iso> --out <game dir>\n");
         return 2;
     }
 
-    printf("@log fake SSABuild, iso %s\n", iso);
+    printf("@log fake SkyBuild, iso %s\n", iso);
     step("toolchain", "Preparing the compiler", 10);
     step("disc", "Reading the disc", 10);
     step("recompile", "Translating the game code", 40);

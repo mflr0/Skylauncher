@@ -1,7 +1,8 @@
 // "Copy files" in the window (docs/launcher_ui.md "Game data"): the game settings' Disc tab section, where a game's disc
 // comes from at start (its copy or the remembered image), and the wrong-disc button. The files and the checks are
-// game_copy.h / shared/collection/game_data.h; the script at the end (SSA_LAUNCHER_TEST_COPY) drives all of it in an offscreen window.
+// game_copy.h / shared/collection/game_data.h; the script at the end (SKY_LAUNCHER_TEST_COPY) drives all of it in an offscreen window.
 #include "launcher/ui/launcher_app.h"
+#include "launcher/env.h"
 #include "shared/collection/datadir.h"
 #include <fmt/format.h>
 
@@ -199,10 +200,10 @@ namespace launcher_ui
 
     // ---- The test script -------------------------------------------------------------------------------------------------
 
-    // SSA_LAUNCHER_TEST_COPY, in an offscreen window, on tiny stand-in discs (the real default.xex alone): Giants is given SSA's
+    // SKY_LAUNCHER_TEST_COPY, in an offscreen window, on tiny stand-in discs (the real default.xex alone): Giants is given SSA's
     // disc, offers it to SSA (the wrong-disc button), and the copy goes through its states (not enough space, interrupted, carried on,
     // played from with no disc image, damaged and falling back to the disc image, repaired, removed). The stand-in discs and the
-    // fake kit are the C++ test's (tests/copy_test.cpp). Screenshots in SSA_LAUNCHER_SHOTS.
+    // fake kit are the C++ test's (tests/copy_test.cpp). Screenshots in SKY_LAUNCHER_SHOTS.
     void App::TestCopyScript(uint64_t now)
     {
         const GameInfo& ssa = *FindGame("ssa");
@@ -230,7 +231,7 @@ namespace launcher_ui
         };
         auto busy = [&](GameSlot& slot) { return slot.disc == DiscState::Verifying || slot.copyJob.Running() || slot.installer.Running(); };
         const std::string folder = datadir::Text(gamedata::Folder("ssa"));
-        const std::string giantsIso = SDL_getenv("SKYLAUNCHER_TEST_COPY_GIANTS_ISO") != nullptr ? SDL_getenv("SKYLAUNCHER_TEST_COPY_GIANTS_ISO") : "";
+        const std::string giantsIso = LauncherEnv("SKY_LAUNCHER_TEST_COPY_GIANTS_ISO") != nullptr ? LauncherEnv("SKY_LAUNCHER_TEST_COPY_GIANTS_ISO") : "";
         if (m_testBegan == 0)
             m_testBegan = now;
         if (now - m_testBegan > 120000)
@@ -272,7 +273,7 @@ namespace launcher_ui
             expect(a.disc == DiscState::Ready && !a.fromCopy && SettingGet(m_config, "ssa", "iso") == m_testPath, "SSA has the disc");
             expect(SlotStatus(&a).state == SlotState::ReadyToInstall, "ready to install");
             // Not enough space: said, nothing copied.
-            env("SKYLAUNCHER_COPY_FREE_BYTES", "1000");
+            env("SKY_LAUNCHER_COPY_FREE_BYTES", "1000");
             StartCopy();
             expect(a.copyJob.Running(), "the copy started");
             m_testStep++;
@@ -280,7 +281,7 @@ namespace launcher_ui
         case 4:
             if (a.copyJob.Running())
                 return;
-            env("SKYLAUNCHER_COPY_FREE_BYTES", nullptr);
+            env("SKY_LAUNCHER_COPY_FREE_BYTES", nullptr);
             expect(a.copyMessage.rfind("Not enough space", 0) == 0 && a.copy.state == gamedata::State::None && !a.fromCopy, "not enough space is said");
             expect(!std::filesystem::exists(std::filesystem::path(folder) / "default.xex"), "nothing was copied");
             m_testStep++;

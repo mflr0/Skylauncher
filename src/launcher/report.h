@@ -50,6 +50,6 @@ namespace launcher_report
     // The whole report, already redacted.
     std::string BuildReport(const Sources& sources);
 
-    // "Skylauncher-report-<yyyymmdd-hhmmss>.txt".
+    // "ArkeyanLauncher-report-<yyyymmdd-hhmmss>.txt".
     std::string FileName();
 }

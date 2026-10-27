@@ -54,13 +54,13 @@ namespace launcher_ui
         // B / Escape belongs to the page: an overlay is open, a seat is being chosen for, or a search is typed.
         bool TakesBack() const { return m_overlay != Overlay::None || m_choosing >= 0 || m_search[0] != 0; }
 
-        // SSA_LAUNCHER_TEST_SEATX: the X of every seat, pressed by mouse, keyboard and pad (App::TestSeatXScript).
+        // SKY_LAUNCHER_TEST_SEATX: the X of every seat, pressed by mouse, keyboard and pad (App::TestSeatXScript).
         std::vector<std::string> TestSeats() const { return m_model.seats; }
         void TestSetSeats(const std::vector<std::string>& seats); // the seats as given, written to the session file
         void TestFocusSeat(size_t seat) { m_focusSeat = int(seat); }
         ImVec2 TestCrossAt(size_t seat) const { return seat < m_crossAt.size() ? m_crossAt[seat] : ImVec2(-1, -1); }
 
-        // Screenshot test (SSA_LAUNCHER_TEST_COLLECTION): every screen, in a scratch collection.
+        // Screenshot test (SKY_LAUNCHER_TEST_COLLECTION): every screen, in a scratch collection.
         void Seed();
         void TestScreen(int step);
         static const char* TestShotName(int step);

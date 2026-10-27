@@ -1,9 +1,10 @@
-// SkylauncherTest's checks for "Uninstall everything" (launcher/uninstall.h): the plan (a dry run), what the run removes and
+// ArkeyanLauncherTest's checks for "Uninstall everything" (launcher/uninstall.h): the plan (a dry run), what the run removes and
 // keeps, the refusals, the launcher's own removal on every system's rules, and the helper that runs after the launcher quits.
 // Scratch trees only: nothing here names the real data folders, the real Desktop, the real Trash, the real figures or the
 // running launcher. The launcher to remove is always a dummy file or bundle made in the scratch folder.
 // Called from launcher_test.cpp's main; returns the number of failures.
 #include "launcher/uninstall.h"
+#include "launcher/env.h"
 #include "launcher/launcher.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -209,7 +210,7 @@ namespace
             here.home = home;
         if (const char* appdata = SDL_getenv("APPDATA"))
             here.appData = appdata;
-        UN_EXPECT(DefaultRoot(CurrentOs(), here) == ThisMachine({}).root || SDL_getenv("SKYLAUNCHER_DATA") != nullptr);
+        UN_EXPECT(DefaultRoot(CurrentOs(), here) == ThisMachine({}).root || LauncherEnv("SKY_LAUNCHER_DATA") != nullptr);
         for (const auto& [name, value] : saved)
             SDL_setenv_unsafe(name.c_str(), value.c_str(), 1), SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name.c_str(), value.c_str(), true);
     }
@@ -284,6 +285,38 @@ namespace
         (void)without;
         printf("Uninstall (%s layout): plan with sizes, the run without and with the tick, discs, links and strangers kept\n",
             os == Os::MacOS ? "macOS" : os == Os::Windows ? "Windows" : "Linux");
+    }
+
+    // ---- A scratch folder reached through a link ($TMPDIR is /var/... on macOS, really /private/var/...) ------------------
+
+    void SymlinkChecks(const fs::path& scratch)
+    {
+        // The whole plan and run, with every path written through a link to the folder that holds the trees.
+        const fs::path real = scratch / "via-link-real", link = scratch / "via-link";
+        fs::remove_all(real);
+        std::error_code error;
+        fs::remove(link, error);
+        fs::create_directories(real);
+        fs::create_symlink(real, link, error);
+        UN_EXPECT(!error);
+        for (Os os : { Os::MacOS, Os::Windows, Os::Linux })
+            PlanAndRunChecks(link, os);
+        // The links are followed in both directions: the same trees written by their real path are the same tree.
+        UN_EXPECT(Has(real / "linux" / "apps" / "Skylauncher.AppImage") && Has(real / "mac" / "apps" / "Skylauncher.app"));
+
+        // A launcher reached through a link into a system folder is still refused, and one in an ordinary folder is not.
+        const fs::path system = "/usr/bin/true";
+        if (Has(system))
+        {
+            fs::create_symlink("/usr", scratch / "via-link-usr", error);
+            Tree tree = MakeTree(scratch / "via-link-system", Os::Linux);
+            tree.env.launcherSelf = scratch / "via-link-usr" / "bin" / "true";
+            LauncherRemoval removal = PlanLauncherRemoval(tree.env);
+            UN_EXPECT(!removal.ok && removal.paths.empty());
+            tree.env.launcherSelf = tree.self;
+            UN_EXPECT(PlanLauncherRemoval(tree.env).ok);
+        }
+        printf("Uninstall through a link: the plan and the run work on a folder reached by a link, a link into a system folder is refused\n");
     }
 
     // ---- The folders of the layout before 0.3.1 ---------------------------------------------------------------------
@@ -396,7 +429,7 @@ namespace
             RunUninstall(plan, moved.env, true);
             UN_EXPECT(Listing(away) == awayBefore);
         }
-        // Saves kept outside the data folder (SSA_SAVE_DIR): not ours to remove.
+        // Saves kept outside the data folder (SKY_SAVE_DIR): not ours to remove.
         {
             Tree odd = MakeTree(base / "refuse-saves", Os::Linux);
             odd.env.games[0].saves = odd.outside / "my-saves";
@@ -607,16 +640,16 @@ namespace
         const char* oldData = SDL_getenv("SKYLANDERS_DATA");
         const std::string saved = oldData != nullptr ? oldData : std::string();
         set("SKYLANDERS_DATA", data.string());
-        set("SKYLAUNCHER_UNINSTALL_SELF", "");
-        set("SKYLAUNCHER_UNINSTALL_TRASH", "");
+        set("SKY_LAUNCHER_UNINSTALL_SELF", "");
+        set("SKY_LAUNCHER_UNINSTALL_TRASH", "");
         UN_EXPECT(ScratchRun());
         UN_EXPECT(ThisMachine({}).launcherSelf.empty());
         const fs::path dummy = base / "machine" / "Skylauncher.app";
         Put(dummy / "Contents" / "MacOS" / "Skylauncher", 10);
-        set("SKYLAUNCHER_UNINSTALL_SELF", dummy.string());
+        set("SKY_LAUNCHER_UNINSTALL_SELF", dummy.string());
         Environment env = ThisMachine({});
         UN_EXPECT(env.os != Os::MacOS || env.launcherSelf.empty()); // macOS: no Trash named, so no launcher
-        set("SKYLAUNCHER_UNINSTALL_TRASH", (base / "machine" / "Trash").string());
+        set("SKY_LAUNCHER_UNINSTALL_TRASH", (base / "machine" / "Trash").string());
         env = ThisMachine({});
         UN_EXPECT(env.launcherSelf == dummy && env.trash == base / "machine" / "Trash");
         UN_EXPECT(env.root == data && !env.games.empty());
@@ -627,8 +660,8 @@ namespace
                      "/.local/share/Skylanders", "/.Trash" })
                 for (const fs::path& path : { env.root, env.launcherData, env.settingsFile, env.collection, env.trash })
                     UN_EXPECT(path.string().rfind(home + real, 0) != 0);
-        set("SKYLAUNCHER_UNINSTALL_SELF", "");
-        set("SKYLAUNCHER_UNINSTALL_TRASH", "");
+        set("SKY_LAUNCHER_UNINSTALL_SELF", "");
+        set("SKY_LAUNCHER_UNINSTALL_TRASH", "");
         set("SKYLANDERS_DATA", saved);
         printf("Uninstall on this machine: scratch variables keep the launcher, the Trash and the real folders out of it\n");
     }
@@ -642,6 +675,7 @@ int UninstallChecks(const fs::path& scratch)
     LayoutChecks();
     for (Os os : { Os::MacOS, Os::Windows, Os::Linux })
         PlanAndRunChecks(base, os);
+    SymlinkChecks(scratch);
     OldFolderChecks(base);
     RefusalChecks(base);
     LauncherChecks(base);

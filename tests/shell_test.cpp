@@ -1,4 +1,4 @@
-// SkylauncherTest's checks for the launcher shell: the install checklist, game runs and logs, the updater, settings.
+// ArkeyanLauncherTest's checks for the launcher shell: the install checklist, game runs and logs, the updater, settings.
 // Called from launcher_test.cpp's main; returns the number of failures.
 #include "launcher/game_install.h"
 #include "launcher/game_run.h"
@@ -142,7 +142,7 @@ namespace
         // A stand-in runtime: a shell script that prints, then exits with a code, or answers --portal-probe.
         std::filesystem::path logs = scratch / "logs";
         std::filesystem::create_directories(logs);
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LOG_DIR", logs.string().c_str(), true);
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR", logs.string().c_str(), true);
         std::filesystem::path script = scratch / "fake_runtime.sh";
         std::ofstream(script) << "#!/bin/sh\nif [ \"$1\" = --portal-probe ]; then echo '{\"kind\":\"hid\",\"vid\":\"1430\",\"pid\":\"0150\","
             "\"product\":\"Fake\",\"opened\":true,\"status\":\"ok\"}'; echo '{\"done\":true,\"count\":1}'; exit 0; fi\n"
@@ -166,7 +166,7 @@ namespace
         // The tail starts on a whole line.
         std::ofstream(logs / "big.log") << "aaaa\nbbbb\ncccc\n";
         SHELL_EXPECT(ReadLogTail(logs / "big.log", 7) == "cccc\n" && ReadLogTail(logs / "big.log", 100) == "aaaa\nbbbb\ncccc\n");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LOG_DIR");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR");
 #endif
         printf("Game run: capture of stdout and stderr, exit code, logs text and portal probe checked\n");
     }
@@ -195,7 +195,7 @@ namespace
         const std::map<std::string, std::string>& hashes, bool withSums = true)
     {
         std::filesystem::create_directories(folder);
-        std::string json = "{\"tag_name\":\"" + tag + "\",\"name\":\"Skylauncher " + tag + "\",\"body\":\"What\\u2019s new\\n- a thing\",\"html_url\":\"https://example.test/r\",\"prerelease\":false,\"assets\":[";
+        std::string json = "{\"tag_name\":\"" + tag + "\",\"name\":\"Arkeyan Launcher " + tag + "\",\"body\":\"What\\u2019s new\\n- a thing\",\"html_url\":\"https://example.test/r\",\"prerelease\":false,\"assets\":[";
         std::string sums;
         bool first = true;
         for (const auto& [name, content] : assets)
@@ -259,26 +259,26 @@ namespace
         SHELL_EXPECT(!ParseRelease("<html>rate limited</html>", release, &error) && error.find("JSON") != std::string::npos);
         SHELL_EXPECT(!ParseRelease("{\"message\":\"Not Found\"}", release, &error) && error.find("Not Found") != std::string::npos);
         std::filesystem::path updates = scratch / "updates";
-        MakeRelease(updates / "r1", "v99.0.0", { { "Skylauncher.exe", "exe bytes" }, { "ssa-kit-test.zip", "zip" } }, {});
+        MakeRelease(updates / "r1", "v99.0.0", { { "ArkeyanLauncher.exe", "exe bytes" }, { "ssa-kit-test.zip", "zip" } }, {});
         SHELL_EXPECT(ParseRelease(ReadBytes(updates / "r1" / "latest.json"), release) && release.tag == "v99.0.0");
-        SHELL_EXPECT(release.notes.find("What\xE2\x80\x99s new") == 0 && release.assets.size() == 3 && FindAsset(release, "Skylauncher.exe")->size == 9);
+        SHELL_EXPECT(release.notes.find("What\xE2\x80\x99s new") == 0 && release.assets.size() == 3 && FindAsset(release, "ArkeyanLauncher.exe")->size == 9);
         std::string sums = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  a b.txt\n"
                            "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855 *empty.bin\r\nshort  x\n";
         SHELL_EXPECT(FindChecksum(sums, "a b.txt").starts_with("ba7816bf") && FindChecksum(sums, "empty.bin").starts_with("e3b0c442"));
         SHELL_EXPECT(FindChecksum(sums, "x").empty() && FindChecksum(sums, "nothing").empty());
-        SHELL_EXPECT(LauncherAssetName().starts_with("Skylauncher") && KitAssetName().starts_with("ssa-kit-"));
+        SHELL_EXPECT(LauncherAssetName().starts_with("ArkeyanLauncher") && OldLauncherAssetName().starts_with("Skylauncher") && KitAssetName().starts_with("skylanders-kit-") && OldKitAssetName().starts_with("ssa-kit-"));
 
         // Downloads: good, damaged, and a release without SHA256SUMS.
         std::string downloadError;
-        auto file = DownloadVerified(release, "Skylauncher.exe", updates / "got", {}, nullptr, downloadError);
+        auto file = DownloadVerified(release, "ArkeyanLauncher.exe", updates / "got", {}, nullptr, downloadError);
         SHELL_EXPECT(!file.empty() && ReadBytes(file) == "exe bytes" && !std::filesystem::exists(updates / "got" / "SHA256SUMS"));
-        MakeRelease(updates / "r2", "v99.0.0", { { "Skylauncher.exe", "exe bytes" } }, { { "Skylauncher.exe", std::string(64, 'a') } });
+        MakeRelease(updates / "r2", "v99.0.0", { { "ArkeyanLauncher.exe", "exe bytes" } }, { { "ArkeyanLauncher.exe", std::string(64, 'a') } });
         ParseRelease(ReadBytes(updates / "r2" / "latest.json"), release);
-        file = DownloadVerified(release, "Skylauncher.exe", updates / "got2", {}, nullptr, downloadError);
-        SHELL_EXPECT(file.empty() && downloadError.find("damaged") != std::string::npos && !std::filesystem::exists(updates / "got2" / "Skylauncher.exe"));
-        MakeRelease(updates / "r3", "v99.0.0", { { "Skylauncher.exe", "exe bytes" } }, {}, false);
+        file = DownloadVerified(release, "ArkeyanLauncher.exe", updates / "got2", {}, nullptr, downloadError);
+        SHELL_EXPECT(file.empty() && downloadError.find("damaged") != std::string::npos && !std::filesystem::exists(updates / "got2" / "ArkeyanLauncher.exe"));
+        MakeRelease(updates / "r3", "v99.0.0", { { "ArkeyanLauncher.exe", "exe bytes" } }, {}, false);
         ParseRelease(ReadBytes(updates / "r3" / "latest.json"), release);
-        file = DownloadVerified(release, "Skylauncher.exe", updates / "got3", {}, nullptr, downloadError);
+        file = DownloadVerified(release, "ArkeyanLauncher.exe", updates / "got3", {}, nullptr, downloadError);
         SHELL_EXPECT(file.empty() && downloadError.find("can't be verified") != std::string::npos);
         file = DownloadVerified(release, "Other.exe", updates / "got3", {}, nullptr, downloadError);
         SHELL_EXPECT(file.empty() && downloadError.find("Other.exe") != std::string::npos);
@@ -287,7 +287,7 @@ namespace
         SHELL_EXPECT(!HttpDownload("http://example.test/x", updates / "got4" / "y").ok); // never plain http
 
         // Swapping: the new one in place, the old one kept as .old, undone when the new one is missing.
-        std::filesystem::path app = updates / "swap" / "Skylauncher.exe";
+        std::filesystem::path app = updates / "swap" / "ArkeyanLauncher.exe";
         WriteBytes(app, "old");
         WriteBytes(updates / "swap" / "new", "new");
         SHELL_EXPECT(ReplaceInPlace(app, updates / "swap" / "new", error) && ReadBytes(app) == "new" && ReadBytes(app.string() + ".old") == "old");
@@ -311,20 +311,49 @@ namespace
         MakeZip(zip, { { "SSABuild", "first install" }, { "SSABuild.exe", "first install" } });
         SHELL_EXPECT(InstallKitZip(zip, updates / "fresh" / "ssa-kit", error) && ReadBytes(updates / "fresh" / "ssa-kit" / "SSABuild") == "first install");
 
+        // The two name sets: a release carries the new ones, the old ones or both (0.6.0 publishes both); the new come first.
+        {
+            ReleaseInfo both, oldOnly, newOnly, neither;
+            both.assets = { { OldLauncherAssetName(), "u", 1 }, { LauncherAssetName(), "u", 1 }, { OldKitAssetName(), "u", 1 }, { KitAssetName(), "u", 1 } };
+            oldOnly.assets = { { OldLauncherAssetName(), "u", 1 }, { OldKitAssetName(), "u", 1 } };
+            newOnly.assets = { { LauncherAssetName(), "u", 1 }, { KitAssetName(), "u", 1 } };
+            SHELL_EXPECT(LauncherAssetIn(both) == LauncherAssetName() && KitAssetIn(both) == KitAssetName());
+            SHELL_EXPECT(LauncherAssetIn(oldOnly) == OldLauncherAssetName() && KitAssetIn(oldOnly) == OldKitAssetName());
+            SHELL_EXPECT(LauncherAssetIn(newOnly) == LauncherAssetName() && KitAssetIn(newOnly) == KitAssetName());
+            SHELL_EXPECT(LauncherAssetIn(neither) == LauncherAssetName() && KitAssetIn(neither) == KitAssetName()); // the message names the new one
+            SHELL_EXPECT(LauncherAssetName() != OldLauncherAssetName() && KitAssetName() != OldKitAssetName());
+            // The kit zip is the same file under both names: SkyBuild at the root, or SSABuild (a kit for 0.4.x launchers), wrapped or not.
+            MakeZip(zip, { { "skylanders-kit-test/SkyBuild", "new builder" }, { "skylanders-kit-test/SkyBuild.exe", "new builder" } });
+            SHELL_EXPECT(InstallKitZip(zip, updates / "fresh" / "skybuild-kit", error) && ReadBytes(updates / "fresh" / "skybuild-kit" / "SkyBuild") == "new builder");
+            MakeZip(zip, { { "SkyBuild", "root" }, { "SkyBuild.exe", "root" }, { "SSABuild", "copy" }, { "SSABuild.exe", "copy" } });
+            SHELL_EXPECT(InstallKitZip(zip, updates / "fresh" / "both-kit", error) && ReadBytes(updates / "fresh" / "both-kit" / "SSABuild") == "copy");
+            // The kit folder is found with either builder and either folder name.
+            std::filesystem::path kitSkyBuild = updates / "kits" / "skylanders-kit-test";
+#if defined(_WIN32)
+            WriteBytes(kitSkyBuild / "SkyBuild.exe", "x");
+#else
+            WriteBytes(kitSkyBuild / "SkyBuild", "x");
+#endif
+            auto kit = InstallKitIn(kitSkyBuild);
+            SHELL_EXPECT(kit && kit->ssabuild.filename().string().starts_with("SkyBuild"));
+            auto oldKit = InstallKitIn(updates / "game" / "ssa-kit");
+            SHELL_EXPECT(oldKit && oldKit->ssabuild.filename().string().starts_with("SSABuild"));
+        }
+
         // The manager: a check against the fake latest.json, then the kit update from it.
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r1" / "latest.json").c_str(), true);
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r1" / "latest.json").c_str(), true);
         UpdateManager manager;
         UpdateManager::Settings settings;
         manager.Check(settings);
         WaitFor(manager);
         UpdateManager::State state = manager.Snapshot();
         SHELL_EXPECT(state.checked && state.launcherNewer && state.launcher.tag == "v99.0.0" && state.games.empty() && state.phase == UpdateManager::Phase::Idle);
-        MakeRelease(updates / "r4", "v0.0.1", { { "Skylauncher.exe", "x" } }, {});
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r4" / "latest.json").c_str(), true);
+        MakeRelease(updates / "r4", "v0.0.1", { { "ArkeyanLauncher.exe", "x" } }, {});
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r4" / "latest.json").c_str(), true);
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(manager.Snapshot().checked && !manager.Snapshot().launcherNewer);
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "none.json").c_str(), true);
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "none.json").c_str(), true);
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(!manager.Snapshot().checked && !manager.Snapshot().checkError.empty());
@@ -333,8 +362,8 @@ namespace
         // read like the other assets (SHA256SUMS), refused if its hash is wrong, absent: no game updates and no complaint.
         ParseGamesManifestChecks();
         std::string manifest = R"({"games":[{"id":"ssa","version":"0.9.0","kit":"v2.0.0","notes":""},{"id":"giants","version":"0.8.2","kit":"v2.0.0","notes":"Fixes a thing."},{"id":"x","version":"?"}]})";
-        MakeRelease(updates / "r5", "v2.0.0", { { GamesManifestName, manifest }, { "Skylauncher.exe", "x" } }, {});
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r5" / "latest.json").c_str(), true);
+        MakeRelease(updates / "r5", "v2.0.0", { { GamesManifestName, manifest }, { "ArkeyanLauncher.exe", "x" } }, {});
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5" / "latest.json").c_str(), true);
         settings.kitRepo = "someone/kit";
         manager.Check(settings);
         WaitFor(manager);
@@ -342,26 +371,26 @@ namespace
         SHELL_EXPECT(state.checked && state.games.size() == 2 && state.games[1].id == "giants" && state.games[1].version == "0.8.2" &&
             state.games[1].kit == "v2.0.0" && state.games[1].notes == "Fixes a thing.");
         MakeRelease(updates / "r5b", "v2.0.0", { { GamesManifestName, manifest } }, { { GamesManifestName, std::string(64, 'c') } });
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r5b" / "latest.json").c_str(), true);
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5b" / "latest.json").c_str(), true);
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a wrong hash: no updates offered
-        MakeRelease(updates / "r5c", "v2.0.0", { { "Skylauncher.exe", "x" } }, {});
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r5c" / "latest.json").c_str(), true);
+        MakeRelease(updates / "r5c", "v2.0.0", { { "ArkeyanLauncher.exe", "x" } }, {});
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5c" / "latest.json").c_str(), true);
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a release without the manifest
         // The kit download INSTALL starts with: the release of this launcher's tag, else the latest, verified, then found.
         auto setEnv = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
-        setEnv("SKYLAUNCHER_DATA", (updates / "data").string());
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
+        setEnv("SKY_LAUNCHER_DATA", (updates / "data").string());
         std::string launcherTag = "v" + LauncherVersion();
         std::string dlZip = MakeZip(updates / "dl" / KitAssetName(), { { "ssa-kit/", "" }, { "ssa-kit/SSABuild", "dl kit" }, { "ssa-kit/SSABuild.exe", "dl kit" }, { "ssa-kit/kit.txt", "build=b9\n" } });
         MakeRelease(updates / "dl", launcherTag, { { KitAssetName(), dlZip } }, {});
         std::filesystem::create_directories(updates / "dl-other");
         std::filesystem::copy_file(updates / "dl" / "latest.json", updates / "dl-other" / (launcherTag + ".json"));
         MakeRelease(updates / "dl-other", "v77.0.0", { { KitAssetName(), "wrong zip" } }, {}); // the latest: must not be used
-        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-other" / "latest.json"));
+        setEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "dl-other" / "latest.json"));
         std::string kitError, kitTag;
         uint64_t lastBytes = 0;
         std::filesystem::path kitDir = DownloadKit("x/y", launcherTag, DownloadedKitsFolder(), [&](uint64_t bytes, uint64_t) { lastBytes = bytes; }, nullptr, kitError, &kitTag);
@@ -378,32 +407,32 @@ namespace
         // No release of that tag: the latest.
         std::string latestZip = MakeZip(updates / "dl-latest" / KitAssetName(), { { "SSABuild", "latest kit" }, { "SSABuild.exe", "latest kit" } });
         MakeRelease(updates / "dl-latest", "v77.0.0", { { KitAssetName(), latestZip } }, {});
-        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-latest" / "latest.json"));
+        setEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "dl-latest" / "latest.json"));
         kitDir = DownloadKit("x/y", launcherTag, updates / "data2" / "kit", {}, nullptr, kitError);
         SHELL_EXPECT(kitDir == updates / "data2" / "kit" / "v77.0.0" && ReadBytes(kitDir / "SSABuild") == "latest kit");
         // A bad hash and a SHA256SUMS without the line are refused, and nothing is left behind.
         MakeRelease(updates / "dl-bad", "v78.0.0", { { KitAssetName(), latestZip } }, { { KitAssetName(), std::string(64, 'b') } });
-        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-bad" / "latest.json"));
+        setEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "dl-bad" / "latest.json"));
         kitDir = DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError);
         SHELL_EXPECT(kitDir.empty() && kitError.find("damaged") != std::string::npos && !std::filesystem::exists(updates / "data3" / "kit" / "v78.0.0"));
         MakeRelease(updates / "dl-line", "v79.0.0", { { KitAssetName(), latestZip }, { "other.bin", "x" } }, {});
         WriteBytes(updates / "dl-line" / "SHA256SUMS", Sha("x") + "  other.bin\n");
-        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-line" / "latest.json"));
+        setEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "dl-line" / "latest.json"));
         kitDir = DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError);
         SHELL_EXPECT(kitDir.empty() && kitError.find("can't be verified") != std::string::npos);
-        MakeRelease(updates / "dl-noasset", "v80.0.0", { { "Skylauncher.exe", "x" } }, {});
-        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-noasset" / "latest.json"));
+        MakeRelease(updates / "dl-noasset", "v80.0.0", { { "ArkeyanLauncher.exe", "x" } }, {});
+        setEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "dl-noasset" / "latest.json"));
         SHELL_EXPECT(DownloadKit("x/y", launcherTag, updates / "data3" / "kit", {}, nullptr, kitError).empty() && kitError.find(KitAssetName()) != std::string::npos);
         // On a thread, as the card polls it.
-        setEnv("SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "dl-latest" / "latest.json"));
+        setEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "dl-latest" / "latest.json"));
         KitDownloader downloader;
         downloader.Start("x/y", launcherTag, updates / "data4" / "kit");
         for (int i = 0; i < 500 && downloader.Running(); i++)
             SDL_Delay(20);
         KitDownloader::Snapshot_ result = downloader.Snapshot();
         SHELL_EXPECT(result.state == KitDownloader::State::Done && result.tag == "v77.0.0" && std::filesystem::exists(result.folder / "SSABuild"));
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_DATA");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL");
         printf("Updater: versions, release JSON, SHA-256 check, swap with rollback, kit zip and the manager checked\n");
     }
 
@@ -525,7 +554,7 @@ namespace
         SHELL_EXPECT(report.find("previous run") != std::string::npos && report.find("previous install") != std::string::npos);
         SHELL_EXPECT(report.find("alice") == std::string::npos && report.find("Alices-MacBook-Pro") == std::string::npos);
         SHELL_EXPECT(report.find("<home>") != std::string::npos && report.find("<iso folder>/SSA.iso") != std::string::npos);
-        SHELL_EXPECT(launcher_report::FileName().starts_with("Skylauncher-report-") &&
+        SHELL_EXPECT(launcher_report::FileName().starts_with("ArkeyanLauncher-report-") &&
             launcher_report::FileName().ends_with(".txt"));
         printf("Report: the three home folders, names in text, computer and ISO folder redacted; nothing else changed\n");
     }
@@ -573,8 +602,8 @@ namespace
             WriteBytes(folder / "SSABuild.exe", "x");
             WriteBytes(folder / "kit.txt", text);
         };
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
-        setEnv("SKYLAUNCHER_DATA", (root / "data").string());
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
+        setEnv("SKY_LAUNCHER_DATA", (root / "data").string());
 
         // What a kit builds: games= in kit.txt; a kit from before 0.5.0 says nothing and builds Spyro's Adventure only.
         kit(root / "old", "version=0.3.1\nbuild=a\n");
@@ -596,7 +625,7 @@ namespace
         SHELL_EXPECT(!KitOlderThanLauncher(*InstallKitIn(root / "none"), "9.0.0"));
 
         // Next to the launcher or downloaded: the kit next to it, unless a downloaded one comes from a newer release.
-        setEnv("SKYLAUNCHER_BASE_PATH", (root / "base").string());
+        setEnv("SKY_LAUNCHER_BASE_PATH", (root / "base").string());
         kit(root / "base" / "ssa-kit-windows-x64", "version=0.3.1\nbuild=beside\n");
         auto found = FindInstallKit({});
         SHELL_EXPECT(found && found->version == "beside" && found->tag.empty() && !found->chosen);
@@ -607,19 +636,19 @@ namespace
         found = FindInstallKit({});
         SHELL_EXPECT(found && found->version == "beside");
         // The player's own choice wins over both, and is never called old.
-        setEnv("SKYLAUNCHER_KIT", (root / "old").string());
+        setEnv("SKY_LAUNCHER_KIT", (root / "old").string());
         found = FindInstallKit({});
         SHELL_EXPECT(found && found->chosen && found->version == "a" && !KitOlderThanLauncher(*found, "9.0.0"));
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_BASE_PATH");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_BASE_PATH");
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_DATA");
         printf("Kit: games=, the release it comes from, next to the launcher against downloaded, the player's own\n");
     }
 }
 
-// The kit of a fake release for SkylauncherTest's launcher checks (tests/launcher_test.cpp): `kitFolder`'s files in a zip, as the kit
+// The kit of a fake release for ArkeyanLauncherTest's launcher checks (tests/launcher_test.cpp): `kitFolder`'s files in a zip, as the kit
 // asset of a release for each of `tags`, the last one the latest; `<tag>.json` is the release of that tag, as the launcher asks for
-// its own; `gamesJson` (when not empty) is the release's games.json. `folder` is what SKYLAUNCHER_UPDATE_URL points into. Where `zip` exists the Unix modes are kept (so the kit's SSABuild
+// its own; `gamesJson` (when not empty) is the release's games.json. `folder` is what SKY_LAUNCHER_UPDATE_URL points into. Where `zip` exists the Unix modes are kept (so the kit's SSABuild
 // runs once unpacked).
 void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder,
     const std::string& gamesJson)
