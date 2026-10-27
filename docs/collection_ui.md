@@ -118,7 +118,8 @@ At the first visit to the page (`CollectionPage::Open`):
   Type menus). The combo boxes use ImGui's own arrow.
 - **Upgrades in Edit** (2026-10-26): `DrawUpgradeEditor`: the toy's upgrades by name (`collection::Upgrades`), the same
   columns, rules and words as the Toy Box (`collection::ToggleUpgrade`...), All / None, the focused one's description;
-  the Edit fields scroll above the Save row. Save writes `upgrades` (and the Giants Wow Pow copy) only when they changed
+  the Edit fields scroll above the Save row. Save writes `upgrades` and Giants' Wow Pow (`wowPow`, the extra area's +0x06 bit 0, where Giants writes it when
+  Persephone sells it; the sheet works on `collection::EditorBits`, the field with bit 10 for the Wow Pow) only when they changed
   (`MergeEditedStats`). The sheet shows a name once, and "Never" under Last played for a figure no game has written.
 - **Texts** (2026-10-26): one short sentence per help line, no path or file name in running text, no help when the
   label is clear, errors as what happened then what to do. The intro of Add a figure, the Edit sheet's backup note,

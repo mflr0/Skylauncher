@@ -611,6 +611,12 @@ void EditChecks()
     edited = base;
     edited.gold = 5;
     EXPECT(MergeEditedStats(now, base, edited, "Splash", "Splash").upgrades == 0x0004);
+    // Giants' Wow Pow: the Edit sheet's bit 10 goes to the figure's own place (FigureStats::wowPow), not the field.
+    edited = base;
+    collection::StoreEditorBits(uint16_t(collection::EditorBits(edited.upgrades, edited.wowPow) | 1 << collection::UpgradeWowPowBit),
+        edited.upgrades, edited.wowPow);
+    saved = MergeEditedStats(now, base, edited, "Splash", "Splash");
+    EXPECT(saved.wowPow == 1 && saved.upgrades == now.upgrades);
 
     using launcher_ui::Trimmed;
     EXPECT(Trimmed("   ").empty() && Trimmed("").empty() && Trimmed("\t Splash's  ") == "Splash's" && Trimmed("A b") == "A b");

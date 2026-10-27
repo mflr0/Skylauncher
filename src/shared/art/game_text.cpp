@@ -19,7 +19,8 @@ namespace art
     namespace
     {
         // Where each entry of a toy's upgrade list goes [V] (both games' menus): 4 basic upgrades, 3 for each path, the
-        // Soul Gem, the Wow Pow (Giants, Series 2): { bit, path, index in the price list }.
+        // Soul Gem, the Wow Pow (Giants, Series 2; bit 10 of the editors' bits, collection::EditorBits): { bit, path, index
+        // in the price list }.
         struct Slot
         {
             int bit, path, price;

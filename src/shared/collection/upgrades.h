@@ -16,7 +16,9 @@ namespace collection
     constexpr int UpgradePathChosenBit = 0; // a path is chosen
     constexpr int UpgradePathSecondBit = 1; // ...and it is the second one (clear: the first)
     constexpr int UpgradeSoulGemBit = 9;
-    constexpr int UpgradeWowPowBit = 10;    // Giants, Series 2 figures [?] (figures.md)
+    // Giants' Wow Pow (Series 2 figures) is not in this field: the game keeps it in the extra area (FigureStats::wowPow).
+    // The editors' working bits (EditorBits) carry it at bit 10, so that one 16-bit value drives the Edit sheets.
+    constexpr int UpgradeWowPowBit = 10;
 
     enum class UpgradePath
     {
@@ -58,6 +60,11 @@ namespace collection
     uint16_t AllUpgrades(uint16_t bits, const UpgradeTable& table);
     uint16_t NoUpgrades(uint16_t bits);
     int BoughtCount(uint16_t bits, const UpgradeTable& table);
+    // The Edit sheets' working bits from a figure: its upgrade field (FigureStats::upgrades) with bit 10 = its Wow Pow
+    // (FigureStats::wowPow); and back. Bits 10-11 of the field itself are another Giants field (cleared by the game on a
+    // figure's first use) and are kept as they were.
+    uint16_t EditorBits(uint16_t field, uint8_t wowPow);
+    void StoreEditorBits(uint16_t bits, uint16_t& field, uint8_t& wowPow);
     // A name or description for display: the game's button marks become "the button" / "le bouton", line breaks and
     // doubled spaces go; the description is cut to its first sentence.
     std::string UpgradeLabel(const std::string& text, const std::string& language);

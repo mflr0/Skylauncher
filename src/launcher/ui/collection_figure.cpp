@@ -190,7 +190,7 @@ namespace launcher_ui
         {
             std::string nickname = figures::NicknameUtf8(f.stats);
             rows.push_back({ Tr("Nickname"), nickname.empty() ? std::string(Tr("None")) : nickname });
-            rows.push_back({ Tr("Hero points"), Tf("{}   ·   {}   ·   {} upgrades", f.stats.heroPoints, HatText(f.stats.hat), std::popcount(f.stats.upgrades)) });
+            rows.push_back({ Tr("Hero points"), Tf("{}   ·   {}   ·   {} upgrades", f.stats.heroPoints, HatText(f.stats.hat), std::popcount(uint16_t(collection::EditorBits(f.stats.upgrades, f.stats.wowPow) & 0x07FF))) });
         }
         std::string games;
         int count = 0;
@@ -480,26 +480,26 @@ namespace launcher_ui
         collection::UpgradeTable table = collection::Upgrades(*f.toy, m_model.gameId, language);
         if (table.upgrades.empty())
             return;
-        auto setBits = [&](uint16_t bits) {
-            m_edit.upgrades = bits;
-            for (const collection::Upgrade& upgrade : table.upgrades)
-                if (upgrade.path == collection::UpgradePath::WowPow)
-                    m_edit.wowPow = uint8_t(bits >> collection::UpgradeWowPowBit & 1);
+        // The editors' bits: the upgrade field with bit 10 = the Wow Pow, which the figure keeps in its extra area.
+        uint16_t bits = collection::EditorBits(m_edit.upgrades, m_edit.wowPow);
+        auto setBits = [&](uint16_t edited) {
+            bits = edited;
+            collection::StoreEditorBits(edited, m_edit.upgrades, m_edit.wowPow);
         };
         ImGui::Dummy(ImVec2(0, 10));
         ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Upgrades"));
         ImGui::SameLine(0, 12);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{} of {}", collection::BoughtCount(m_edit.upgrades, table), table.upgrades.size()).c_str());
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{} of {}", collection::BoughtCount(bits, table), table.upgrades.size()).c_str());
         ImGui::SameLine(0, 16);
         if (ImGui::SmallButton(Tr("All")))
-            setBits(collection::AllUpgrades(m_edit.upgrades, table));
+            setBits(collection::AllUpgrades(bits, table));
         ImGui::SameLine(0, 6);
         if (ImGui::SmallButton(Tr("None")))
-            setBits(collection::NoUpgrades(m_edit.upgrades));
+            setBits(collection::NoUpgrades(bits));
         constexpr float Gap = 10, Row = 40;
         float columnW = (ImGui::GetContentRegionAvail().x - 2 * Gap) / 3;
         ImVec2 origin = ImGui::GetCursorScreenPos();
-        bool chosen = (m_edit.upgrades >> collection::UpgradePathChosenBit & 1) != 0, second = (m_edit.upgrades >> collection::UpgradePathSecondBit & 1) != 0;
+        bool chosen = (bits >> collection::UpgradePathChosenBit & 1) != 0, second = (bits >> collection::UpgradePathSecondBit & 1) != 0;
         const std::string titles[3] = { Tr("Basic"), table.pathNames[0], table.pathNames[1] };
         ImDrawList* draw = ImGui::GetWindowDrawList();
         ImGui::PushFont(m_app.m_boldFont, SmallSize);
@@ -521,11 +521,11 @@ namespace launcher_ui
             ImGui::SetCursorScreenPos(at);
             ImGui::PushID(int(i));
             if (ImGui::InvisibleButton("##upgrade", ImVec2(columnW, Row), ImGuiButtonFlags_EnableNav))
-                setBits(collection::ToggleUpgrade(m_edit.upgrades, upgrade));
+                setBits(collection::ToggleUpgrade(bits, upgrade));
             ImGui::PopID();
             bool hovered = ImGui::IsItemHovered(), focused = ImGui::IsItemFocused();
             m_app.FocusRing(Radius);
-            bool bought = collection::UpgradeBought(m_edit.upgrades, upgrade), greyed = collection::UpgradeGreyed(m_edit.upgrades, upgrade);
+            bool bought = collection::UpgradeBought(bits, upgrade), greyed = collection::UpgradeGreyed(bits, upgrade);
             draw->AddRectFilled(at, ImVec2(at.x + columnW, at.y + Row), Rgb(hovered || focused ? PanelRaised : Field), Radius);
             ImVec2 mark(at.x + 20, at.y + Row / 2);
             draw->AddCircleFilled(mark, 9, Rgb(bought ? Accent : PanelRaisedActive));

@@ -51,8 +51,8 @@ namespace figures
         uint8_t extraSequence = 0;     // the extra area's sequence number (0 without one)
         uint32_t swapForceExperience = 0; // extra area +0x08 (LE32): Swap Force's part (levels 16-20) [?]; read and kept,
                                        // never counted by Spyro's Adventure or Giants
-        uint8_t wowPow = 0;            // Giants' Wow Pow (Series 2 figures), 0 or 1: extra area +0x06 bits 6-8, the copy Giants
-                                       // reads; mirrored in `upgrades` bits 10-11 (figures.md, "Upgrades")
+        uint8_t wowPow = 0;            // Giants' Wow Pow bought (Series 2 figures), 0 or 1: extra area +0x06 bit 0, where the
+                                       // game writes it when Persephone sells it [V] (figures.md, "Upgrades")
         std::array<uint8_t, 8> owner{}; // 0x18, the first owner's id, written by the title
         std::u16string nickname;       // 0x20 and 0x40, 16 UTF-16 code units, zero padded
         Date lastPlaced;               // 0x50

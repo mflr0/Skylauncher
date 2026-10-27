@@ -152,8 +152,7 @@ namespace collection
                 return bits | (1 << upgrade.bit);
             }
         }
-        bool wow = upgrade.path == UpgradePath::WowPow;
-        uint16_t mask = wow ? 3 << UpgradeWowPowBit : 1 << upgrade.bit; // the Wow Pow is a 2-bit counter: on = 1
+        uint16_t mask = uint16_t(1 << upgrade.bit);
         if (BitOn(bits, upgrade))
             return bits & ~mask;
         return (bits & ~mask) | (1 << upgrade.bit);
@@ -180,6 +179,18 @@ namespace collection
     uint16_t NoUpgrades(uint16_t bits)
     {
         return bits & ~0x0FFF;
+    }
+
+    uint16_t EditorBits(uint16_t field, uint8_t wowPow)
+    {
+        return uint16_t((field & ~(1 << UpgradeWowPowBit)) | (wowPow & 1) << UpgradeWowPowBit);
+    }
+
+    void StoreEditorBits(uint16_t bits, uint16_t& field, uint8_t& wowPow)
+    {
+        constexpr uint16_t GiantsField = 3 << UpgradeWowPowBit; // bits 10-11 of the field: not the editors'
+        wowPow = uint8_t(bits >> UpgradeWowPowBit & 1);
+        field = uint16_t((bits & ~GiantsField) | (field & GiantsField));
     }
 
     int BoughtCount(uint16_t bits, const UpgradeTable& table)
