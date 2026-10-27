@@ -6,6 +6,31 @@ image, it builds the game on your computer, and you play. (Formerly Skylauncher:
 Arkeyan Launcher contains no game code and no game art. Everything shown from the game is read from your own disc and stays
 on your computer.
 
+## The games
+
+| Game | Mac | Windows | Linux | Played so far |
+|---|---|---|---|---|
+| Spyro's Adventure | ✅ | ✅ | ⚠️ not tested on a real PC | The story and the Heroic Challenges; a complete playthrough is not confirmed yet |
+| Giants | ✅ | ⚠️ not tested on a real PC | ⚠️ not tested on a real PC | Chapter 1, and 78 of its 91 levels in an automatic tour (the other 13 are challenge levels the tour cannot start) |
+| Swap Force | ✅ new | ⚠️ not tested on a real PC | ⚠️ not tested on a real PC | The tutorial, the first area of the story and the two-player arenas |
+
+Finished a game, or played one on Windows or Linux? Please say so in an
+[issue](https://github.com/mflr0/Skylauncher/issues): it is how this table gets filled.
+
+## Supported discs
+
+The launcher checks your disc image (the SHA-256 of its `default.xex`). These Xbox 360 releases are supported (the names
+are the Redump ones):
+
+| Game | Disc |
+|---|---|
+| Spyro's Adventure | Skylanders - Spyro's Adventure (USA, Europe) (En,Fr,De,Es,It,Nl,Sv,No,Da,Fi) |
+| Giants | Skylanders - Giants (USA, Europe) (En,Fr,De,Es,It,Nl,Pt,Sv,No,Da,Fi) |
+| Swap Force | Skylanders - Swap Force (USA, Australia) (En,Fr) |
+| Swap Force | Skylanders - Swap Force (Europe) (Es,It) |
+
+Another release is refused with a message. If you own one, open an issue with its name: adding a release is usually quick.
+
 ## What you need
 
 - Your own copy of *Skylanders: Spyro's Adventure*, *Skylanders: Giants* or *Skylanders: Swap Force* for Xbox 360, as a disc image (`.iso`).
@@ -108,9 +133,32 @@ ninja -C build ArkeyanLauncher
 The developer docs are in `docs/`: `launcher_ui.md` covers the screens and theme, `install.md` the install,
 `collection_ui.md` the figures, `updates.md` the updater and releases, and `support.md` the logs.
 
+## Known issues
+
+- Giants and Swap Force have not been tested on a real Windows or Linux PC yet.
+- Swap Force is new: not every mode has been played through yet.
+- The 60 fps option is experimental.
+- The Mac app is not notarized, and Windows SmartScreen may warn about the launcher (see Get started).
+
+## How it works
+
+The ports are made by static recompilation: the game's PowerPC code is translated to C++ and its shaders to Metal,
+Vulkan and Direct3D 12 shaders, on your computer, from your disc. A runtime written for these games replaces the Xbox 360
+(memory, threads, files, graphics, audio, controllers, the Portal of Power). This is an independent project: it is not a
+fork of other Skylanders recompilation projects, even where an executable shares a name with one of them.
+
+The reverse engineering is the author's own work; AI tools assist with the reimplementation.
+
 ## Credits and licence
 
 Designed by dorydev.
+
+The ports are built with [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) and
+[XenosRecomp](https://github.com/hedge-dev/XenosRecomp) (hedge-dev), [plume](https://github.com/renderbag/plume)
+(renderbag) and SDL 3, and adapt parts of [Xenia](https://github.com/xenia-project/xenia). Facts (never code) were
+checked against public work: tsapZ's Spyro's Adventure, Giants and Swap Force recompilations (where some prompts,
+movie functions and camera values live, the portal models' ids), and Marijn Kneppers' research on the portal and the
+figures. Thank you to all of them.
 
 MIT licence, see `LICENSE`. The third-party components are listed in `THIRD_PARTY_NOTICES.md`.
 
