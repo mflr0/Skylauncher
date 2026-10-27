@@ -243,6 +243,27 @@ bool ParseRelease(const std::string& json, ReleaseInfo& release, std::string* er
     return true;
 }
 
+bool ParseGamesManifest(const std::string& json, std::vector<GameUpdate>& games, std::string* error)
+{
+    JsonValue root;
+    std::string parseError;
+    if (!ParseJson(json, root, &parseError) || !root["games"].IsArray())
+    {
+        if (error != nullptr)
+            *error = parseError.empty() ? std::string("no games") : parseError;
+        return false;
+    }
+    games.clear();
+    const JsonValue& list = root["games"];
+    for (size_t i = 0; i < list.array.size(); i++)
+    {
+        GameUpdate game{ list[i]["id"].Str(), list[i]["version"].Str(), list[i]["kit"].Str(), list[i]["notes"].Str() };
+        if (!game.id.empty() && ParseSemVer(game.version).valid)
+            games.push_back(std::move(game));
+    }
+    return true;
+}
+
 const ReleaseAsset* FindAsset(const ReleaseInfo& release, std::string_view name)
 {
     for (const ReleaseAsset& asset : release.assets)
@@ -754,6 +775,7 @@ void UpdateManager::Check(const Settings& settings)
             return ParseRelease(ReadText(file), release, &error);
         };
         ReleaseInfo launcher, kit;
+        std::vector<GameUpdate> games;
         std::string error, kitError;
         bool launcherOk = fetch(m_settings.repo, launcher, error);
         bool kitOk = false;
@@ -761,6 +783,14 @@ void UpdateManager::Check(const Settings& settings)
         {
             // The kit has its own releases: the same file name would be overwritten by the first fetch, so each is read at once.
             kitOk = fetch(m_settings.kitRepo, kit, kitError);
+            // The manifest: a small asset, verified like the rest; a release without one has no game updates.
+            if (kitOk && FindAsset(kit, GamesManifestName) != nullptr)
+            {
+                std::string manifestError;
+                fs::path file = DownloadVerified(kit, GamesManifestName, temp / "games", {}, &m_cancel, manifestError);
+                if (!file.empty() && !ParseGamesManifest(ReadText(file), games, &manifestError))
+                    games.clear();
+            }
         }
         std::error_code fsError;
         fs::remove_all(temp, fsError);
@@ -772,13 +802,9 @@ void UpdateManager::Check(const Settings& settings)
             m_state.launcherNewer = launcherOk && !launcher.prerelease && IsNewer(launcher.tag, LauncherVersion());
             if (launcherOk)
                 m_state.launcher = launcher;
-            m_state.kitNewer = false;
-            if (kitOk && FindAsset(kit, KitAssetName()) != nullptr)
-            {
-                const std::string& installed = m_settings.kitInstalled;
-                m_state.kitNewer = IsNewer(kit.tag, installed) || (!installed.empty() && !ParseSemVer(installed).valid && kit.tag != installed);
+            m_state.games = std::move(games);
+            if (kitOk)
                 m_state.kit = kit;
-            }
         }
         m_busy = false;
     });
@@ -873,58 +899,6 @@ void UpdateManager::UpdateLauncher()
         }
         else
             Fail(error);
-        m_busy = false;
-    });
-}
-
-void UpdateManager::UpdateKit()
-{
-    if (m_busy)
-        return;
-    Join();
-    m_busy = true;
-    m_cancel = false;
-    m_thread = std::thread([this] {
-        ReleaseInfo release;
-        fs::path kitFolder;
-        { std::lock_guard lock(m_mutex); release = m_state.kit; kitFolder = m_settings.kitFolder; m_state.error.clear(); m_state.note.clear(); }
-        std::error_code fsError;
-        if (kitFolder.empty() && !m_settings.kitRoot.empty()) // no kit next to the launcher: a new one goes in kit/<tag>
-        {
-            kitFolder = KitFolderFor(m_settings.kitRoot, release.tag);
-            fs::create_directories(m_settings.kitRoot, fsError);
-        }
-        if (kitFolder.empty() || !Writable(kitFolder.parent_path()))
-        {
-            Fail(Tr("Can't write next to Skylauncher: move it to a writable folder."));
-            m_busy = false;
-            return;
-        }
-        SetPhase(Phase::Downloading, "kit");
-        auto progress = [&](uint64_t bytes) {
-            const ReleaseAsset* asset = FindAsset(release, KitAssetName());
-            std::lock_guard lock(m_mutex);
-            m_state.progress = asset != nullptr && asset->size > 0 ? std::min(1.0f, float(double(bytes) / double(asset->size))) : -1.0f;
-        };
-        fs::path folder = kitFolder.parent_path() / ".skylauncher-update";
-        std::string error;
-        fs::path zip = DownloadVerified(release, KitAssetName(), folder, progress, &m_cancel, error);
-        if (!zip.empty())
-        {
-            SetPhase(Phase::Installing, "kit");
-            if (InstallKitZip(zip, kitFolder, error))
-            {
-                std::lock_guard lock(m_mutex);
-                m_state.phase = Phase::Done;
-                m_state.kitNewer = false;
-                m_state.note = Tr("The game kit is up to date: update the game to use it.");
-                fs::remove_all(folder, fsError);
-                m_busy = false;
-                return;
-            }
-        }
-        fs::remove_all(folder, fsError);
-        Fail(error);
         m_busy = false;
     });
 }

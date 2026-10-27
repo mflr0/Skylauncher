@@ -45,6 +45,16 @@ const ReleaseAsset* FindAsset(const ReleaseInfo& release, std::string_view name)
 // The expected hash of `name` in a SHA256SUMS file ("<64 hex>  <name>" or "<hex> *<name>" lines); empty when absent.
 std::string FindChecksum(const std::string& sums, std::string_view name);
 
+// A game's entry in the release's manifest asset `games.json` (docs/updates.md): {"games":[{"id","version","kit","notes"}]}. `kit` is the
+// tag of the release holding the kit that builds this version, `notes` what changed (plain text, may be empty).
+struct GameUpdate
+{
+    std::string id, version, kit, notes;
+};
+// Entries without an id or a version are skipped. False and `error` when `json` is not a manifest.
+bool ParseGamesManifest(const std::string& json, std::vector<GameUpdate>& games, std::string* error = nullptr);
+inline constexpr char GamesManifestName[] = "games.json";
+
 // The release asset for this OS: Skylauncher.exe, Skylauncher-macOS.zip, Skylauncher-x86_64.AppImage.
 std::string LauncherAssetName();
 // The kit's: ssa-kit-windows-x64.zip, ssa-kit-macos-arm64.zip, ssa-kit-linux-x64.zip.
@@ -132,10 +142,7 @@ public:
     struct Settings
     {
         std::string repo = "mflr0/Skylauncher";
-        std::string kitRepo;            // empty: no kit updates (the default is the launcher's own repository)
-        std::string kitInstalled;       // the installed kit's version or release tag
-        std::filesystem::path kitFolder; // where the kit is (a kit next to the launcher); empty: a new kit goes in kitRoot/<tag>
-        std::filesystem::path kitRoot;   // DownloadedKitsFolder()
+        std::string kitRepo;            // empty: no game updates (the default is the launcher's own repository)
     };
     struct State
     {
@@ -144,8 +151,8 @@ public:
         std::string checkError;         // why the last check failed
         bool launcherNewer = false;
         ReleaseInfo launcher;
-        bool kitNewer = false;
-        ReleaseInfo kit;
+        ReleaseInfo kit;                // the release that carries the games (its assets' sizes tell the download)
+        std::vector<GameUpdate> games;  // its games.json: what each game's latest version is (empty: none published)
         std::string doing;              // "launcher" or "kit", what Downloading..Installing is for
         float progress = -1;            // 0..1 while downloading, -1 when unknown
         std::string error;              // why Failed
@@ -154,9 +161,8 @@ public:
     };
 
     ~UpdateManager() { Cancel(); Join(); }
-    void Check(const Settings& settings);      // the latest launcher release (and the kit's), in the background
+    void Check(const Settings& settings);      // the latest launcher release (and the games' manifest), in the background
     void UpdateLauncher();                     // download, verify, replace; needs a Check that found one
-    void UpdateKit();
     void Cancel() { m_cancel = true; }
     void Dismiss();                            // clears a failure or a note
 

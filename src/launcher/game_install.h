@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdint>
 #include <filesystem>
+#include <map>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -23,10 +24,12 @@ struct InstallKit
     std::string release;            // "version=" in kit.txt: the release it came from, "" when it has none
     std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
     std::vector<std::string> games; // "games=" in kit.txt: what the kit builds ("ssa", "giants", "swapforce"); a kit before 0.5.0 has none: SSA only
+    std::map<std::string, std::string> gameVersions; // "game_version.<id>=" in kit.txt: the version of each game the kit builds ("0.8.2"); a kit before 0.5.2 has none
     std::string tag;                // the release it was downloaded from (its kit/<tag>/ folder), "" for any other kit
     bool chosen = false;            // SKYLAUNCHER_KIT or "[launcher] kit=": the player's own, never replaced by the launcher
 
     bool Builds(std::string_view gameId) const;
+    std::string GameVersion(std::string_view gameId) const; // "" when the kit does not say
 };
 
 // The kit comes from an older release than the launcher's version: its kit/<tag>/ folder, else "version=" in its kit.txt.
@@ -62,14 +65,16 @@ std::string_view ActiveGame();
 // saves, settings and log. Never next to the ISO. The argument is unused (one folder per game, whatever its release).
 std::filesystem::path GameInstallFolder(const std::string& xexSha256);
 
-// The game built for a disc, from "[install.<sha256>] runtime= kit=". Empty runtime when none was built or it is gone.
+// The game built for a disc, from "[install.<sha256>] runtime= kit= version=". Empty runtime when none was built or it is gone.
 struct InstalledGame
 {
     std::string runtime;
     std::string kitVersion;
+    std::string gameVersion; // "version=": the game's version when it was built ("0.8.2"); empty for a build from before versions
 };
 InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string& xexSha256);
-void RecordInstalledGame(LauncherConfig& config, const std::string& xexSha256, const std::string& runtime, const std::string& kitVersion);
+void RecordInstalledGame(LauncherConfig& config, const std::string& xexSha256, const std::string& runtime, const std::string& kitVersion,
+    const std::string& gameVersion = {});
 
 // After a successful install (docs/install.md, "Housekeeping"): the build's work folder (2-3 GB) goes but its logs stay in
 // <game>/install-logs, the kits older than `kitFolder` (a downloaded kit, kit/<release tag>/) go, and so do compiler

@@ -69,6 +69,12 @@ namespace
                 kit.version = Trim(text.substr(6));
             else if (text.starts_with("version="))
                 version = Trim(text.substr(8));
+            else if (text.starts_with("game_version."))
+            {
+                size_t equals = text.find('=');
+                if (std::string id(Trim(text.substr(13, equals - 13))), value(Trim(text.substr(equals + 1))); !id.empty() && !value.empty())
+                    kit.gameVersions[id] = value;
+            }
             else if (text.starts_with("games="))
             {
                 std::string_view list = text.substr(6);
@@ -115,6 +121,12 @@ std::optional<InstallKit> InstallKitIn(const std::filesystem::path& folder) { re
 bool InstallKit::Builds(std::string_view gameId) const
 {
     return std::find(games.begin(), games.end(), gameId) != games.end();
+}
+
+std::string InstallKit::GameVersion(std::string_view gameId) const
+{
+    auto found = gameVersions.find(std::string(gameId));
+    return found == gameVersions.end() ? std::string() : found->second;
 }
 
 bool KitOlderThanLauncher(const InstallKit& kit, std::string_view launcherVersion)
@@ -238,7 +250,8 @@ InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string&
 {
     if (xexSha256.empty())
         return {};
-    InstalledGame game{ Setting(config, InstallSection(xexSha256), "runtime"), Setting(config, InstallSection(xexSha256), "kit") };
+    InstalledGame game{ Setting(config, InstallSection(xexSha256), "runtime"), Setting(config, InstallSection(xexSha256), "kit"),
+        Setting(config, InstallSection(xexSha256), "version") };
     std::filesystem::path runtime = Path(game.runtime);
     if (runtime.extension() == ".app") // a macOS app: its executable is named after it
         game.runtime = Utf8(runtime / "Contents" / "MacOS" / runtime.stem());
@@ -248,11 +261,16 @@ InstalledGame FindInstalledGame(const LauncherConfig& config, const std::string&
     return game;
 }
 
-void RecordInstalledGame(LauncherConfig& config, const std::string& xexSha256, const std::string& runtime, const std::string& kitVersion)
+void RecordInstalledGame(LauncherConfig& config, const std::string& xexSha256, const std::string& runtime, const std::string& kitVersion,
+    const std::string& gameVersion)
 {
     auto& section = config[InstallSection(xexSha256)];
     section["runtime"] = runtime;
     section["kit"] = kitVersion;
+    if (gameVersion.empty())
+        section.erase("version");
+    else
+        section["version"] = gameVersion;
 }
 
 void InstallProgress::Apply(std::string_view line, uint64_t now)
