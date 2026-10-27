@@ -572,6 +572,9 @@ namespace
         std::optional<InstallKit> old = InstallKitIn(root / "old"), multi = InstallKitIn(root / "multi");
         SHELL_EXPECT(old && old->Builds("ssa") && !old->Builds("giants"));
         SHELL_EXPECT(multi && multi->Builds("ssa") && multi->Builds("giants") && !multi->Builds("swapforce"));
+        kit(root / "three", "version=0.6.0\nbuild=d\ngames=ssa,giants,swapforce\n");
+        std::optional<InstallKit> three = InstallKitIn(root / "three");
+        SHELL_EXPECT(three && three->Builds("ssa") && three->Builds("giants") && three->Builds("swapforce") && !three->Builds("trapteam"));
 
         // From an older release than the launcher: the kit.txt version, or the folder's release tag; the player's own never.
         SHELL_EXPECT(KitOlderThanLauncher(*old, "0.4.0") && !KitOlderThanLauncher(*old, "0.3.1") && !KitOlderThanLauncher(*multi, "0.4.0"));

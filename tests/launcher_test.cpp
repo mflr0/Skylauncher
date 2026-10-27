@@ -336,7 +336,7 @@ namespace
         std::string anvil = collection::PathOf("200 Anvil Rain.sky");
         std::string session = launcher_ui::SessionFile(ssa);
         EXPECT(session == (save / "portal.txt").string());
-        EXPECT(launcher_ui::WriteSeats(session, { gill, "", anvil, "" }));
+        EXPECT(launcher_ui::WriteSeats(ssa, session, { gill, "", anvil, "" }));
         std::vector<std::string> seats = launcher_ui::ReadSeats(ssa, session);
         EXPECT(seats.size() == 4 && seats[0] == gill && seats[1].empty() && seats[2] == anvil && seats[3].empty());
         // The game numbers slots by hardware, not seats: a figure goes to the first seat that takes it.
@@ -420,7 +420,8 @@ namespace
             EXPECT(model.Shelf(later, shown).empty() && shown.empty()); // no Giants toy here
             EXPECT(collection::LevelText(*model.Find(gill), "ssa") == "Level 10" && collection::LevelText(*model.Find(anvil), "ssa").empty());
             // Giants starts with prepared seats too; the games with no runtime yet have none.
-            EXPECT(!launcher_ui::SessionFile(*catalogue.FindGame("giants")).empty() && launcher_ui::SessionFile(*catalogue.FindGame("swap_force")).empty());
+            EXPECT(!launcher_ui::SessionFile(*catalogue.FindGame("giants")).empty() && launcher_ui::SessionFile(*catalogue.FindGame("swapforce")) == (save / "portal.txt").string() &&
+                launcher_ui::SessionFile(*catalogue.FindGame("trap_team")).empty());
         }
 
         // The launcher's own earlier state moves over: favourites and "starts on the portal", by name.
@@ -474,6 +475,108 @@ namespace
         EXPECT(!model.Delete(back, &why) && !why.empty() && fs::exists(back) && collection::Trash().size() == trashed);
         { std::ofstream(folder / "collection.json", std::ios::binary).write(goodIndex.data(), std::streamsize(goodIndex.size())); }
         EXPECT(model.Delete(back, &why) && !fs::exists(back));
+
+        // Swap Force: a swapper is one card, one seat, two portal slots (src/shared/collection "Swappers", docs/collection_ui.md).
+        {
+            const collection::Game& sf = *catalogue.FindGame("swapforce");
+            EXPECT(sf.seats.size() == 4 && launcher_ui::SeatFirstSlot(sf, 0) == 0 && launcher_ui::SeatFirstSlot(sf, 1) == 2 &&
+                launcher_ui::SeatFirstSlot(sf, 2) == 4 && launcher_ui::SeatFirstSlot(sf, 3) == 5);
+            EXPECT(launcher_ui::SlotSeat(sf, 1) == 0 && launcher_ui::SlotSeat(sf, 3) == 1 && launcher_ui::SlotSeat(sf, 4) == 2 && launcher_ui::SlotSeat(sf, 5) == 3);
+            EXPECT(launcher_ui::SeatFirstSlot(ssa, 3) == 3 && launcher_ui::SlotSeat(ssa, 2) == 2); // the other games: one slot per seat
+            collection::SwapperPaths doom = collection::CreateSwapper(2003, 1003), blast = collection::CreateSwapper(2004, 1004);
+            EXPECT(!doom.top.empty() && !doom.bottom.empty() && !blast.top.empty() && !blast.bottom.empty());
+            collection::Figure top, bottom;
+            EXPECT(collection::Read(doom.top, top) && collection::Read(doom.bottom, bottom) && top.IsSwapTop() && bottom.IsSwapBottom() &&
+                top.partner == bottom.file && bottom.partner == top.file);
+            std::string lone = collection::Create(1007), item, adventure;
+            for (const collection::Toy& toy : catalogue.Toys())
+            {
+                if (!catalogue.Accepts("swapforce", toy.type))
+                    continue;
+                if (item.empty() && toy.category == collection::Category::MagicItem)
+                    item = collection::Create(toy.type);
+                if (adventure.empty() && toy.category == collection::Category::Adventure)
+                    adventure = collection::Create(toy.type);
+            }
+            EXPECT(!lone.empty() && !item.empty() && !adventure.empty());
+
+            launcher_ui::CollectionModel swap;
+            swap.gameId = "swapforce";
+            swap.Load();
+            const size_t halves = swap.figures.size();
+            // The shelf shows each swapper once: the sections hold the top only, whichever half a filter or the search matched.
+            std::vector<collection::Figure> shown;
+            std::vector<collection::Section> shelf = swap.Shelf({}, shown);
+            size_t cards = 0;
+            for (const collection::Section& section : shelf)
+                cards += section.items.size();
+            EXPECT(collection::Cards(shown).size() == cards && cards < halves);
+            std::vector<collection::Figure> kept; // the cards point into it
+            auto cardsOf = [&](launcher_ui::ShelfFilter filter) {
+                swap.Shelf(filter, kept);
+                return collection::Cards(kept);
+            };
+            launcher_ui::ShelfFilter search;
+            search.text = "doom";
+            std::vector<collection::Card> found = cardsOf(search);
+            EXPECT(found.size() == 1 && found[0].Swapper() && found[0].first->path == doom.top && found[0].second->path == doom.bottom);
+            launcher_ui::ShelfFilter bottomsOnly; // the type of one half only: the card still comes with both
+            bottomsOnly.category = int(collection::Category::SwapBottom);
+            found = cardsOf(bottomsOnly);
+            EXPECT(std::any_of(found.begin(), found.end(), [&](const collection::Card& c) { return c.Swapper() && c.first->path == doom.top; }));
+            EXPECT(collection::CardName(collection::CardOf(swap.figures, 0)).size() > 0);
+
+            // Put on a seat: the top's path is the seat, the file has both tags (player 1: slots 0 and 1, player 2: 2 and 3).
+            const std::string session = launcher_ui::SessionFile(sf);
+            auto lines = [&] {
+                std::ifstream in(session);
+                std::vector<std::string> out;
+                for (std::string line; std::getline(in, line);)
+                    out.push_back(line);
+                return out;
+            };
+            EXPECT(swap.SetSeat(0, doom.top) && swap.SetSeat(1, blast.top) && swap.SetSeat(2, item) && swap.SetSeat(3, adventure));
+            EXPECT((lines() == std::vector<std::string>{ "0 " + doom.top, "1 " + doom.bottom, "2 " + blast.top, "3 " + blast.bottom, "4 " + item, "5 " + adventure }));
+            std::vector<std::string> seats = launcher_ui::ReadSeats(sf, session);
+            EXPECT((seats == std::vector<std::string>{ doom.top, blast.top, item, adventure })); // a bottom is no seat of its own
+            swap.Load();
+            EXPECT(swap.SeatOf(doom.top) == 0 && swap.SeatOf(doom.bottom) < 0 && swap.OnPortal().size() == 4);
+            // A half on its own sits in the first slot of its seat; a file in the game's own order comes back as it was written.
+            EXPECT(swap.SetSeat(0, lone) && lines()[0] == "0 " + lone && lines()[1] == "2 " + blast.top);
+            EXPECT(launcher_ui::ReadSeats(sf, session)[0] == lone);
+            EXPECT(swap.SetSeat(0, doom.top) && launcher_ui::ReadSeats(sf, session)[0] == doom.top);
+            // Bottom first in the file, the order the game itself writes them in: still one seat.
+            { std::ofstream(session) << "1 " << doom.bottom << "\n0 " << doom.top << "\n"; }
+            seats = launcher_ui::ReadSeats(sf, session);
+            EXPECT(seats[0] == doom.top && seats[1].empty());
+            EXPECT(swap.SetSeat(0, doom.top));
+
+            // Change the bottom: the card keeps the top and takes the other swapper's bottom; that one gets the old half back.
+            std::string error2;
+            EXPECT(collection::ChangeHalf(doom.top, blast.bottom, &error2) && collection::Read(doom.top, top) && top.partner == fs::path(blast.bottom).filename().string());
+            EXPECT(collection::Read(doom.bottom, bottom) && bottom.partner == fs::path(blast.top).filename().string());
+            // The seat is still the top's, its portal file is written again for the new bottom (the page does it after a change).
+            swap.Load();
+            EXPECT(swap.SeatOf(doom.top) == 0 && swap.SetSeat(0, doom.top) && lines()[1] == "1 " + blast.bottom);
+            EXPECT(collection::CardName(collection::CardOf(swap.figures, size_t(std::find_if(swap.figures.begin(), swap.figures.end(),
+                [&](const collection::Figure& f) { return f.path == doom.top; }) - swap.figures.begin()))) == "Doom Stone / Blast Zone");
+
+            // Delete: both halves go, the seat empties; the trash holds two, and both come back.
+            size_t listedBefore = swap.figures.size(), trashBefore = collection::Trash().size();
+            EXPECT(swap.DeleteCard(doom.top, &error2) && swap.Find(doom.top) == nullptr && swap.Find(blast.bottom) == nullptr);
+            EXPECT(swap.figures.size() == listedBefore - 2 && collection::Trash().size() == trashBefore + 2 && swap.SeatOf(doom.top) < 0);
+            EXPECT(launcher_ui::ReadSeats(sf, session)[0].empty() && lines().size() == 4);
+            std::vector<collection::TrashEntry> trash = collection::Trash();
+            int undeleted = 0;
+            for (const collection::TrashEntry& entry : trash)
+                if (entry.file == fs::path(doom.top).filename().string() || entry.file == fs::path(blast.bottom).filename().string())
+                    undeleted += !collection::Undelete(entry.id).empty();
+            EXPECT(undeleted == 2);
+            swap.Load();
+            EXPECT(swap.figures.size() == listedBefore && swap.Find(doom.top) != nullptr && swap.Find(blast.bottom) != nullptr);
+            // Deleting a half on its own deletes only it.
+            EXPECT(swap.Delete(lone, &error2) && swap.Find(lone) == nullptr && swap.Find(blast.top) != nullptr);
+        }
         printf("Collection: library, migration, locks, seats, live refresh and icons checked\n");
     }
 }
@@ -841,7 +944,12 @@ int main(int argc, char** argv)
     printf("Game table: %zu game(s); \"ssa\" = %s, %zu release(s)\n", g_games.size(), game.name, game.releases.size());
     EXPECT(FindGame("unknown") == nullptr);
     const GameInfo* giants = FindGame("giants");
-    EXPECT(g_games.size() == 2 && giants != nullptr && std::string(giants->runtime) == "SGRecomp" && giants->releases.size() == 1);
+    EXPECT(g_games.size() == 3 && giants != nullptr && std::string(giants->runtime) == "SGRecomp" && giants->releases.size() == 1);
+    const GameInfo* swapForce = FindGame("swapforce");
+    EXPECT(swapForce != nullptr && std::string(swapForce->runtime) == "SSFRecomp" && swapForce->releases.size() == 1 &&
+        swapForce->releases[0].titleId == 0x415608E9 && std::string(swapForce->releases[0].defaultXexSha256).size() == 64);
+    EXPECT(std::string(LauncherTheme::StyleOf("swapforce").top == LauncherTheme::SwapForceStyle.top ? "own" : "launcher") == "own" &&
+        LauncherTheme::StyleOf("swapforce").top != LauncherTheme::StyleOf("giants").top);
     EXPECT(giants != nullptr && giants->releases[0].titleId == 0x415608DA && std::string(giants->releases[0].defaultXexSha256).size() == 64);
 
     printf("Player's disc image:\n");
@@ -883,6 +991,8 @@ int main(int argc, char** argv)
         EXPECT(provider.Get(LauncherAssets::Role::Logo).valid && provider.Get(LauncherAssets::Role::HeroBackground).valid);
         EXPECT(provider.Get(LauncherAssets::Role::TitleIcon).valid && LauncherAssets::Cached(id, LauncherAssets::Role::Logo).valid);
         EXPECT(found.portraits >= minimumPortraits);
+        if (std::string_view(id) == "swapforce")
+            return;
         // The upgrades' names, read with the pictures (shared/collection/upgrades.h): Spyro's list from the disc.
         collection::UpgradeTable spyro = collection::Upgrades(*collection::Catalogue::Get().Find(16), id, "fr");
         printf("  %s: upgrades from the disc %s, Spyro's first: %s\n", id, spyro.fromDisc ? "yes" : "NO",
@@ -907,6 +1017,14 @@ int main(int argc, char** argv)
             EXPECT(collection::PortraitPath("giants", *eruptor, 0x1206).ends_with("eruptor_lightcore.png"));
             EXPECT(collection::PortraitPath("ssa", *jetVac).ends_with("eagle.png"));
         }
+    }
+    if (const char* swapIso = getenv("SKYLAUNCHER_TEST_SWAPFORCE_ISO"); swapIso != nullptr)
+    {
+        artChecks("swapforce", swapIso, 150);
+        // A toy's portrait comes from the shown game's disc; Swap Force's own toys have one only here.
+        const collection::Toy* doomTop = collection::Catalogue::Get().Find(2003);
+        EXPECT(doomTop != nullptr && !collection::PortraitPath("swapforce", *doomTop).empty());
+        EXPECT(std::filesystem::exists(scratch / "art-data" / "SwapForce" / "portraits")); // the data folder is SwapForce/
     }
     if (dataBefore.empty())
         SDL_unsetenv_unsafe("SKYLANDERS_DATA");
@@ -962,6 +1080,19 @@ int main(int argc, char** argv)
         SwitchChecks(scratch, iso.string(), giantsIso);
         printf("The sidebar line through an install and an update:\n");
         SidebarChecks(scratch, iso.string(), giantsIso);
+    }
+    if (const char* swapIso = getenv("SKYLAUNCHER_TEST_SWAPFORCE_ISO"); swapIso != nullptr && swapForce != nullptr)
+    {
+        printf("Swap Force disc image:\n");
+        GameSourceCheck own = CheckGameSource(swapIso, *swapForce);
+        EXPECT(own.status == GameSourceStatus::Ok && own.xexSha256 == swapForce->releases[0].defaultXexSha256);
+        EXPECT(CheckGameSource(swapIso, game).status == GameSourceStatus::WrongGame);
+        if (giants != nullptr)
+            EXPECT(CheckGameSource(swapIso, *giants).status == GameSourceStatus::WrongGame);
+        EXPECT(CheckGameSource(iso.string(), *swapForce).status == GameSourceStatus::WrongGame);
+        if (const char* giantsIso = getenv("SKYLAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
+            EXPECT(CheckGameSource(giantsIso, *swapForce).status == GameSourceStatus::WrongGame);
+        printf("  accepted by its own game, refused by the others\n");
     }
     printf("The kit follows the launcher:\n");
     KitFlowChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");

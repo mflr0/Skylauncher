@@ -126,6 +126,8 @@ namespace
         SETTINGS_EXPECT(ShortcutFileName("Skylanders: Spyro's Adventure") == "Skylanders Spyro's Adventure");
         SETTINGS_EXPECT(ShortcutFileName("  A/B*C?  ") == "A B C" && ShortcutFileName(":::") == "Skylanders");
         SETTINGS_EXPECT(ShortcutArguments("giants") == "--game giants --play");
+        SETTINGS_EXPECT(ShortcutFileName("Skylanders: Swap Force") == "Skylanders Swap Force" && ShortcutArguments("swapforce") == "--game swapforce --play");
+        SETTINGS_EXPECT(GameVideoSection("swapforce") == "swapforce.video");
         SETTINGS_EXPECT(ShellQuote("/Applications/My Apps/Sky'launcher") == "'/Applications/My Apps/Sky'\\''launcher'");
         SETTINGS_EXPECT(DesktopExecQuote("/opt/sky launcher/run") == "\"/opt/sky launcher/run\"");
         SETTINGS_EXPECT(DesktopExecQuote("/a\"b`c$d%e") == "\"/a\\\"b\\`c\\$d%%e\"");
