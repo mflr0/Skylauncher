@@ -550,9 +550,9 @@ namespace launcher_ui
         if (PillButton(m_s->installLog ? Tr("Hide details") : Tr("Show details"), false, 130))
             m_s->installLog = !m_s->installLog;
         constexpr float ButtonW = 150;
-        float gap = ImGui::GetStyle().ItemSpacing.x;
-        auto rightButtons = [&](int count) {
-            ImGui::SetCursorPos(ImVec2(Pad + width - count * ButtonW - (count - 1) * gap, rowY));
+        // The action on the right edge, at its real width (a longer translation widens it).
+        auto rightButton = [&](const char* label, bool bold) {
+            ImGui::SetCursorPos(ImVec2(Pad + width - PillWidth(label, ButtonW, bold), rowY));
         };
         if (failed || interrupted)
         {
@@ -572,7 +572,7 @@ namespace launcher_ui
             ImGui::SameLine();
             if (PillButton(Tr("Open logs folder"), false, 140))
                 OpenFolder(GameInstallFolder(m_s->installSha));
-            rightButtons(1);
+            rightButton(failed ? Tr("Retry") : Tr("Resume"), true);
             ImGui::BeginDisabled(m_s->installPastPid != 0);
             if (PillButton(failed ? Tr("Retry") : Tr("Resume"), true, ButtonW, true))
                 StartInstall();
@@ -580,7 +580,7 @@ namespace launcher_ui
         }
         else if (running)
         {
-            rightButtons(1);
+            rightButton(Tr("Cancel"), false);
             if (PillButton(Tr("Cancel"), false, ButtonW))
             {
                 m_s->installer.Cancel();

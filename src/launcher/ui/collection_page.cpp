@@ -604,7 +604,7 @@ namespace launcher_ui
 
         // Add a figure, and the rest of the collection's work behind "...".
         constexpr float AddW = 190, MoreW = 52;
-        ImGui::SetCursorScreenPos(ImVec2(top.x + width - AddW - 10 - MoreW, top.y + 4));
+        ImGui::SetCursorScreenPos(ImVec2(top.x + width - m_app.PillWidth(Tr("+  Add a figure"), AddW, true) - 10 - MoreW, top.y + 4));
         if (m_app.PillButton(Tr("+  Add a figure"), true, AddW, true))
         {
             m_overlay = Overlay::Add;

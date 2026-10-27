@@ -467,7 +467,7 @@ namespace launcher_ui
             ImGui::EndPopup();
         }
         ImGui::SameLine(0, 8);
-        ImGui::SetCursorPosX(size.x - Pad - 110);
+        ImGui::SetCursorPosX(size.x - Pad - m_app.PillWidth(Tr("Close"), 110, true));
         if (m_app.PillButton(Tr("Close"), false, 110, true))
             CloseOverlay();
 

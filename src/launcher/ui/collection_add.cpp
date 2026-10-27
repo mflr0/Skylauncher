@@ -260,7 +260,7 @@ namespace launcher_ui
             }
         }
 
-        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + size.x - Pad - 110, ImGui::GetWindowPos().y + size.y - Pad - 40));
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + size.x - Pad - m_app.PillWidth(Tr("Close"), 110, true), ImGui::GetWindowPos().y + size.y - Pad - 40));
         if (m_app.PillButton(Tr("Close"), false, 110, true))
             CloseOverlay();
     }
