@@ -1,9 +1,9 @@
-# Skylauncher
+# Arkeyan Launcher
 
 A launcher for the native PC ports of *Skylanders: Spyro's Adventure*, *Skylanders: Giants* and *Skylanders: Swap Force*. You give it your own disc
-image, it builds the game on your computer, and you play.
+image, it builds the game on your computer, and you play. (Formerly Skylauncher: it updates itself to this version.)
 
-Skylauncher contains no game code and no game art. Everything shown from the game is read from your own disc and stays
+Arkeyan Launcher contains no game code and no game art. Everything shown from the game is read from your own disc and stays
 on your computer.
 
 ## What you need
@@ -25,10 +25,10 @@ on your computer.
 
 ## Get started
 
-1. Download Skylauncher from the [Releases page](https://github.com/mflr0/Skylauncher/releases):
-   - **Windows:** `Skylauncher.exe`. If SmartScreen warns you, choose More info, then Run anyway.
-   - **Mac:** `Skylauncher-macOS.dmg`. The app is not notarized: the first time, right-click it and choose Open.
-   - **Linux:** `Skylauncher-x86_64.AppImage`, after `chmod +x`.
+1. Download Arkeyan Launcher from the [Releases page](https://github.com/mflr0/Skylauncher/releases):
+   - **Windows:** `ArkeyanLauncher.exe`. If SmartScreen warns you, choose More info, then Run anyway.
+   - **Mac:** `ArkeyanLauncher-macOS.dmg`. The app is not notarized: the first time, right-click it and choose Open.
+   - **Linux:** `ArkeyanLauncher-x86_64.AppImage`, after `chmod +x`.
 2. Drop your `.iso` on the window, or click the button to choose it. The disc is checked.
 3. Click **INSTALL**. The game is built from your disc. It takes about 10 minutes for Spyro's Adventure and 15 for
    Giants, and happens once.
@@ -92,7 +92,7 @@ Portal of Power. Then click **Test the portal**.
 - Everything is in one "Skylanders" folder: `%APPDATA%\Skylanders\` on Windows, `~/Library/Application Support/Skylanders/`
   on Mac, `~/.local/share/Skylanders/` on Linux. The logs are in its `logs/` and `SSA/` folders.
 - If the game stops with an error, a window offers Copy log and Report.
-- Updates (Skylauncher's and each game's) are looked for at every start; an offline start says nothing. Every download is checked against the release's SHA-256.
+- Updates (Arkeyan Launcher's and each game's) are looked for at every start; an offline start says nothing. Every download is checked against the release's SHA-256.
 
 ## Build from source
 
@@ -102,7 +102,7 @@ You need CMake 3.20 or later, Ninja, a C++20 compiler (Clang) and git.
 git clone --recursive https://github.com/mflr0/Skylauncher.git
 cd Skylauncher
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja -C build Skylauncher
+ninja -C build ArkeyanLauncher
 ```
 
 The developer docs are in `docs/`: `launcher_ui.md` covers the screens and theme, `install.md` the install,

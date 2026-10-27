@@ -10,13 +10,13 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | --- | --- | --- | --- | --- |
 | `launcher` | `fullscreen` | `0`, `1` | The launcher window itself | n/a |
 | `launcher` | `ui_scale` | `auto`, `0.75` to `3` | The launcher's size: `auto` follows the display's scale (Windows 150 %, 200 %...); Ctrl + / Ctrl - / Ctrl 0 change it | n/a |
-| `launcher` | `language` | empty (the system's language), `game`, or a code (`en`, `fr`...) | The language of the launcher's own text (`docs/translations.md`): `game` follows the shown game's `language`; a code that has no file in `resources/lang` shows English. The environment variable `SKYLAUNCHER_LANGUAGE` overrides it (tests, screenshots) | n/a |
+| `launcher` | `language` | empty (the system's language), `game`, or a code (`en`, `fr`...) | The language of the launcher's own text (`docs/translations.md`): `game` follows the shown game's `language`; a code that has no file in `resources/lang` shows English. The environment variable `SKY_LAUNCHER_LANGUAGE` overrides it (tests, screenshots) | n/a |
 | `launcher` | `reduce_motion` | `auto`, `0`, `1` | The logo's fall on the game page (`docs/launcher_ui.md`): `auto` follows the system (macOS Reduce motion, Windows animation effects), `1` never animates, `0` always does | n/a |
 | `launcher` | `runtime` | path | The game runtime to start, if not next to the launcher | n/a |
 | `launcher` | `kit` | folder | The player kit that installs the game, if not next to the launcher (`docs/install.md`) | n/a |
-| `update` | `auto_check` | `0`, `1` | Look for a new Skylauncher and for game updates at every start (default 1; `docs/updates.md`) | n/a |
+| `update` | `auto_check` | `0`, `1` | Look for a new Arkeyan Launcher and for game updates at every start (default 1; `docs/updates.md`) | n/a |
 | `update` | `last_check` | epoch seconds | When the last check ran | n/a |
-| `update` | `repo` | `owner/name` | Where Skylauncher's releases are (default `mflr0/Skylauncher`) | n/a |
+| `update` | `repo` | `owner/name` | Where Arkeyan Launcher's releases are (default `mflr0/Skylauncher`) | n/a |
 | `update` | `kit_repo` | `owner/name` | Where the player kit's releases and `games.json` are; empty: no game updates | n/a |
 | `update` | `kit_tag` | text | The release of the installed kit, written after a kit download | n/a |
 | `update` | `kit_fetched` | release tag | The release whose kit INSTALL or UPDATE fetched: not asked again for it (docs/updates.md) | n/a |
@@ -42,9 +42,9 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `input` | `gamepad` | SDL GUID | The gamepad chosen when `device=gamepad` | yes |
 | `input` | `key_<action>` | SDL key name (`Space`, `Return`, `A`...) | Keyboard binding | yes |
 | `input` | `glyphs` | `auto` (default), `xbox360`, `xboxone`, `playstation`, `nintendo`, `keyboard` (`xbox` is read as Xbox One / Series) | The button pictures the game shows | yes |
-| `portal` | `mode` | `auto` (default), `emulated` (Virtual), `real` (`hid` and `usb` still work) | Portal of Power backend | yes (`SSA_PORTAL`) |
+| `portal` | `mode` | `auto` (default), `emulated` (Virtual), `real` (`hid` and `usb` still work) | Portal of Power backend | yes (`SKY_PORTAL`) |
 | `portal` | `toybox_auto_open` | `1` (default), `0` | The Toy Box opens by itself when the game asks for a figure | no: the game reads `launcher.ini` itself (Settings > Controls > Portal of Power) |
-| `portal` | `place` | figure file names, comma separated | Figures put on the emulated portal at start | yes (`SSA_PORTAL_PLACE`) |
+| `portal` | `place` | figure file names, comma separated | Figures put on the emulated portal at start | yes (`SKY_PORTAL_PLACE`) |
 | `collection` | `favourites` | figure file names, comma separated | Old favourites; moved once into the shared collection's `collection.json` | read once (see `collection_ui.md`) |
 | `collection` | `moved` | `1` | Set once the old favourites and `[portal] place` were moved | launcher only |
 
@@ -76,14 +76,14 @@ Keyboard actions: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `
 ## Figures
 
 The launcher and the game share one collection folder (`collection::Folder()`: `Skylanders/Collection` in the user's data
-folder, or `SSA_COLLECTION`), with `collection.json` (labels, favourites, views, trash), `<dump>.lock` (JSON written by
+folder, or `SKY_COLLECTION`), with `collection.json` (labels, favourites, views, trash), `<dump>.lock` (JSON written by
 the game while a figure is on its portal), `backups/` and `trash/`. `docs/collection_ui.md` describes the page; the
 format is SSARecomp's `docs/collection.md`. The old `figures` folder next to `launcher.ini` is copied in once, never
 changed.
 
-- The seats of the next session are `portal.txt` in the game's save folder (`SSA_SAVE_DIR`, else its preference
+- The seats of the next session are `portal.txt` in the game's save folder (`SKY_SAVE_DIR`, else its preference
   folder): the launcher writes it, the game reads it at start. `[portal] place` is no longer written (it would override
-  the session file through `SSA_PORTAL_PLACE`); `[portal] mode` still goes through `SSA_PORTAL`.
+  the session file through `SKY_PORTAL_PLACE`); `[portal] mode` still goes through `SKY_PORTAL`.
 - Before every change the library backs the figure up (newest 10 kept); a figure whose lock belongs to another live
   process is never written.
 

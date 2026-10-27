@@ -33,7 +33,7 @@ and words, a sheet with three main actions. The look is dorydev's: her colours, 
 - Removed: `figure_file.*` and `figure_collection.*` (the old engine), replaced by `figure_tag`/`figure_crypto`/
   `figure_data` and `collection`.
 - Folder: `collection::Folder()` (`%APPDATA%\Skylanders\Collection`, `~/Library/Application Support/Skylanders/Collection`).
-  `SSA_COLLECTION` overrides it (tests, portable installs).
+  `SKY_COLLECTION` overrides it (tests, portable installs).
 
 ## Swappers (Swap Force): one card, two halves
 
@@ -68,13 +68,13 @@ At the first visit to the page (`CollectionPage::Open`):
 2. The launcher's own earlier state moves once (`[collection] moved=1` in `launcher.ini` records it): favourites
    (`[collection] favourites`, file names) become `collection.json` favourites on the copies; the figures that
    started on the portal (`[portal] place`) become the next session's seats; `[portal] place` is then emptied, because
-   `SSA_PORTAL_PLACE` overrides the session file at the game's start. The old keys are left in `launcher.ini` otherwise.
+   `SKY_PORTAL_PLACE` overrides the session file at the game's start. The old keys are left in `launcher.ini` otherwise.
 3. The never-played starters the game made on its own (37 of them, one per character) are not the player's: My
    Skylanders hides them (the header counts them), Manage > Tidy moves them to the trash.
 
 ## The portal at the next start
 
-- What the game reads at start is `portal.txt` in its data folder (`SSA_SAVE_DIR` in tests, else the game's folder in
+- What the game reads at start is `portal.txt` in its data folder (`SKY_SAVE_DIR` in tests, else the game's folder in
   the data root): `<slot> <path>` lines, rewritten by the game at every change. The launcher writes it with seat *i* in
   slot *i* (`WriteSeats`) and reads it back (`ReadSeats`): a figure goes to its slot's seat when it fits, else to the
   first seat that takes it (as the Toy Box does). The seats are per game (`catalogue.json` `games[].seats`). Swap Force's
@@ -88,7 +88,7 @@ At the first visit to the page (`CollectionPage::Open`):
   goes on the seat ("Player 1: Splash's"), and the choosing ends. Click the seat again, Cancel, B or Escape stops
   choosing. Dragging a card onto a seat also works; a figure already on the other seat moves (it is on one seat only).
 - **Taking off**: the X on the tile (**fixed** in #9: `SetNextItemAllowOverlap()` before the tile's button lets the X win
-  where it is; `SSA_LAUNCHER_TEST_SEATX` checks all four seats by mouse, keyboard and pad), Delete or the pad's X on a
+  where it is; `SKY_LAUNCHER_TEST_SEATX` checks all four seats by mouse, keyboard and pad), Delete or the pad's X on a
   focused tile (or Delete with the mouse over it), the tile's right-click menu ("Take it off", "Choose another", "Open its
   sheet"), or dragging the tile onto the shelf. A seat whose figure is gone shows "Missing figure" and can be emptied.
 - **A tile**: the seat's name (accent while choosing for it), the figure's picture, name and level for that game
@@ -184,7 +184,7 @@ At the first visit to the page (`CollectionPage::Open`):
 
 ## Checks
 
-- `SkylauncherTest` (`CollectionChecks`): library, migration (originals intact, second pass copies none), stats,
+- `ArkeyanLauncherTest` (`CollectionChecks`): library, migration (originals intact, second pass copies none), stats,
   backups, restore, reset, duplicate, trash, import dedupe, JSON locks (live, stale), seats and `portal.txt`, live
   refresh, settings move, unknown toy naming, icons for every catalogue toy (and the family's mark on items and packs),
   **the shelf** (every figure once, none left out, favourites first; choosing for the Magic item seat shows only the
@@ -192,18 +192,18 @@ At the first visit to the page (`CollectionPage::Open`):
   that Giants and Swap Force can be prepared but not the games without a runtime, **the swapper cards** (a swapper once on the
   shelf whichever half a search or a filter matches, one seat and two lines of `portal.txt` for it, a bottom first in the
   file still one seat, Change the bottom, Delete and Undelete of both halves, a lone half deleted alone). Seat X: 12 of 12. Everything runs in a scratch
-  folder (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
-- Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
+  folder (`SKY_COLLECTION`, `SKY_SAVE_DIR`, `SKY_MIGRATE_FROM` set by the test).
+- Screenshots: `SKY_LAUNCHER_TEST_COLLECTION=1` with `SKY_LAUNCHER_SHOTS=<dir>` seeds a scratch `SKY_COLLECTION` (it
   refuses without it) and writes `20-collection` to `52-sort-name`: the shelf, choosing for Player 1 and for the Magic
   item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
-  backups), the live portal (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
+  backups), the live portal (`SKY_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
   its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on, Swap Force's portal with a
   swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (Standard and the others, no
   second row with the toy's own name), then the smart search (an element, a level, a typo: `47-` to `49-`), the Filters panel
   (`50-`), the tags with a count (`51-`) and a sort (`52-`). Set `SKYLANDERS_DATA`
   to a folder holding the discs' cached pictures to see them (else the drawn icons).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
-  `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the
+  `SKY_COLLECTION`/`SKY_SAVE_DIR`, no `SKY_PORTAL_PLACE`: its log says which figures it took and the launcher shows the
   locks while it runs and the stats after.
 
 ## Not done

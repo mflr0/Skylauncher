@@ -1,6 +1,6 @@
 # Third-party notices
 
-Skylauncher itself is released under the MIT licence (see `LICENSE`). It builds and ships the components below.
+Arkeyan Launcher itself is released under the MIT licence (see `LICENSE`). It builds and ships the components below.
 The GNU binutils disassembler that XenonUtils normally includes is neither built nor linked.
 
 ## SDL 3

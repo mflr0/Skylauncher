@@ -17,7 +17,7 @@ language. The game's text and voice languages are a different thing: they are th
   replaced by the English one at run time, and fails the test.
 - **A text a language says in two ways** (singular and plural) is two English strings (`Copied: {}, 1 file`, `Copied: {}, {} files`);
   a sentence is never built from pieces.
-- **Not translated:** names (Skylauncher, the games, the figures), the text of the problem report (it goes to the maintainers),
+- **Not translated:** names (Arkeyan Launcher, the games, the figures), the text of the problem report (it goes to the maintainers),
   the command-line help, and what other programs print: the installer kit's own lines in the install log, the game's portal
   test answers, GitHub's messages. A message built before the language changed (a toast already shown, a disc check's result)
   stays in the language it was made in until it is made again.
@@ -29,20 +29,20 @@ Settings > Launcher > Language: **Same as the game**, or one language of the lis
   launcher has a file for it, else English. A game with no text language chosen counts as English.
 - **Not chosen yet** (the default): the system's language, the first of the system's preferred languages the launcher has,
   else English.
-- `SKYLAUNCHER_LANGUAGE=<code>` forces a language (the tests and the screenshots use it).
+- `SKY_LAUNCHER_LANGUAGE=<code>` forces a language (the tests and the screenshots use it).
 
 ## Adding a language
 1. Take the language's code from the disc's: `de`, `es`, `it`, `nl`, `sv`, `no`, `da`, `fi` (the codes of
    `LanguageChoices` in `ui/launcher_app.h`; Norwegian is `no`, whatever the system calls it).
-2. Make the list of strings: `SKYLAUNCHER_TEST_I18N_DUMP=/path/to/list.txt SKYLAUNCHER_TEST_I18N_ONLY=1 SkylauncherTest x <scratch>`
+2. Make the list of strings: `SKY_LAUNCHER_TEST_I18N_DUMP=/path/to/list.txt SKY_LAUNCHER_TEST_I18N_ONLY=1 ArkeyanLauncherTest x <scratch>`
    writes every English string, each followed by a tab, in the file format. Copy it to `resources/lang/<code>.txt`, add
    `@code` and `@name` at the top, and write the translations after the tabs.
 3. Build (CMake finds the file). The language is in the menu.
-4. Run `SKYLAUNCHER_TEST_I18N_ALL=1 SKYLAUNCHER_TEST_I18N_ONLY=1 SkylauncherTest x <scratch>`: it lists the strings still
+4. Run `SKY_LAUNCHER_TEST_I18N_ALL=1 SKY_LAUNCHER_TEST_I18N_ONLY=1 ArkeyanLauncherTest x <scratch>`: it lists the strings still
    missing, the placeholders that differ from the English, and the entries the code no longer has. The key coverage test is part
-   of the full `SkylauncherTest`.
-5. Look at it in the window, smallest size included (`SKYLAUNCHER_LANGUAGE=<code>`; `SSA_LAUNCHER_TEST_SIZE=1024x680` with
-   `SSA_LAUNCHER_SHOTS` takes the screenshot test's pictures at that size): a language is often longer than English. Buttons
+   of the full `ArkeyanLauncherTest`.
+5. Look at it in the window, smallest size included (`SKY_LAUNCHER_LANGUAGE=<code>`; `SKY_LAUNCHER_TEST_SIZE=1024x680` with
+   `SKY_LAUNCHER_SHOTS` takes the screenshot test's pictures at that size): a language is often longer than English. Buttons
    widen to their label; a long sentence is better shortened.
 
 ## For a developer

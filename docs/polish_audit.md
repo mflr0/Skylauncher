@@ -5,7 +5,7 @@ Xbox app and the Epic launcher. The design is dorydev's: nothing here redesigns 
 states, copy, layout slips, robustness and performance.
 
 How it was checked: the code of every screen (`src/launcher/ui/`), the launcher's own screenshot test
-(`SSA_LAUNCHER_SHOTS`: the main, collection and install passes, at the minimum window size), `SkylauncherTest`, and an
+(`SSA_LAUNCHER_SHOTS`: the main, collection and install passes, at the minimum window size), `ArkeyanLauncherTest`, and an
 idle CPU measure (the launcher alone on Home, offscreen, 6 s). Real displays at 150-200 % and Linux were not available:
 their findings come from the code. While fixing, a keyboard and pad pass (`SSA_LAUNCHER_TEST_NAV`, keys sent to ImGui as
 a player's) found N0, N10 and N11, a timing found P4's freeze, and a 300-figure collection found P6 and B1.
