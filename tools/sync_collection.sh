@@ -3,7 +3,7 @@
 # (src/shared/art, resources/games/<id>/art.json, docs/launcher_ui.md "Disc art") into this checkout
 # (docs/collection_ui.md), or with --check only
 # lists the files that differ. The SSARecomp copies are the reference (they have the tests): change them there.
-# Same files as SSARecomp's tools/sync_skylauncher.sh, into Skylauncher's layout (src/shared/). The library is in
+# Same files as SSARecomp's tools/sync_skylauncher.sh, into Arkeyan Launcher's layout (src/shared/). The library is in
 # runtime/host/ (SSARecomp's tree since the multi-game reorganisation) or SSARecomp/host/ (older checkouts).
 #   tools/sync_collection.sh [--check] <ssa-recomp dir>
 set -euo pipefail
@@ -26,6 +26,10 @@ if [[ -d "$from/$lib/host/art" ]]; then
     for f in xenos_texture alchemy_archive lux_images game_art; do
         pairs+=("$lib/host/art/$f.h:src/shared/art/$f.h" "$lib/host/art/$f.cpp:src/shared/art/$f.cpp")
     done
+fi
+# The environment-variable helper (SKY_* names, the older SSA_* ones still read), from the 0.6.0 library on.
+if [[ -f "$from/$lib/host/env.h" ]]; then
+    pairs+=("$lib/host/env.h:src/shared/env.h")
 fi
 pairs+=("resources/collection/catalogue.json:resources/collection/catalogue.json" "cmake/embed_file.cmake:cmake/embed_file.cmake")
 # Each game's art manifest (where its pictures are on the disc), joined and built in by cmake/join_json.cmake.

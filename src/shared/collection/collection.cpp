@@ -9,6 +9,7 @@
 #include <cstring>
 #include <ctime>
 #include <map>
+#include "../env.h"
 #ifdef _WIN32
 #define NOMINMAX
 #include <windows.h>
@@ -323,9 +324,9 @@ namespace collection
     {
         static const std::string folder = [] {
             std::string chosen;
-            if (const char* path = getenv("SSA_COLLECTION"); path != nullptr && *path != '\0')
+            if (const char* path = skyenv::Get("SKY_COLLECTION"); path != nullptr && *path != '\0')
                 chosen = path;
-            else if (const char* old = getenv("SSA_FIGURES"); old != nullptr && *old != '\0')
+            else if (const char* old = skyenv::Get("SKY_FIGURES"); old != nullptr && *old != '\0')
                 chosen = old;
             else
                 chosen = DefaultFolder();
@@ -990,6 +991,28 @@ namespace collection
         return { &figure, nullptr };
     }
 
+    std::string SwapperName(const std::string& top, const std::string& bottom)
+    {
+        auto trimSuffix = [](std::string name) {
+            for (const char* suffix : { " (top)", " (bottom)" })
+            {
+                size_t length = strlen(suffix);
+                if (name.size() > length && name.compare(name.size() - length, length, suffix) == 0)
+                    name.erase(name.size() - length);
+            }
+            return name;
+        };
+        std::string topPlain = trimSuffix(top);
+        std::string bottomPlain = trimSuffix(bottom);
+        size_t lastSpace = topPlain.find_last_of(' ');
+        std::string topPart = lastSpace == std::string::npos ? topPlain : topPlain.substr(0, lastSpace);
+        if (topPart.empty())
+            topPart = topPlain;
+        size_t bottomLastSpace = bottomPlain.find_last_of(' ');
+        std::string bottomLast = bottomLastSpace == std::string::npos ? bottomPlain : bottomPlain.substr(bottomLastSpace + 1);
+        return topPart + " " + bottomLast;
+    }
+
     std::string CardName(const Card& card)
     {
         if (card.second == nullptr || !card.first->label.empty())
@@ -1006,7 +1029,7 @@ namespace collection
         // 2000 + n and 1000 + n are the same swapper's top and bottom.
         if (card.first->type - 2000 == card.second->type - 1000)
             return plain(card.first->DisplayName());
-        return plain(card.first->DisplayName()) + " / " + plain(card.second->DisplayName());
+        return SwapperName(card.first->DisplayName(), card.second->DisplayName());
     }
 
     std::string CardLevelText(const Card& card, const std::string& game, bool french)
@@ -1623,9 +1646,9 @@ namespace collection
 
     std::string LegacyFolder()
     {
-        if (const char* from = getenv("SSA_MIGRATE_FROM"))
+        if (const char* from = skyenv::Get("SKY_MIGRATE_FROM"))
             return from;
-        if (getenv("SSA_COLLECTION") != nullptr || getenv("SSA_FIGURES") != nullptr)
+        if (skyenv::Get("SKY_COLLECTION") != nullptr || skyenv::Get("SKY_FIGURES") != nullptr)
             return {};
         // Where the game's own figures folder is now; the datadir migration moved it there from SSARecomp/figures.
         std::filesystem::path folder = datadir::Game("ssa");
