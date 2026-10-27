@@ -507,16 +507,21 @@ namespace launcher_ui
     void CollectionPage::ChangeHalf(const Figure& keep, const Figure& replacement)
     {
         const Figure* oldTop = keep.IsSwapTop() ? &keep : CardOf(keep).first;
-        int seat = m_model.SeatOf(oldTop->path);
-        const std::string newTop = keep.IsSwapTop() ? keep.path : replacement.path;
+        const int seat = m_model.SeatOf(oldTop->path);
+        const std::string seated = oldTop->path, newTop = keep.IsSwapTop() ? keep.path : replacement.path;
+        // Off the seat while the halves change: the portal file must not keep the old bottom, which would read as a seat of its own.
+        if (seat >= 0)
+            m_model.SetSeat(size_t(seat), "");
         std::string error;
         if (!collection::ChangeHalf(keep.path, replacement.path, &error))
         {
+            if (seat >= 0)
+                m_model.SetSeat(size_t(seat), seated);
             Toast(Tr("Couldn't change it: ") + error);
             return;
         }
         Reload();
-        if (seat >= 0 && !m_model.seats[seat].empty())
+        if (seat >= 0)
             m_model.SetSeat(size_t(seat), newTop);
         if (const Figure* now = m_model.Find(keep.path))
             m_figure = CardOf(*now).first->path;

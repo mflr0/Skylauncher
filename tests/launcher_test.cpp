@@ -488,6 +488,12 @@ namespace
             collection::Figure top, bottom;
             EXPECT(collection::Read(doom.top, top) && collection::Read(doom.bottom, bottom) && top.IsSwapTop() && bottom.IsSwapBottom() &&
                 top.partner == bottom.file && bottom.partner == top.file);
+            // A version of a swapper (Add a figure's "Dark Blast Zone"): both halves of that version, linked.
+            collection::SwapperPaths dark = collection::CreateSwapper(2004, 1004, 0x2402, 0x2402);
+            collection::Figure darkTop, darkBottom;
+            EXPECT(!dark.top.empty() && collection::Read(dark.top, darkTop) && collection::Read(dark.bottom, darkBottom) &&
+                darkTop.variant == 0x2402 && darkBottom.variant == 0x2402 && darkTop.partner == darkBottom.file);
+            EXPECT(collection::Delete(dark.top) && collection::Delete(dark.bottom));
             std::string lone = collection::Create(1007), item, adventure;
             for (const collection::Toy& toy : catalogue.Toys())
             {
