@@ -506,12 +506,9 @@ namespace launcher_ui
         if (m_shots.empty() && SDL_getenv("SKYLAUNCHER_NO_UPDATE_CHECK") == nullptr)
         {
             CleanupOldUpdate(LauncherSelf()); // the .old a previous update left
-            // At most once a day, and only if the player left it on.
-            int64_t last = SettingInt(m_config, "update", "last_check", 0), now = int64_t(std::time(nullptr));
-            if (ParseBool(SettingGet(m_config, "update", "auto_check", "1")) && (last <= 0 || now - last > 86400 || last > now))
-                StartUpdateCheck(false);
+            // At every start (the launcher's release and the games' versions), if the player left it on; offline it is silent.
             if (ParseBool(SettingGet(m_config, "update", "auto_check", "1")))
-                RefreshKit("v" + LauncherVersion());
+                StartUpdateCheck(false);
         }
         while (m_running)
         {
@@ -524,7 +521,6 @@ namespace launcher_ui
                 HandleEvent(event);
             PollSlots();
             PollUpdates();
-            PollKitRefresh();
             AutoPlay();
             Frame();
             TestScript();
@@ -1204,16 +1200,7 @@ namespace launcher_ui
             }
         }
         // A verified disc. The page's button is INSTALL until the game is built, PLAY after.
-        const char* button = NeedsInstall(*slot) ? Tr("INSTALL") : Tr("PLAY");
-        if (m_kitRefresh.Running())
-        {
-            // The launcher's own tools are coming: a built game can be played meanwhile, an install waits for them.
-            KitDownloader::Snapshot_ kit = m_kitRefresh.Snapshot();
-            float fraction = kit.total > 0 ? std::clamp(float(double(kit.done) / double(kit.total)), 0.0f, 1.0f) : 0.0f;
-            SlotLine result = line(S::DownloadingTools, "", Accent, button, !NeedsInstall(*slot), fraction);
-            result.text = Tf("{} {} %", Tr(N_("Downloading tools")), int(std::floor(fraction * 100)));
-            return result;
-        }
+        const char* button = NeedsInstall(*slot) ? Tr("INSTALL") : UpdateAvailable(*slot) ? Tr("UPDATE") : Tr("PLAY");
         if (slot->installView)
         {
             InstallProgress::State state = InstallSnapshot(*slot).state;
@@ -1558,7 +1545,11 @@ namespace launcher_ui
             draw->AddRect(ImVec2(position.x + 6, position.y + 6), ImVec2(end.x - 6, end.y - 6), Rgb(AccentDark), RadiusLarge, 4.0f);
 
         // The logo (else the game's name), as large as fits and centred between the language menu and the disc status.
-        float areaTop = position.y + Pad * 2.5f, areaBottom = end.y - 128, areaH = areaBottom - areaTop;
+        // The game's version takes a line above the disc's lines: the logo's area and the lines rise by it.
+        const GameUpdate* offered = UpdateAvailable() ? PendingUpdate(*m_s) : nullptr;
+        const float notesH = offered != nullptr && !offered->notes.empty() ? 22.0f : 0.0f;
+        const float versionH = (GameVersion(*m_s).empty() || m_s->installView ? 0.0f : 22.0f) + notesH;
+        float areaTop = position.y + Pad * 2.5f, areaBottom = end.y - 128 - versionH, areaH = areaBottom - areaTop;
         const ArtTexture* logo = m_s->logo ? &m_s->logo : CachedArt(m_s->game.id, LauncherAssets::Role::Logo, 0);
         if (m_s->installView)
         {
@@ -1583,11 +1574,19 @@ namespace launcher_ui
         }
 
         // The disc, bottom left of the hero: the image's file name, its status under it ("Change disc..." on the right).
-        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 116));
+        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 116 - versionH));
         ImGui::BeginGroup();
         if (!m_s->installView) // the progress card takes the whole hero
         {
             ImGui::BeginGroup();
+            // The game's version on top ("Giants 0.8.2"), then the file name, then "DISC IMAGE:" and the status.
+            if (std::string version = GameVersion(*m_s); !version.empty() && !m_s->installView)
+            {
+                std::string name = m_s->game.name;
+                if (size_t colon = name.find(": "); colon != std::string::npos)
+                    name.erase(0, colon + 2);
+                BoldText(fmt::format("{} {}", name, version).c_str(), TextSecondary);
+            }
             // The file name on top, then "DISC IMAGE:" and the status on the line below.
             std::string file = m_s->fromCopy ? Tr("Copied game data")
                 : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
@@ -1626,17 +1625,22 @@ namespace launcher_ui
                 }
                 else if (UpdateAvailable())
                 {
-                    ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("A game update is ready."));
-                    ImGui::SameLine(0, 10);
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 2));
-                    ImGui::PushStyleColor(ImGuiCol_Button, Rgb(Accent));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(AccentHover));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(AccentDark));
-                    ImGui::PushStyleColor(ImGuiCol_Text, Rgb(AccentInk));
-                    if (ImGui::Button(Tr("Update the game")))
-                        StartInstall();
-                    ImGui::PopStyleColor(4);
-                    ImGui::PopStyleVar();
+                    // What UPDATE does: from the built version to the published one, the download (the kit, if it is not here yet)
+                    // and the time, then the release's notes for the game.
+                    const GameUpdate* pending = PendingUpdate(*m_s);
+                    std::string size = Tr("no download");
+                    if (KitNeedsFetch(*m_s))
+                        if (const ReleaseAsset* asset = FindAsset(m_updates.Snapshot().kit, KitAssetName()); asset != nullptr && asset->size > 0)
+                            size = Tf("{} download", LauncherFormatSize(asset->size));
+                    ImGui::PushTextWrapPos(available.x - 40); // window coordinates
+                    ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+                    ImGui::TextWrapped("%s", (m_s->installed.gameVersion.empty()
+                            ? Tf("Update to {}: {}, up to about {} min.", pending->version, size, InstallMinutesFor(m_s->game.id))
+                            : Tf("Update {} to {}: {}, up to about {} min.", m_s->installed.gameVersion, pending->version, size, InstallMinutesFor(m_s->game.id))).c_str());
+                    if (!pending->notes.empty())
+                        ImGui::TextWrapped("%s", pending->notes.c_str());
+                    ImGui::PopStyleColor();
+                    ImGui::PopTextWrapPos();
                 }
                 break;
             case DiscState::Failed:
@@ -1666,6 +1670,7 @@ namespace launcher_ui
         SlotLine state = SlotStatus(m_s);
         bool ready = m_s->disc == DiscState::Ready, verifying = state.state == SlotState::Checking, installing = Installing();
         bool install = ready && NeedsInstall();
+        bool update = ready && !install && UpdateAvailable();
         const char* label = state.button;
         // The band's group, centred in it on whole points (crisp edges at any scale): the controller picker, then the
         // action button (the main action and the game's settings), both PlayButtonH tall. The smallest window fits it.
@@ -1684,8 +1689,8 @@ namespace launcher_ui
         case MainActionHit::Main:
             if (!ready)
                 Browse();
-            else if (install)
-                StartInstall(); // which checks first that the image is still there
+            else if (install || update)
+                StartInstall(); // which checks first that the image is still there; an update rebuilds the game
             else
                 PlayNow();
             break;
@@ -1694,6 +1699,32 @@ namespace launcher_ui
             break;
         case MainActionHit::None:
             break;
+        }
+
+        // Under UPDATE, a small link to play what is built (offline, in a hurry).
+        if (update && !installing)
+        {
+            ImGui::PushFont(nullptr, SmallSize);
+            const char* text = Tr("Play without updating");
+            ImVec2 extent = ImGui::CalcTextSize(text);
+            // Under the portal's line (which is under the button), centred as it is.
+            float below = m_portal.Current().Line().empty() ? 6.0f : 22.0f;
+            ImVec2 linkAt(std::floor(mainX + (PlayButtonW - extent.x) / 2), buttonY + PlayButtonH + below);
+            ImGui::SetCursorScreenPos(linkAt);
+            ImGui::InvisibleButton("##playwithout", ImVec2(extent.x, extent.y + 4), ImGuiButtonFlags_EnableNav);
+            bool hovered = ImGui::IsItemHovered();
+            if (hovered)
+                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+            FocusRing(4);
+            unsigned ink = hovered ? Text : TextSecondary;
+            AddBoldText(draw, linkAt, Rgb(ink), text);
+            draw->AddLine(ImVec2(linkAt.x, linkAt.y + extent.y + 1), ImVec2(linkAt.x + extent.x, linkAt.y + extent.y + 1), Rgb(ink), 1.0f);
+            if (ImGui::IsItemClicked() || m_testPlayWithout)
+            {
+                m_testPlayWithout = false;
+                m_s->skipUpdate = true;
+            }
+            ImGui::PopFont();
         }
 
         // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
@@ -1783,7 +1814,7 @@ namespace launcher_ui
         if (ready && !installing && !m_s->installView && !m_s->fromCopy) // the copy replaces the disc image
         {
             constexpr float ChangeDiscW = 160;
-            ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112));
+            ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112 - notesH));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
             if (PillButton(Tr("Change disc..."), false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
                 Browse();
@@ -2270,7 +2301,7 @@ namespace launcher_ui
             static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-search",
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
-            if (m_testButtons || m_testSidebar || m_testCopy)
+            if (m_testButtons || m_testSidebar || m_testCopy || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testNav)
                 Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
@@ -2324,22 +2355,26 @@ namespace launcher_ui
         { "unknown-release", "Unknown release", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::Failed; slot.check.status = GameSourceStatus::WrongVersion; } },
         { "not-a-game-disc", "Not a game disc", "Choose disc", [](GameSlot& slot) { slot.disc = DiscState::Failed; slot.check.status = GameSourceStatus::NotXboxDisc; } },
         { "ready-to-install", "Ready to install", "INSTALL", [](GameSlot& slot) { slot.installed.runtime.clear(); } },
-        { "update-available", "Update available", "PLAY", [](GameSlot& slot) { slot.installed.kitVersion = "0.0.0-old"; } },
+        { "update-available", "Update available", "UPDATE", [](GameSlot& slot) { slot.installed.gameVersion = "0.0.1"; } },
         { "ready", "Ready to play", "PLAY", [](GameSlot&) {} },
     };
 
     // The kit follows the launcher (SSA_LAUNCHER_TEST_KIT, with SKYLAUNCHER_BASE_PATH holding an old kit and SKYLAUNCHER_UPDATE_URL a
     // fake release of the launcher's own tag, its kit asset being the fake kit "kit-new"; both games' iso= for "old" and "giants"):
-    //  old     INSTALL with a kit next to the launcher from an older release: the kit of the launcher's release is fetched
-    //          first, and it is the one that builds the game;
-    //  giants  INSTALL of Giants with a kit that does not build it (no giants in games=): the right kit first;
-    //  start   at start, and right after the launcher became a newer release, the old kit is replaced in the background and the
-    //          sidebar says "Downloading tools".
+    //  old       INSTALL with a kit next to the launcher from an older release: the kit of the launcher's release is fetched
+    //            first, and it is the one that builds the game;
+    //  giants    INSTALL of Giants with a kit that does not build it (no giants in games=): the right kit first;
+    //  updates   the game updates (TestUpdatesScript): a release that bumps Giants only;
+    //  offline   the same with no release to reach.
     void App::TestKitScript(uint64_t now)
     {
         const GameInfo& ssa = *FindGame("ssa");
         const GameInfo& giants = *FindGame("giants");
-        const bool start = m_testKit == "start";
+        if (m_testKit == "updates" || m_testKit == "offline")
+        {
+            TestUpdatesScript(now);
+            return;
+        }
         GameSlot& slot = SlotFor(m_testKit == "giants" ? giants : ssa);
         auto expect = [&](bool ok, const char* what) {
             if (!ok)
@@ -2364,28 +2399,12 @@ namespace launcher_ui
             m_page = Page::Play;
             if (m_testBegan == now)
             {
-                if (!start)
-                    SelectGame(giants);
+                SelectGame(giants);
                 SelectGame(ssa);
                 return;
             }
-            if (SlotFor(ssa).disc == DiscState::Verifying || (!start && SlotFor(giants).disc == DiscState::Verifying))
+            if (SlotFor(ssa).disc == DiscState::Verifying || SlotFor(giants).disc == DiscState::Verifying)
                 return;
-            if (start)
-            {
-                // The sidebar line while the tools come, on the launcher's own release; then the same for the release it becomes.
-                expect(slot.disc == DiscState::Ready, "the disc is ready");
-                std::optional<InstallKit> kit = FindInstallKit(m_config);
-                expect(kit && !kit->chosen && kit->tag.empty() && KitOlderThanLauncher(*kit, tag), "an old kit next to the launcher");
-                SemVer next = ParseSemVer(LauncherVersion());
-                m_testNextTag = fmt::format("v{}.{}.{}", next.major, next.minor, next.patch + 1);
-                RefreshKit(m_testNextTag);
-                expect(m_kitRefresh.Running(), "the refresh started");
-                std::string text = SlotStatus(&slot).text;
-                expect(text.rfind("Downloading tools", 0) == 0, "the sidebar says Downloading tools");
-                m_testStep = 2;
-                return;
-            }
             expect(slot.disc == DiscState::Ready, "the disc is ready");
             m_s = &slot;
             SetActiveGame(slot.game.id);
@@ -2402,23 +2421,153 @@ namespace launcher_ui
             m_testStep++;
             break;
         case 2:
-            if (start)
-            {
-                if (!m_kitRefreshTag.empty())
-                    return;
-                std::optional<InstallKit> kit = FindInstallKit(m_config);
-                expect(kit && kit->version == "kit-new" && kit->tag == m_testNextTag, "the kit of the new release is the one in use");
-                expect(SettingGet(m_config, "update", "kit_fetched") == m_testNextTag, "and remembered");
-                expect(std::filesystem::exists(DownloadedKitsFolder() / m_testNextTag / "kit.txt"), "in its own folder");
-                m_running = false;
-                return;
-            }
             if (slot.installer.Running() || slot.kitDownload.Running() || slot.installView)
                 return;
             expect(slot.kit && slot.kit->version == "kit-new" && slot.kit->tag == tag && slot.kit->Builds(slot.game.id), "the downloaded kit is the one in use");
             expect(slot.kit && FindInstalledGame(m_config, slot.check.xexSha256).kitVersion == "kit-new", "the game was built by it");
             expect(!slot.installed.runtime.empty(), "and is there");
             expect(SettingGet(m_config, "update", "kit_fetched") == tag, "the fetch is remembered");
+            m_running = false;
+            break;
+        }
+    }
+
+    // The game updates (SSA_LAUNCHER_TEST_KIT=updates, SKYLAUNCHER_BASE_PATH holding a kit that builds both games at SSA 0.9.0 and
+    // Giants 0.8.0, SKYLAUNCHER_UPDATE_URL a fake release whose games.json bumps Giants to 0.8.1 only, its kit being "kit-new"):
+    // both games built from the kit at hand, then the check as made at every start: SSA stays PLAY, Giants shows UPDATE, nothing
+    // is downloaded meanwhile, "Play without updating" gives PLAY back, UPDATE fetches the kit and rebuilds Giants only.
+    // "offline" has no release to reach: the check fails without a word.
+    void App::TestUpdatesScript(uint64_t now)
+    {
+        const GameInfo& ssa = *FindGame("ssa");
+        const GameInfo& giants = *FindGame("giants");
+        GameSlot& a = SlotFor(ssa);
+        GameSlot& g = SlotFor(giants);
+        const bool offline = m_testKit == "offline";
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL updates step %d (%s): %s (Giants \"%s\")\n", m_testStep, m_testKit.c_str(), what, SlotStatus(&g).text.c_str());
+                m_testFailures++;
+            }
+        };
+        auto shoot = [&](const char* name, uint64_t wait = 500) {
+            m_toasts.clear(); // the install's "Game installed" would sit on the banner
+            m_testShot = fmt::format("{:02}-{}", m_testStep, name);
+            m_testAt = now + wait;
+        };
+        auto busy = [](GameSlot& slot) { return slot.installer.Running() || slot.kitDownload.Running() || slot.installView; };
+        auto toolsLine = [&](GameSlot& slot) { return SlotStatus(&slot).text.rfind("Downloading tools", 0) == 0; };
+        const std::string next = [] {
+            SemVer v = ParseSemVer(LauncherVersion());
+            return fmt::format("v{}.{}.{}", v.major, v.minor, v.patch + 1);
+        }();
+        if (m_testBegan == 0)
+            m_testBegan = now;
+        if (now - m_testBegan > 180000)
+        {
+            expect(false, "timeout");
+            m_running = false;
+            return;
+        }
+        switch (m_testStep)
+        {
+        case 0: // the discs checked in the background
+            m_page = Page::Play;
+            if (m_testBegan == now)
+            {
+                if (!offline)
+                    SelectGame(giants);
+                SelectGame(ssa);
+                return;
+            }
+            if (a.disc == DiscState::Verifying || (!offline && g.disc == DiscState::Verifying))
+                return;
+            expect(a.disc == DiscState::Ready && (offline || g.disc == DiscState::Ready), "the discs are ready");
+            m_testStep = offline ? 20 : 1;
+            break;
+        case 1: // both games built from the kit at hand (no download: it is not older than the launcher)
+            SelectGame(ssa);
+            StartInstall();
+            expect(!a.kitUsed && a.installer.Running(), "the kit at hand builds Spyro's Adventure");
+            m_testStep++;
+            break;
+        case 2:
+            if (busy(a))
+                return;
+            expect(!a.installed.runtime.empty() && a.installed.gameVersion == "0.9.0", "Spyro's Adventure is built, at 0.9.0");
+            SelectGame(giants);
+            StartInstall();
+            expect(!g.kitUsed && g.installer.Running(), "and Giants");
+            m_testStep++;
+            break;
+        case 3:
+            if (busy(g))
+                return;
+            expect(!g.installed.runtime.empty() && g.installed.gameVersion == "0.8.0" && GameVersion(g) == "0.8.0", "Giants is built, at 0.8.0");
+            expect(m_gameUpdates.empty() && !UpdateAvailable(g) && SlotStatus(&g).button == std::string("PLAY"), "nothing is offered before a check");
+            SelectGame(giants);
+            shoot("giants-built");
+            break;
+        case 4: // the check made at every start
+            StartUpdateCheck(false);
+            m_testStep++;
+            break;
+        case 5:
+            if (m_updates.Busy() || m_updateWasBusy)
+                return;
+            expect(m_gameUpdates.size() == 2, "the release's games.json was read");
+            expect(UpdateAvailable(g) && !UpdateAvailable(a), "Giants only has an update");
+            expect(SlotStatus(&g).button == std::string("UPDATE") && SlotStatus(&a).button == std::string("PLAY"), "UPDATE for Giants, PLAY for the other");
+            expect(!toolsLine(g) && !toolsLine(a) && !std::filesystem::exists(DownloadedKitsFolder()), "no kit is downloaded in the background");
+            expect(m_updates.Snapshot().launcherNewer, "the launcher's own update is still offered");
+            SelectGame(giants);
+            shoot("giants-update");
+            break;
+        case 6: // "Play without updating"
+            m_testPlayWithout = true;
+            m_testStep++;
+            break;
+        case 7:
+            expect(g.skipUpdate && !UpdateAvailable(g) && SlotStatus(&g).button == std::string("PLAY"), "Play without updating gives PLAY back");
+            shoot("giants-play-without");
+            break;
+        case 8:
+            g.skipUpdate = false;
+            SelectGame(ssa);
+            shoot("ssa-up-to-date");
+            break;
+        case 9: // UPDATE: the kit first, then the rebuild
+            SelectGame(giants);
+            expect(UpdateAvailable(g) && KitNeedsFetch(g), "UPDATE needs the release's kit");
+            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.15", true); // slow enough for a shot of the card
+            StartInstall();
+            expect(g.kitUsed && g.kitDownload.Running() && g.kitTag == next, "UPDATE fetches the kit of the release the game names");
+            shoot("giants-updating", 1500);
+            break;
+        case 10:
+            if (busy(g))
+                return;
+            expect(g.kit && g.kit->tag == next && SettingGet(m_config, "update", "kit_fetched") == next, "the new kit is in use");
+            expect(g.installed.gameVersion == "0.8.1" && !UpdateAvailable(g) && SlotStatus(&g).button == std::string("PLAY"), "Giants is at 0.8.1 and PLAY again");
+            expect(FindInstalledGame(m_config, a.check.xexSha256).kitVersion != "kit-new" && a.installed.gameVersion == "0.9.0", "Spyro's Adventure was not rebuilt");
+            shoot("giants-updated");
+            break;
+        case 11:
+            m_running = false;
+            break;
+        case 20: // offline
+            StartUpdateCheck(false);
+            m_testStep++;
+            break;
+        case 21:
+            if (m_updates.Busy() || m_updateWasBusy)
+                return;
+            expect(!m_updates.Snapshot().checked && m_gameUpdates.empty() && BannerHeight() == 0 && m_toasts.empty(), "offline: nothing is said");
+            expect(!UpdateAvailable(a) && !std::filesystem::exists(DownloadedKitsFolder()), "and nothing is offered or downloaded");
+            shoot("offline");
+            break;
+        default:
             m_running = false;
             break;
         }
@@ -2505,8 +2654,9 @@ namespace launcher_ui
             expect(!a.installed.runtime.empty() && line() == "Ready to play", "Ready to play once built");
             shoot("ready", 4000);
             break;
-        case 6: // the kit has moved on since the build: an update
-            m_config["install." + m_testSha]["kit"] = "0.0.0-old";
+        case 6: // the release publishes a newer version of the game than the one built: an update
+            m_config["install." + m_testSha]["version"] = "0.0.1";
+            m_gameUpdates = { { a.game.id, "99.0.0", "v99.0.0", "" } };
             RefreshInstall();
             expect(line() == "Update available", "Update available");
             shoot("update-available", 400);
@@ -2566,6 +2716,9 @@ namespace launcher_ui
                     a.verify.done = true;
                     a.installed.runtime = m_testBuilt;
                     a.installed.kitVersion = a.kit ? a.kit->version : "";
+                    // The release publishes version 99 of the game: only the state that built an older one is offered it.
+                    m_gameUpdates = { { a.game.id, "99.0.0", "v99.0.0", "" } };
+                    a.installed.gameVersion = "99.0.0";
                     state.setup(a);
                     m_page = Page::Play;
                     expect(line() == state.text, state.name);

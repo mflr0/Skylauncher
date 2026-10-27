@@ -19,8 +19,6 @@ A (jump, confirm)	A (saut, valider)
 Only asks github.com for the latest version. Nothing else is sent.	Interroge seulement github.com pour connaître la dernière version. Rien d'autre n'est envoyé.
 Couldn't write to the game folder.	Impossible d'écrire dans le dossier du jeu.
 A launcher for the native PC ports of Skylanders. It has no game code or art: all of it comes from your own disc.	Un lanceur pour les portages PC natifs de Skylanders. Il ne contient ni code ni images du jeu : tout vient de votre propre disque.
-Game update available	Mise à jour du jeu disponible
-A game update is ready.	Une mise à jour du jeu est prête.
 About	À propos
 Adding the movie shaders	Ajout des shaders des vidéos
 Advanced	Avancé
@@ -57,7 +55,6 @@ Check now	Vérifier maintenant
 Check at startup	Vérifier au démarrage
 Checking Skylauncher	Vérification de Skylauncher
 Checking the Xbox 360 executable	Vérification de l'exécutable Xbox 360
-Checking the game kit	Vérification du kit du jeu
 Checking your disc	Vérification du disque
 Checking...	Vérification...
 Choose the disc image first.	Choisissez d'abord l'image disque.
@@ -123,7 +120,6 @@ Disc image	Image disque
 Disc not found	Disque introuvable
 Disc verified: {}	Disque vérifié : {}
 Downloading Skylauncher	Téléchargement de Skylauncher
-Downloading the game kit	Téléchargement du kit du jeu
 Downloading the game tools	Téléchargement des outils du jeu
 Downloading tools	Téléchargement des outils
 Drop your disc image (.iso) here.	Déposez votre image disque (.iso) ici.
@@ -174,7 +170,6 @@ Install failed	Échec de l'installation
 Installation cancelled	Installation annulée
 Installing	Installation
 Installing Skylauncher	Installation de Skylauncher
-Installing the game kit	Installation du kit du jeu
 Interrupted	Interrompue
 Interrupted: {} of {} copied	Interrompue : {} sur {} copiés
 Keep installing	Continuer l'installation
@@ -316,14 +311,12 @@ The download holds no Skylauncher.app	Le téléchargement ne contient pas Skylau
 The download is damaged: nothing was installed	Le téléchargement est endommagé : rien n'a été installé
 The download isn't a game kit	Le téléchargement n'est pas un kit de jeu
 The download isn't a zip file	Le téléchargement n'est pas un fichier zip
-Can't write next to Skylauncher: move it to a writable folder.	Écriture impossible à côté de Skylauncher : déplacez-le vers un dossier accessible en écriture.
 The game didn't finish the portal test.	Le jeu n'a pas terminé le test du portail.
 The game is running: quit it first.	Le jeu est en cours d'exécution : quittez-le d'abord.
 The game is running: quit it to restore a backup.	Le jeu est en cours d'exécution : quittez-le pour restaurer une copie de secours.
 The game is still installing	Le jeu est encore en cours d'installation
 Press INSTALL first	Appuyez d'abord sur INSTALLER
 Earlier versions of your saves.	Versions précédentes de vos sauvegardes.
-The game kit is up to date: update the game to use it.	Le kit du jeu est à jour : mettez le jeu à jour pour l'utiliser.
 No disc image needed.	Plus besoin de l'image disque.
 The game uses the disc image instead.	Le jeu utilise l'image disque à la place.
 The game ({}) wasn't found next to Skylauncher.\n\nPut it in the same folder.	Le jeu ({}) est introuvable à côté de Skylauncher.\n\nPlacez-le dans le même dossier.
@@ -377,7 +370,6 @@ Update available	Mise à jour disponible
 Update available: {}	Mise à jour disponible : {}
 Update failed	Échec de la mise à jour
 Update now	Mettre à jour
-Update the game	Mettre le jeu à jour
 Updates	Mises à jour
 Updating	Mise à jour
 Use it for {}	L'utiliser pour {}
@@ -699,3 +691,9 @@ No other bottom to take.	Pas d'autre bas à prendre.
 No other top to take.	Pas d'autre haut à prendre.
 Couldn't change it: 	Impossible de le changer : 
 Changed	Changé
+UPDATE	MISE À JOUR
+Play without updating	Jouer sans mettre à jour
+Update {} to {}: {}, up to about {} min.	Mise à jour de {} à {} : {}, jusqu'à environ {} min.
+Update to {}: {}, up to about {} min.	Mise à jour vers {} : {}, jusqu'à environ {} min.
+no download	aucun téléchargement
+{} download	{} à télécharger

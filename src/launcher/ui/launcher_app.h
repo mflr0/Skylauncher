@@ -226,6 +226,8 @@ namespace launcher_ui
         KitDownloader kitDownload;  // the first step of an install when there is no kit yet
         std::string kitError;       // why the downloaded kit can't be used
         bool kitUsed = false;       // this install started with that download
+        std::string kitTag;         // the release whose kit that download fetches
+        bool skipUpdate = false;    // "Play without updating", until the launcher is closed
         InstallProgress::Step kitStep;
         std::string installSha;    // the disc being installed
         std::string installKitVersion;
@@ -392,10 +394,12 @@ namespace launcher_ui
         void StartInstaller();
         void StartKitDownload();
         bool KitNeedsFetch(const GameSlot& slot) const; // no kit, one from an older release, or one that can't build the game
-        void RefreshKit(const std::string& tag);        // at start and after a self-update: the kit of release `tag` replaces an older one
-        void PollKitRefresh();
-        bool UpdateAvailable() const;
+        bool UpdateAvailable() const;                   // the release has a newer version of this game than the one built (docs/updates.md)
         bool UpdateAvailable(const GameSlot& slot) const;
+        bool AnyGameUpdate() const;
+        const GameUpdate* PendingUpdate(const GameSlot& slot) const; // the game's entry in the release's games.json, if any
+        std::string WantedKitTag(const GameSlot& slot) const;        // the release whose kit INSTALL / UPDATE must be using
+        std::string GameVersion(const GameSlot& slot) const;         // "0.8.2": the built game's, else the kit's; "" when unknown
         void StartInstall();
         void PollInstall();
         void DrawInstall(ImVec2 at, ImVec2 size);
@@ -431,6 +435,7 @@ namespace launcher_ui
         void TestCopyScript(uint64_t now);
         void TestSidebarScript(uint64_t now);
         void TestKitScript(uint64_t now);
+        void TestUpdatesScript(uint64_t now);
         void TestSeatXScript(uint64_t now);
         void TestButtonsScript(uint64_t now);
         void PlayNow(); // PLAY on the shown game: its disc and built game are what the launcher returns
@@ -469,9 +474,8 @@ namespace launcher_ui
         UpdateManager m_updates;
         bool m_updateManual = false;     // the running check was asked for: say the answer, even "up to date"
         bool m_updateLater = false;      // the player closed the banner for this session
-        bool m_kitLater = false;
-        KitDownloader m_kitRefresh;      // the kit of the launcher's own release, fetched on its own (not part of an install)
-        std::string m_kitRefreshTag;     // the release it was started for; empty when none is under way
+        bool m_testPlayWithout = false;        // tests: press "Play without updating" on the next frame
+        std::vector<GameUpdate> m_gameUpdates; // the games.json of the last answered check
         bool m_whatsNewOpen = false;
         bool m_updateWasBusy = false;
         std::string m_updateDoneNote;    // the last answer of a manual check, shown in About
@@ -516,8 +520,7 @@ namespace launcher_ui
         std::map<std::string, std::string> m_drawn; // while testing: what the sidebar, Home and the main button drew ("sidebar:ssa", "home:ssa", "button")
         bool m_testSidebar = false;    // SSA_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
         bool m_testCopy = false;       // SSA_LAUNCHER_TEST_COPY: copying the game data, playing from it, the wrong-disc button
-        std::string m_testNextTag;     // the release the launcher "became" in the kit check
-        std::string m_testKit;         // SSA_LAUNCHER_TEST_KIT: "old", "giants" or "start": the kit that follows the launcher (fake release)
+        std::string m_testKit;         // SSA_LAUNCHER_TEST_KIT: "old", "giants", "updates" or "offline": the kit that follows the launcher, the game updates (fake release)
         bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
         int m_testFailures = 0;
         uint64_t m_testBegan = 0;

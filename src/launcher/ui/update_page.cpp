@@ -54,17 +54,12 @@ namespace launcher_ui
         m_updateManual = manual;
         if (manual)
         {
-            m_updateLater = m_kitLater = false;
+            m_updateLater = false;
             m_updateDoneNote.clear();
         }
         UpdateManager::Settings settings;
         settings.repo = SettingGet(m_config, "update", "repo", "mflr0/Skylauncher");
         settings.kitRepo = SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher");
-        settings.kitInstalled = SettingGet(m_config, "update", "kit_tag", m_s->kit ? m_s->kit->release : std::string());
-        settings.kitRoot = DownloadedKitsFolder();
-        // A kit next to the launcher (development, offline) is updated in place; a downloaded one gets its own kit/<tag>/.
-        if (m_s->kit && m_s->kit->folder.parent_path() != settings.kitRoot)
-            settings.kitFolder = m_s->kit->folder;
         m_updateWasBusy = true;
         m_updates.Check(settings);
     }
@@ -79,21 +74,14 @@ namespace launcher_ui
             if (state.phase == UpdateManager::Phase::Idle)
             {
                 Set("update", "last_check", std::to_string(Now()));
+                if (state.checked)
+                    m_gameUpdates = state.games; // offline or failed: silent, the list stays as it was
                 if (m_updateManual)
                     m_updateDoneNote = !state.checked ? Tf("Couldn't check: {}", state.checkError)
                         : state.launcherNewer          ? Tf("Version {} is available.", state.launcher.tag)
-                        : state.kitNewer               ? Tr("Skylauncher is up to date. A game update is available.")
+                        : AnyGameUpdate()              ? Tr("Skylauncher is up to date. A game update is available.")
                                                        : Tr("Skylauncher is up to date.");
             }
-            else if (state.phase == UpdateManager::Phase::Done && state.doing == "kit")
-            {
-                Set("update", "kit_tag", state.kit.tag);
-                RefreshInstall();
-                if (m_s->disc == DiscState::Ready && !Installing())
-                    StartInstall(); // the new kit builds the game
-            }
-            else if (state.phase == UpdateManager::Phase::Done && state.doing == "launcher" && state.restartNeeded)
-                RefreshKit(state.launcher.tag); // the kit of the release the launcher just became
         }
     }
 
@@ -102,7 +90,7 @@ namespace launcher_ui
         UpdateManager::State state = m_updates.Snapshot();
         using Phase = UpdateManager::Phase;
         bool progress = state.phase == Phase::Downloading || state.phase == Phase::Verifying || state.phase == Phase::Installing;
-        bool offer = (state.launcherNewer && !m_updateLater) || (state.kitNewer && !m_kitLater && m_s->disc == DiscState::Ready);
+        bool offer = state.launcherNewer && !m_updateLater;
         bool shown = progress || state.restartNeeded || (state.phase == Phase::Failed && !state.error.empty()) || offer ||
             (state.phase == Phase::Done && !state.note.empty());
         return shown ? BannerH : 0;
@@ -129,7 +117,7 @@ namespace launcher_ui
         std::string text;
         float barFraction = -1;
         bool progress = state.phase == Phase::Downloading || state.phase == Phase::Verifying || state.phase == Phase::Installing;
-        enum { None, WhatsNew, UpdateLauncher, UpdateKit, Later, KitLater, Restart, Cancel, Retry, Dismiss };
+        enum { None, WhatsNew, UpdateLauncher, Later, Restart, Cancel, Retry, Dismiss };
         if (state.restartNeeded)
         {
             text = Tf("Skylauncher {} is installed. Restart to use it.", state.launcher.tag);
@@ -137,10 +125,9 @@ namespace launcher_ui
         }
         else if (progress)
         {
-            bool kit = state.doing == "kit";
-            text = state.phase == Phase::Downloading ? Tr(kit ? N_("Downloading the game kit") : N_("Downloading Skylauncher"))
-                : state.phase == Phase::Verifying    ? Tr(kit ? N_("Checking the game kit") : N_("Checking Skylauncher"))
-                                                     : Tr(kit ? N_("Installing the game kit") : N_("Installing Skylauncher"));
+            text = state.phase == Phase::Downloading ? Tr("Downloading Skylauncher")
+                : state.phase == Phase::Verifying    ? Tr("Checking Skylauncher")
+                                                     : Tr("Installing Skylauncher");
             barFraction = state.phase == Phase::Downloading ? state.progress : -1;
             if (state.phase == Phase::Downloading)
                 buttons = { { Tr("Cancel"), false, 120, Cancel } };
@@ -160,11 +147,7 @@ namespace launcher_ui
             text = Tf("Update available: {}", state.launcher.tag);
             buttons = { { Tr("Update now"), true, 140, UpdateLauncher }, { Tr("What's new"), false, 130, WhatsNew }, { Tr("Later"), false, 100, Later } };
         }
-        else
-        {
-            text = Tr("Game update available");
-            buttons = { { Tr("Update the game"), true, 170, UpdateKit }, { Tr("Later"), false, 100, KitLater } };
-        }
+        // else: BannerHeight said there is nothing to show, and the banner is not drawn
 
         float gap = 10, buttonsW = 0;
         for (Button& button : buttons)
@@ -215,11 +198,9 @@ namespace launcher_ui
         {
         case WhatsNew: m_whatsNewOpen = true; break;
         case UpdateLauncher: m_updates.UpdateLauncher(); m_updateWasBusy = true; break;
-        case UpdateKit: m_updates.UpdateKit(); m_updateWasBusy = true; break;
         case Later: m_updateLater = true; break;
-        case KitLater: m_kitLater = true; break;
         case Cancel: m_updates.Cancel(); break;
-        case Retry: if (state.doing == "kit") m_updates.UpdateKit(); else m_updates.UpdateLauncher(); m_updateWasBusy = true; break;
+        case Retry: m_updates.UpdateLauncher(); m_updateWasBusy = true; break;
         case Dismiss: m_updates.Dismiss(); break;
         case Restart:
         {

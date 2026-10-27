@@ -103,7 +103,42 @@ namespace launcher_ui
 
     bool App::UpdateAvailable(const GameSlot& slot) const
     {
-        return slot.disc == DiscState::Ready && !slot.installed.runtime.empty() && slot.kit && slot.kit->version != slot.installed.kitVersion;
+        if (slot.disc != DiscState::Ready || slot.installed.runtime.empty() || slot.skipUpdate)
+            return false;
+        const GameUpdate* pending = PendingUpdate(slot);
+        // A build from before versions (or by a kit that did not say) is older than any published version.
+        return pending != nullptr && (slot.installed.gameVersion.empty() || IsNewer(pending->version, slot.installed.gameVersion));
+    }
+
+    bool App::AnyGameUpdate() const
+    {
+        for (const auto& slot : m_slots)
+            if (UpdateAvailable(*slot))
+                return true;
+        return false;
+    }
+
+    const GameUpdate* App::PendingUpdate(const GameSlot& slot) const
+    {
+        for (const GameUpdate& update : m_gameUpdates)
+            if (update.id == slot.game.id)
+                return &update;
+        return nullptr;
+    }
+
+    std::string App::WantedKitTag(const GameSlot& slot) const
+    {
+        // The launcher's own release; a game whose published version needs a newer release's kit asks for that one.
+        std::string tag = "v" + LauncherVersion();
+        const GameUpdate* pending = PendingUpdate(slot);
+        return pending != nullptr && IsNewer(pending->kit, tag) ? pending->kit : tag;
+    }
+
+    std::string App::GameVersion(const GameSlot& slot) const
+    {
+        if (!slot.installed.runtime.empty())
+            return slot.installed.gameVersion;
+        return slot.kit ? slot.kit->GameVersion(slot.game.id) : std::string();
     }
 
     void App::SetInstallState(const std::string& sha, const char* state)
@@ -128,8 +163,9 @@ namespace launcher_ui
         if (slot.kit->chosen)
             return false;
         // Once the launcher's own release was fetched (or the nearest one there is), an older tag is the best there is.
-        bool fetched = SettingGet(m_config, "update", "kit_fetched") == "v" + LauncherVersion();
-        return !slot.kit->Builds(slot.game.id) || (KitOlderThanLauncher(*slot.kit, LauncherVersion()) && !fetched);
+        std::string tag = WantedKitTag(slot);
+        bool fetched = SettingGet(m_config, "update", "kit_fetched") == tag;
+        return !slot.kit->Builds(slot.game.id) || (KitOlderThanLauncher(*slot.kit, tag) && !fetched);
     }
 
     void App::StartInstall()
@@ -137,11 +173,6 @@ namespace launcher_ui
         if (!DiscStillThere())
             return;
         RefreshInstall();
-        if (m_kitRefresh.Running())
-        {
-            Toast(Tr("Downloading tools")); // the install goes on with them: press again in a moment
-            return;
-        }
         if (m_s->kit && m_s->kit->chosen && !m_s->kit->Builds(m_s->game.id))
         {
             Toast(Tf("These game tools can't build {}", m_s->game.name), true); // the player's own kit: not ours to replace
@@ -162,49 +193,14 @@ namespace launcher_ui
             StartInstaller();
     }
 
-    // No kit, or one that is older than the launcher or can't build this game: the first step of the install fetches the
-    // launcher's own (docs/install.md).
+    // No kit, or one that is older than the release wanted or can't build this game: the first step of the install fetches
+    // the right one (docs/install.md).
     void App::StartKitDownload()
     {
         m_s->kitUsed = true;
+        m_s->kitTag = WantedKitTag(*m_s);
         m_s->kitStep = { "kit", "Downloading the game tools", SDL_GetTicks(), 0 };
-        m_s->kitDownload.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), "v" + LauncherVersion(), DownloadedKitsFolder());
-    }
-
-    // At start (and after the launcher replaced itself): a kit from an older release than the launcher's is replaced by
-    // the one of the launcher's release, in the background; the sidebar says "Downloading tools" meanwhile.
-    void App::RefreshKit(const std::string& tag)
-    {
-        if (m_kitRefresh.Running() || AnyInstalling())
-            return;
-        try
-        {
-            std::optional<InstallKit> kit = FindInstallKit(m_config);
-            if (!kit || !KitOlderThanLauncher(*kit, tag) || SettingGet(m_config, "update", "kit_fetched") == tag)
-                return;
-            m_kitRefresh.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), tag, DownloadedKitsFolder());
-            m_kitRefreshTag = tag;
-        }
-        catch (const std::filesystem::filesystem_error& e)
-        {
-            // A folder the system refuses to list must not stop the launcher: carry on without refreshing the kit.
-            SDL_Log("Kit refresh skipped: %s", e.what());
-        }
-    }
-
-    void App::PollKitRefresh()
-    {
-        if (m_kitRefreshTag.empty() || m_kitRefresh.Running())
-            return;
-        KitDownloader::Snapshot_ kit = m_kitRefresh.Snapshot();
-        if (kit.state == KitDownloader::State::Done)
-        {
-            Set("update", "kit_tag", kit.tag);
-            Set("update", "kit_fetched", m_kitRefreshTag);
-            for (auto& slot : m_slots)
-                slot->kit = FindInstallKit(m_config, slot->game.id);
-        }
-        m_kitRefreshTag.clear(); // a failure is silent: INSTALL says so if it matters
+        m_s->kitDownload.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), m_s->kitTag, DownloadedKitsFolder());
     }
 
     void App::StartInstaller()
@@ -270,7 +266,7 @@ namespace launcher_ui
             {
                 m_s->kitStep.endedAt = SDL_GetTicks();
                 Set("update", "kit_tag", kit.tag);
-                Set("update", "kit_fetched", "v" + LauncherVersion());
+                Set("update", "kit_fetched", m_s->kitTag);
                 RefreshInstall();
                 if (m_s->kit && m_s->kit->Builds(m_s->game.id))
                 {
@@ -292,7 +288,11 @@ namespace launcher_ui
         InstallProgress progress = m_s->installer.Snapshot();
         if (progress.state == InstallProgress::State::Done)
         {
-            RecordInstalledGame(m_config, m_s->installSha, progress.runtime, m_s->installKitVersion);
+            // The version built: what the kit says, else (a kit that does not) what the release published for the game.
+            std::string version = m_s->kit ? m_s->kit->GameVersion(m_s->game.id) : std::string();
+            if (const GameUpdate* pending = PendingUpdate(*m_s); version.empty() && pending != nullptr)
+                version = pending->version;
+            RecordInstalledGame(m_config, m_s->installSha, progress.runtime, m_s->installKitVersion, version);
             SetInstallState(m_s->installSha, nullptr);
             Toast(Tr("Game installed: press PLAY"));
             m_s->installView = false;
