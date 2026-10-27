@@ -64,8 +64,8 @@ list Swap Force makes the launcher fetch the right one first, as for Giants).
   the game table. Each logs to `SSARecomp.log` in its own folder.
 - The Giants install is about 15 minutes (4443 shaders to translate instead of 1118): `InstallMinutesFor()`. Measured with kit 0.5.0 on an M1 Pro: SSA 193 s, Giants 563 s (the second shader pass is incremental since 0.5.0).
 - The shared figure collection serves all three games (the catalogue already holds all six games' toys).
-- Swap Force's disc is "Skylanders - Swap Force (USA, Australia) (En,Fr)": English and French (its Language tab offers those
-  two). The install estimate shown is the generic one (`InstallMinutes`); only Giants has its own figure.
+- Swap Force's disc is "Skylanders - Swap Force (USA, Australia) (En,Fr)": English and French (its Language tab lists the
+  languages the disc holds). The install estimate shown is the generic one (`InstallMinutes`); only Giants has its own figure.
 - Verify: `ArkeyanLauncherTest <spyro iso> <scratch>` checks the table and folders; with `SKY_LAUNCHER_TEST_GIANTS_ISO=<giants iso>` it
   also checks that each disc is accepted by its own game and refused by the other; `SKY_LAUNCHER_TEST_SWAPFORCE_ISO=<swap force iso>`
   adds the Swap Force disc (accepted by its game, refused by the others, its pictures and portraits read into `SwapForce/`). End to end: see "Testing without the kit".

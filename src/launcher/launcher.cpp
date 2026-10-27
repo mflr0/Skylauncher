@@ -249,7 +249,10 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
         if (sha256 == release.defaultXexSha256)
         {
             report(1.0f, Tr("Verified"));
-            return { Ok, {}, sha256 };
+            std::vector<std::string> names;
+            for (const auto& file : disc.Files())
+                names.push_back(file.first);
+            return { Ok, {}, sha256, {}, art::LanguagesOnDisc(game.id, names) };
         }
     }
     for (const GameRelease& release : game.releases)
@@ -467,6 +470,38 @@ LanguageChoice ResolveLanguages(const GameInfo& game)
         return value != nullptr ? std::string(value) : config[game.id][key];
     };
     return { pick("SKY_LANGUAGE", "language"), pick("SKY_VOICE_LANGUAGE", "voice_language") };
+}
+
+void StoreDiscLanguages(LauncherConfig& config, std::string_view game, const art::DiscLanguages& languages)
+{
+    auto& section = config[std::string(game)];
+    auto store = [&](const char* key, const std::vector<std::string>& codes)
+    {
+        if (codes.empty())
+            section.erase(key);
+        else
+            section[key] = art::JoinLanguages(codes);
+    };
+    store("disc_text_languages", languages.text);
+    store("disc_voice_languages", languages.voice);
+}
+
+art::DiscLanguages StoredDiscLanguages(const LauncherConfig& config, std::string_view game)
+{
+    art::DiscLanguages languages;
+    auto section = config.find(std::string(game));
+    if (section == config.end())
+        return languages;
+    if (auto it = section->second.find("disc_text_languages"); it != section->second.end())
+        languages.text = art::SplitLanguages(it->second);
+    if (auto it = section->second.find("disc_voice_languages"); it != section->second.end())
+        languages.voice = art::SplitLanguages(it->second);
+    return languages;
+}
+
+bool OffersLanguage(const std::vector<std::string>& onDisc, std::string_view code)
+{
+    return onDisc.empty() || code.empty() || std::find(onDisc.begin(), onDisc.end(), code) != onDisc.end();
 }
 
 std::string ResolveGameSource(int argc, char** argv, const GameInfo& game, bool interactive)

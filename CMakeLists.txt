@@ -138,6 +138,7 @@ add_library(ArkeyanLauncherCore STATIC
     src/shared/collection/search.cpp
     src/shared/collection/upgrades.cpp
     src/shared/art/alchemy_archive.cpp
+    src/shared/art/disc_languages.cpp
     src/shared/art/game_art.cpp
     src/shared/art/game_text.cpp
     src/shared/art/lux_images.cpp

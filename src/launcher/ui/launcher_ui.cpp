@@ -736,6 +736,9 @@ namespace launcher_ui
             m_s->logo = LoadArt(m_renderer, logo.path, true);
         if (!m_s->fromCopy)
             Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
+        StoreDiscLanguages(m_config, m_s->game.id, m_s->check.languages);
+        if (!SaveLauncherConfig(m_configPath, m_config))
+            Toast(Tr("Couldn't save the settings"), true);
         m_s->disc = DiscState::Ready;
         RefreshInstall();
     }

@@ -140,22 +140,12 @@ namespace launcher_ui
     {
         if (!BeginSettingsTable("##language"))
             return;
-        const bool giants = m_s->game.id == std::string_view("giants");
-        const bool swapForce = m_s->game.id == std::string_view("swapforce");
         SettingRow(Tr(strings::GameText), Tr(strings::GameTextHint));
-        if (swapForce)
-            Combo("##text", m_s->game.id, "language", SwapForceLanguageChoices, 0);
-        else if (giants)
-            Combo("##text", m_s->game.id, "language", GiantsLanguageChoices, 0);
-        else
-            Combo("##text", m_s->game.id, "language", LanguageChoices, 0);
+        const std::vector<Choice> text = GameLanguageChoices(m_config, m_s->game.id, false);
+        Combo("##text", m_s->game.id, "language", text, 0);
         SettingRow(Tr(strings::GameVoices), Tr(strings::GameVoicesHint));
-        if (swapForce)
-            Combo("##voice", m_s->game.id, "voice_language", SwapForceLanguageChoices, 0);
-        else if (giants)
-            Combo("##voice", m_s->game.id, "voice_language", GiantsVoiceChoices, 0);
-        else
-            Combo("##voice", m_s->game.id, "voice_language", LanguageChoices, 0);
+        const std::vector<Choice> voice = GameLanguageChoices(m_config, m_s->game.id, true);
+        Combo("##voice", m_s->game.id, "voice_language", voice, 0);
         EndSettingsTable();
     }
 
@@ -172,6 +162,7 @@ namespace launcher_ui
         m_s->check = {};
         m_s->installView = m_s->kitUsed = false;
         m_config[m_s->game.id].erase("iso");
+        StoreDiscLanguages(m_config, m_s->game.id, {});
         if (!SaveLauncherConfig(m_configPath, m_config))
             Toast(Tr("Couldn't save the settings"), true);
         RefreshInstall();

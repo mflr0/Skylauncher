@@ -6,6 +6,7 @@
 #include "launcher/game_settings.h"
 #include "launcher/launcher.h"
 #include "launcher/shortcut.h"
+#include "launcher/ui/launcher_app.h"
 #include "shared/collection/save_backup.h"
 #include <SDL3/SDL.h>
 #include <cstdio>
@@ -406,6 +407,61 @@ namespace
     }
 }
 
+namespace
+{
+    // A game's language lists follow its disc: stored at the check, filtered, the saved choice off the disc shows the default.
+    void DiscLanguageChecks()
+    {
+        using namespace launcher_ui;
+        using V = std::vector<std::string>;
+        auto values = [](const std::vector<Choice>& choices) {
+            V out;
+            for (const Choice& choice : choices)
+                out.push_back(choice.value);
+            return out;
+        };
+
+        SETTINGS_EXPECT(OffersLanguage({}, "fr") && OffersLanguage({ "en" }, "") && OffersLanguage({ "en", "fr" }, "fr") && !OffersLanguage({ "en" }, "fr"));
+
+        LauncherConfig config;
+        art::DiscLanguages europe{ { "es", "it" }, { "es", "it" } };
+        StoreDiscLanguages(config, "swapforce", europe);
+        SETTINGS_EXPECT(config["swapforce"]["disc_text_languages"] == "es,it");
+        art::DiscLanguages back = StoredDiscLanguages(config, "swapforce");
+        SETTINGS_EXPECT(back.text == europe.text && back.voice == europe.voice);
+        // It survives the settings file.
+        fs::path file = fs::temp_directory_path() / "disc-languages-check.ini";
+        SETTINGS_EXPECT(SaveLauncherConfig(file.string(), config));
+        art::DiscLanguages loaded = StoredDiscLanguages(LoadLauncherConfig(file.string()), "swapforce");
+        SETTINGS_EXPECT(loaded.text == europe.text && loaded.voice == europe.voice);
+        fs::remove(file);
+
+        // Swap Force Europe: Spanish and Italian only; the choice that was saved is not there, so the first (the default) is shown.
+        std::vector<Choice> text = GameLanguageChoices(config, "swapforce", false);
+        SETTINGS_EXPECT(values(text) == V({ "es", "it" }));
+        SETTINGS_EXPECT(ChoiceIndex(text, "fr", 0) == 0 && ChoiceIndex(text, "it", 0) == 1);
+
+        // Spyro's Adventure with voices on the disc but one text language less: each list on its own.
+        StoreDiscLanguages(config, "ssa", { { "en", "fr", "de" }, { "en", "es" } });
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "ssa", false)) == V({ "en", "fr", "de" }));
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "ssa", true)) == V({ "en", "es" }));
+
+        // Giants keeps "Same as text" whatever the disc says.
+        StoreDiscLanguages(config, "giants", { { "en", "fr" }, { "en", "fr" } });
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "giants", true)) == V({ "", "en", "fr" }));
+
+        // Nothing stored (a game checked before this version): today's full lists; Swap Force's was English and French.
+        LauncherConfig old;
+        SETTINGS_EXPECT(GameLanguageChoices(old, "ssa", false).size() == 10 && GameLanguageChoices(old, "giants", false).size() == 12);
+        SETTINGS_EXPECT(GameLanguageChoices(old, "giants", true).size() == 13);
+        SETTINGS_EXPECT(values(GameLanguageChoices(old, "swapforce", true)) == V({ "en", "fr" }));
+        // Forgetting the disc clears them.
+        StoreDiscLanguages(config, "swapforce", {});
+        SETTINGS_EXPECT(config["swapforce"].count("disc_text_languages") == 0 && StoredDiscLanguages(config, "swapforce").text.empty());
+        printf("Disc languages: stored, filtered, the default when the choice is not on the disc, the full list when unknown\n");
+    }
+}
+
 int SettingsChecks(const fs::path& scratch)
 {
     fs::create_directories(scratch);
@@ -414,5 +470,6 @@ int SettingsChecks(const fs::path& scratch)
     EnvironmentChecks();
     ShortcutChecks(scratch / "shortcut");
     DataChecks(scratch / "datachecks");
+    DiscLanguageChecks();
     return g_settingsFailures;
 }
