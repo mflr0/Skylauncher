@@ -330,10 +330,19 @@ namespace launcher_ui
             std::string text = restore ? Tf("Put back the copy from {}?", BackupLabel(m_confirm.substr(8)))
                 : m_confirm == "reset" ? Tf("Reset {} to new? Level, gold and upgrades are lost.", Name(f))
                 : Tf("Move {} to the trash?", Name(f));
+            // The buttons' real widths (a longer translation widens the first one), so they are laid out from the bar's right
+            // edge inwards: 8 px of margin, 8 px between them. The message stops before them.
+            float firstW = restore ? m_app.PillWidth(Tr("Restore"), 160, true)
+                : m_confirm == "reset" ? m_app.PillWidth(Tr("Hold to reset"), 160, true)
+                : m_app.PillWidth(Tr("Hold to delete"), 160, true);
+            float cancelW = m_app.PillWidth(Tr("Cancel"), 110, true);
+            float btnX = barAt.x + barW - 8 - (firstW + 8 + cancelW);
             ImGui::PushFont(nullptr, SmallSize);
+            draw->PushClipRect(ImVec2(barAt.x + 16, barAt.y), ImVec2(btnX - 12, barAt.y + 48), true);
             draw->AddText(ImVec2(barAt.x + 16, barAt.y + 15), Rgb(Text), text.c_str());
+            draw->PopClipRect();
             ImGui::PopFont();
-            ImGui::SetCursorScreenPos(ImVec2(barAt.x + barW - 290, barAt.y + 4));
+            ImGui::SetCursorScreenPos(ImVec2(btnX, barAt.y + 4));
             if (restore)
             {
                 if (m_app.PillButton(Tr("Restore"), true, 160, true))
