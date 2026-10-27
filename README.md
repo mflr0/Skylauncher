@@ -6,6 +6,12 @@ image, it builds the game on your computer, and you play. (Formerly Skylauncher:
 Arkeyan Launcher contains no game code and no game art. Everything shown from the game is read from your own disc and stays
 on your computer.
 
+| Game | Status |
+|---|---|
+| Spyro's Adventure | ![code recompiled: 100% (31k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2831k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: playable](https://img.shields.io/badge/Windows-playable-brightgreen) ![Linux: not tested](https://img.shields.io/badge/Linux-not%20tested-lightgrey) |
+| Giants | ![code recompiled: 100% (23k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2823k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: not tested](https://img.shields.io/badge/Windows-not%20tested-lightgrey) ![Linux: not tested](https://img.shields.io/badge/Linux-not%20tested-lightgrey) |
+| Swap Force | ![code recompiled: 100% (81k functions)](https://img.shields.io/badge/code%20recompiled-100%25%20%2881k%20functions%29-blue) ![Mac: playable](https://img.shields.io/badge/Mac-playable-brightgreen) ![Windows: not tested](https://img.shields.io/badge/Windows-not%20tested-lightgrey) ![Linux: not tested](https://img.shields.io/badge/Linux-not%20tested-lightgrey) |
+
 ## The games
 
 | Game | Mac | Windows | Linux | Played so far |
