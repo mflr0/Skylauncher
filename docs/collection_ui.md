@@ -40,14 +40,22 @@ and words, a sheet with three main actions. The look is dorydev's: her colours, 
 A Swap Force swapper is two toys, a top and a bottom, each its own dump. The library links them (`Figure::partner`,
 `collection::Cards`, `CardName`, `CardLevelText`, `CreateSwapper`, `Pair`, `ChangeHalf`) and the page shows the pair as
 **one card** everywhere: the shelf, the seat tile, the sheet, Add a figure and the search.
-- **The card**: the top's picture with the bottom's small at its corner, the name ("Doom Stone", or "Boom Jet / Wash
-  Buckler" for mixed halves, or the label the player gave), the top's level and favourite star, one seat badge. A half on
-  its own (no partner) is a card of its own. A search or a filter that lets one half through brings the whole card.
+- **The card**: the swapper's picture, then its name ("Doom Stone", "Magna Jet" for a top and a bottom of two different
+  swappers, as the game names them: `collection::CardName`, or the label the player gave), the top's level and favourite
+  star, one seat badge. A half on its own (no partner) is a card of its own. A search or a filter that lets one half
+  through brings the whole card.
+- **The picture** is the game's swap screen: the top's artwork above, the bottom's artwork below, meeting at the waist, the
+  same on the shelf, the seats, the sheet and Add a figure (and in the game's Toy Box). Each half's picture from the Swap
+  Force disc is cut to its visible pixels, both are brought to the same width (the narrower grows) and stacked, centred
+  (`collection::SwapperPicture`, `StackHalves`, shared with the game, with a unit test on synthetic images); the result is
+  fitted into the card's square. A matched or a mixed swapper, and each version (Dark, Legendary...), has its own halves.
+  When a half has no such picture (the pictures are read from the player's disc, so before the first disc check), the card
+  shows the top's picture with the bottom small at its corner, as before.
 - **Putting it on the portal**: a click on a seat, a drag, or the sheet's "Put on the portal" places **both halves**. The seat
   holds the top; `portal.txt` gets two lines for it, the top in the first slot of its seat and the bottom in the next.
   Swap Force's slots are **Player 1: 0 and 1, Player 2: 2 and 3, Magic item: 4, Adventure: 5**; a figure that is not a
   swapper takes the first slot of its seat. Reading the file back, a bottom whose top is on the portal too is not a seat.
-- **The sheet** (the top's page) shows both halves ("Top: Doom Stone · bottom: Doom Stone"), the top's level, **Change the
+- **The sheet** (the top's page) shows both halves ("Top: Doom Stone · Bottom: Doom Stone"), the top's level, **Change the
   bottom** and **Change the top**: a list of the other halves (one row each, those on a seat or in use left out, "Now with
   Blast Zone" or "On its own" under each); the card keeps one half and takes the one chosen, and a swapper that lost it is
   given the old one, so no card disappears. A card on a seat stays there, written again for the new half. A half on its own
@@ -55,6 +63,7 @@ A Swap Force swapper is two toys, a top and a bottom, each its own dump. The lib
 - **Delete** (hold) sends both halves to the trash and takes the card off its seat; a half on its own deletes alone. Duplicate
   copies both halves, linked. A swapper is in use when either half is held by a running game: the whole card is read-only.
   Export and the other Manage actions work on dumps, so they carry both halves.
+- **A figure that was never played** says "New: never played" and shows no "Last played" row.
 - **Add a figure** lists a swapper once, by its top ("Doom Stone", 16 of them), and **Create** makes both halves, linked;
   its versions are those of the top, the bottom of the same version when it has one.
 
@@ -200,7 +209,9 @@ At the first visit to the page (`CollectionPage::Open`):
   its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on, Swap Force's portal with a
   swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (Standard and the others, no
   second row with the toy's own name), then the smart search (an element, a level, a typo: `47-` to `49-`), the Filters panel
-  (`50-`), the tags with a count (`51-`) and a sort (`52-`). Set `SKYLANDERS_DATA`
+  (`50-`), the tags with a count (`51-`) and a sort (`52-`). With `SSA_LAUNCHER_TEST_SWAPPERS=1` the collection also holds all
+  16 swappers matched and four mixed ones, and `53-all-swappers` (Swap Force's swapper cards; use `SSA_LAUNCHER_TEST_SIZE=1700x1500`
+  to see them all), `54-mixed-swapper-sheet` and `55-add-swapper-versions` are written. Set `SKYLANDERS_DATA`
   to a folder holding the discs' cached pictures to see them (else the drawn icons).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the

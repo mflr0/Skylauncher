@@ -378,6 +378,7 @@ namespace launcher_ui
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
             m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
             m_testUninstall = SDL_getenv("SSA_LAUNCHER_TEST_UNINSTALL") != nullptr;
+            m_testLogo = SDL_getenv("SSA_LAUNCHER_TEST_LOGO") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -2326,7 +2327,7 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || !m_testKit.empty())
+            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
                 Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
@@ -3136,6 +3137,21 @@ namespace launcher_ui
         if (m_testUninstall)
         {
             TestUninstallScript(now);
+            return;
+        }
+        if (m_testLogo)
+        {
+            // Each game's page, once its logo has settled (SSA_LAUNCHER_TEST_SIZE sets the window).
+            static const char* const Games[] = { "ssa", "giants", "swapforce" };
+            if (m_testStep >= int(std::size(Games)))
+            {
+                m_running = false;
+                return;
+            }
+            SelectGame(*FindGame(Games[m_testStep]));
+            m_page = Page::Play;
+            m_testShot = fmt::format("logo-{}", Games[m_testStep]);
+            m_testAt = now + 2200;
             return;
         }
         if (m_testButtons)

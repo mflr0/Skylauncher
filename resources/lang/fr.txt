@@ -678,7 +678,7 @@ Basic	De base
 {} gold	{} or
 Swapper	Swapper
 Bottom file	Fichier du bas
-Top: {} · bottom: {}	Haut : {} · bas : {}
+Top: {} · Bottom: {}	Haut : {} · Bas : {}
 Change the bottom	Changer le bas
 Change the top	Changer le haut
 CHANGE THE BOTTOM	CHANGER LE BAS

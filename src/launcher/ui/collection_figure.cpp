@@ -179,8 +179,11 @@ namespace launcher_ui
         std::vector<std::pair<std::string, std::string>> rows;
         if (collection::HasProgress(f) && f.state == figures::AreaState::Valid)
             rows.push_back({ Tr("Gold"), Tf("{}   ·   {} played", f.stats.gold, PlayTime(f.stats.playSeconds)) });
-        rows.push_back({ Tr("Last played"), f.lastGame.empty() || f.state == figures::AreaState::Blank ? std::string(Tr("Never")) : fmt::format("{} · {}", ShortGameName(f.lastGame), ShortDate(f.lastUsed)) });
-        FactRows("##facts", rows);
+        // A never-played figure already says so above: no "Last played: Never" row for it.
+        if (f.state != figures::AreaState::Blank)
+            rows.push_back({ Tr("Last played"), f.lastGame.empty() ? std::string(Tr("Never")) : fmt::format("{} · {}", ShortGameName(f.lastGame), ShortDate(f.lastUsed)) });
+        if (!rows.empty())
+            FactRows("##facts", rows);
         ImGui::EndGroup();
     }
 
@@ -247,9 +250,12 @@ namespace launcher_ui
         constexpr float Picture = 220;
         ImVec2 origin = ImGui::GetCursorScreenPos();
         draw->AddRectFilled(origin, ImVec2(origin.x + Picture, origin.y + Picture), Rgb(Field), RadiusLarge);
-        DrawPicture(draw, f.toy, f.Kind(), f.variant, ImVec2(origin.x + 6, origin.y + 6), Picture - 12);
-        if (card.Swapper())
-            DrawBottom(draw, *card.second, ImVec2(origin.x + Picture - 76, origin.y + Picture - 76), 68);
+        if (!DrawSwapper(draw, card, ImVec2(origin.x + 6, origin.y + 6), Picture - 12))
+        {
+            DrawPicture(draw, f.toy, f.Kind(), f.variant, ImVec2(origin.x + 6, origin.y + 6), Picture - 12);
+            if (card.Swapper())
+                DrawBottom(draw, *card.second, ImVec2(origin.x + Picture - 76, origin.y + Picture - 76), 68);
+        }
         float badgeX = origin.x;
         auto badge = [&](const std::string& text, unsigned fill, unsigned ink) {
             ImGui::PushFont(nullptr, SmallSize - 1);
@@ -275,7 +281,7 @@ namespace launcher_ui
         m_app.Title(Name(f).c_str(), HeadlineSize - 6, Text);
         std::string what = f.toy != nullptr ? f.variantInfo.name : Tf("Toy type {}", f.type);
         if (card.Swapper())
-            what = Tf("Top: {} · bottom: {}", WithoutHalf(f.variantInfo.name), WithoutHalf(card.second->variantInfo.name));
+            what = Tf("Top: {} · Bottom: {}", WithoutHalf(f.variantInfo.name), WithoutHalf(card.second->variantInfo.name));
         if (what != Name(f)) // the second line only when it says more (a nickname over the toy's name)
             ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", what.c_str());
         if (card.Busy())

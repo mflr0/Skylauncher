@@ -20,6 +20,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include "../env.h"
 
 extern const unsigned char g_embeddedArtManifests[];
 extern const size_t g_embeddedArtManifestsSize;
@@ -29,7 +30,7 @@ namespace art
     namespace
     {
         // Bump when a picture is read or composed differently: the cached pictures (not the portraits) are made again.
-        constexpr int CacheVersion = 3;
+        constexpr int CacheVersion = 4; // 4: Swap Force's logo from its lossless 32-bit picture
 
         std::string Lower(std::string text)
         {
@@ -608,7 +609,7 @@ namespace art
         {
             const collection::Game* game = collection::Catalogue::Get().FindGame(m.game);
             int present = CountPngs(folder);
-            if (game != nullptr && Complete(game->artworks, folder))
+            if (game != nullptr && Complete(game->artworks, folder) && (game->halves.empty() || Complete(game->halves, folder)))
                 return present;
             if (!m.artworkMaterials.empty())
                 return AlchemyMaterials(m.artworkMaterials, disc, folder);
@@ -679,7 +680,7 @@ namespace art
 
     std::filesystem::path PortraitFolder(std::string_view game)
     {
-        if (const char* folder = getenv("SSA_PORTRAITS"))
+        if (const char* folder = skyenv::Get("SKY_PORTRAITS"))
             return datadir::FromText(folder);
         std::filesystem::path data = datadir::Game(game);
         return data.empty() ? std::filesystem::path() : data / "portraits";

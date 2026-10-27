@@ -282,7 +282,13 @@ namespace launcher_ui
     {
         if (!logo)
             return;
-        float width = std::min(size.x, size.y * logo.aspect), height = width / logo.aspect;
+        float width = std::min(size.x, size.y * logo.aspect);
+        // Never above its own pixels (one texel per device pixel at most): a larger logo only blurs, and one that is smaller on the
+        // disc than another game's must not be stretched to match it.
+        float textureW = 0, textureH = 0;
+        SDL_GetTextureSize(logo.texture, &textureW, &textureH);
+        width = std::min(width, textureW * (logo.uv1.x - logo.uv0.x) / std::max(1.0f, ImGui::GetIO().DisplayFramebufferScale.x));
+        float height = width / logo.aspect;
         ImVec2 min(at.x + (size.x - width) / 2, at.y + (size.y - height) / 2), max(min.x + width, min.y + height);
         if (shadow)
         {

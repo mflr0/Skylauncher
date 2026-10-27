@@ -291,7 +291,7 @@ differs per game is the provider's table.
 
 | Role | Spyro's Adventure | Giants | Swap Force | File |
 | --- | --- | --- | --- | --- |
-| Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 1033x541, with the plate and the medallions) | the title picture of `defaultloadscreen.pak` (`juicestandard_title_10.igz`, 872x400) | `<data>/<Game>/launcher-cache/logo.png` |
+| Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 1033x541, with the plate and the medallions) | the title picture of `defaultloadscreen.pak` (`juicestandard_title_00.igz`, 872x400, the 32-bit lossless one; the disc has no larger logo) | `<data>/<Game>/launcher-cache/logo.png` |
 | Background (game page, Home) | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | the main menu's background of `juicedomain_frontend.pak` (1280x720) | `.../background.png` |
 | Title icon | `default.xex` XDBF resource | the same | the same | `.../title_icon.png` |
 | Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px), 4 items and 3 family icons (potion, compass, paw) of `uigameimage.str`: 81 | the collection screen's 123 portraits (256 px) | the toy collection's portraits and the collectible icons of `toycollectionimages.pak` and `collectibleicons.pak`: 209 | `<data>/<Game>/portraits/` |
@@ -306,6 +306,11 @@ differs per game is the provider's table.
 - **Textures at most 1024 px wide for the backdrop** (`BackdropArtW`): SDL's software renderer (the offscreen screenshot
   test, and the fallback when no GPU renderer opens) drops one triangle of an image wider than that (seen with Giants'
   1600 px painting).
+- **A logo is never drawn above its own pixels** (`App::DrawLogo`: one texel per device pixel at most, with the display's
+  scale taken in): a picture stretched past its size only blurs, and a game whose disc has a smaller logo (Swap Force's is
+  872 px wide, SSA's 1024 and Giants' 1033) is not enlarged to match the others. In a large window the logo stops growing.
+- Swapper cards show the swap screen's pictures of both halves, stacked (`docs/collection_ui.md`); they are read from the
+  disc with the other artworks (`artworks/`, the `halves` of the catalogue).
 - The toys' pictures follow one rule (`collection::PortraitPath`): the shown game's, else the other game's, else the
   toy's family picture, else the generated icon (see `docs/collection_ui.md`).
 
@@ -333,6 +338,7 @@ The launcher's texts are short. A player reads them to decide or to know what to
 5. **Numbers that help decide** (sizes, times) stay, rounded. The tone is the same; French keeps "vous" and is as short.
 6. **Labels are two or three words**, and a title and its button do not repeat words ("Desktop shortcut" and **Create**,
    not "Create a desktop shortcut").
+7. **Each part of a line starts with a capital**: "Top: Doom Stone · Bottom: Doom Stone" (French: "Haut : Doom Stone · Bas : Doom Stone").
 
 Developer details (the runtime's name, an option's file, the SHA-256 a check uses) belong in these docs, not in the window.
 
@@ -398,6 +404,8 @@ With `SSA_LAUNCHER_TEST_INSTALL=1` and `SKYLAUNCHER_KIT=$PWD/build/fake-kit` it 
 (`docs/install.md`).
 
 ## Other screenshot variables
+`SSA_LAUNCHER_TEST_LOGO=1` shoots each game's page (`logo-ssa`, `logo-giants`, `logo-swapforce`) from the art already cached in
+`SKYLANDERS_DATA`; `SSA_LAUNCHER_TEST_SIZE=<w>x<h>` sets the window (the default one, a large one).
 `SSA_LAUNCHER_TEST_UPDATE=1` with `SKYLAUNCHER_UPDATE_URL=file://<fake latest.json>` shows the update screens (`20-` to `24-`).
 `SSA_LAUNCHER_TEST_INSTALL=real` runs the real kit. `private/shoot.sh <out dir> [VAR=value...]` is the wrapper used in this
 repository's working copy (its own HOME, the offscreen driver).

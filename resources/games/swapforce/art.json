@@ -3,12 +3,20 @@
   "game": "swapforce",
   "engine": "alchemy",
   "about": "Where Swap Force keeps its pictures on the disc (docs/runtime/host/game_art.md, games/swapforce/docs/art.md). Names only: the pictures are read from the player's own disc.",
-  "logo": { "archive": "archives/defaultloadscreen.pak", "entry": "textures\\juicestandard_title_10.igz" },
+  "logo": { "archive": "archives/defaultloadscreen.pak", "entry": "textures\\juicestandard_title_00.igz" },
   "background": { "archive": "archives/juicedomain_frontend.pak", "entry": "textures\\juicestandard_mainmenu_background_10.igz" },
   "portraits": { "materials": [
     { "archive": "archives/toycollectionimages.pak", "folder": "materialinstances\\toycollection\\" },
     { "archive": "archives/collectibleicons.pak", "folder": "materialinstances\\haticon_ufo_materials" } ] },
   "artworks": { "materials": [
     { "archive": "archives/faceoffportraitsimages.pak", "folder": "materialinstances\\portrait_faceoff\\",
-      "ending": "_fullscreen_materials.igz" } ] }
+      "ending": "_fullscreen_materials.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "body_wii_material.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "top_wii_material.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "legs_wii_material.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "fireworks_wii_material.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "fortune_wii_material.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "stormbird_wii_material.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "vampire_wii_material.igz" },
+    { "archive": "archives/characterillustrations.pak", "folder": "materialinstances\\wiiportraits\\", "ending": "altdecocowboybelt_wii_material.igz" } ] }
 }

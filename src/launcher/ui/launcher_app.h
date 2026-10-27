@@ -515,6 +515,7 @@ namespace launcher_ui
         } m_un;
         bool m_uninstalled = false;    // done: the window only shows the result and quits
         bool m_testUninstall = false;  // SSA_LAUNCHER_TEST_UNINSTALL: the uninstall screens
+        bool m_testLogo = false;       // SSA_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
         uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)
 

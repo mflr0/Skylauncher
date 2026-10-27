@@ -32,7 +32,7 @@ namespace collection
     // A toy's picture from one game's disc, as cached by art::Extract (art/game_art.h): the picture of its variant
     // (`variant`: the variant id, 0 for the plain toy) if the game has one, else the toy's. `large`: the game's biggest
     // (SSA: the 512 px "versus" picture; Giants has one size, 256 px). Empty when that game has none cached.
-    // Folders: SSA_PORTRAITS, else "portraits" in the game's data folder.
+    // Folders: SKY_PORTRAITS, else "portraits" in the game's data folder.
     std::string GamePortraitPath(const std::string& gameId, const Toy& toy, uint16_t variant = 0, bool large = false);
 
     // A toy family's picture from one game's disc (Game::kindPictures: SSA's magic item, location and sidekick icons),
@@ -50,6 +50,19 @@ namespace collection
     std::string BestPicturePath(const std::string& gameId, const Toy& toy, uint16_t variant = 0);
     // When only the kind is known (the Toy Box, the collection's cards): the toy's one variant of that kind, else 0.
     uint16_t VariantFor(const Toy& toy, VariantKind kind);
+    // One half of a swapper from the disc (Swap Force's swap screen pictures, Game::halves): a top above its waist or
+    // a bottom's legs, the variant's own before the plain toy's, from the first game that has one. Empty when none.
+    std::string HalfPicturePath(const Toy& toy, uint16_t variant = 0);
+    // `image` cut to its visible pixels (alpha above `minAlpha`: its bounding box); unchanged when none is visible.
+    Image CropToVisible(const Image& image, uint8_t minAlpha = 8);
+    // The two halves of a swapper stacked, as the game's swap screen shows them: each cut to its visible pixels, both at
+    // the width of the wider (the narrower grows, bilinear), the top above the bottom, centred, meeting at the waist.
+    // Empty when either half has no visible pixel.
+    Image StackHalves(const Image& top, const Image& bottom);
+    // A swapper's picture: its two halves' pictures from the discs (HalfPicturePath) stacked. Empty when either half has
+    // none (the caller falls back to the top's picture with the bottom small in a corner). The same picture in the
+    // launcher, the figure sheet, Add a figure, the seats and the Toy Box.
+    Image SwapperPicture(const Toy& top, uint16_t topVariant, const Toy& bottom, uint16_t bottomVariant);
     // PortraitPath with no game being viewed: the first game, in catalogue order, that has one.
     std::string DiscImagePath(const Toy& toy);
 

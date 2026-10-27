@@ -588,7 +588,7 @@ namespace
             swap.Load();
             EXPECT(swap.SeatOf(doom.top) == 0 && swap.SetSeat(0, doom.top) && lines()[1] == "1 " + blast.bottom);
             EXPECT(collection::CardName(collection::CardOf(swap.figures, size_t(std::find_if(swap.figures.begin(), swap.figures.end(),
-                [&](const collection::Figure& f) { return f.path == doom.top; }) - swap.figures.begin()))) == "Doom Stone / Blast Zone");
+                [&](const collection::Figure& f) { return f.path == doom.top; }) - swap.figures.begin()))) == "Doom Zone"); // a top and a bottom of two swappers: named as the game does
 
             // Delete: both halves go, the seat empties; the trash holds two, and both come back.
             size_t listedBefore = swap.figures.size(), trashBefore = collection::Trash().size();

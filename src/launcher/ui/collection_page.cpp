@@ -237,6 +237,38 @@ namespace launcher_ui
         draw->AddImage(Ref(picture.texture), corner, ImVec2(corner.x + w, corner.y + h));
     }
 
+    bool CollectionPage::DrawSwapper(ImDrawList* draw, const collection::Toy* top, uint16_t topVariant, const collection::Toy* bottom, uint16_t bottomVariant, ImVec2 at, float box)
+    {
+        if (top == nullptr || bottom == nullptr)
+            return false;
+        std::string key = fmt::format("swapper:{}:{}:{}:{}", top->type, topVariant, bottom->type, bottomVariant);
+        auto found = m_icons.find(key);
+        if (found == m_icons.end())
+        {
+            FigureIconTexture picture;
+            if (collection::Image image = collection::SwapperPicture(*top, topVariant, *bottom, bottomVariant); !image.Empty())
+            {
+                std::vector<uint8_t> bytes(image.rgba.size() * 4);
+                std::memcpy(bytes.data(), image.rgba.data(), bytes.size()); // R, G, B, A in memory on the little-endian systems we run on
+                picture.texture = LoadRgba(m_app.m_renderer, bytes, image.width, image.height);
+                picture.width = float(image.width), picture.height = float(image.height);
+            }
+            found = m_icons.emplace(key, picture).first; // no picture is remembered too
+        }
+        const FigureIconTexture& picture = found->second;
+        if (picture.texture == nullptr)
+            return false;
+        float scale = std::min(box / picture.width, box / picture.height), w = picture.width * scale, h = picture.height * scale;
+        ImVec2 corner(at.x + (box - w) / 2, at.y + (box - h) / 2);
+        draw->AddImage(Ref(picture.texture), corner, ImVec2(corner.x + w, corner.y + h));
+        return true;
+    }
+
+    bool CollectionPage::DrawSwapper(ImDrawList* draw, const collection::Card& card, ImVec2 at, float box)
+    {
+        return card.Swapper() && DrawSwapper(draw, card.first->toy, card.first->variant, card.second->toy, card.second->variant, at, box);
+    }
+
     // ---- Data -----------------------------------------------------------------------------------------------------
 
     std::string CollectionPage::Folder() const
@@ -781,9 +813,12 @@ namespace launcher_ui
             };
             if (occupied && figure != nullptr)
             {
-                DrawIcon(draw, figure->toy, figure->Kind(), icon, Icon, false);
-                if (collection::Card card = CardOf(*figure); card.Swapper())
-                    DrawBottom(draw, *card.second, ImVec2(icon.x + Icon - 22, icon.y + Icon - 22), 22);
+                if (collection::Card card = CardOf(*figure); !DrawSwapper(draw, card, icon, Icon))
+                {
+                    DrawIcon(draw, figure->toy, figure->Kind(), icon, Icon, false);
+                    if (card.Swapper())
+                        DrawBottom(draw, *card.second, ImVec2(icon.x + Icon - 22, icon.y + Icon - 22), 22);
+                }
                 ImGui::PushFont(m_app.m_boldFont, TextSize - 1);
                 draw->AddText(ImVec2(tx, at.y + 30), Rgb(Text), fit(Name(*figure), TextSize - 1, m_app.m_boldFont).c_str());
                 ImGui::PopFont();
@@ -1077,10 +1112,13 @@ namespace launcher_ui
         draw->AddRectFilled(at, end, Rgb(hovered ? PanelRaised : Panel, 240), Radius);
         draw->AddRect(at, end, Rgb(seat >= 0 ? Accent : selected || hovered ? BorderBright : Border), Radius, 0, seat >= 0 || selected ? 2.0f : 1.0f);
         float icon = width - 28;
-        DrawIcon(draw, figure.toy, figure.Kind(), ImVec2(at.x + 14, at.y + 10), icon, false);
+        if (collection::Card card = CardOf(figure); !DrawSwapper(draw, card, ImVec2(at.x + 14, at.y + 10), icon))
+        {
+            DrawIcon(draw, figure.toy, figure.Kind(), ImVec2(at.x + 14, at.y + 10), icon, false);
+            if (card.Swapper())
+                DrawBottom(draw, *card.second, ImVec2(at.x + 14 + icon - icon * 0.38f, at.y + 10 + icon - icon * 0.38f), icon * 0.38f);
+        }
         const bool busy = Busy(figure);
-        if (collection::Card card = CardOf(figure); card.Swapper())
-            DrawBottom(draw, *card.second, ImVec2(at.x + 14 + icon - icon * 0.38f, at.y + 10 + icon - icon * 0.38f), icon * 0.38f);
 
         ImGui::PushFont(m_app.m_boldFont, SmallSize + 1);
         std::string name = Name(figure);

@@ -14,6 +14,18 @@ namespace launcher_ui
         // A swapper is added whole: the catalogue lists its tops only, named without the "(top)", and creating one makes both halves.
         bool IsSwapper(const Toy& toy) { return toy.category == Category::SwapTop; }
 
+        // The bottom that goes with a swapper's top (the same version's when it has one), for its stacked picture.
+        const Toy* BottomOf(const Toy& top, uint16_t variant, uint16_t& bottomVariant)
+        {
+            bottomVariant = 0;
+            const Toy* bottom = collection::Catalogue::Get().Find(collection::MatchingHalf(top.type));
+            if (bottom != nullptr && variant != 0)
+                for (const collection::Variant& candidate : bottom->variants)
+                    if (candidate.id == variant)
+                        bottomVariant = candidate.id;
+            return bottom;
+        }
+
         // A toy's "base" entry is its "Standard" (made under the id the toy is sold with): its own row would say the same twice.
         bool PlainDuplicate(const Toy&, const collection::Variant& variant) { return variant.kind == collection::VariantKind::Base; }
 
@@ -131,7 +143,9 @@ namespace launcher_ui
                 draw->AddRectFilled(at, ImVec2(at.x + Cell, at.y + Cell + 38), Rgb(selected ? PanelRaisedActive : hovered ? PanelRaised : Field), Radius);
                 if (selected)
                     draw->AddRect(at, ImVec2(at.x + Cell, at.y + Cell + 38), Rgb(Accent), Radius, 0, 2.5f);
-                DrawIcon(draw, &toy, collection::VariantKind::Base, ImVec2(at.x + 16, at.y + 6), Cell - 32, false);
+                uint16_t bottomVariant = 0;
+                if (!IsSwapper(toy) || !DrawSwapper(draw, &toy, 0, BottomOf(toy, 0, bottomVariant), bottomVariant, ImVec2(at.x + 16, at.y + 6), Cell - 32))
+                    DrawIcon(draw, &toy, collection::VariantKind::Base, ImVec2(at.x + 16, at.y + 6), Cell - 32, false);
                 ImGui::PushFont(nullptr, SmallSize);
                 std::string name = LauncherMiddleEllipsis(IsSwapper(toy) ? WithoutHalf(toy.name) : toy.name, 14);
                 ImVec2 nameSize = ImGui::CalcTextSize(name.c_str());
@@ -184,7 +198,10 @@ namespace launcher_ui
                 if (ImGui::Selectable((std::string("##v") + std::to_string(i)).c_str(), m_addVersion == int(i), 0, ImVec2(0, Row)))
                     m_addVersion = int(i);
                 ImDrawList* draw = ImGui::GetWindowDrawList();
-                DrawPicture(draw, chosen, versions[i].second, i == 0 ? uint16_t(0) : chosen->variants[i - 1].id, ImVec2(at.x + 4, at.y + 3), Row - 6);
+                const uint16_t versionId = i == 0 || chosen->variants[i - 1].sameTag ? uint16_t(0) : chosen->variants[i - 1].id;
+                uint16_t bottomVariant = 0;
+                if (!IsSwapper(*chosen) || !DrawSwapper(draw, chosen, versionId, BottomOf(*chosen, versionId, bottomVariant), bottomVariant, ImVec2(at.x + 4, at.y + 3), Row - 6))
+                    DrawPicture(draw, chosen, versions[i].second, i == 0 ? uint16_t(0) : chosen->variants[i - 1].id, ImVec2(at.x + 4, at.y + 3), Row - 6);
                 float textX = at.x + Row + 6;
                 ImGui::PushFont(m_app.m_boldFont, SmallSize);
                 draw->AddText(ImVec2(textX, at.y + 5), Rgb(Text), LauncherMiddleEllipsis(IsSwapper(*chosen) ? WithoutHalf(versions[i].first) : versions[i].first, 26).c_str());

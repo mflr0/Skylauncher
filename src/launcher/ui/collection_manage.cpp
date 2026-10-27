@@ -297,7 +297,8 @@ namespace launcher_ui
             "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
             "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet", "42-swapforce-portal", "43-swapper-sheet",
             "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-standard-version", "47-search-element", "48-search-level",
-            "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name" };
+            "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name", "53-all-swappers", "54-mixed-swapper-sheet",
+            "55-add-swapper-versions" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -374,6 +375,15 @@ namespace launcher_ui
             }
             collection::Create(1007);
             (void)night;
+            // SSA_LAUNCHER_TEST_SWAPPERS: all 16 swappers matched and a few mixed (a top with another swapper's bottom), to look at
+            // their pictures (shots 53 to 55).
+            if (getenv("SSA_LAUNCHER_TEST_SWAPPERS") != nullptr)
+            {
+                for (uint16_t i = 0; i < 16; i++)
+                    collection::CreateSwapper(2000 + i, 1000 + i);
+                for (auto [top, bottom] : { std::pair<uint16_t, uint16_t>{ 2010, 1000 }, { 2000, 1015 }, { 2007, 1002 }, { 2004, 1001 } })
+                    collection::CreateSwapper(top, bottom);
+            }
         }
         // Level 15 and a hat (Giants' part of the figure): Giants shows 15, Spyro's Adventure 10.
         std::string eruptor = collection::Create(9);
@@ -640,6 +650,27 @@ namespace launcher_ui
             }
             else
                 m_filter.sort = collection::Sort::Name;
+            break;
+        case 33: // Swap Force: every swapper's picture (SSA_LAUNCHER_TEST_SWAPPERS seeds them all)
+            SelectPortalGame("swapforce");
+            m_filter.category = int(collection::Category::SwapTop);
+            break;
+        case 34: // a mixed swapper's sheet: Magna's top on Boom Jet's bottom
+        {
+            SelectPortalGame("swapforce");
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 2010 && !figure.partner.empty())
+                    for (const Figure& other : m_model.figures)
+                        if (other.file == figure.partner && other.type == 1000)
+                            OpenFigure(figure.path);
+            break;
+        }
+        case 35: // Add a figure, Swap Force: Free Ranger's versions with their pictures
+            m_overlay = Overlay::Add;
+            m_addGame = "swapforce";
+            m_addToy = 2001;
+            m_addCategory = int(collection::Category::SwapTop);
+            m_addVersion = 0;
             break;
         default: break;
         }

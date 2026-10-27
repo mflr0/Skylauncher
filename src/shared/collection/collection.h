@@ -12,7 +12,7 @@
 
 namespace collection
 {
-    // The collection folder, without a trailing slash: SSA_COLLECTION, else SSA_FIGURES (the old variable), else
+    // The collection folder, without a trailing slash: SKY_COLLECTION, else SKY_FIGURES (the old variable), else
     // DefaultFolder(). Created when first written to.
     std::string Folder();
     // <data root>/Collection (datadir.h): ~/Library/Application Support/Skylanders/Collection on macOS,
@@ -189,8 +189,10 @@ namespace collection
     std::vector<Card> Cards(const std::vector<Figure>& list);
     // The card the figure `list[index]` belongs to (a bottom gives its swapper's card).
     Card CardOf(const std::vector<Figure>& list, size_t index);
+    std::string SwapperName(const std::string& top, const std::string& bottom);
     // The card's name: the top's label if the player gave one; else the swapper's name when both halves are the same
-    // swapper ("Wash Buckler"); else both ("Boom Jet / Wash Buckler"); the figure's DisplayName for a single figure.
+    // swapper ("Wash Buckler"); else the mixed swapper's name as the game gives it, SwapperName ("Nitro Magna Jet");
+    // the figure's DisplayName for a single figure.
     std::string CardName(const Card& card);
     // LevelText of the card's first figure (a swapper's top carries the level), `game` as for LevelText.
     std::string CardLevelText(const Card& card, const std::string& game, bool french = false);
@@ -315,7 +317,7 @@ namespace collection
 
     // --- Migration from the per-game folders ---------------------------------------------------------------------------
 
-    // Where an older build kept the figures: SSA_MIGRATE_FROM, else (only when neither SSA_COLLECTION nor SSA_FIGURES
+    // Where an older build kept the figures: SKY_MIGRATE_FROM, else (only when neither SKY_COLLECTION nor SKY_FIGURES
     // is set) "figures" in the SSA game folder (datadir.h). Empty: nothing to migrate.
     std::string LegacyFolder();
 
