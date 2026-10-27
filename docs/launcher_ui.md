@@ -79,7 +79,7 @@ GitHub link bottom right. A card opens its game's page. The launcher's own langu
 (`docs/translations.md`); the game's text and voice languages are in that game's settings ("Game text", "Game voices"). The game shown last is selected
 in the sidebar (`[launcher] game=`); the other is one click away.
 1. **Left sidebar** (grey, fixed width).
-   - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.4.2`, from
+   - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.4.3`, from
      `SKYLAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" and YOUR GAMES.
    - The seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later", SuperChargers
      Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the

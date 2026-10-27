@@ -4,6 +4,7 @@
 // in collection_figure.cpp, collection_add.cpp and collection_manage.cpp.
 #include "launcher/ui/launcher_app.h"
 #include "launcher/ui/launcher_ui.h"
+#include "launcher/ui/text_fit.h"
 #include "shared/collection/icons.h"
 #include <algorithm>
 #include <cctype>
@@ -722,18 +723,7 @@ namespace launcher_ui
             ImGui::PopFont();
             auto fit = [&](const std::string& text, float size, ImFont* font = nullptr) {
                 ImGui::PushFont(font, size);
-                std::string out = text;
-                if (ImGui::CalcTextSize(out.c_str()).x > tw)
-                {
-                    // Shorter by whole characters until it fits with its "...".
-                    while (!out.empty() && ImGui::CalcTextSize((out + "...").c_str()).x > tw)
-                    {
-                        out.pop_back();
-                        while (!out.empty() && (uint8_t(out.back()) & 0xC0) == 0x80)
-                            out.pop_back();
-                    }
-                    out += "...";
-                }
+                std::string out = FitText(text, tw, [](const std::string& s) { return ImGui::CalcTextSize(s.c_str()).x; });
                 ImGui::PopFont();
                 return out;
             };

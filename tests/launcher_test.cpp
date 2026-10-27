@@ -627,6 +627,7 @@ int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder); // tests/shell_test.cpp
 int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
 int I18nChecks(); // tests/i18n_test.cpp
+int TextFitChecks(); // tests/text_fit_test.cpp
 int CopyChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso); // tests/copy_test.cpp
 
 // The launcher window switching games in place (App::TestSwitchScript, in an offscreen window): both discs checked, a
@@ -830,6 +831,7 @@ int main(int argc, char** argv)
     g_failures += ShellChecks(scratch);
     g_failures += SettingsChecks(scratch / "settings");
     g_failures += I18nChecks();
+    g_failures += TextFitChecks();
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };

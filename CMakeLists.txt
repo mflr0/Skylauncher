@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(Skylauncher LANGUAGES C CXX)
-set(SKYLAUNCHER_VERSION "0.4.2" CACHE STRING "Version shown in the app bundle")
+set(SKYLAUNCHER_VERSION "0.4.3" CACHE STRING "Version shown in the app bundle")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -217,6 +217,6 @@ add_dependencies(SkylauncherTest FakeSSABuild Skylauncher)
 target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_FAKE_KIT="${CMAKE_BINARY_DIR}/fake-kit" SKYLAUNCHER_TEST_EXE="$<TARGET_FILE:Skylauncher>")
 
 # The launcher shell's checks (tests/shell_test.cpp), run by SkylauncherTest.
-target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp tests/copy_test.cpp tests/i18n_test.cpp)
+target_sources(SkylauncherTest PRIVATE tests/shell_test.cpp tests/settings_test.cpp tests/copy_test.cpp tests/i18n_test.cpp tests/text_fit_test.cpp)
 target_compile_definitions(SkylauncherTest PRIVATE SKYLAUNCHER_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 target_include_directories(SkylauncherTest PRIVATE lib/miniz)

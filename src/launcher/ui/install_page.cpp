@@ -2,6 +2,7 @@
 // progress card that replaces the logo on Play (docs/install.md).
 #include "launcher/install_checklist.h"
 #include "launcher/ui/launcher_app.h"
+#include "launcher/ui/text_fit.h"
 #include "shared/platform/platform.h"
 #include <algorithm>
 #include <array>
@@ -23,16 +24,7 @@ namespace launcher_ui
         // `text` cut to `width` with "..." at its end.
         std::string Fit(const std::string& text, float width)
         {
-            if (ImGui::CalcTextSize(text.c_str()).x <= width)
-                return text;
-            std::string cut = text;
-            while (!cut.empty() && ImGui::CalcTextSize((cut + "...").c_str()).x > width)
-            {
-                cut.pop_back();
-                while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80) // a whole UTF-8 character
-                    cut.pop_back();
-            }
-            return cut + "...";
+            return launcher_ui::FitText(text, width, [](const std::string& s) { return ImGui::CalcTextSize(s.c_str()).x; });
         }
     }
 

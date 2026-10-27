@@ -1,6 +1,7 @@
 // Updates in the window: the check at start, the banner ("Update available" and its progress), What's new, and the About
 // page (version, "Check now", credits and licences). The logic is in launcher/updater.cpp (docs/updates.md).
 #include "launcher/ui/launcher_app.h"
+#include "launcher/ui/text_fit.h"
 #include <ctime>
 #include <fmt/format.h>
 
@@ -15,16 +16,7 @@ namespace launcher_ui
 
         std::string Fit(const std::string& text, float width)
         {
-            if (ImGui::CalcTextSize(text.c_str()).x <= width)
-                return text;
-            std::string cut = text;
-            while (!cut.empty() && ImGui::CalcTextSize((cut + "...").c_str()).x > width)
-            {
-                cut.pop_back();
-                while (!cut.empty() && (static_cast<unsigned char>(cut.back()) & 0xC0) == 0x80)
-                    cut.pop_back();
-            }
-            return cut + "...";
+            return launcher_ui::FitText(text, width, [](const std::string& s) { return ImGui::CalcTextSize(s.c_str()).x; });
         }
 
         const char* PlatformName()
