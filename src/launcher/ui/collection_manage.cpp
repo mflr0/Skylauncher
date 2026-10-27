@@ -1,6 +1,7 @@
 // Manage: the trash, backups, import and export, unknown toys, the tidy of the starters the game made on its own.
 // Also the screenshot test's scratch collection (Seed, TestScreen).
 #include "launcher/ui/launcher_app.h"
+#include "launcher/env.h"
 #include "launcher/ui/launcher_ui.h"
 #include <algorithm>
 #include <atomic>
@@ -310,12 +311,12 @@ namespace launcher_ui
         return int(std::size(Shots));
     }
 
-    // Figures in the scratch collection only: SSA_COLLECTION must name it (and SSA_SAVE_DIR the seats' folder).
+    // Figures in the scratch collection only: SKY_COLLECTION must name it (and SKY_SAVE_DIR the seats' folder).
     void CollectionPage::Seed()
     {
         if (!m_opened)
             Open();
-        if (getenv("SSA_COLLECTION") == nullptr || !collection::List().empty())
+        if (skyenv::Get("SKY_COLLECTION") == nullptr || !collection::List().empty())
             return;
         auto make = [](uint16_t type, uint16_t variant, uint32_t experience, uint16_t gold, const char* nickname) {
             std::string path = collection::Create(type, variant);
@@ -400,7 +401,7 @@ namespace launcher_ui
         collection::Delete(doomed);
         collection::Delete(doomed2);
         (void)chop; (void)item; (void)pack; (void)sidekick; (void)dark;
-        if (getenv("SSA_SAVE_DIR") != nullptr)
+        if (skyenv::Get("SKY_SAVE_DIR") != nullptr)
             if (const collection::Game* game = m_model.Game())
                 WriteSeats(*game, SessionFile(*game), { gill, spyro, item, pack });
         Reload();
@@ -475,7 +476,7 @@ namespace launcher_ui
 #ifndef _WIN32
             // A game holds the figures of the seats: a lock of a live process other than this one.
             for (const std::string& seat : m_model.seats)
-                if (!seat.empty() && getenv("SSA_COLLECTION") != nullptr && getenv("SSA_LAUNCHER_TEST_FAKE_LOCKS") != nullptr)
+                if (!seat.empty() && skyenv::Get("SKY_COLLECTION") != nullptr && LauncherEnv("SKY_LAUNCHER_TEST_FAKE_LOCKS") != nullptr)
                 {
                     std::ofstream lock(seat + ".lock");
                     lock << fmt::format("{{ \"game\": \"ssa\", \"pid\": {}, \"since\": \"2026-10-24T10:15:00Z\" }}\n", (long long)getppid());
@@ -486,7 +487,7 @@ namespace launcher_ui
         }
         case 13: // the game quit; deleting a figure from its sheet: back to the shelf, on the next figure
             for (const std::string& seat : m_model.seats)
-                if (!seat.empty() && getenv("SSA_COLLECTION") != nullptr)
+                if (!seat.empty() && skyenv::Get("SKY_COLLECTION") != nullptr)
                     collection::BreakLock(seat);
             Reload();
             OpenFigure(figureOf(19));
@@ -499,7 +500,7 @@ namespace launcher_ui
             for (const Figure& figure : m_model.figures)
                 if (figure.type == 9 && figure.level == figures::MaxLevelGiants)
                     eruptor = figure.path;
-            TestSetSeats({ eruptor, figureOf(14), "" }); // the test's two games share SSA_SAVE_DIR, so one session file
+            TestSetSeats({ eruptor, figureOf(14), "" }); // the test's two games share SKY_SAVE_DIR, so one session file
             break;
         }
         case 15: // Giants: a figure at level 15 with a hat, its sheet and its Edit (the hat picker)

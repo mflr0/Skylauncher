@@ -3,6 +3,7 @@
 // real default.xex alone): the wrong-disc button, the copy through its states, playing with no disc image (App::TestCopyScript).
 // The real discs are read only; every copy goes to a scratch folder.
 #include "launcher/game_copy.h"
+#include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_app.h"
@@ -224,26 +225,26 @@ namespace
         SetEnv("SDL_VIDEO_DRIVER", "offscreen");
         SetEnv("SDL_AUDIO_DRIVER", "dummy");
         SetEnv("SKYLANDERS_DATA", (scratch / "window-data").string());
-        SetEnv("SKYLAUNCHER_DATA", (scratch / "window-launcher-data").string());
-        SetEnv("SSA_COLLECTION", (scratch / "window-collection").string());
-        SetEnv("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
+        SetEnv("SKY_LAUNCHER_DATA", (scratch / "window-launcher-data").string());
+        SetEnv("SKY_COLLECTION", (scratch / "window-collection").string());
+        SetEnv("SKY_LAUNCHER_NO_UPDATE_CHECK", "1");
         SetEnv("FAKE_SSABUILD_DELAY", "0.01");
         UnsetEnv("FAKE_SSABUILD_FAIL");
         UnsetEnv("FAKE_SSABUILD_HOLD");
         // The other window checks leave their switches set (the first script that matches runs): only this one may be.
         for (const char* other : { "SWITCH", "SIDEBAR", "INSTALL", "UPDATE", "NAV", "COLLECTION", "SEATX", "BUTTONS", "DROP" })
-            UnsetEnv((std::string("SSA_LAUNCHER_TEST_") + other).c_str());
+            UnsetEnv((std::string("SKY_LAUNCHER_TEST_") + other).c_str());
         if (!UnderScratch(scratch, gamedata::Folder("ssa")) || !UnderScratch(scratch, datadir::Root()) || !UnderScratch(scratch, LauncherDataFolder()))
         {
             g_failures++;
             return;
         }
-        SetEnv("SSA_LAUNCHER_SHOTS", (scratch / "shots").string());
-        SetEnv("SSA_LAUNCHER_TEST_COPY", "1");
+        SetEnv("SKY_LAUNCHER_SHOTS", (scratch / "shots").string());
+        SetEnv("SKY_LAUNCHER_TEST_COPY", "1");
         if (!giantsIso.empty())
-            SetEnv("SKYLAUNCHER_TEST_COPY_GIANTS_ISO", giantsIso);
+            SetEnv("SKY_LAUNCHER_TEST_COPY_GIANTS_ISO", giantsIso);
         std::string ini = (scratch / "copy.ini").string();
-        SetEnv("SSA_LAUNCHER_INI", ini);
+        SetEnv("SKY_LAUNCHER_INI", ini);
         LauncherConfig config;
         config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
         config["giants"]["iso"] = standIn.string(); // the wrong disc for Giants
@@ -253,14 +254,14 @@ namespace
             EXPECT(app.TestFailures() == 0);
         }
         EXPECT(config["ssa"]["iso"] == standIn.string() && config["giants"]["iso"] == giantsIso); // SSA got the disc Giants was given
-        UnsetEnv("SSA_LAUNCHER_TEST_COPY");
-        UnsetEnv("SKYLAUNCHER_TEST_COPY_GIANTS_ISO");
+        UnsetEnv("SKY_LAUNCHER_TEST_COPY");
+        UnsetEnv("SKY_LAUNCHER_TEST_COPY_GIANTS_ISO");
         SetActiveGame("ssa");
         printf("Copy and wrong-disc button in the window: %s\n", g_failures == 0 ? "ok" : "FAILED");
     }
 }
 
-// SKYLAUNCHER_TEST_COPY_REAL=1 (with SKYLANDERS_DATA on a scratch folder): copies the whole real discs the way the launcher does, checks
+// SKY_LAUNCHER_TEST_COPY_REAL=1 (with SKYLANDERS_DATA on a scratch folder): copies the whole real discs the way the launcher does, checks
 // them, and leaves them there for a game run with no disc image (docs/launcher_ui.md "Game data").
 static void RealCopyChecks(const std::string& ssaIso, const std::string& giantsIso)
 {
@@ -293,7 +294,7 @@ static void RealCopyChecks(const std::string& ssaIso, const std::string& giantsI
 
 int CopyChecks(const fs::path& scratch, const std::string& ssaIso, const std::string& giantsIso)
 {
-    if (SDL_getenv("SKYLAUNCHER_TEST_COPY_REAL") != nullptr)
+    if (LauncherEnv("SKY_LAUNCHER_TEST_COPY_REAL") != nullptr)
     {
         g_failures = 0;
         RealCopyChecks(ssaIso, giantsIso);

@@ -2,6 +2,7 @@
 // launcher's widgets. The collection's pages are in collection_page.cpp; the class is declared in launcher_app.h.
 // Every choice is written to launcher.ini, which the game runtime reads (docs/settings.md lists the keys).
 #include "launcher/ui/launcher_ui.h"
+#include "launcher/env.h"
 #include "launcher/install_checklist.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/collection/datadir.h"
@@ -43,7 +44,7 @@ namespace launcher_ui
             constexpr const char* ChooseDisc = N_("Choose disc");
             constexpr const char* PlayWith = N_("PLAY WITH");
             constexpr const char* DiscGone = N_("The disc image isn't there. Choose it again.");
-            constexpr const char* LauncherLanguageHint = N_("Skylauncher's own language. \"Same as the game\" follows its text language.");
+            constexpr const char* LauncherLanguageHint = N_("Arkeyan Launcher's own language. \"Same as the game\" follows its text language.");
             constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds, shared by all games.");
             constexpr const char* GameSettings = N_("Game settings");
             constexpr const char* ResetKeys = N_("Reset to defaults");
@@ -261,7 +262,7 @@ namespace launcher_ui
     bool App::LoadFonts()
     {
         std::vector<std::string> directories;
-        if (const char* directory = SDL_getenv("SSA_LAUNCHER_FONT_DIR"))
+        if (const char* directory = LauncherEnv("SKY_LAUNCHER_FONT_DIR"))
             directories.emplace_back(directory);
         if (const char* base = SDL_GetBasePath())
         {
@@ -310,7 +311,7 @@ namespace launcher_ui
         if (ParseBool(SettingGet(m_config, "launcher", "fullscreen")))
             flags |= SDL_WINDOW_FULLSCREEN;
         SDL_PropertiesID properties = SDL_CreateProperties();
-        SDL_SetStringProperty(properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Skylauncher");
+        SDL_SetStringProperty(properties, SDL_PROP_WINDOW_CREATE_TITLE_STRING, "Arkeyan Launcher");
         SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, int(WindowW));
         SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, int(WindowH));
         SDL_SetNumberProperty(properties, SDL_PROP_WINDOW_CREATE_FLAGS_NUMBER, Sint64(flags));
@@ -358,26 +359,26 @@ namespace launcher_ui
         for (int i = 0; i < 140; i++)
             m_stars.push_back(ImVec4(SDL_randf(), SDL_randf(), 0.6f + 1.4f * SDL_randf(), 6.28f * SDL_randf()));
 
-        if (const char* shots = SDL_getenv("SSA_LAUNCHER_SHOTS"))
+        if (const char* shots = LauncherEnv("SKY_LAUNCHER_SHOTS"))
         {
             m_shots = shots;
             std::error_code error;
             std::filesystem::create_directories(m_shots, error);
-            if (const char* drop = SDL_getenv("SSA_LAUNCHER_TEST_DROP"))
+            if (const char* drop = LauncherEnv("SKY_LAUNCHER_TEST_DROP"))
                 m_testDrop = drop;
-            m_testInstall = SDL_getenv("SSA_LAUNCHER_TEST_INSTALL") != nullptr;
-            m_testReal = m_testInstall && std::string_view(SDL_getenv("SSA_LAUNCHER_TEST_INSTALL")) == "real";
-            m_testUpdate = SDL_getenv("SSA_LAUNCHER_TEST_UPDATE") != nullptr;
-            m_testCollection = SDL_getenv("SSA_LAUNCHER_TEST_COLLECTION") != nullptr;
-            m_testNav = SDL_getenv("SSA_LAUNCHER_TEST_NAV") != nullptr;
-            m_testSwitch = SDL_getenv("SSA_LAUNCHER_TEST_SWITCH") != nullptr;
-            m_testSidebar = SDL_getenv("SSA_LAUNCHER_TEST_SIDEBAR") != nullptr;
-            if (const char* kit = SDL_getenv("SSA_LAUNCHER_TEST_KIT"))
+            m_testInstall = LauncherEnv("SKY_LAUNCHER_TEST_INSTALL") != nullptr;
+            m_testReal = m_testInstall && std::string_view(LauncherEnv("SKY_LAUNCHER_TEST_INSTALL")) == "real";
+            m_testUpdate = LauncherEnv("SKY_LAUNCHER_TEST_UPDATE") != nullptr;
+            m_testCollection = LauncherEnv("SKY_LAUNCHER_TEST_COLLECTION") != nullptr;
+            m_testNav = LauncherEnv("SKY_LAUNCHER_TEST_NAV") != nullptr;
+            m_testSwitch = LauncherEnv("SKY_LAUNCHER_TEST_SWITCH") != nullptr;
+            m_testSidebar = LauncherEnv("SKY_LAUNCHER_TEST_SIDEBAR") != nullptr;
+            if (const char* kit = LauncherEnv("SKY_LAUNCHER_TEST_KIT"))
                 m_testKit = kit;
-            m_testCopy = SDL_getenv("SSA_LAUNCHER_TEST_COPY") != nullptr;
-            m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
-            m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
-            m_testUninstall = SDL_getenv("SSA_LAUNCHER_TEST_UNINSTALL") != nullptr;
+            m_testCopy = LauncherEnv("SKY_LAUNCHER_TEST_COPY") != nullptr;
+            m_testSeatX = LauncherEnv("SKY_LAUNCHER_TEST_SEATX") != nullptr;
+            m_testButtons = LauncherEnv("SKY_LAUNCHER_TEST_BUTTONS") != nullptr;
+            m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -504,7 +505,7 @@ namespace launcher_ui
             m_s->started = true;
             StartGameDisc();
         }
-        if (m_shots.empty() && SDL_getenv("SKYLAUNCHER_NO_UPDATE_CHECK") == nullptr)
+        if (m_shots.empty() && LauncherEnv("SKY_LAUNCHER_NO_UPDATE_CHECK") == nullptr)
         {
             CleanupOldUpdate(LauncherSelf()); // the .old a previous update left
             // At every start (the launcher's release and the games' versions), if the player left it on; offline it is silent.
@@ -668,7 +669,7 @@ namespace launcher_ui
                 w = std::min(w, usable.w);
                 h = std::min(h, usable.h - 40);
             }
-            if (const char* size = SDL_getenv("SSA_LAUNCHER_TEST_SIZE")) // screenshot test: "1024x680", the smallest window
+            if (const char* size = LauncherEnv("SKY_LAUNCHER_TEST_SIZE")) // screenshot test: "1024x680", the smallest window
                 std::sscanf(size, "%dx%d", &w, &h);
             SDL_SetWindowSize(m_window, w, h);
             SDL_DisplayID display = SDL_GetDisplayForWindow(m_window);
@@ -1249,11 +1250,21 @@ namespace launcher_ui
             return pressed;
         };
 
-        // The title is the Home button; the launcher's version sits beside it, small and dim.
+        // The title is the Home button; the launcher's version sits beside it, small and dim. The title is as large as the
+        // column leaves room for next to the version.
         {
             ImVec2 titleAt = ImGui::GetCursorScreenPos();
+            const std::string version = "v" + LauncherVersion();
+            ImGui::PushFont(m_boldFont, VersionSize);
+            ImVec2 versionSize = ImGui::CalcTextSize(version.c_str());
+            ImGui::PopFont();
+            const float room = SidebarW - 2 * 18 - versionSize.x - 8; // the sidebar's padding, then the gap to the version
             ImGui::PushFont(m_titleFont, TitleSize + 4);
-            ImVec2 titleSize = ImGui::CalcTextSize("SKYLAUNCHER");
+            const float wide = ImGui::CalcTextSize("ARKEYAN LAUNCHER").x;
+            ImGui::PopFont();
+            const float titleFontSize = std::min(TitleSize + 4, std::floor((TitleSize + 4) * room / wide));
+            ImGui::PushFont(m_titleFont, titleFontSize);
+            ImVec2 titleSize = ImGui::CalcTextSize("ARKEYAN LAUNCHER");
             ImGui::PopFont();
             if (ImGui::InvisibleButton("##home", titleSize, ImGuiButtonFlags_EnableNav))
                 GoTo(Page::Home);
@@ -1262,10 +1273,8 @@ namespace launcher_ui
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
             FocusRing(RadiusSmall);
             ImGui::SetCursorScreenPos(titleAt);
-            Title("SKYLAUNCHER", TitleSize + 4, hovered ? 0xFFFFFF : SidebarInk);
-            std::string version = "v" + LauncherVersion();
+            Title("ARKEYAN LAUNCHER", titleFontSize, hovered ? 0xFFFFFF : SidebarInk);
             ImGui::PushFont(m_boldFont, VersionSize);
-            ImVec2 versionSize = ImGui::CalcTextSize(version.c_str());
             draw->AddText(ImVec2(titleAt.x + titleSize.x + 8, titleAt.y + titleSize.y - versionSize.y - 3), Rgb(TextDim, 200), version.c_str());
             ImGui::PopFont();
         }
@@ -1421,7 +1430,7 @@ namespace launcher_ui
         ImGui::PopStyleColor();
     }
 
-    // The launcher's menu, opened by the SKYLAUNCHER title: the games as a library (a card each, with its art from the
+    // The launcher's menu, opened by the ARKEYAN LAUNCHER title: the games as a library (a card each, with its art from the
     // player's disc), the games still to come under them, the project's links bottom right.
     void App::DrawHome()
     {
@@ -1547,7 +1556,7 @@ namespace launcher_ui
         if (hovered)
         {
             ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ImGui::SetTooltip("%s", Tr("Skylauncher on GitHub"));
+            ImGui::SetTooltip("%s", Tr("Arkeyan Launcher on GitHub"));
         }
         if (m_github != nullptr)
             ImGui::GetWindowDrawList()->AddImage(Ref(m_github), iconAt, ImVec2(iconAt.x + Icon, iconAt.y + Icon), ImVec2(0, 0), ImVec2(1, 1),
@@ -1641,8 +1650,11 @@ namespace launcher_ui
                     const GameUpdate* pending = PendingUpdate(*m_s);
                     std::string size = Tr("no download");
                     if (KitNeedsFetch(*m_s))
-                        if (const ReleaseAsset* asset = FindAsset(m_updates.Snapshot().kit, KitAssetName()); asset != nullptr && asset->size > 0)
+                    {
+                        const ReleaseInfo kit = m_updates.Snapshot().kit;
+                        if (const ReleaseAsset* asset = FindAsset(kit, KitAssetIn(kit)); asset != nullptr && asset->size > 0)
                             size = Tf("{} download", LauncherFormatSize(asset->size));
+                    }
                     ImGui::PushTextWrapPos(available.x - 40); // window coordinates
                     ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
                     ImGui::TextWrapped("%s", (m_s->installed.gameVersion.empty()
@@ -1999,7 +2011,7 @@ namespace launcher_ui
         Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("For Skylauncher and all games."));
+        ImGui::TextUnformatted(Tr("For Arkeyan Launcher and all games."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
@@ -2069,12 +2081,12 @@ namespace launcher_ui
         }
     }
 
-    // The language of the launcher's text: SKYLAUNCHER_LANGUAGE (tests, screenshots), else [launcher] language: "game" follows
+    // The language of the launcher's text: SKY_LAUNCHER_LANGUAGE (tests, screenshots), else [launcher] language: "game" follows
     // the shown game's text language, a code is that language, and nothing (the default) is the system's.
     void App::UpdateLanguage()
     {
         static const std::vector<std::string> system = SystemLanguages();
-        const char* forced = SDL_getenv("SKYLAUNCHER_LANGUAGE");
+        const char* forced = LauncherEnv("SKY_LAUNCHER_LANGUAGE");
         std::string setting = forced != nullptr && *forced != 0 ? forced : SettingGet(m_config, "launcher", "language");
         std::string gameLanguage = SettingGet(m_config, m_s->game.id, "language");
         i18n::SetLanguage(i18n::Resolve(setting, gameLanguage.empty() ? "en" : gameLanguage, system));
@@ -2386,7 +2398,7 @@ namespace launcher_ui
         { "ready", "Ready to play", "PLAY", [](GameSlot&) {} },
     };
 
-    // The kit follows the launcher (SSA_LAUNCHER_TEST_KIT, with SKYLAUNCHER_BASE_PATH holding an old kit and SKYLAUNCHER_UPDATE_URL a
+    // The kit follows the launcher (SKY_LAUNCHER_TEST_KIT, with SKY_LAUNCHER_BASE_PATH holding an old kit and SKY_LAUNCHER_UPDATE_URL a
     // fake release of the launcher's own tag, its kit asset being the fake kit "kit-new"; both games' iso= for "old" and "giants"):
     //  old       INSTALL with a kit next to the launcher from an older release: the kit of the launcher's release is fetched
     //            first, and it is the one that builds the game;
@@ -2459,8 +2471,8 @@ namespace launcher_ui
         }
     }
 
-    // The game updates (SSA_LAUNCHER_TEST_KIT=updates, SKYLAUNCHER_BASE_PATH holding a kit that builds both games at SSA 0.9.0 and
-    // Giants 0.8.0, SKYLAUNCHER_UPDATE_URL a fake release whose games.json bumps Giants to 0.8.1 only, its kit being "kit-new"):
+    // The game updates (SKY_LAUNCHER_TEST_KIT=updates, SKY_LAUNCHER_BASE_PATH holding a kit that builds both games at SSA 0.9.0 and
+    // Giants 0.8.0, SKY_LAUNCHER_UPDATE_URL a fake release whose games.json bumps Giants to 0.8.1 only, its kit being "kit-new"):
     // both games built from the kit at hand, then the check as made at every start: SSA stays PLAY, Giants shows UPDATE, nothing
     // is downloaded meanwhile, "Play without updating" gives PLAY back, UPDATE fetches the kit and rebuilds Giants only.
     // "offline" has no release to reach: the check fails without a word.
@@ -2600,7 +2612,7 @@ namespace launcher_ui
         }
     }
 
-    // The sidebar's line through an install and an update (SSA_LAUNCHER_TEST_SIDEBAR, with a [launcher] kit= that is the fake
+    // The sidebar's line through an install and an update (SKY_LAUNCHER_TEST_SIDEBAR, with a [launcher] kit= that is the fake
     // kit and both games' iso=): Spyro's Adventure ready, installing at 0, 50 and 100 %, Giants shown meanwhile (the other
     // game's line), ready, an update available, updating at 0, 50 and 100 %, then a build that fails. Each shot "<nn>-<state>"
     // is checked against the line the sidebar draws (m_testFailures).
@@ -2791,7 +2803,7 @@ namespace launcher_ui
         }
     }
 
-    // Keyboard and pad navigation (SSA_LAUNCHER_TEST_NAV): keys go to ImGui as a player's would, a shot after each group.
+    // Keyboard and pad navigation (SKY_LAUNCHER_TEST_NAV): keys go to ImGui as a player's would, a shot after each group.
     // Switching games in place: both games' discs are checked and their builds made (the fake kit) while the window
     // stays, the state of each is kept, and PLAY returns the shown game and its own build.
     void App::TestSwitchScript(uint64_t now)
@@ -3021,7 +3033,7 @@ namespace launcher_ui
         m_testAt = now + (holding ? 1500 : 600);
     }
 
-    // The action button's states (SSA_LAUNCHER_TEST_BUTTONS, with a [launcher] kit= that is the fake kit and both games'
+    // The action button's states (SKY_LAUNCHER_TEST_BUTTONS, with a [launcher] kit= that is the fake kit and both games'
     // iso=): for each game INSTALL, under the pointer, pressed, focused, the settings under the
     // pointer, disabled, installing, then PLAY and PLAY under the pointer; then each game in the smallest window, at 150 %
     // and at 200 %. Shots "<game>-<step>-<state>".
@@ -3175,7 +3187,7 @@ namespace launcher_ui
         }
         if (m_testCollection)
         {
-            // The collection's screens, in the scratch collection SSA_COLLECTION names.
+            // The collection's screens, in the scratch collection SKY_COLLECTION names.
             if (m_testStep >= CollectionPage::TestShotCount())
                 m_running = false;
             else

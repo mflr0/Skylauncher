@@ -55,14 +55,22 @@ struct GameUpdate
 bool ParseGamesManifest(const std::string& json, std::vector<GameUpdate>& games, std::string* error = nullptr);
 inline constexpr char GamesManifestName[] = "games.json";
 
-// The release asset for this OS: Skylauncher.exe, Skylauncher-macOS.zip, Skylauncher-x86_64.AppImage.
+// The release asset for this OS: ArkeyanLauncher.exe, ArkeyanLauncher-macOS.zip, ArkeyanLauncher-x86_64.AppImage.
 std::string LauncherAssetName();
-// The kit's: ssa-kit-windows-x64.zip, ssa-kit-macos-arm64.zip, ssa-kit-linux-x64.zip.
+// The names of releases before 0.6.0 (Skylauncher.exe, Skylauncher-macOS.zip, Skylauncher-x86_64.AppImage), still published
+// next to the new ones so that an older launcher can update itself.
+std::string OldLauncherAssetName();
+// The asset of `release` to download: the new name, else the old one (the new one when the release has neither).
+std::string LauncherAssetIn(const ReleaseInfo& release);
+// The kit's: skylanders-kit-windows-x64.zip, skylanders-kit-macos-arm64.zip, skylanders-kit-linux-x64.zip, and the older
+// ssa-kit-<platform>.zip (same file) of releases before 0.6.0.
 std::string KitAssetName();
+std::string OldKitAssetName();
+std::string KitAssetIn(const ReleaseInfo& release);
 
 // ---- Pieces (synchronous, tested on their own) ------------------------------------------------------------------------
 
-// Where the latest release of "owner/name" is told; SKYLAUNCHER_UPDATE_URL replaces it (tests, mirrors).
+// Where the latest release of "owner/name" is told; SKY_LAUNCHER_UPDATE_URL replaces it (tests, mirrors).
 std::string LatestReleaseUrl(const std::string& repo);
 
 struct HttpResult
@@ -91,14 +99,14 @@ bool ExtractZip(const std::filesystem::path& zip, const std::filesystem::path& f
 // (Linux, $APPIMAGE). Empty when none applies (a build run from a build folder): updates then open the release page.
 std::filesystem::path LauncherSelf();
 
-// Installs the kit zip over `kitFolder` (the folder holding SSABuild; created when there is none): extracted next to it,
+// Installs the kit zip over `kitFolder` (the folder holding SkyBuild or SSABuild; created when there is none): extracted next to it,
 // then swapped in with ReplaceInPlace, so a failure leaves the old kit.
 bool InstallKitZip(const std::filesystem::path& zip, const std::filesystem::path& kitFolder, std::string& error);
 
 // Where the kit of release `tag` goes: kitRoot/<tag>.
 std::filesystem::path KitFolderFor(const std::filesystem::path& kitRoot, const std::string& tag);
 
-// The release tagged `tag` of "owner/name"; with SKYLAUNCHER_UPDATE_URL set, "<tag>.json" next to that file.
+// The release tagged `tag` of "owner/name"; with SKY_LAUNCHER_UPDATE_URL set, "<tag>.json" next to that file.
 std::string TaggedReleaseUrl(const std::string& repo, const std::string& tag);
 
 // Downloads the kit for this OS into `kitRoot`/<release tag>/: from the release tagged `tag` (v<launcher version>), else
@@ -157,7 +165,7 @@ public:
         float progress = -1;            // 0..1 while downloading, -1 when unknown
         std::string error;              // why Failed
         bool restartNeeded = false;     // the launcher was replaced: restart to use it
-        std::string note;               // e.g. "The installer was opened: drag Skylauncher to Applications."
+        std::string note;               // e.g. "The installer was opened: drag Arkeyan Launcher to Applications."
     };
 
     ~UpdateManager() { Cancel(); Join(); }

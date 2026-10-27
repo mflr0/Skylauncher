@@ -1,9 +1,10 @@
-// SkylauncherTest's checks for "Uninstall everything" (launcher/uninstall.h): the plan (a dry run), what the run removes and
+// ArkeyanLauncherTest's checks for "Uninstall everything" (launcher/uninstall.h): the plan (a dry run), what the run removes and
 // keeps, the refusals, the launcher's own removal on every system's rules, and the helper that runs after the launcher quits.
 // Scratch trees only: nothing here names the real data folders, the real Desktop, the real Trash, the real figures or the
 // running launcher. The launcher to remove is always a dummy file or bundle made in the scratch folder.
 // Called from launcher_test.cpp's main; returns the number of failures.
 #include "launcher/uninstall.h"
+#include "launcher/env.h"
 #include "launcher/launcher.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -209,7 +210,7 @@ namespace
             here.home = home;
         if (const char* appdata = SDL_getenv("APPDATA"))
             here.appData = appdata;
-        UN_EXPECT(DefaultRoot(CurrentOs(), here) == ThisMachine({}).root || SDL_getenv("SKYLAUNCHER_DATA") != nullptr);
+        UN_EXPECT(DefaultRoot(CurrentOs(), here) == ThisMachine({}).root || LauncherEnv("SKY_LAUNCHER_DATA") != nullptr);
         for (const auto& [name, value] : saved)
             SDL_setenv_unsafe(name.c_str(), value.c_str(), 1), SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name.c_str(), value.c_str(), true);
     }
@@ -428,7 +429,7 @@ namespace
             RunUninstall(plan, moved.env, true);
             UN_EXPECT(Listing(away) == awayBefore);
         }
-        // Saves kept outside the data folder (SSA_SAVE_DIR): not ours to remove.
+        // Saves kept outside the data folder (SKY_SAVE_DIR): not ours to remove.
         {
             Tree odd = MakeTree(base / "refuse-saves", Os::Linux);
             odd.env.games[0].saves = odd.outside / "my-saves";
@@ -639,16 +640,16 @@ namespace
         const char* oldData = SDL_getenv("SKYLANDERS_DATA");
         const std::string saved = oldData != nullptr ? oldData : std::string();
         set("SKYLANDERS_DATA", data.string());
-        set("SKYLAUNCHER_UNINSTALL_SELF", "");
-        set("SKYLAUNCHER_UNINSTALL_TRASH", "");
+        set("SKY_LAUNCHER_UNINSTALL_SELF", "");
+        set("SKY_LAUNCHER_UNINSTALL_TRASH", "");
         UN_EXPECT(ScratchRun());
         UN_EXPECT(ThisMachine({}).launcherSelf.empty());
         const fs::path dummy = base / "machine" / "Skylauncher.app";
         Put(dummy / "Contents" / "MacOS" / "Skylauncher", 10);
-        set("SKYLAUNCHER_UNINSTALL_SELF", dummy.string());
+        set("SKY_LAUNCHER_UNINSTALL_SELF", dummy.string());
         Environment env = ThisMachine({});
         UN_EXPECT(env.os != Os::MacOS || env.launcherSelf.empty()); // macOS: no Trash named, so no launcher
-        set("SKYLAUNCHER_UNINSTALL_TRASH", (base / "machine" / "Trash").string());
+        set("SKY_LAUNCHER_UNINSTALL_TRASH", (base / "machine" / "Trash").string());
         env = ThisMachine({});
         UN_EXPECT(env.launcherSelf == dummy && env.trash == base / "machine" / "Trash");
         UN_EXPECT(env.root == data && !env.games.empty());
@@ -659,8 +660,8 @@ namespace
                      "/.local/share/Skylanders", "/.Trash" })
                 for (const fs::path& path : { env.root, env.launcherData, env.settingsFile, env.collection, env.trash })
                     UN_EXPECT(path.string().rfind(home + real, 0) != 0);
-        set("SKYLAUNCHER_UNINSTALL_SELF", "");
-        set("SKYLAUNCHER_UNINSTALL_TRASH", "");
+        set("SKY_LAUNCHER_UNINSTALL_SELF", "");
+        set("SKY_LAUNCHER_UNINSTALL_TRASH", "");
         set("SKYLANDERS_DATA", saved);
         printf("Uninstall on this machine: scratch variables keep the launcher, the Trash and the real folders out of it\n");
     }

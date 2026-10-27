@@ -1,4 +1,5 @@
 #include "launcher/shortcut.h"
+#include "launcher/env.h"
 #include "launcher/i18n.h"
 #include "shared/collection/datadir.h"
 #include <SDL3/SDL.h>
@@ -135,7 +136,7 @@ std::string DesktopExecQuote(std::string_view text)
 
 std::string MacLaunchScript(const fs::path& launcher, std::string_view gameId)
 {
-    return "#!/bin/sh\n# Opens Skylauncher on this game and starts it. Made by Skylauncher (Game settings).\nexec " +
+    return "#!/bin/sh\n# Opens Arkeyan Launcher on this game and starts it. Made by Arkeyan Launcher (Game settings).\nexec " +
         ShellQuote(datadir::Text(launcher)) + " " + ShortcutArguments(gameId) + "\n";
 }
 
@@ -176,7 +177,7 @@ std::vector<uint8_t> MacIcns(const std::vector<uint8_t>& png)
 std::string LinuxDesktopEntry(std::string_view gameName, const fs::path& launcher, std::string_view gameId, const fs::path& icon)
 {
     std::string text = "[Desktop Entry]\nType=Application\nVersion=1.0\nName=" + std::string(gameName) + "\nComment=" +
-        Tf("Play {} with Skylauncher", gameName) + "\nExec=" + DesktopExecQuote(datadir::Text(launcher)) + " " + ShortcutArguments(gameId) + "\n";
+        Tf("Play {} with Arkeyan Launcher", gameName) + "\nExec=" + DesktopExecQuote(datadir::Text(launcher)) + " " + ShortcutArguments(gameId) + "\n";
     if (!icon.empty())
         text += "Icon=" + datadir::Text(icon) + "\n";
     return text + "Terminal=false\nCategories=Game;\n";
@@ -205,7 +206,7 @@ std::vector<uint8_t> WindowsIco(const std::vector<uint8_t>& png)
 
 fs::path DesktopFolder()
 {
-    if (const char* folder = SDL_getenv("SKYLAUNCHER_DESKTOP"); folder != nullptr && *folder != 0)
+    if (const char* folder = LauncherEnv("SKY_LAUNCHER_DESKTOP"); folder != nullptr && *folder != 0)
         return datadir::FromText(folder);
     if (const char* folder = SDL_GetUserFolder(SDL_FOLDER_DESKTOP))
         return datadir::FromText(folder);
@@ -214,7 +215,7 @@ fs::path DesktopFolder()
 
 fs::path SelfExecutable()
 {
-    if (const char* exe = SDL_getenv("SKYLAUNCHER_EXE"); exe != nullptr && *exe != 0)
+    if (const char* exe = LauncherEnv("SKY_LAUNCHER_EXE"); exe != nullptr && *exe != 0)
         return datadir::FromText(exe);
 #if defined(__APPLE__)
     char buffer[PATH_MAX];
@@ -328,12 +329,67 @@ namespace
 }
 #endif
 
+namespace
+{
+    std::string ReadText(const fs::path& path)
+    {
+        std::ifstream file(path, std::ios::binary);
+        return std::string(std::istreambuf_iterator<char>(file), {});
+    }
+
+    // The value of the first "<key>=" line of a .desktop file.
+    std::string DesktopValue(const std::string& text, const std::string& key)
+    {
+        size_t at = text.find("\n" + key + "=");
+        if (at == std::string::npos)
+            return {};
+        size_t begin = at + key.size() + 2;
+        return text.substr(begin, text.find('\n', begin) - begin);
+    }
+}
+
+int RefreshShortcuts(const fs::path& folder, const std::vector<std::pair<std::string, std::string>>& games, const fs::path& launcher)
+{
+    if (folder.empty() || launcher.empty())
+        return 0;
+    int rewritten = 0;
+    std::error_code error;
+    for (const auto& [id, name] : games)
+    {
+        const std::string arguments = ShortcutArguments(id);
+        // Ours: it starts this game the way the launcher writes it. Old: it still says Skylauncher.
+        auto old = [&](const std::string& text) { return text.find(arguments) != std::string::npos && text.find("Skylauncher") != std::string::npos; };
+        // macOS: the script of the small app.
+        fs::path script = folder / (ShortcutFileName(name) + ".app") / "Contents" / "MacOS" / "launch";
+        if (fs::is_regular_file(script, error) && !fs::is_symlink(script, error))
+        {
+            std::string text = ReadText(script), fresh = MacLaunchScript(launcher, id);
+            if (old(text) && text != fresh && WriteText(script, fresh))
+                rewritten++;
+        }
+        // Linux: the .desktop file, its icon kept.
+        std::string lower = ShortcutFileName(name);
+        for (char& c : lower)
+            c = c == ' ' ? '-' : char(std::tolower(static_cast<unsigned char>(c)));
+        fs::path desktop = folder / (lower + ".desktop");
+        if (fs::is_regular_file(desktop, error) && !fs::is_symlink(desktop, error))
+        {
+            std::string text = ReadText(desktop);
+            std::string fresh = LinuxDesktopEntry(DesktopValue(text, "Name").empty() ? name : DesktopValue(text, "Name"), launcher, id,
+                datadir::FromText(DesktopValue(text, "Icon")));
+            if (old(text) && text != fresh && WriteText(desktop, fresh))
+                rewritten++;
+        }
+    }
+    return rewritten;
+}
+
 ShortcutResult CreateDesktopShortcut(const ShortcutSpec& spec)
 {
     if (spec.folder.empty())
         return Fail(Tr("This computer has no Desktop folder."));
     if (spec.launcher.empty())
-        return Fail(Tr("Skylauncher couldn't find its own file."));
+        return Fail(Tr("Arkeyan Launcher couldn't find its own file."));
     std::error_code error;
     fs::create_directories(spec.folder, error);
     if (!fs::is_directory(spec.folder, error))

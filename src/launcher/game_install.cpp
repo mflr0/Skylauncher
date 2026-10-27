@@ -1,4 +1,5 @@
 #include "launcher/game_install.h"
+#include "launcher/env.h"
 #include "launcher/i18n.h"
 #include "launcher/updater.h"
 #include "shared/dir_list.h"
@@ -46,17 +47,24 @@ namespace
         return k == s->second.end() ? std::string() : k->second;
     }
 
+    // The kit's builder: SkyBuild, or SSABuild in a kit made for 0.4.x launchers.
 #if defined(_WIN32)
-    constexpr char SsaBuildName[] = "SSABuild.exe";
+    constexpr const char* BuilderNames[] = { "SkyBuild.exe", "SSABuild.exe" };
 #else
-    constexpr char SsaBuildName[] = "SSABuild";
+    constexpr const char* BuilderNames[] = { "SkyBuild", "SSABuild" };
 #endif
 
     std::optional<InstallKit> KitIn(const std::filesystem::path& folder)
     {
         std::error_code error;
-        std::filesystem::path ssabuild = folder / SsaBuildName;
-        if (!std::filesystem::is_regular_file(ssabuild, error))
+        std::filesystem::path ssabuild;
+        for (const char* name : BuilderNames)
+            if (std::filesystem::is_regular_file(folder / name, error))
+            {
+                ssabuild = folder / name;
+                break;
+            }
+        if (ssabuild.empty())
             return {};
         InstallKit kit{ folder, ssabuild, {}, {} };
         // kit.txt: "key=value" lines; "build" changes with every kit made, "version" with releases.
@@ -109,7 +117,7 @@ namespace
 
 std::filesystem::path LauncherDataFolder()
 {
-    if (const char* folder = SDL_getenv("SKYLAUNCHER_DATA"); folder != nullptr && *folder != 0)
+    if (const char* folder = LauncherEnv("SKY_LAUNCHER_DATA"); folder != nullptr && *folder != 0)
         return Path(folder);
     return datadir::Root();
 }
@@ -141,12 +149,12 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::stri
             kit->chosen = true;
         return kit;
     };
-    if (const char* path = SDL_getenv("SKYLAUNCHER_KIT"); path != nullptr && *path != 0)
+    if (const char* path = LauncherEnv("SKY_LAUNCHER_KIT"); path != nullptr && *path != 0)
         return chosen(KitIn(Path(path)));
     if (std::string path = Setting(config, "launcher", "kit"); !path.empty())
         return chosen(KitIn(Path(path)));
 
-    // The kits Skylauncher downloaded (kit/<release tag>/): the newest release.
+    // The kits Arkeyan Launcher downloaded (kit/<release tag>/): the newest release.
     std::optional<InstallKit> best;
     SemVer bestTag;
     std::error_code error;
@@ -165,7 +173,7 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::stri
 
     // A kit next to the launcher is used unless a downloaded one comes from a newer release (a stale kit left there).
     auto nextToLauncher = [&]() -> std::optional<InstallKit> {
-        const char* base = SDL_getenv("SKYLAUNCHER_BASE_PATH"); // tests: the folder the launcher "is in"
+        const char* base = LauncherEnv("SKY_LAUNCHER_BASE_PATH"); // tests: the folder the launcher "is in"
         if (base == nullptr || *base == 0)
             base = SDL_GetBasePath();
         if (base == nullptr)
@@ -180,12 +188,12 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::stri
 
         for (const std::filesystem::path& folder : folders)
         {
-            for (const char* name : { "ssa-kit", "kit" })
+            for (const char* name : { "skylanders-kit", "ssa-kit", "kit" })
                 if (auto kit = KitIn(folder / name))
                     return kit;
             std::error_code error;
             for (const auto& entry : ListDirectory(folder, error))
-                if (entry.is_directory(error) && Utf8(entry.path().filename()).starts_with("ssa-kit"))
+                if (entry.is_directory(error) && (Utf8(entry.path().filename()).starts_with("skylanders-kit") || Utf8(entry.path().filename()).starts_with("ssa-kit")))
                     if (auto kit = KitIn(entry.path()))
                         return kit;
         }
@@ -201,7 +209,7 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::stri
 std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly)
 {
     std::vector<std::filesystem::path> candidates;
-    if (const char* path = SDL_getenv("SKYLAUNCHER_RUNTIME"))
+    if (const char* path = LauncherEnv("SKY_LAUNCHER_RUNTIME"))
         candidates.push_back(Path(path));
     if (!overrideOnly)
     {
@@ -419,7 +427,7 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     };
 
     if (!kit)
-        return fail(Tr("Game kit not found. Put the ssa-kit folder next to Skylauncher, then press Retry."));
+        return fail(Tr("Game kit not found. Put the skylanders-kit folder next to Arkeyan Launcher, then press Retry."));
     std::error_code error;
     std::filesystem::create_directories(out, error);
     if (error)
@@ -432,7 +440,7 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
 
     std::string program = Utf8(kit->ssabuild), outText = Utf8(out), kitText = Utf8(kit->folder);
     std::vector<const char*> arguments{ program.c_str(), "--iso", iso.c_str(), "--out", outText.c_str(), "--kit", kitText.c_str() };
-    const char* jobs = SDL_getenv("SKYLAUNCHER_BUILD_JOBS"); // else SSABuild picks
+    const char* jobs = LauncherEnv("SKY_LAUNCHER_BUILD_JOBS"); // else SSABuild picks
     if (jobs != nullptr && *jobs != 0)
         arguments.insert(arguments.end(), { "--jobs", jobs });
 #if defined(_WIN32)
@@ -441,7 +449,10 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
     arguments.insert(arguments.end(), { "--toolchain", toolchainText.c_str() });
 #endif
     arguments.push_back(nullptr);
+    SDL_Environment* environment = CreateGameEnvironment(); // a builder of an older kit reads the SSA_ names, a newer one the SKY_ names
     SDL_PropertiesID properties = SDL_CreateProperties();
+    if (environment != nullptr)
+        SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, environment);
     SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, arguments.data());
     SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
     SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_APP);
@@ -453,6 +464,8 @@ bool GameInstaller::Start(const std::optional<InstallKit>& kit, const std::strin
 #endif
     m_process = SDL_CreateProcessWithProperties(properties);
     SDL_DestroyProperties(properties);
+    if (environment != nullptr)
+        SDL_DestroyEnvironment(environment);
     if (m_process == nullptr)
         return fail(Tf("Couldn't start the game: {}", SDL_GetError()));
 

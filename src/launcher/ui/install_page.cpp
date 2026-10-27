@@ -1,6 +1,7 @@
 // Installing the game: the INSTALL flow's state (StartInstall, PollInstall, what a launcher restart finds) and the
 // progress card that replaces the logo on Play (docs/install.md).
 #include "launcher/install_checklist.h"
+#include "launcher/env.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/platform/platform.h"
 #include <algorithm>
@@ -507,7 +508,7 @@ namespace launcher_ui
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
             ImGui::PushTextWrapPos(left + width);
             ImGui::TextWrapped("%s", m_s->installPastPid != 0 ? Tr("The earlier install is still stopping. Resume in a moment.")
-                                                           : Tr("Skylauncher closed during the install. Resume carries on."));
+                                                           : Tr("Arkeyan Launcher closed during the install. Resume carries on."));
             ImGui::PopTextWrapPos();
             ImGui::PopStyleColor();
         }
@@ -590,7 +591,7 @@ namespace launcher_ui
         EndCard();
     }
 
-    // The install screens (SSA_LAUNCHER_TEST_INSTALL, with SKYLAUNCHER_KIT set to <build>/fake-kit): the Install button, the
+    // The install screens (SKY_LAUNCHER_TEST_INSTALL, with SKY_LAUNCHER_KIT set to <build>/fake-kit): the Install button, the
     // progress card early and during the compile, with its log, a failure, a retry that succeeds, Game data, and an
     // install read back after a restart.
     void App::TestInstallScript(uint64_t now)
@@ -598,8 +599,8 @@ namespace launcher_ui
         InstallProgress progress = m_s->installer.Snapshot();
         if (m_testReal)
         {
-            // The real kit: INSTALL, then a screenshot every few minutes until it ends (and PLAY with SSA_LAUNCHER_TEST_PLAY).
-            const char* every = SDL_getenv("SSA_LAUNCHER_TEST_EVERY");
+            // The real kit: INSTALL, then a screenshot every few minutes until it ends (and PLAY with SKY_LAUNCHER_TEST_PLAY).
+            const char* every = LauncherEnv("SKY_LAUNCHER_TEST_EVERY");
             uint64_t interval = (every != nullptr ? uint64_t(std::atoi(every)) : 120) * 1000;
             if (m_testStep == 0)
             {
@@ -620,12 +621,12 @@ namespace launcher_ui
             }
             else
             {
-                // SSA_LAUNCHER_TEST_PLAY: then PLAY, as the button does, once the game is built.
-                if (SDL_getenv("SSA_LAUNCHER_TEST_PLAY") != nullptr && m_s->disc == DiscState::Ready && !NeedsInstall())
+                // SKY_LAUNCHER_TEST_PLAY: then PLAY, as the button does, once the game is built.
+                if (LauncherEnv("SKY_LAUNCHER_TEST_PLAY") != nullptr && m_s->disc == DiscState::Ready && !NeedsInstall())
                 {
                     m_s->chosen = m_s->discPath;
                     m_s->chosenRuntime = m_s->installed.runtime;
-                    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_SHOTS"); // else the game runs its own shots
+                    UnsetGameVariable("SKY_LAUNCHER_SHOTS"); // else the game runs its own shots
                 }
                 m_running = false;
             }

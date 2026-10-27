@@ -79,8 +79,8 @@ namespace launcher_ui
                 if (m_updateManual)
                     m_updateDoneNote = !state.checked ? Tf("Couldn't check: {}", state.checkError)
                         : state.launcherNewer          ? Tf("Version {} is available.", state.launcher.tag)
-                        : AnyGameUpdate()              ? Tr("Skylauncher is up to date. A game update is available.")
-                                                       : Tr("Skylauncher is up to date.");
+                        : AnyGameUpdate()              ? Tr("Arkeyan Launcher is up to date. A game update is available.")
+                                                       : Tr("Arkeyan Launcher is up to date.");
             }
         }
     }
@@ -120,14 +120,14 @@ namespace launcher_ui
         enum { None, WhatsNew, UpdateLauncher, Later, Restart, Cancel, Retry, Dismiss };
         if (state.restartNeeded)
         {
-            text = Tf("Skylauncher {} is installed. Restart to use it.", state.launcher.tag);
+            text = Tf("Arkeyan Launcher {} is installed. Restart to use it.", state.launcher.tag);
             buttons = { { Tr("Restart now"), true, 150, Restart } };
         }
         else if (progress)
         {
-            text = state.phase == Phase::Downloading ? Tr("Downloading Skylauncher")
-                : state.phase == Phase::Verifying    ? Tr("Checking Skylauncher")
-                                                     : Tr("Installing Skylauncher");
+            text = state.phase == Phase::Downloading ? Tr("Downloading Arkeyan Launcher")
+                : state.phase == Phase::Verifying    ? Tr("Checking Arkeyan Launcher")
+                                                     : Tr("Installing Arkeyan Launcher");
             barFraction = state.phase == Phase::Downloading ? state.progress : -1;
             if (state.phase == Phase::Downloading)
                 buttons = { { Tr("Cancel"), false, 120, Cancel } };
@@ -218,7 +218,7 @@ namespace launcher_ui
                 m_running = false;
             }
             else
-                Toast(Tr("Couldn't restart: start Skylauncher again"), true);
+                Toast(Tr("Couldn't restart: start Arkeyan Launcher again"), true);
             break;
         }
         }
@@ -301,7 +301,7 @@ namespace launcher_ui
 
     void App::DrawAbout()
     {
-        Title("Skylauncher", HeadlineSize);
+        Title("Arkeyan Launcher", HeadlineSize);
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Version {}, {}", LauncherVersion(), PlatformName()).c_str());
         ImGui::Dummy(ImVec2(0, 6));
         ImGui::TextWrapped("%s", Tr("A launcher for the native PC ports of Skylanders. It has no game code or art: all of it comes from your own disc."));
@@ -328,7 +328,7 @@ namespace launcher_ui
         ImGui::PopFont();
     }
 
-    // The update screens (SSA_LAUNCHER_TEST_UPDATE, SKYLAUNCHER_UPDATE_URL on a fake release): the banner, What's new, About
+    // The update screens (SKY_LAUNCHER_TEST_UPDATE, SKY_LAUNCHER_UPDATE_URL on a fake release): the banner, What's new, About
     // before and after a manual check, and a failure.
     void App::TestUpdateScript(uint64_t now)
     {
@@ -353,14 +353,14 @@ namespace launcher_ui
             m_testAt = now + 500;
             break;
         case 3:
-            m_updateDoneNote = Tr("Skylauncher is up to date.");
+            m_updateDoneNote = Tr("Arkeyan Launcher is up to date.");
             m_testAt = now + 400;
             break;
         case 4:
-            m_updates.UpdateLauncher(); // the fake release has no SHA256SUMS: refused
+            m_updates.UpdateLauncher(); // a fake release without SHA256SUMS: refused; with one, the update is made
             m_updateWasBusy = true;
             m_page = Page::Play;
-            if (m_updates.Snapshot().phase == UpdateManager::Phase::Failed)
+            if (const auto phase = m_updates.Snapshot().phase; phase == UpdateManager::Phase::Failed || phase == UpdateManager::Phase::Done)
                 m_testAt = now + 400;
             break;
         default:

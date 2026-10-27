@@ -1,7 +1,7 @@
 #pragma once
 
 // Per-game settings and a game's data (docs/launcher_ui.md, "Settings", and docs/install.md, "Delete data and uninstall").
-// No UI and no SDL: SkylauncherTest runs these on scratch folders.
+// No UI and no SDL: ArkeyanLauncherTest runs these on scratch folders.
 //
 // Video settings are per game. The runtime reads one [video] section of launcher.ini, so each game keeps its own copy in
 // [<game>.video]: the game's settings page edits that copy, PLAY puts it in [video] for the runtime, and when the game
@@ -27,7 +27,7 @@ void StoreGameVideo(LauncherConfig& config, std::string_view gameId);
 struct GameFolders
 {
     std::filesystem::path game;  // the game's folder
-    std::filesystem::path saves; // its saves (SSA_SAVE_DIR, else <game>/saves); the backups are <saves>-backup
+    std::filesystem::path saves; // its saves (SKY_SAVE_DIR, else <game>/saves); the backups are <saves>-backup
 };
 GameFolders FoldersOf(std::string_view gameId);
 

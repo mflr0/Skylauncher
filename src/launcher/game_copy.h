@@ -2,7 +2,7 @@
 
 // "Copy the game data" as the launcher uses it (docs/launcher_ui.md "Game data", docs/install.md): which source a game plays
 // from, and the copy job that runs on a worker thread. The files, the manifest and the checks are shared/collection/game_data.h.
-// No UI: SkylauncherTest runs these on scratch folders.
+// No UI: ArkeyanLauncherTest runs these on scratch folders.
 #include "launcher/launcher.h"
 #include "shared/collection/game_data.h"
 #include <atomic>

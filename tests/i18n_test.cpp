@@ -1,8 +1,9 @@
-// SkylauncherTest's checks for the launcher's languages: every string the code translates has an entry in every language file
+// ArkeyanLauncherTest's checks for the launcher's languages: every string the code translates has an entry in every language file
 // (the key coverage test), the entries keep their placeholders, no entry is left over, no visible string is written without
 // Tr, and the language is chosen as docs/translations.md says. Reads the source tree (SKYLAUNCHER_SOURCE_DIR). Called from
 // launcher_test.cpp's main; returns the number of failures.
 #include "launcher/i18n.h"
+#include "launcher/env.h"
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -155,7 +156,7 @@ namespace
                     }
                     std::string literal;
                     size_t end = p;
-                    if (!ReadLiterals(text, end, literal) || literal.rfind("##", 0) == 0 || literal == "SKYLAUNCHER" || literal == "Skylauncher" || literal == "%s")
+                    if (!ReadLiterals(text, end, literal) || literal.rfind("##", 0) == 0 || literal == "SKYLAUNCHER" || literal == "Skylauncher" || literal == "Arkeyan Launcher" || literal == "ARKEYAN LAUNCHER" || literal == "%s")
                         continue;
                     bool letters = false;
                     for (char c : literal)
@@ -196,11 +197,11 @@ namespace
         return found;
     }
 
-    // SKYLAUNCHER_TEST_I18N_ALL lists every missing string (a new language starts from that list); SKYLAUNCHER_TEST_I18N_DUMP=<file>
+    // SKY_LAUNCHER_TEST_I18N_ALL lists every missing string (a new language starts from that list); SKY_LAUNCHER_TEST_I18N_DUMP=<file>
     // writes every string of the code in the language files' format, the English with an empty translation.
     void CheckLanguage(const fs::path& file, const std::set<std::string>& keys)
     {
-        const int MaxListed = std::getenv("SKYLAUNCHER_TEST_I18N_ALL") != nullptr ? 100000 : 25;
+        const int MaxListed = skyenv::Get("SKY_LAUNCHER_TEST_I18N_ALL") != nullptr ? 100000 : 25;
         i18n::Catalog catalog;
         std::string name = file.filename().string();
         if (!i18n::ParseCatalog(Read(file), catalog))
@@ -250,7 +251,7 @@ int I18nChecks()
     const std::set<std::string> keys = TranslatedKeys(sources);
     I18N_EXPECT(keys.size() > 300);
     CheckNoRawText(sources);
-    if (const char* dump = std::getenv("SKYLAUNCHER_TEST_I18N_DUMP"))
+    if (const char* dump = skyenv::Get("SKY_LAUNCHER_TEST_I18N_DUMP"))
     {
         std::ofstream out(dump, std::ios::binary | std::ios::trunc);
         for (const std::string& key : keys)

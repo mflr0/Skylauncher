@@ -1,7 +1,7 @@
 #pragma once
 
 // The install card's model: SSABuild's events (InstallProgress) turned into a fixed checklist of steps, one overall
-// fraction and a time left. Pure: the UI draws it, SkylauncherTest checks it.
+// fraction and a time left. Pure: the UI draws it, ArkeyanLauncherTest checks it.
 #include "launcher/game_install.h"
 #include <cstdint>
 #include <string>

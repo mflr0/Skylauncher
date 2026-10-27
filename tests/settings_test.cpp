@@ -1,6 +1,7 @@
-// SkylauncherTest's checks for the settings split: each game's own video settings, the command line, the desktop shortcut
+// ArkeyanLauncherTest's checks for the settings split: each game's own video settings, the command line, the desktop shortcut
 // files of every system, and what delete data and uninstall remove. Scratch folders only: nothing here touches the real
 // data folder or the real Desktop. Called from launcher_test.cpp's main; returns the number of failures.
+#include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/game_settings.h"
 #include "launcher/launcher.h"
@@ -118,6 +119,55 @@ namespace
         printf("Command line: --game, --game=, --play, --help; the rest listed\n");
     }
 
+    // ---- The names of the environment variables ---------------------------------------------------------------------------
+
+    void EnvironmentChecks()
+    {
+        const char* all[] = { "SKY_LAUNCHER_ZZ", "SKYLAUNCHER_ZZ", "SSA_LAUNCHER_ZZ", "SKY_ZZ", "SSA_ZZ", "SKY_YY", "SSA_YY", "SKYLAUNCHER_XX", "SKY_LAUNCHER_XX", "SSA_LAUNCHER_XX",
+            "SKY_LAUNCHER_WW", "SKYLAUNCHER_WW", "SSA_LAUNCHER_WW" };
+        auto clear = [&] { for (const char* name : all) SetEnv(name, ""); };
+        clear();
+        // The launcher reads the new name, then SKYLAUNCHER_, then SSA_LAUNCHER_; a game's variable SKY_ then SSA_.
+        SETTINGS_EXPECT(LauncherEnv("SKY_LAUNCHER_ZZ") == nullptr);
+        SetEnv("SSA_LAUNCHER_ZZ", "c");
+        SETTINGS_EXPECT(std::string(LauncherEnv("SKY_LAUNCHER_ZZ")) == "c");
+        SetEnv("SKYLAUNCHER_ZZ", "b");
+        SETTINGS_EXPECT(std::string(LauncherEnv("SKY_LAUNCHER_ZZ")) == "b");
+        SetEnv("SKY_LAUNCHER_ZZ", "a");
+        SETTINGS_EXPECT(std::string(LauncherEnv("SKY_LAUNCHER_ZZ")) == "a");
+        SetEnv("SSA_ZZ", "game");
+        SETTINGS_EXPECT(std::string(skyenv::Get("SKY_ZZ")) == "game");
+
+        // A game is started with both names of everything set: the older kits read SSA_, the newer ones SKY_. The launcher's own
+        // environment is left as it is.
+        clear();
+        SetEnv("SKY_YY", "new");
+        SetEnv("SSA_ZZ", "old");
+        SetEnv("SKYLAUNCHER_XX", "launcher");
+        SetEnv("SSA_LAUNCHER_WW", "oldest");
+        SetEnv("SKY_LAUNCHER_ZZ", "kept");
+        SetEnv("SSA_LAUNCHER_ZZ", "other"); // both set: neither is replaced
+        SDL_Environment* game = CreateGameEnvironment();
+        SETTINGS_EXPECT(game != nullptr);
+        auto var = [&](const char* name) { const char* value = SDL_GetEnvironmentVariable(game, name); return value != nullptr ? std::string(value) : std::string("<unset>"); };
+        auto own = [](const char* name) { const char* value = SDL_getenv(name); return value != nullptr ? std::string(value) : std::string("<unset>"); };
+        SETTINGS_EXPECT(var("SSA_YY") == "new" && var("SKY_YY") == "new");
+        SETTINGS_EXPECT(var("SKY_ZZ") == "old" && var("SSA_ZZ") == "old");
+        SETTINGS_EXPECT(var("SKY_LAUNCHER_XX") == "launcher" && var("SKYLAUNCHER_XX") == "launcher" && var("SSA_LAUNCHER_XX") == "launcher");
+        SETTINGS_EXPECT(var("SKY_LAUNCHER_WW") == "oldest" && var("SKYLAUNCHER_WW") == "oldest" && var("SSA_LAUNCHER_WW") == "oldest");
+        SETTINGS_EXPECT(var("SKY_LAUNCHER_ZZ") == "kept" && var("SSA_LAUNCHER_ZZ") == "other");
+        SETTINGS_EXPECT(var("HOME") == own("HOME") && var("PATH") == own("PATH")); // everything else goes along
+        SETTINGS_EXPECT(own("SSA_YY") == "<unset>" && own("SKY_ZZ") == "<unset>" && own("SKY_LAUNCHER_XX") == "<unset>" && own("SSA_LAUNCHER_XX") == "<unset>"); // the launcher's own is unchanged
+        SDL_DestroyEnvironment(game);
+        // Set and unset under every name.
+        SetGameVariable("SKY_LAUNCHER_WW", "forced");
+        SETTINGS_EXPECT(own("SKY_LAUNCHER_WW") == "forced" && own("SKYLAUNCHER_WW") == "forced" && own("SSA_LAUNCHER_WW") == "forced");
+        UnsetGameVariable("SKY_LAUNCHER_WW");
+        SETTINGS_EXPECT(own("SKY_LAUNCHER_WW") == "<unset>" && own("SKYLAUNCHER_WW") == "<unset>" && own("SSA_LAUNCHER_WW") == "<unset>");
+        clear();
+        printf("Environment: new names first, older names still read, both names given to a game\n");
+    }
+
     // ---- The desktop shortcut --------------------------------------------------------------------------------------------
 
     void ShortcutChecks(const fs::path& scratch)
@@ -165,11 +215,11 @@ namespace
         SETTINGS_EXPECT(LinuxDesktopEntry("X", "/x", "ssa", {}).find("Icon=") == std::string::npos);
 
         // The files on disk: a Desktop of the test's own, replaced when made again, the script really starting the launcher.
-        SetEnv("SKYLAUNCHER_DESKTOP", (scratch / "desktop").string());
+        SetEnv("SKY_LAUNCHER_DESKTOP", (scratch / "desktop").string());
         SETTINGS_EXPECT(DesktopFolder() == scratch / "desktop");
-        SetEnv("SKYLAUNCHER_EXE", "/somewhere/Skylauncher");
+        SetEnv("SKY_LAUNCHER_EXE", "/somewhere/Skylauncher");
         SETTINGS_EXPECT(SelfExecutable() == fs::path("/somewhere/Skylauncher"));
-        SetEnv("SKYLAUNCHER_EXE", "");
+        SetEnv("SKY_LAUNCHER_EXE", "");
 
         ShortcutSpec spec;
         spec.gameId = "giants";
@@ -215,8 +265,33 @@ namespace
         none = spec;
         none.launcher.clear();
         SETTINGS_EXPECT(!CreateDesktopShortcut(none).ok);
-        SetEnv("SKYLAUNCHER_DESKTOP", "");
-        printf("Shortcut: macOS .app (script run), Linux .desktop, Windows .ico, names and quoting checked\n");
+        // Shortcuts made by a launcher called Skylauncher (0.4.x) start the new one and carry its name; the rest is left as it is.
+        {
+            const fs::path desktop = scratch / "older-desktop";
+            const std::string oldExec = "/Applications/Skylauncher.app/Contents/MacOS/Skylauncher";
+            const std::string oldScript = "#!/bin/sh\n# Opens Skylauncher on this game and starts it. Made by Skylauncher (Game settings).\nexec '" + oldExec + "' --game giants --play\n";
+            Write(desktop / "Skylanders Giants.app" / "Contents" / "MacOS" / "launch", oldScript);
+            Write(desktop / "Skylanders Giants.app" / "Contents" / "Resources" / "icon.icns", "icon");
+            const std::string oldEntry = "[Desktop Entry]\nType=Application\nVersion=1.0\nName=Skylanders: Spyro's Adventure\nComment=Play Skylanders: Spyro's Adventure with Skylauncher\n"
+                                         "Exec=\"/home/p/Skylauncher-x86_64.AppImage\" --game ssa --play\nIcon=/home/p/shortcut-icon.png\nTerminal=false\nCategories=Game;\n";
+            Write(desktop / "skylanders-spyro's-adventure.desktop", oldEntry);
+            // Not ours (no --game), already current, and another game's name: untouched.
+            Write(desktop / "skylanders-swap-force.desktop", "[Desktop Entry]\nName=Skylanders: Swap Force\nComment=with Skylauncher\nExec=/bin/true\n");
+            const std::vector<std::pair<std::string, std::string>> games = { { "ssa", "Skylanders: Spyro's Adventure" }, { "giants", "Skylanders: Giants" },
+                { "swapforce", "Skylanders: Swap Force" } };
+            const fs::path newer = "/Applications/Arkeyan Launcher.app/Contents/MacOS/ArkeyanLauncher";
+            SETTINGS_EXPECT(RefreshShortcuts(desktop, games, newer) == 2);
+            SETTINGS_EXPECT(Read(desktop / "Skylanders Giants.app" / "Contents" / "MacOS" / "launch") == MacLaunchScript(newer, "giants"));
+            SETTINGS_EXPECT(Read(desktop / "Skylanders Giants.app" / "Contents" / "MacOS" / "launch").find("Skylauncher") == std::string::npos);
+            SETTINGS_EXPECT(Read(desktop / "Skylanders Giants.app" / "Contents" / "Resources" / "icon.icns") == "icon");
+            const std::string rewritten = Read(desktop / "skylanders-spyro's-adventure.desktop");
+            SETTINGS_EXPECT(rewritten == LinuxDesktopEntry("Skylanders: Spyro's Adventure", newer, "ssa", "/home/p/shortcut-icon.png") && rewritten.find("Skylauncher") == std::string::npos);
+            SETTINGS_EXPECT(Read(desktop / "skylanders-swap-force.desktop").find("Exec=/bin/true") != std::string::npos);
+            SETTINGS_EXPECT(RefreshShortcuts(desktop, games, newer) == 0); // once is enough
+            SETTINGS_EXPECT(RefreshShortcuts(desktop / "nowhere", games, newer) == 0 && RefreshShortcuts(desktop, games, {}) == 0);
+        }
+        SetEnv("SKY_LAUNCHER_DESKTOP", "");
+        printf("Shortcut: macOS .app (script run), Linux .desktop, Windows .ico, names and quoting, shortcuts of older launchers rewritten\n");
     }
 
     // ---- Delete data, uninstall -------------------------------------------------------------------------------------------
@@ -247,7 +322,7 @@ namespace
     void DataChecks(const fs::path& scratch)
     {
         // The seat of the data folder these paths come from: the helpers answer for the folders they are given.
-        SetEnv("SSA_SAVE_DIR", "");
+        SetEnv("SKY_SAVE_DIR", "");
         GameFolders folders = Populate(scratch / "data");
 
         GameDataSizes sizes = MeasureGameData(folders);
@@ -309,14 +384,14 @@ namespace
         SETTINGS_EXPECT(!DeleteGameData(nothing).ok && !UninstallGame(nothing, config).ok && MeasureGameData(nothing).saves == 0);
         SETTINGS_EXPECT(fs::exists(scratch / "data" / "Giants" / "textures" / "t.dds"));
 
-        // FoldersOf names the game's folder in the data folder, and SSA_SAVE_DIR moves the saves.
+        // FoldersOf names the game's folder in the data folder, and SKY_SAVE_DIR moves the saves.
         SetEnv("SKYLANDERS_DATA", (scratch / "root").string());
-        SetEnv("SKYLAUNCHER_DATA", "");
+        SetEnv("SKY_LAUNCHER_DATA", "");
         SETTINGS_EXPECT(FoldersOf("giants").game == scratch / "root" / "Giants" && FoldersOf("giants").saves == scratch / "root" / "Giants" / "saves");
         SETTINGS_EXPECT(FoldersOf("ssa").game == scratch / "root" / "SSA");
-        SetEnv("SSA_SAVE_DIR", (scratch / "elsewhere-saves").string());
+        SetEnv("SKY_SAVE_DIR", (scratch / "elsewhere-saves").string());
         SETTINGS_EXPECT(FoldersOf("ssa").saves == scratch / "elsewhere-saves");
-        SetEnv("SSA_SAVE_DIR", "");
+        SetEnv("SKY_SAVE_DIR", "");
         printf("Delete data and uninstall: sizes, caches only, refused while the game runs, what stays, on a scratch folder\n");
     }
 }
@@ -326,6 +401,7 @@ int SettingsChecks(const fs::path& scratch)
     fs::create_directories(scratch);
     VideoChecks();
     ArgumentChecks();
+    EnvironmentChecks();
     ShortcutChecks(scratch / "shortcut");
     DataChecks(scratch / "datachecks");
     return g_settingsFailures;

@@ -11,7 +11,7 @@
 
 namespace launcher_ui
 {
-    // The file the game's emulated portal starts from: portal.txt in its save folder (SSA_SAVE_DIR, else its runtime's
+    // The file the game's emulated portal starts from: portal.txt in its save folder (SKY_SAVE_DIR, else its runtime's
     // data folder), "<slot> <path>" lines, rewritten by the game at every change. Empty for a game with no runtime.
     std::string SessionFile(const collection::Game& game);
 

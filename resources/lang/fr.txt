@@ -1,4 +1,4 @@
-# Skylauncher in French. English is the source (docs/translations.md); a missing string shows in English.
+# Arkeyan Launcher in French. English is the source (docs/translations.md); a missing string shows in English.
 # One "English<TAB>French" per line; \n is a new line. Placeholders ({}, {0}, {:g}...) keep their format.
 # A space that must not break before : ? ! % and inside « » is a no-break space (U+00A0).
 @code fr
@@ -53,7 +53,7 @@ Carry on copying	Reprendre la copie
 Change disc...	Changer de disque...
 Check now	Vérifier maintenant
 Check at startup	Vérifier au démarrage
-Checking Skylauncher	Vérification de Skylauncher
+Checking Arkeyan Launcher	Vérification d'Arkeyan Launcher
 Checking the Xbox 360 executable	Vérification de l'exécutable Xbox 360
 Checking your disc	Vérification du disque
 Checking...	Vérification...
@@ -94,7 +94,7 @@ Couldn't open the folder	Impossible d'ouvrir le dossier
 Couldn't put the kit in place: {}	Impossible de mettre le kit en place : {}
 Couldn't put the new {} in place: {}	Impossible de mettre en place le nouveau {} : {}
 Couldn't remove the copy: {}	Impossible de supprimer la copie : {}
-Couldn't restart: start Skylauncher again	Redémarrage impossible : relancez Skylauncher
+Couldn't restart: start Arkeyan Launcher again	Redémarrage impossible : relancez Arkeyan Launcher
 Couldn't restore the backup: {}	Impossible de restaurer la sauvegarde : {}
 Couldn't save the download: {}	Impossible d'enregistrer le téléchargement : {}
 Couldn't save the report	Impossible d'enregistrer le rapport
@@ -119,7 +119,7 @@ Disc	Disque
 Disc image	Image disque
 Disc not found	Disque introuvable
 Disc verified: {}	Disque vérifié : {}
-Downloading Skylauncher	Téléchargement de Skylauncher
+Downloading Arkeyan Launcher	Téléchargement d'Arkeyan Launcher
 Downloading the game tools	Téléchargement des outils du jeu
 Downloading tools	Téléchargement des outils
 Drop your disc image (.iso) here.	Déposez votre image disque (.iso) ici.
@@ -131,7 +131,7 @@ Finding default.xex	Recherche de default.xex
 Fingerprinting default.xex (SHA-256)	Calcul de l'empreinte de default.xex (SHA-256)
 Finishing	Finalisation
 Folders	Dossiers
-For Skylauncher and all games.	Pour Skylauncher et tous les jeux.
+For Arkeyan Launcher and all games.	Pour Arkeyan Launcher et tous les jeux.
 Found	Détecté
 Found, not usable	Détecté, inutilisable
 Frame rate limit	Limite d'images par seconde
@@ -170,7 +170,7 @@ Builds the game on your PC: about {} min, {} GB, internet needed once.	Construit
 Install failed	Échec de l'installation
 Installation cancelled	Installation annulée
 Installing	Installation
-Installing Skylauncher	Installation de Skylauncher
+Installing Arkeyan Launcher	Installation d'Arkeyan Launcher
 Interrupted	Interrompue
 Interrupted: {} of {} copied	Interrompue : {} sur {} copiés
 Keep installing	Continuer l'installation
@@ -221,7 +221,7 @@ Opens a new issue on GitHub	Ouvre un nouveau ticket sur GitHub
 PLAY	JOUER
 PLAY WITH	JOUER AVEC
 Play {}	Jouer à {}
-Play {} with Skylauncher	Jouer à {} avec Skylauncher
+Play {} with Arkeyan Launcher	Jouer à {} avec Arkeyan Launcher
 Plug in the portal, then test it.	Branchez le portail, puis testez-le.
 Portal	Portail
 Portal of Power	Portail des Pouvoirs
@@ -279,12 +279,12 @@ Show in folder	Afficher dans le dossier
 Skip intro movies	Passer les vidéos d'intro
 Skips the start-up logos.	Passe les logos de démarrage.
 Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision.	Skylanders est une marque d'Activision. Ce projet n'est ni affilié à Activision ni approuvé par Activision.
-Skylauncher couldn't find its own file.	Skylauncher n'a pas trouvé son propre fichier.
-Skylauncher is up to date.	Skylauncher est à jour.
-Skylauncher is up to date. A game update is available.	Skylauncher est à jour. Une mise à jour du jeu est disponible.
-Skylauncher on GitHub	Skylauncher sur GitHub
-Skylauncher closed during the install. Resume carries on.	Skylauncher a été fermé pendant l'installation. Reprendre continue.
-Skylauncher {} is installed. Restart to use it.	Skylauncher {} est installé. Redémarrez pour l'utiliser.
+Arkeyan Launcher couldn't find its own file.	Arkeyan Launcher n'a pas trouvé son propre fichier.
+Arkeyan Launcher is up to date.	Arkeyan Launcher est à jour.
+Arkeyan Launcher is up to date. A game update is available.	Arkeyan Launcher est à jour. Une mise à jour du jeu est disponible.
+Arkeyan Launcher on GitHub	Arkeyan Launcher sur GitHub
+Arkeyan Launcher closed during the install. Resume carries on.	Arkeyan Launcher a été fermé pendant l'installation. Reprendre continue.
+Arkeyan Launcher {} is installed. Restart to use it.	Arkeyan Launcher {} est installé. Redémarrez pour l'utiliser.
 Something went wrong while {}.	Un problème est survenu pendant l'étape « {} ».
 Spyro's Adventure accepts this portal.	Spyro's Adventure accepte ce portail.
 Spyro's Adventure rejects this portal: {}.	Spyro's Adventure refuse ce portail : {}.
@@ -308,7 +308,7 @@ Game data damaged: {}	Données du jeu endommagées : {}
 Copy stopped: {}. Press the button to carry on.	Copie arrêtée : {}. Appuyez sur le bouton pour reprendre.
 Couldn't read the disc image. Check that it's complete.	Lecture de l'image disque impossible. Vérifiez qu'elle est complète.
 The download failed: {}	Le téléchargement a échoué : {}
-The download holds no Skylauncher.app	Le téléchargement ne contient pas Skylauncher.app
+The download holds no launcher app	Le téléchargement ne contient aucune application du lanceur
 The download is damaged: nothing was installed	Le téléchargement est endommagé : rien n'a été installé
 The download isn't a game kit	Le téléchargement n'est pas un kit de jeu
 The download isn't a zip file	Le téléchargement n'est pas un fichier zip
@@ -320,7 +320,7 @@ Press INSTALL first	Appuyez d'abord sur INSTALLER
 Earlier versions of your saves.	Versions précédentes de vos sauvegardes.
 No disc image needed.	Plus besoin de l'image disque.
 The game uses the disc image instead.	Le jeu utilise l'image disque à la place.
-The game ({}) wasn't found next to Skylauncher.\n\nPut it in the same folder.	Le jeu ({}) est introuvable à côté de Skylauncher.\n\nPlacez-le dans le même dossier.
+The game ({}) wasn't found next to Arkeyan Launcher.\n\nPut it in the same folder.	Le jeu ({}) est introuvable à côté d'Arkeyan Launcher.\n\nPlacez-le dans le même dossier.
 The game stopped unexpectedly	Le jeu s'est arrêté de façon inattendue
 Couldn't download the game tools. Check your connection.	Téléchargement des outils impossible. Vérifiez votre connexion.
 The game tools are incomplete.	Les outils du jeu sont incomplets.
@@ -331,12 +331,12 @@ Choose the disc image first	Choisissez d'abord l'image disque
 Menus, subtitles and on-screen text.	Menus, sous-titres et textes à l'écran.
 Spoken lines and cutscenes.	Voix et cinématiques.
 The installer couldn't start.	L'installateur n'a pas pu démarrer.
-Game kit not found. Put the ssa-kit folder next to Skylauncher, then press Retry.	Kit du jeu introuvable. Placez le dossier ssa-kit à côté de Skylauncher, puis appuyez sur Réessayer.
+Game kit not found. Put the skylanders-kit folder next to Arkeyan Launcher, then press Retry.	Kit du jeu introuvable. Placez le dossier skylanders-kit à côté d'Arkeyan Launcher, puis appuyez sur Réessayer.
 The earlier install is still stopping. Resume in a moment.	L'installation précédente s'arrête encore. Reprenez dans un instant.
 The installer stopped before the game was built.	L'installateur s'est arrêté avant la fin de la construction du jeu.
 The installer stopped with exit code {}.	L'installateur s'est arrêté avec le code de sortie {}.
-Drag Skylauncher to Applications, replacing the old one.	Glissez Skylauncher dans Applications, en remplaçant l'ancien.
-Skylauncher's own language. "Same as the game" follows its text language.	La langue de Skylauncher. « Identique au jeu » suit la langue des textes du jeu.
+Drag Arkeyan Launcher to Applications, replacing the old one.	Glissez Arkeyan Launcher dans Applications, en remplaçant l'ancien.
+Arkeyan Launcher's own language. "Same as the game" follows its text language.	La langue d'Arkeyan Launcher. « Identique au jeu » suit la langue des textes du jeu.
 Designed by dorydev.	Conçu par dorydev.
 The game's last log, for a bug report.	Le dernier journal du jeu, pour un rapport de bug.
 The portal can't be opened: using the virtual portal.	Le portail ne s'ouvre pas : le portail virtuel est utilisé.
@@ -698,10 +698,10 @@ Update {} to {}: {}, up to about {} min.	Mise à jour de {} à {} : {}, jusqu'�
 Update to {}: {}, up to about {} min.	Mise à jour vers {} : {}, jusqu'à environ {} min.
 no download	aucun téléchargement
 {} download	{} à télécharger
-Remove Skylauncher	Retirer Skylauncher
+Remove Arkeyan Launcher	Retirer Arkeyan Launcher
 Uninstall everything...	Tout désinstaller...
 Uninstall everything	Tout désinstaller
-Removes the games, their files and Skylauncher.	Retire les jeux, leurs fichiers et Skylauncher.
+Removes the games, their files and Arkeyan Launcher.	Retire les jeux, leurs fichiers et Arkeyan Launcher.
 Wait for the game to finish.	Attendez que le jeu ait fini.
 Hold to delete all of this.	Maintenez pour tout supprimer.
 What goes	Ce qui sera supprimé
@@ -728,12 +728,12 @@ Everything is removed	Tout est supprimé
 Removed, except	Supprimé, sauf
 {} freed.	{} libérés.
 and {} more	et {} autres
-Skylauncher goes to the Trash when you quit.	Skylauncher ira à la corbeille quand vous quitterez.
-Skylauncher deletes itself when you quit.	Skylauncher se supprimera quand vous quitterez.
+Arkeyan Launcher goes to the Trash when you quit.	Arkeyan Launcher ira à la corbeille quand vous quitterez.
+Arkeyan Launcher deletes itself when you quit.	Arkeyan Launcher se supprimera quand vous quitterez.
 {} is not in its folder: it stays.	{} n'est pas dans son dossier : il reste.
 {} is a link: it stays.	{} est un lien : il reste.
-Skylauncher can't remove itself from here: delete it by hand.	Skylauncher ne peut pas se supprimer d'ici : supprimez-le à la main.
-{} is outside Skylauncher's folders: it stays.	{} est hors des dossiers de Skylauncher : il reste.
+Arkeyan Launcher can't remove itself from here: delete it by hand.	Arkeyan Launcher ne peut pas se supprimer d'ici : supprimez-le à la main.
+{} is outside Arkeyan Launcher's folders: it stays.	{} est hors des dossiers d'Arkeyan Launcher : il reste.
 {} is a disc image: it stays.	{} est une image disque : elle reste.
 {} couldn't be removed.	{} n'a pas pu être supprimé.
 Other files in the figures folder stay.	Les autres fichiers du dossier des figurines restent.

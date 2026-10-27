@@ -1,0 +1,30 @@
+// Resources of the exe, for llvm-mingw's windres (CMakeLists.txt fills in the version).
+// The application manifest (RT_MANIFEST 24, id 1: the process's own).
+1 24 "@CMAKE_SOURCE_DIR@/resources/windows/skylauncher.manifest"
+// The icon of the exe (Explorer, the taskbar before the window opens).
+2 ICON "@CMAKE_SOURCE_DIR@/resources/icons/skylauncher.ico"
+
+1 VERSIONINFO
+FILEVERSION @LAUNCHER_VERSION_PART_0@,@LAUNCHER_VERSION_PART_1@,@LAUNCHER_VERSION_PART_2@,@LAUNCHER_VERSION_PART_3@
+PRODUCTVERSION @LAUNCHER_VERSION_PART_0@,@LAUNCHER_VERSION_PART_1@,@LAUNCHER_VERSION_PART_2@,@LAUNCHER_VERSION_PART_3@
+FILEOS 0x40004
+FILETYPE 1
+{
+    BLOCK "StringFileInfo"
+    {
+        BLOCK "040904B0"
+        {
+            VALUE "CompanyName", ""
+            VALUE "FileDescription", "Arkeyan Launcher"
+            VALUE "FileVersion", "@LAUNCHER_VERSION@"
+            VALUE "InternalName", "ArkeyanLauncher"
+            VALUE "OriginalFilename", "ArkeyanLauncher.exe"
+            VALUE "ProductName", "Arkeyan Launcher"
+            VALUE "ProductVersion", "@LAUNCHER_VERSION@"
+        }
+    }
+    BLOCK "VarFileInfo"
+    {
+        VALUE "Translation", 0x409, 0x4B0
+    }
+}

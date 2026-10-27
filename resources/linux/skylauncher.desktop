@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Skylauncher
-Comment=Launcher for the Skylanders: Spyro's Adventure PC port
-Exec=Skylauncher
+Name=Arkeyan Launcher
+Comment=Launcher for the Skylanders PC ports
+Exec=ArkeyanLauncher
 Icon=skylauncher
 Categories=Game;
 Terminal=false

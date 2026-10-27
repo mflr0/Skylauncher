@@ -1,4 +1,5 @@
 #include "launcher/uninstall.h"
+#include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/game_settings.h"
 #include "launcher/shortcut.h"
@@ -399,7 +400,7 @@ namespace uninstall
                 std::string name = entry.path().filename().string();
                 add(GroupOfGameEntry(name, fs::is_regular_file(fs::symlink_status(entry.path(), error))), game.id, entry.path());
             }
-            // Saves kept elsewhere than <folder>/saves (SSA_SAVE_DIR): the folder and its backups, if they are ours.
+            // Saves kept elsewhere than <folder>/saves (SKY_SAVE_DIR): the folder and its backups, if they are ours.
             if (!game.saves.empty())
             {
                 add(Group::Saves, game.id, game.saves);
@@ -735,7 +736,7 @@ namespace uninstall
         SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true); // outlives the launcher
         SDL_Process* process = SDL_CreateProcessWithProperties(properties);
         SDL_DestroyProperties(properties);
-        // Not waited for and not destroyed: it runs on after Skylauncher quits.
+        // Not waited for and not destroyed: it runs on after Arkeyan Launcher quits.
         return process != nullptr;
     }
 
@@ -752,8 +753,8 @@ namespace uninstall
 
     bool ScratchRun()
     {
-        for (const char* name : { "SKYLANDERS_DATA", "SKYLAUNCHER_DATA", "SSA_LAUNCHER_INI", "SSA_COLLECTION" })
-            if (const char* value = SDL_getenv(name); value != nullptr && *value != 0)
+        for (const char* name : { "SKYLANDERS_DATA", "SKY_LAUNCHER_DATA", "SKY_LAUNCHER_INI", "SKY_COLLECTION" })
+            if (const char* value = LauncherEnv(name); value != nullptr && *value != 0)
                 return true;
         return false;
     }
@@ -773,8 +774,8 @@ namespace uninstall
             env.launcherSelf = LauncherSelf();
         else
         {
-            const char* dummy = SDL_getenv("SKYLAUNCHER_UNINSTALL_SELF");
-            const char* trash = SDL_getenv("SKYLAUNCHER_UNINSTALL_TRASH");
+            const char* dummy = LauncherEnv("SKY_LAUNCHER_UNINSTALL_SELF");
+            const char* trash = LauncherEnv("SKY_LAUNCHER_UNINSTALL_TRASH");
             if (trash != nullptr && *trash != 0)
                 env.trash = datadir::FromText(trash);
             // A scratch run never reaches the real launcher, nor the real Trash.

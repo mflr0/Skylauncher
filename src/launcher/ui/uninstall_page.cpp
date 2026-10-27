@@ -23,7 +23,7 @@ namespace launcher_ui
             case Group::OldFolders: return Tr("Older folders");
             case Group::Settings: return Tr("Settings");
             case Group::Shortcuts: return Tr("Desktop shortcuts");
-            case Group::Launcher: return "Skylauncher";
+            case Group::Launcher: return "Arkeyan Launcher";
             case Group::Saves: return Tr("Saves");
             case Group::Figures: return Tr("Figures");
             }
@@ -47,12 +47,12 @@ namespace launcher_ui
             case Why::Link: return Tf("{} is a link: it stays.", NameOf(left));
             case Why::Outside:
             case Why::Unsafe:
-                return left.group == Group::Launcher ? std::string(Tr("Skylauncher can't remove itself from here: delete it by hand."))
-                                                     : Tf("{} is outside Skylauncher's folders: it stays.", NameOf(left));
+                return left.group == Group::Launcher ? std::string(Tr("Arkeyan Launcher can't remove itself from here: delete it by hand."))
+                                                     : Tf("{} is outside Arkeyan Launcher's folders: it stays.", NameOf(left));
             case Why::DiscImage: return Tf("{} is a disc image: it stays.", NameOf(left));
             case Why::InUse: return Tr("A game is running: quit it first.");
             case Why::NotRemoved: return Tf("{} couldn't be removed.", NameOf(left));
-            case Why::Unfit: return left.group == Group::Launcher ? std::string(Tr("Skylauncher can't remove itself from here: delete it by hand."))
+            case Why::Unfit: return left.group == Group::Launcher ? std::string(Tr("Arkeyan Launcher can't remove itself from here: delete it by hand."))
                                                                     : Tf("{} couldn't be removed.", NameOf(left));
             case Why::Kept: return left.group == Group::OldFolders ? Tr("Kept: Xbox signing keys") : Tr("Other files in the figures folder stay.");
             }
@@ -63,7 +63,7 @@ namespace launcher_ui
     // The section of the Launcher tab: a button that opens the list.
     void App::DrawUninstallSection()
     {
-        Title(Tr("Remove Skylauncher"), TitleSize, Text);
+        Title(Tr("Remove Arkeyan Launcher"), TitleSize, Text);
         const bool busy = AnyInstalling() || AnyVerifying();
         ImGui::BeginDisabled(busy);
         if (PillButton(Tr("Uninstall everything..."), false, 300))
@@ -71,7 +71,7 @@ namespace launcher_ui
         ImGui::EndDisabled();
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", busy ? Tr("Wait for the game to finish.") : Tr("Removes the games, their files and Skylauncher."));
+        ImGui::TextWrapped("%s", busy ? Tr("Wait for the game to finish.") : Tr("Removes the games, their files and Arkeyan Launcher."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
@@ -158,7 +158,7 @@ namespace launcher_ui
                 note(Tf("and {} more", lines.size() - shown));
             ImGui::Dummy(ImVec2(0, 12));
             if (m_un.launcherScheduled)
-                note(m_un.env.os == uninstall::Os::MacOS ? Tr("Skylauncher goes to the Trash when you quit.") : Tr("Skylauncher deletes itself when you quit."));
+                note(m_un.env.os == uninstall::Os::MacOS ? Tr("Arkeyan Launcher goes to the Trash when you quit.") : Tr("Arkeyan Launcher deletes itself when you quit."));
             ImGui::Dummy(ImVec2(0, 8));
             if (interrupted && PillButton(Tr("Back"), false, 200))
                 m_un.stage = UninstallStage::Closed;
@@ -242,7 +242,7 @@ namespace launcher_ui
             m_un = {};
     }
 
-    // The screens of the screenshot test (SSA_LAUNCHER_TEST_UNINSTALL), in a scratch data tree. Each is captured once settled.
+    // The screens of the screenshot test (SKY_LAUNCHER_TEST_UNINSTALL), in a scratch data tree. Each is captured once settled.
     void App::TestUninstallScript(uint64_t now)
     {
         switch (m_testStep)

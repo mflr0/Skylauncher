@@ -1,4 +1,5 @@
 #include "launcher/updater.h"
+#include "launcher/env.h"
 #include "launcher/i18n.h"
 #include "launcher/launcher.h"
 #include "shared/dir_list.h"
@@ -8,6 +9,7 @@
 #include <cctype>
 #include <fmt/format.h>
 #include <fstream>
+#include <initializer_list>
 #include <miniz.h>
 
 #if defined(_WIN32)
@@ -154,13 +156,24 @@ namespace
         return true;
     }
 
-    fs::path SSABuildIn(const fs::path& folder)
+    // The kit's builder at the root of `folder`: SkyBuild, or SSABuild in a kit made for 0.4.x launchers.
+    bool HoldsBuilder(const fs::path& folder)
     {
+        std::error_code error;
 #if defined(_WIN32)
-        return folder / "SSABuild.exe";
+        return fs::exists(folder / "SkyBuild.exe", error) || fs::exists(folder / "SSABuild.exe", error);
 #else
-        return folder / "SSABuild";
+        return fs::exists(folder / "SkyBuild", error) || fs::exists(folder / "SSABuild", error);
 #endif
+    }
+
+    // The first of `names` that the release carries; the first one when none is (the message then names it).
+    std::string FirstOffered(const ReleaseInfo& release, std::initializer_list<std::string> names)
+    {
+        for (const std::string& name : names)
+            if (FindAsset(release, name) != nullptr)
+                return name;
+        return *names.begin();
     }
 }
 
@@ -302,6 +315,17 @@ std::string FindChecksum(const std::string& sums, std::string_view name)
 std::string LauncherAssetName()
 {
 #if defined(_WIN32)
+    return "ArkeyanLauncher.exe";
+#elif defined(__APPLE__)
+    return "ArkeyanLauncher-macOS.zip";
+#else
+    return "ArkeyanLauncher-x86_64.AppImage";
+#endif
+}
+
+std::string OldLauncherAssetName()
+{
+#if defined(_WIN32)
     return "Skylauncher.exe";
 #elif defined(__APPLE__)
     return "Skylauncher-macOS.zip";
@@ -310,24 +334,32 @@ std::string LauncherAssetName()
 #endif
 }
 
-std::string KitAssetName()
+std::string LauncherAssetIn(const ReleaseInfo& release) { return FirstOffered(release, { LauncherAssetName(), OldLauncherAssetName() }); }
+
+std::string KitPlatform()
 {
 #if defined(_WIN32)
-    return "ssa-kit-windows-x64.zip";
+    return "windows-x64";
 #elif defined(__APPLE__)
 #if defined(__aarch64__)
-    return "ssa-kit-macos-arm64.zip";
+    return "macos-arm64";
 #else
-    return "ssa-kit-macos-x64.zip";
+    return "macos-x64";
 #endif
 #else
-    return "ssa-kit-linux-x64.zip";
+    return "linux-x64";
 #endif
 }
 
+std::string KitAssetName() { return "skylanders-kit-" + KitPlatform() + ".zip"; }
+
+std::string OldKitAssetName() { return "ssa-kit-" + KitPlatform() + ".zip"; }
+
+std::string KitAssetIn(const ReleaseInfo& release) { return FirstOffered(release, { KitAssetName(), OldKitAssetName() }); }
+
 std::string LatestReleaseUrl(const std::string& repo)
 {
-    if (const char* url = SDL_getenv("SKYLAUNCHER_UPDATE_URL"); url != nullptr && *url != 0)
+    if (const char* url = LauncherEnv("SKY_LAUNCHER_UPDATE_URL"); url != nullptr && *url != 0)
         return url;
     return "https://api.github.com/repos/" + repo + "/releases/latest";
 }
@@ -342,7 +374,7 @@ fs::path KitFolderFor(const fs::path& kitRoot, const std::string& tag)
 
 std::string TaggedReleaseUrl(const std::string& repo, const std::string& tag)
 {
-    if (const char* url = SDL_getenv("SKYLAUNCHER_UPDATE_URL"); url != nullptr && *url != 0)
+    if (const char* url = LauncherEnv("SKY_LAUNCHER_UPDATE_URL"); url != nullptr && *url != 0)
     {
         std::string base = url;
         return base.substr(0, base.find_last_of('/') + 1) + tag + ".json";
@@ -355,7 +387,7 @@ std::string TaggedReleaseUrl(const std::string& repo, const std::string& tag)
 HttpResult HttpDownload(const std::string& url, const fs::path& file, const std::function<void(uint64_t)>& progress, const std::atomic<bool>* cancel)
 {
     HttpResult result;
-    if (url.empty() || !(url.starts_with("https://") || url.starts_with("file://") || SDL_getenv("SKYLAUNCHER_UPDATE_URL") != nullptr))
+    if (url.empty() || !(url.starts_with("https://") || url.starts_with("file://") || LauncherEnv("SKY_LAUNCHER_UPDATE_URL") != nullptr))
     {
         result.error = Tr("The address isn't a secure one (https)");
         return result;
@@ -365,7 +397,7 @@ HttpResult HttpDownload(const std::string& url, const fs::path& file, const std:
     fs::path part = file;
     part += ".part";
     fs::remove(part, error);
-    std::string agent = "Skylauncher/" + LauncherVersion();
+    std::string agent = "ArkeyanLauncher/" + LauncherVersion();
     std::vector<std::string> arguments{ CurlProgram(), "-fsSL", "--connect-timeout", "15", "--max-time", "1800", "--retry", "2",
         "-A", agent, "-H", "Accept: application/vnd.github+json", "-o", ToUtf8(part), url };
     if (url.starts_with("https://"))
@@ -565,7 +597,7 @@ fs::path LauncherSelf()
     const char* base = SDL_GetBasePath();
     if (base == nullptr)
         return {};
-    // .../Skylauncher.app/Contents/Resources/ -> .../Skylauncher.app
+    // .../<name>.app/Contents/Resources/ -> .../<name>.app (whatever the player named it)
     fs::path resources = FromUtf8(base);
     if (resources.filename().empty())
         resources = resources.parent_path();
@@ -590,17 +622,17 @@ bool InstallKitZip(const fs::path& zip, const fs::path& kitFolder, std::string& 
         fs::remove_all(staging, fsError);
         return false;
     }
-    // A zip made around one folder ("ssa-kit-windows-x64/...") is that folder.
+    // A zip made around one folder ("skylanders-kit-windows-x64/...") is that folder.
     fs::path fresh = staging;
-    if (!fs::exists(SSABuildIn(fresh), fsError))
+    if (!HoldsBuilder(fresh))
     {
         std::vector<fs::path> children;
         for (const auto& entry : ListDirectory(staging, fsError))
             children.push_back(entry.path());
-        if (children.size() == 1 && fs::exists(SSABuildIn(children[0]), fsError))
+        if (children.size() == 1 && HoldsBuilder(children[0]))
             fresh = children[0];
     }
-    if (!fs::exists(SSABuildIn(fresh), fsError))
+    if (!HoldsBuilder(fresh))
     {
         fs::remove_all(staging, fsError);
         error = Tr("The download isn't a game kit");
@@ -649,15 +681,16 @@ fs::path DownloadKit(const std::string& repo, const std::string& tag, const fs::
             return {};
         }
     }
-    const ReleaseAsset* asset = FindAsset(release, KitAssetName());
+    const std::string kitAsset = KitAssetIn(release); // the new name, else the one 0.4.x releases carry
+    const ReleaseAsset* asset = FindAsset(release, kitAsset);
     if (asset == nullptr)
     {
         fs::remove_all(work, fsError);
-        error = Tf("The release {} has no {}", release.tag, KitAssetName());
+        error = Tf("The release {} has no {}", release.tag, kitAsset);
         return {};
     }
     uint64_t size = asset->size;
-    fs::path zip = DownloadVerified(release, KitAssetName(), work, [&](uint64_t bytes) { if (progress) progress(bytes, size); }, cancel, error);
+    fs::path zip = DownloadVerified(release, kitAsset, work, [&](uint64_t bytes) { if (progress) progress(bytes, size); }, cancel, error);
     fs::path folder;
     if (!zip.empty())
     {
@@ -820,8 +853,9 @@ void UpdateManager::UpdateLauncher()
     m_thread = std::thread([this] {
         ReleaseInfo release;
         { std::lock_guard lock(m_mutex); release = m_state.launcher; m_state.error.clear(); m_state.note.clear(); }
+        const std::string assetName = LauncherAssetIn(release); // the new name, else the one 0.4.x releases carry
         auto progress = [&](uint64_t bytes) {
-            const ReleaseAsset* asset = FindAsset(release, LauncherAssetName());
+            const ReleaseAsset* asset = FindAsset(release, assetName);
             std::lock_guard lock(m_mutex);
             m_state.progress = asset != nullptr && asset->size > 0 ? std::min(1.0f, float(double(bytes) / double(asset->size))) : -1.0f;
         };
@@ -834,7 +868,7 @@ void UpdateManager::UpdateLauncher()
             // The app can't be replaced where it is: the disk image, opened for the player to drag from.
             std::string error;
             fs::path folder = fs::temp_directory_path() / "skylauncher-update";
-            fs::path dmg = DownloadVerified(release, "Skylauncher-macOS.dmg", folder, progress, &m_cancel, error);
+            fs::path dmg = DownloadVerified(release, FirstOffered(release, { "ArkeyanLauncher-macOS.dmg", "Skylauncher-macOS.dmg" }), folder, progress, &m_cancel, error);
             if (dmg.empty())
                 Fail(error);
             else
@@ -842,7 +876,7 @@ void UpdateManager::UpdateLauncher()
                 SDL_OpenURL(("file://" + ToUtf8(dmg)).c_str());
                 std::lock_guard lock(m_mutex);
                 m_state.phase = Phase::Done;
-                m_state.note = Tr("Drag Skylauncher to Applications, replacing the old one.");
+                m_state.note = Tr("Drag Arkeyan Launcher to Applications, replacing the old one.");
             }
             m_busy = false;
             return;
@@ -860,7 +894,7 @@ void UpdateManager::UpdateLauncher()
 #endif
         fs::path folder = self.parent_path() / ".skylauncher-update";
         std::string error;
-        fs::path file = DownloadVerified(release, LauncherAssetName(), folder, progress, &m_cancel, error);
+        fs::path file = DownloadVerified(release, assetName, folder, progress, &m_cancel, error);
         if (file.empty())
         {
             fs::remove_all(folder, fsError);
@@ -878,11 +912,18 @@ void UpdateManager::UpdateLauncher()
             m_busy = false;
             return;
         }
-        fresh = folder / "app" / self.filename();
-        if (!fs::exists(fresh, fsError))
+        // The new bundle, whatever its name: it is put where the running one is and takes its name.
+        fresh.clear();
+        for (const auto& entry : ListDirectory(folder / "app", fsError))
+            if (entry.path().extension() == ".app" && fs::is_directory(entry.path(), fsError))
+            {
+                fresh = entry.path();
+                break;
+            }
+        if (fresh.empty())
         {
             fs::remove_all(folder, fsError);
-            Fail(Tr("The download holds no Skylauncher.app"));
+            Fail(Tr("The download holds no launcher app"));
             m_busy = false;
             return;
         }

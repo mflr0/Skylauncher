@@ -2,7 +2,7 @@
 
 // Whether a real Portal of Power is plugged in: the VID:PID table and the status line ("Portal: <model>" or
 // "Portal: not detected"), then a watcher that re-enumerates SDL's HID devices on a worker thread when one is plugged in or
-// out (docs/support.md). The watcher is started by the launcher window; SkylauncherTest checks the table and the status
+// out (docs/support.md). The watcher is started by the launcher window; ArkeyanLauncherTest checks the table and the status
 // logic with fake enumerators.
 #include <atomic>
 #include <cstdint>

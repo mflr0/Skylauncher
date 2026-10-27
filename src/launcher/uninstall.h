@@ -2,10 +2,10 @@
 
 // "Uninstall everything" (Settings > Launcher; docs/install.md, "Uninstall everything"): what it removes, worked out first
 // (MakePlan: a dry run that measures and touches nothing) and done after (RunUninstall). No UI and no SDL calls in the
-// plan and the executor, so SkylauncherTest runs both on scratch folders for each system's layout.
+// plan and the executor, so ArkeyanLauncherTest runs both on scratch folders for each system's layout.
 //
 // Safety, because this deletes files:
-//  - Targets are only ever worked out from the Environment: the data root, Skylauncher's data folder, each game's own
+//  - Targets are only ever worked out from the Environment: the data root, Arkeyan Launcher's data folder, each game's own
 //    folder, the shared figure folder and the launcher itself. Nothing else is named, and nothing is searched for.
 //  - A target must lie inside one of those roots (after resolving links), must not be a link itself, and never is the
 //    filesystem root, the user's home or a folder that holds it, or empty. A root that fails these refuses everything.
@@ -38,7 +38,7 @@ namespace uninstall
         OldFolders, // the folders of the layout before 0.3.1
         Settings,  // launcher.ini
         Shortcuts, // the desktop shortcuts the launcher made
-        Launcher,  // Skylauncher itself
+        Launcher,  // Arkeyan Launcher itself
         Saves,     // saves, their backups, the seats of the next session
         Figures,   // the figure collection, the games' own figure folders, texture packs
     };
@@ -91,7 +91,7 @@ namespace uninstall
         Os os = Os::Linux;
         std::filesystem::path home;         // the user's home folder, never a target (nor anything that holds it)
         std::filesystem::path root;         // datadir::Root(): <data>/Skylanders
-        std::filesystem::path launcherData; // Skylauncher's own data folder (the root unless SKYLAUNCHER_DATA says otherwise)
+        std::filesystem::path launcherData; // Arkeyan Launcher's own data folder (the root unless SKY_LAUNCHER_DATA says otherwise)
         std::vector<std::filesystem::path> oldFolders; // the pre-0.3.1 folders (datadir::OldRoots) that still exist
         std::filesystem::path settingsFile; // launcher.ini
         std::filesystem::path collection;   // the figure folder
@@ -141,7 +141,7 @@ namespace uninstall
 
     // ---- The launcher itself ----------------------------------------------------------------------------------------
 
-    // What the helper does once Skylauncher has quit: macOS moves the .app (and a .old beside it) to the Trash; Windows
+    // What the helper does once Arkeyan Launcher has quit: macOS moves the .app (and a .old beside it) to the Trash; Windows
     // deletes the .exe (and its .old) once the process is gone; Linux deletes the AppImage. A path that does not fit
     // the system (not a .app on macOS...), or is a link, or is inside a folder it must not be, is refused.
     struct LauncherRemoval
@@ -170,9 +170,9 @@ namespace uninstall
     // The running process's id, for the helper to wait for.
     uint32_t ProcessId();
 
-    // The running launcher's Environment. With a scratch variable set (SKYLANDERS_DATA, SKYLAUNCHER_DATA, SSA_LAUNCHER_INI,
-    // SSA_COLLECTION: a test, a screenshot) the launcher itself is never the target: only SKYLAUNCHER_UNINSTALL_SELF, a
-    // dummy, can be, and on macOS only with SKYLAUNCHER_UNINSTALL_TRASH, a scratch folder, standing for ~/.Trash.
+    // The running launcher's Environment. With a scratch variable set (SKYLANDERS_DATA, SKY_LAUNCHER_DATA, SKY_LAUNCHER_INI,
+    // SKY_COLLECTION: a test, a screenshot) the launcher itself is never the target: only SKY_LAUNCHER_UNINSTALL_SELF, a
+    // dummy, can be, and on macOS only with SKY_LAUNCHER_UNINSTALL_TRASH, a scratch folder, standing for ~/.Trash.
     Environment ThisMachine(const LauncherConfig& config);
     bool ScratchRun();
 }

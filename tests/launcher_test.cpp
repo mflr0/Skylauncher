@@ -1,6 +1,7 @@
 // Checks the launcher's disc verification and settings file without showing any UI.
 // usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]
 #include "launcher/portal_status.h"
+#include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
 #include "launcher/updater.h"
@@ -203,7 +204,7 @@ namespace
         {
             namespace fs = std::filesystem;
             fs::path data = scratch / "data";
-            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA", data.string().c_str(), true);
+            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_DATA", data.string().c_str(), true);
             for (const char* tag : { "v0.2.0", "v0.3.0", "v0.10.0", "notes", ".download" })
             {
                 fs::create_directories(data / "kit" / tag);
@@ -220,7 +221,7 @@ namespace
             // A kit that is not a downloaded one (next to the launcher) leaves them all alone.
             CleanAfterInstall(data / "SSA", scratch / "elsewhere" / "v9.0.0");
             EXPECT(fs::exists(data / "kit" / "v0.3.0") && fs::exists(data / "kit" / "v0.10.0"));
-            SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_DATA");
+            SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_DATA");
         }
 
         // Cancel stops the fake SSABuild, slowed down so it is still running.
@@ -238,17 +239,17 @@ namespace
     }
 
     // The collection: SSARecomp's library (src/shared/collection) and the launcher's model over it, in a scratch folder
-    // (SSA_COLLECTION, SSA_SAVE_DIR, SSA_MIGRATE_FROM): never the player's own.
+    // (SKY_COLLECTION, SKY_SAVE_DIR, SKY_MIGRATE_FROM): never the player's own.
     void CollectionChecks(const std::filesystem::path& scratch)
     {
         namespace fs = std::filesystem;
         fs::path folder = scratch / "collection", legacy = scratch / "legacy", save = scratch / "save";
         fs::create_directories(legacy);
         fs::create_directories(save);
-        SDL_setenv_unsafe("SSA_COLLECTION", folder.string().c_str(), 1);
-        SDL_setenv_unsafe("SSA_SAVE_DIR", save.string().c_str(), 1);
-        SDL_setenv_unsafe("SSA_MIGRATE_FROM", legacy.string().c_str(), 1);
-        SDL_setenv_unsafe("SSA_LAUNCHER_INI", "", 1);
+        SDL_setenv_unsafe("SKY_COLLECTION", folder.string().c_str(), 1);
+        SDL_setenv_unsafe("SKY_SAVE_DIR", save.string().c_str(), 1);
+        SDL_setenv_unsafe("SKY_MIGRATE_FROM", legacy.string().c_str(), 1);
+        SDL_setenv_unsafe("SKY_LAUNCHER_INI", "", 1);
         auto dump = [&](const fs::path& at, uint16_t type) {
             FigureData data = figures::CreateFigure(type, 0);
             WriteFile(at, std::vector<uint8_t>(data.begin(), data.end()));
@@ -781,15 +782,15 @@ static void SwitchChecks(const std::filesystem::path& scratch, const std::string
     set("SDL_VIDEO_DRIVER", "offscreen");
     set("SDL_AUDIO_DRIVER", "dummy");
     set("SKYLANDERS_DATA", (scratch / "data").string());
-    set("SKYLAUNCHER_DATA", (scratch / "launcher_data").string());
-    set("SSA_COLLECTION", (scratch / "collection").string());
-    set("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
+    set("SKY_LAUNCHER_DATA", (scratch / "launcher_data").string());
+    set("SKY_COLLECTION", (scratch / "collection").string());
+    set("SKY_LAUNCHER_NO_UPDATE_CHECK", "1");
     SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
     set("FAKE_SSABUILD_DELAY", "0.01"); // long enough that Giants is still building when SSA is shown again
-    set("SSA_LAUNCHER_SHOTS", (scratch / "shots").string());
-    set("SSA_LAUNCHER_TEST_SWITCH", "1");
+    set("SKY_LAUNCHER_SHOTS", (scratch / "shots").string());
+    set("SKY_LAUNCHER_TEST_SWITCH", "1");
     std::string ini = (scratch / "switch.ini").string();
-    set("SSA_LAUNCHER_INI", ini);
+    set("SKY_LAUNCHER_INI", ini);
     LauncherConfig config;
     config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
     config["ssa"]["iso"] = ssaIso;
@@ -812,14 +813,14 @@ static void SidebarChecks(const std::filesystem::path& scratch, const std::strin
     set("SDL_VIDEO_DRIVER", "offscreen");
     set("SDL_AUDIO_DRIVER", "dummy");
     set("SKYLANDERS_DATA", (scratch / "sidebar-data").string());
-    set("SKYLAUNCHER_DATA", (scratch / "sidebar-launcher-data").string());
-    set("SSA_COLLECTION", (scratch / "sidebar-collection").string());
-    set("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
+    set("SKY_LAUNCHER_DATA", (scratch / "sidebar-launcher-data").string());
+    set("SKY_COLLECTION", (scratch / "sidebar-collection").string());
+    set("SKY_LAUNCHER_NO_UPDATE_CHECK", "1");
     SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
-    set("SSA_LAUNCHER_SHOTS", (scratch / "sidebar-shots").string());
-    set("SSA_LAUNCHER_TEST_SIDEBAR", "1");
+    set("SKY_LAUNCHER_SHOTS", (scratch / "sidebar-shots").string());
+    set("SKY_LAUNCHER_TEST_SIDEBAR", "1");
     std::string ini = (scratch / "sidebar.ini").string();
-    set("SSA_LAUNCHER_INI", ini);
+    set("SKY_LAUNCHER_INI", ini);
     LauncherConfig config;
     config["launcher"]["kit"] = SKYLAUNCHER_FAKE_KIT;
     config["ssa"]["iso"] = ssaIso;
@@ -829,7 +830,7 @@ static void SidebarChecks(const std::filesystem::path& scratch, const std::strin
         app.Run();
         EXPECT(app.TestFailures() == 0);
     }
-    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_TEST_SIDEBAR");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_TEST_SIDEBAR");
     SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_HOLD");
     SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
     SetActiveGame("ssa");
@@ -881,19 +882,19 @@ static void KitFlowChecks(const std::filesystem::path& scratch, const std::strin
         set("SDL_VIDEO_DRIVER", "offscreen");
         set("SDL_AUDIO_DRIVER", "dummy");
         set("SKYLANDERS_DATA", (root / "data").string());
-        set("SKYLAUNCHER_DATA", (root / "launcher_data").string());
-        set("SSA_COLLECTION", (root / "collection").string());
-        set("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
-        set("SKYLAUNCHER_BASE_PATH", (root / "base").string());
+        set("SKY_LAUNCHER_DATA", (root / "launcher_data").string());
+        set("SKY_COLLECTION", (root / "collection").string());
+        set("SKY_LAUNCHER_NO_UPDATE_CHECK", "1");
+        set("SKY_LAUNCHER_BASE_PATH", (root / "base").string());
         bool updates = std::string_view(test.mode) == "updates", offline = std::string_view(test.mode) == "offline";
-        set("SKYLAUNCHER_UPDATE_URL", "file://" + (scratch / "kitflow" / (updates ? "release-updates" : offline ? "no-release" : "release") / "latest.json").string());
+        set("SKY_LAUNCHER_UPDATE_URL", "file://" + (scratch / "kitflow" / (updates ? "release-updates" : offline ? "no-release" : "release") / "latest.json").string());
         set("FAKE_SSABUILD_DELAY", "0.01");
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
-        set("SSA_LAUNCHER_SHOTS", (root / "shots").string());
-        set("SSA_LAUNCHER_TEST_KIT", test.mode);
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
+        set("SKY_LAUNCHER_SHOTS", (root / "shots").string());
+        set("SKY_LAUNCHER_TEST_KIT", test.mode);
         std::string ini = (root / "kit.ini").string();
-        set("SSA_LAUNCHER_INI", ini);
+        set("SKY_LAUNCHER_INI", ini);
         LauncherConfig config;
         config["ssa"]["iso"] = ssaIso;
         config["giants"]["iso"] = giantsIso;
@@ -906,9 +907,9 @@ static void KitFlowChecks(const std::filesystem::path& scratch, const std::strin
         EXPECT(fs::exists(root / "base" / "ssa-kit-test" / "kit.txt"));
         SetActiveGame("ssa");
     }
-    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SSA_LAUNCHER_TEST_KIT");
-    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_BASE_PATH");
-    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_TEST_KIT");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_BASE_PATH");
+    SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL");
     SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY");
 }
 
@@ -920,11 +921,11 @@ static void SeatXChecks(const std::filesystem::path& scratch)
     std::filesystem::path root = scratch / "seatx";
     std::filesystem::create_directories(root / "shots");
     std::filesystem::create_directories(root / "home");
-    std::string command = "env -u SSA_MIGRATE_FROM -u SSA_FIGURES -u SSA_SETTINGS SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy HOME='" + (root / "home").string() +
-        "' SKYLANDERS_DATA='" + (root / "data").string() + "' SKYLAUNCHER_DATA='" + (root / "launcher").string() +
-        "' SSA_COLLECTION='" + (root / "collection").string() + "' SSA_SAVE_DIR='" + (root / "saves").string() +
-        "' SSA_LAUNCHER_INI='" + (root / "x.ini").string() + "' SKYLAUNCHER_NO_UPDATE_CHECK=1 SSA_LAUNCHER_SHOTS='" + (root / "shots").string() +
-        "' SSA_LAUNCHER_TEST_SEATX=1 '" + SKYLAUNCHER_TEST_EXE + "' > '" + (root / "out.txt").string() + "' 2>&1";
+    std::string command = "env -u SKY_MIGRATE_FROM -u SKY_FIGURES -u SKY_SETTINGS -u SSA_MIGRATE_FROM -u SSA_FIGURES -u SSA_SETTINGS SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy HOME='" + (root / "home").string() +
+        "' SKYLANDERS_DATA='" + (root / "data").string() + "' SKY_LAUNCHER_DATA='" + (root / "launcher").string() +
+        "' SKY_COLLECTION='" + (root / "collection").string() + "' SKY_SAVE_DIR='" + (root / "saves").string() +
+        "' SKY_LAUNCHER_INI='" + (root / "x.ini").string() + "' SKY_LAUNCHER_NO_UPDATE_CHECK=1 SKY_LAUNCHER_SHOTS='" + (root / "shots").string() +
+        "' SKY_LAUNCHER_TEST_SEATX=1 '" + SKYLAUNCHER_TEST_EXE + "' > '" + (root / "out.txt").string() + "' 2>&1";
     EXPECT(std::system(command.c_str()) == 0);
     std::ifstream in(root / "out.txt");
     std::string line;
@@ -947,10 +948,10 @@ int main(int argc, char** argv)
         fprintf(stderr, "usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]\n");
         return 2;
     }
-    // The text the windows are checked against is English, whatever language the computer is in (SKYLAUNCHER_TEST_LANGUAGE=fr
+    // The text the windows are checked against is English, whatever language the computer is in (SKY_LAUNCHER_TEST_LANGUAGE=fr
     // only takes screenshots in another language: the text checks then fail).
-    const char* testLanguage = std::getenv("SKYLAUNCHER_TEST_LANGUAGE");
-    SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LANGUAGE", testLanguage != nullptr && *testLanguage != 0 ? testLanguage : "en", true);
+    const char* testLanguage = skyenv::Get("SKY_LAUNCHER_TEST_LANGUAGE");
+    SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LANGUAGE", testLanguage != nullptr && *testLanguage != 0 ? testLanguage : "en", true);
     std::filesystem::path iso = argv[1];
     std::filesystem::path scratch = std::filesystem::path(argv[2]) / "launcher_test";
     std::filesystem::remove_all(scratch);
@@ -962,26 +963,26 @@ int main(int argc, char** argv)
         return (long long)std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
     };
 
-    if (getenv("SKYLAUNCHER_TEST_I18N_ONLY") != nullptr) // only the languages (quick to rerun)
+    if (skyenv::Get("SKY_LAUNCHER_TEST_I18N_ONLY") != nullptr) // only the languages (quick to rerun)
     {
         int failures = I18nChecks();
         return failures == 0 ? 0 : 1;
     }
-    if (getenv("SKYLAUNCHER_TEST_UNINSTALL_ONLY") != nullptr) // only "Uninstall everything" (quick to rerun)
+    if (skyenv::Get("SKY_LAUNCHER_TEST_UNINSTALL_ONLY") != nullptr) // only "Uninstall everything" (quick to rerun)
     {
         int failures = UninstallChecks(scratch);
         printf("%d failures\n", failures);
         return failures == 0 ? 0 : 1;
     }
-    if (getenv("SKYLAUNCHER_TEST_COPY_ONLY") != nullptr) // only "Copy the game data" (quick to rerun)
+    if (skyenv::Get("SKY_LAUNCHER_TEST_COPY_ONLY") != nullptr) // only "Copy the game data" (quick to rerun)
     {
-        int failures = CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
+        int failures = CopyChecks(scratch, iso.string(), skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") != nullptr ? skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") : "");
         printf("%d failures\n", failures);
         return failures == 0 ? 0 : 1;
     }
-    if (getenv("SKYLAUNCHER_TEST_KIT_ONLY") != nullptr) // only "The kit follows the launcher" (quick to rerun)
+    if (skyenv::Get("SKY_LAUNCHER_TEST_KIT_ONLY") != nullptr) // only "The kit follows the launcher" (quick to rerun)
     {
-        KitFlowChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
+        KitFlowChecks(scratch, iso.string(), skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") != nullptr ? skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") : "");
         printf("%d failures\n", g_failures);
         return g_failures == 0 ? 0 : 1;
     }
@@ -1064,7 +1065,7 @@ int main(int argc, char** argv)
     std::string dataBefore = getenv("SKYLANDERS_DATA") != nullptr ? getenv("SKYLANDERS_DATA") : "";
     SDL_setenv_unsafe("SKYLANDERS_DATA", (scratch / "art-data").string().c_str(), 1);
     artChecks("ssa", iso.string(), 70);
-    if (const char* giantsIso = getenv("SKYLAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
+    if (const char* giantsIso = skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
     {
         artChecks("giants", giantsIso, 123);
         // The rule for a toy: the shown game's picture, else the other game's (Jet-Vac has none on Spyro's Adventure).
@@ -1079,7 +1080,7 @@ int main(int argc, char** argv)
             EXPECT(collection::PortraitPath("ssa", *jetVac).ends_with("eagle.png"));
         }
     }
-    if (const char* swapIso = getenv("SKYLAUNCHER_TEST_SWAPFORCE_ISO"); swapIso != nullptr)
+    if (const char* swapIso = skyenv::Get("SKY_LAUNCHER_TEST_SWAPFORCE_ISO"); swapIso != nullptr)
     {
         artChecks("swapforce", swapIso, 150);
         // A toy's portrait comes from the shown game's disc; Swap Force's own toys have one only here.
@@ -1129,8 +1130,8 @@ int main(int argc, char** argv)
         EXPECT(status != GameSourceStatus::Ok);
     }
 
-    // The Giants disc (optional: SKYLAUNCHER_TEST_GIANTS_ISO): its own game accepts it, Spyro's Adventure says it is another game.
-    if (const char* giantsIso = getenv("SKYLAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr && giants != nullptr)
+    // The Giants disc (optional: SKY_LAUNCHER_TEST_GIANTS_ISO): its own game accepts it, Spyro's Adventure says it is another game.
+    if (const char* giantsIso = skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr && giants != nullptr)
     {
         printf("Giants disc image:\n");
         GameSourceCheck own = CheckGameSource(giantsIso, *giants);
@@ -1142,7 +1143,7 @@ int main(int argc, char** argv)
         printf("The sidebar line through an install and an update:\n");
         SidebarChecks(scratch, iso.string(), giantsIso);
     }
-    if (const char* swapIso = getenv("SKYLAUNCHER_TEST_SWAPFORCE_ISO"); swapIso != nullptr && swapForce != nullptr)
+    if (const char* swapIso = skyenv::Get("SKY_LAUNCHER_TEST_SWAPFORCE_ISO"); swapIso != nullptr && swapForce != nullptr)
     {
         printf("Swap Force disc image:\n");
         GameSourceCheck own = CheckGameSource(swapIso, *swapForce);
@@ -1151,14 +1152,14 @@ int main(int argc, char** argv)
         if (giants != nullptr)
             EXPECT(CheckGameSource(swapIso, *giants).status == GameSourceStatus::WrongGame);
         EXPECT(CheckGameSource(iso.string(), *swapForce).status == GameSourceStatus::WrongGame);
-        if (const char* giantsIso = getenv("SKYLAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
+        if (const char* giantsIso = skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
             EXPECT(CheckGameSource(giantsIso, *swapForce).status == GameSourceStatus::WrongGame);
         printf("  accepted by its own game, refused by the others\n");
     }
     printf("The kit follows the launcher:\n");
-    KitFlowChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
+    KitFlowChecks(scratch, iso.string(), skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") != nullptr ? skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") : "");
     printf("Copy the game data:\n");
-    g_failures += CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
+    g_failures += CopyChecks(scratch, iso.string(), skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") != nullptr ? skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") : "");
     printf("The seats' X in the window:\n");
     SeatXChecks(scratch);
     printf("Command line without UI:\n");

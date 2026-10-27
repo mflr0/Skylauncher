@@ -1,4 +1,5 @@
 #include "launcher/game_copy.h"
+#include "launcher/env.h"
 #include "launcher/i18n.h"
 #include "launcher/ui/launcher_ui.h"
 #include "shared/collection/datadir.h"
@@ -56,7 +57,7 @@ void GameCopyJob::Start(const GameInfo& game, const std::string& image, const st
         gamedata::CopyOptions options;
         options.cancel = &m_cancel;
         options.progress = [this](uint64_t done, uint64_t total) { m_total = total; m_bytes = done; };
-        if (const char* free = SDL_getenv("SKYLAUNCHER_COPY_FREE_BYTES")) // tests: the room to assume
+        if (const char* free = LauncherEnv("SKY_LAUNCHER_COPY_FREE_BYTES")) // tests: the room to assume
             options.freeBytes = std::strtoll(free, nullptr, 10);
         m_result = gamedata::Copy(source, gamedata::Folder(id), options);
         m_done = true;

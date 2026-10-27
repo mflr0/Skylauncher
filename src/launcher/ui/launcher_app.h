@@ -257,7 +257,7 @@ namespace launcher_ui
         std::string Run();
         const GameInfo& ChosenGame() const { return m_s->game; } // the game that was shown when Run returned
         const std::string& ChosenRuntime() const { return m_s->chosenRuntime; }
-        int TestFailures() const { return m_testFailures; } // SSA_LAUNCHER_TEST_SWITCH: the checks that failed
+        int TestFailures() const { return m_testFailures; } // SKY_LAUNCHER_TEST_SWITCH: the checks that failed
         // What a game is doing, in a few words, for the sidebar and Home: the same state the game page draws, read from
         // the game's own slot (nullptr: not opened this session). `progress` is 0..1 while it installs or updates.
         struct SlotLine
@@ -514,7 +514,7 @@ namespace launcher_ui
             uint32_t holdId = 0; // the hold button's ImGui ID, for the screenshot test
         } m_un;
         bool m_uninstalled = false;    // done: the window only shows the result and quits
-        bool m_testUninstall = false;  // SSA_LAUNCHER_TEST_UNINSTALL: the uninstall screens
+        bool m_testUninstall = false;  // SKY_LAUNCHER_TEST_UNINSTALL: the uninstall screens
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
         uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)
 
@@ -533,26 +533,26 @@ namespace launcher_ui
         std::vector<ToastItem> m_toasts; // newest last; drawn from the top right, down
         std::vector<ImVec4> m_stars; // x, y (0..1), radius, phase
 
-        // Screenshot test (SSA_LAUNCHER_SHOTS, SSA_LAUNCHER_TEST_DROP): drives the screens without a player.
+        // Screenshot test (SKY_LAUNCHER_SHOTS, SKY_LAUNCHER_TEST_DROP): drives the screens without a player.
         std::string m_shots, m_testDrop;
-        bool m_testUpdate = false;  // SSA_LAUNCHER_TEST_UPDATE: the update screens (SKYLAUNCHER_UPDATE_URL names a fake release)
-        bool m_testReal = false;    // SSA_LAUNCHER_TEST_INSTALL=real: the real kit, a screenshot every SSA_LAUNCHER_TEST_EVERY seconds
-        bool m_testInstall = false; // SSA_LAUNCHER_TEST_INSTALL: the install screens instead
-        bool m_testCollection = false; // SSA_LAUNCHER_TEST_COLLECTION: the collection's screens instead
-        bool m_testSeatX = false;      // SSA_LAUNCHER_TEST_SEATX: the X on every seat, by mouse, keyboard and pad
+        bool m_testUpdate = false;  // SKY_LAUNCHER_TEST_UPDATE: the update screens (SKY_LAUNCHER_UPDATE_URL names a fake release)
+        bool m_testReal = false;    // SKY_LAUNCHER_TEST_INSTALL=real: the real kit, a screenshot every SKY_LAUNCHER_TEST_EVERY seconds
+        bool m_testInstall = false; // SKY_LAUNCHER_TEST_INSTALL: the install screens instead
+        bool m_testCollection = false; // SKY_LAUNCHER_TEST_COLLECTION: the collection's screens instead
+        bool m_testSeatX = false;      // SKY_LAUNCHER_TEST_SEATX: the X on every seat, by mouse, keyboard and pad
         std::vector<std::string> m_testSeats; // the seats the SEATX script restores before each try
         std::string m_testBuilt;                    // the sidebar test's built game, put back between the states it sets by hand
         std::map<std::string, std::string> m_drawn; // while testing: what the sidebar, Home and the main button drew ("sidebar:ssa", "home:ssa", "button")
-        bool m_testSidebar = false;    // SSA_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
-        bool m_testCopy = false;       // SSA_LAUNCHER_TEST_COPY: copying the game data, playing from it, the wrong-disc button
-        std::string m_testKit;         // SSA_LAUNCHER_TEST_KIT: "old", "giants", "updates" or "offline": the kit that follows the launcher, the game updates (fake release)
-        bool m_testSwitch = false;     // SSA_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
+        bool m_testSidebar = false;    // SKY_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
+        bool m_testCopy = false;       // SKY_LAUNCHER_TEST_COPY: copying the game data, playing from it, the wrong-disc button
+        std::string m_testKit;         // SKY_LAUNCHER_TEST_KIT: "old", "giants", "updates" or "offline": the kit that follows the launcher, the game updates (fake release)
+        bool m_testSwitch = false;     // SKY_LAUNCHER_TEST_SWITCH: both games' slots, a switch back and forth, PLAY on each
         int m_testFailures = 0;
         uint64_t m_testBegan = 0;
         std::string m_testSha, m_testPath, m_testRuntime[2];
-        bool m_testNav = false;        // SSA_LAUNCHER_TEST_NAV: keyboard and pad navigation, keys sent to ImGui
+        bool m_testNav = false;        // SKY_LAUNCHER_TEST_NAV: keyboard and pad navigation, keys sent to ImGui
         bool m_testControllers = false; // open the controller menu (its screenshot)
-        bool m_testButtons = false;     // SSA_LAUNCHER_TEST_BUTTONS: the action button's states, both games
+        bool m_testButtons = false;     // SKY_LAUNCHER_TEST_BUTTONS: the action button's states, both games
         bool m_testButtonsOff = false;  // its "disabled" shot: the main button drawn disabled
         std::string m_testShot;         // the next shot's name, for scripts that name their own
         float m_testUiScale = 0;        // > 0: the UI scale, whatever the display (the button test)
