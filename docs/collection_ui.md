@@ -16,13 +16,13 @@ and words, a sheet with three main actions. The look is dorydev's: her colours, 
   catalogue toy and variant kind; the library's own `collection/icons.*` is not used for drawing, only for
   `PortraitPath` (which disc picture a toy gets).
 - **Pictures.** A card shows the toy's picture from the disc of **the game being shown** (Giants' page: Giants'
-  portraits, its Series 2, LightCore, Legendary and alternate decos too), else from the other game's disc (Jet-Vac on
+  portraits, its Series 2, LightCore, Legendary and alternate decos too; Swap Force's, the same), else from the other game's disc (Jet-Vac on
   Spyro's Adventure's page), else the generated icon: `collection::PortraitPath(game, toy, VariantFor(toy, kind), large)`.
   The pictures are those `shared/art` cached in `<data>/<Game>/portraits/` when the disc was checked (or the game's Toy
   Box opened); SSARecomp's `docs/runtime/host/game_art.md` has the rule and the formats. Giants' large artworks (the
   versus screen's, about 1000x960, not square) are cached in `portraits/artworks/`; for a large view of one figure,
   `collection::BestPicturePath(game, toy, variant)` gives its best picture (the variant's own first, the largest).
-- **Variants.** The catalogue lists every variant Spyro's Adventure and Giants know (Series 2, LightCore, Legendary and
+- **Variants.** The catalogue lists every variant Spyro's Adventure, Giants and Swap Force know (Series 2, LightCore, Legendary and
   the alternate decos, with the ids Giants reads), and the later games' from public lists; SSARecomp's
   `docs/runtime/host/collection.md` ("The games' own toy tables") has the sources. Variants of kind `base` are the
   plain figure as sold with a non-zero id (named after the toy).
@@ -34,6 +34,29 @@ and words, a sheet with three main actions. The look is dorydev's: her colours, 
   `figure_data` and `collection`.
 - Folder: `collection::Folder()` (`%APPDATA%\Skylanders\Collection`, `~/Library/Application Support/Skylanders/Collection`).
   `SSA_COLLECTION` overrides it (tests, portable installs).
+
+## Swappers (Swap Force): one card, two halves
+
+A Swap Force swapper is two toys, a top and a bottom, each its own dump. The library links them (`Figure::partner`,
+`collection::Cards`, `CardName`, `CardLevelText`, `CreateSwapper`, `Pair`, `ChangeHalf`) and the page shows the pair as
+**one card** everywhere: the shelf, the seat tile, the sheet, Add a figure and the search.
+- **The card**: the top's picture with the bottom's small at its corner, the name ("Doom Stone", or "Boom Jet / Wash
+  Buckler" for mixed halves, or the label the player gave), the top's level and favourite star, one seat badge. A half on
+  its own (no partner) is a card of its own. A search or a filter that lets one half through brings the whole card.
+- **Putting it on the portal**: a click on a seat, a drag, or the sheet's "Put on the portal" places **both halves**. The seat
+  holds the top; `portal.txt` gets two lines for it, the top in the first slot of its seat and the bottom in the next.
+  Swap Force's slots are **Player 1: 0 and 1, Player 2: 2 and 3, Magic item: 4, Adventure: 5**; a figure that is not a
+  swapper takes the first slot of its seat. Reading the file back, a bottom whose top is on the portal too is not a seat.
+- **The sheet** (the top's page) shows both halves ("Top: Doom Stone · bottom: Doom Stone"), the top's level, **Change the
+  bottom** and **Change the top**: a list of the other halves (one row each, those on a seat or in use left out, "Now with
+  Blast Zone" or "On its own" under each); the card keeps one half and takes the one chosen, and a swapper that lost it is
+  given the old one, so no card disappears. A card on a seat stays there, written again for the new half. A half on its own
+  offers the change that finds it a partner. Edit, Reset, Back up and the favourite act on the top.
+- **Delete** (hold) sends both halves to the trash and takes the card off its seat; a half on its own deletes alone. Duplicate
+  copies both halves, linked. A swapper is in use when either half is held by a running game: the whole card is read-only.
+  Export and the other Manage actions work on dumps, so they carry both halves.
+- **Add a figure** lists a swapper once, by its top ("Doom Stone", 16 of them), and **Create** makes both halves, linked;
+  its versions are those of the top, the bottom of the same version when it has one.
 
 ## Migration (never loses a figure)
 
@@ -54,10 +77,12 @@ At the first visit to the page (`CollectionPage::Open`):
 - What the game reads at start is `portal.txt` in its data folder (`SSA_SAVE_DIR` in tests, else the game's folder in
   the data root): `<slot> <path>` lines, rewritten by the game at every change. The launcher writes it with seat *i* in
   slot *i* (`WriteSeats`) and reads it back (`ReadSeats`): a figure goes to its slot's seat when it fits, else to the
-  first seat that takes it (as the Toy Box does). The seats are per game (`catalogue.json` `games[].seats`).
+  first seat that takes it (as the Toy Box does). The seats are per game (`catalogue.json` `games[].seats`). Swap Force's
+  portal has six slots (see "Swappers"): `SeatFirstSlot` and `SlotSeat` map the seats to them.
 - **Which games**: the selector next to "PORTAL AT THE NEXT START" lists the games that can start with prepared seats,
-  those with a runtime in the catalogue (`SessionFile` not empty): Spyro's Adventure and Giants (Giants: Player 1,
-  Player 2, Item or adventure). The page opens on the game chosen in the sidebar when it is one of them.
+  those the launcher has a runtime for (`SessionFile` not empty): Spyro's Adventure, Giants (Player 1, Player 2, Item or
+  adventure) and Swap Force (Player 1, Player 2, Magic item, Adventure). The page opens on the game chosen in the sidebar
+  when it is one of them.
 - **Placing, two steps**: click a seat (A on it, or LB/RB), it lights up and the bar says "Choose a figure for Player 1 ·
   only what Spyro's Adventure reads"; the shelf then shows only what goes there and the game reads; click a figure: it
   goes on the seat ("Player 1: Splash's"), and the choosing ends. Click the seat again, Cancel, B or Escape stops
@@ -151,13 +176,16 @@ At the first visit to the page (`CollectionPage::Open`):
   refresh, settings move, unknown toy naming, icons for every catalogue toy (and the family's mark on items and packs),
   **the shelf** (every figure once, none left out, favourites first; choosing for the Magic item seat shows only the
   item; for a player seat only characters; the Element, Game and search filters), the card's level ("Level 10"), and
-  that Giants can be prepared but not the games without a runtime. Seat X: 12 of 12. Everything runs in a scratch
+  that Giants and Swap Force can be prepared but not the games without a runtime, **the swapper cards** (a swapper once on the
+  shelf whichever half a search or a filter matches, one seat and two lines of `portal.txt` for it, a bottom first in the
+  file still one seat, Change the bottom, Delete and Undelete of both halves, a lone half deleted alone). Seat X: 12 of 12. Everything runs in a scratch
   folder (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
 - Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `41-giants-variant-sheet`: the shelf, choosing for Player 1 and for the Magic
+  refuses without it) and writes `20-collection` to `45-swapforce-choose-player-1`: the shelf, choosing for Player 1 and for the Magic
   item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
   backups), the live portal (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
-  its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on. Set `SKYLANDERS_DATA`
+  its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on, Swap Force's portal with a
+  swapper on Player 1, the swapper's sheet, Change the bottom, and choosing for Player 1. Set `SKYLANDERS_DATA`
   to a folder holding the discs' cached pictures to see them (else the drawn icons).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the

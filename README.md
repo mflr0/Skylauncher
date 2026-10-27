@@ -1,6 +1,6 @@
 # Skylauncher
 
-A launcher for the native PC ports of *Skylanders: Spyro's Adventure* and *Skylanders: Giants*. You give it your own disc
+A launcher for the native PC ports of *Skylanders: Spyro's Adventure*, *Skylanders: Giants* and *Skylanders: Swap Force*. You give it your own disc
 image, it builds the game on your computer, and you play.
 
 Skylauncher contains no game code and no game art. Everything shown from the game is read from your own disc and stays
@@ -8,7 +8,7 @@ on your computer.
 
 ## What you need
 
-- Your own copy of *Skylanders: Spyro's Adventure* or *Skylanders: Giants* for Xbox 360, as a disc image (`.iso`).
+- Your own copy of *Skylanders: Spyro's Adventure*, *Skylanders: Giants* or *Skylanders: Swap Force* for Xbox 360, as a disc image (`.iso`).
 - Windows 10 or 11 (64-bit), a Mac with Apple Silicon, or a Linux PC (below).
 - An internet connection the first time: INSTALL downloads the game tools (about 30 to 40 MB) and the compiler.
 - **Linux:** an x86_64 PC with a Vulkan driver (Mesa or NVIDIA), about 6 GB free, and a distribution from 2022 or later

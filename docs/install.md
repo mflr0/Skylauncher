@@ -44,11 +44,12 @@ Cancel stops only the process the launcher started: SIGTERM then SIGKILL after 3
 SSABuild runs in a job object, so the compilers it started stop with it (also when the launcher is closed).
 SSABuild's output is also written to `install.log` in the game folder. `SKYLAUNCHER_BUILD_JOBS=N` passes `--jobs N`.
 
-## Two games: Spyro's Adventure and Giants (kit 0.5.0)
+## Three games: Spyro's Adventure, Giants and Swap Force (kit 0.5.0; Swap Force since the kit that lists it)
 
-The sidebar lists both games as playable. Each has its own folder in the data folder (`SSA/`, `Giants/`), its own remembered
-disc (`[ssa] iso=`, `[giants] iso=`), its own built game and its own install log; **one kit builds both** (`kit.txt`
-`games=ssa,giants`).
+The sidebar lists the three games as playable. Each has its own folder in the data folder (`SSA/`, `Giants/`, `SwapForce/`,
+the name `datadir::GameFolderName` gives), its own remembered disc (`[ssa] iso=`, `[giants] iso=`, `[swapforce] iso=`), its own
+built game and its own install log; **one kit builds them all** (`kit.txt` `games=ssa,giants,swapforce`; a kit that does not
+list Swap Force makes the launcher fetch the right one first, as for Giants).
 
 - Clicking the other game switches the window to it in place, with that game's state kept in a slot (docs/launcher_ui.md); the
   choice is kept as `[launcher] game=` so the launcher starts on the game last shown. Code: `App::SelectGame` and `PollSlots`,
@@ -59,12 +60,15 @@ disc (`[ssa] iso=`, `[giants] iso=`), its own built game and its own install log
   from the disc's own XDBF, as for SSA.
 - INSTALL runs the same SSABuild with the disc; **SSABuild finds the game itself** from `default.xex`'s SHA-256
   (workshop `docs/release/launcher/kit_contract.md`, "Several games in one kit"). The built game is `SSARecomp` for Spyro's
-  Adventure and **`SGRecomp`** (`SGRecomp.app`, `SGRecomp.exe`) for Giants, `GameInfo::runtime` in the game table. Both log to
-  `SSARecomp.log` in their own folder.
+  Adventure, **`SGRecomp`** (`SGRecomp.app`, `SGRecomp.exe`) for Giants and **`SSFRecomp`** for Swap Force, `GameInfo::runtime` in
+  the game table. Each logs to `SSARecomp.log` in its own folder.
 - The Giants install is about 15 minutes (4443 shaders to translate instead of 1118): `InstallMinutesFor()`. Measured with kit 0.5.0 on an M1 Pro: SSA 193 s, Giants 563 s (the second shader pass is incremental since 0.5.0).
-- The shared figure collection serves both games (the catalogue already holds all six games' toys).
+- The shared figure collection serves all three games (the catalogue already holds all six games' toys).
+- Swap Force's disc is "Skylanders - Swap Force (USA, Australia) (En,Fr)": English and French (its Language tab offers those
+  two). The install estimate shown is the generic one (`InstallMinutes`); only Giants has its own figure.
 - Verify: `SkylauncherTest <spyro iso> <scratch>` checks the table and folders; with `SKYLAUNCHER_TEST_GIANTS_ISO=<giants iso>` it
-  also checks that each disc is accepted by its own game and refused by the other. End to end: see "Testing without the kit".
+  also checks that each disc is accepted by its own game and refused by the other; `SKYLAUNCHER_TEST_SWAPFORCE_ISO=<swap force iso>`
+  adds the Swap Force disc (accepted by its game, refused by the others, its pictures and portraits read into `SwapForce/`). End to end: see "Testing without the kit".
 
 ## Where things are
 
@@ -129,7 +133,7 @@ rebuilds it with the new kit and ends this.
 ### Delete data, uninstall
 
 Each game's settings > **Game** tab (the Settings button on the game's Play page) has the buttons below. They act on that game
-only, in its folder (`<root>/SSA` or `<root>/Giants`); the shared `Collection/`, the other game, the kits and the launcher's
+only, in its folder (`<root>/SSA`, `<root>/Giants` or `<root>/SwapForce`); the shared `Collection/`, the other game, the kits and the launcher's
 `launcher.ini` are never touched. All of them are **refused while the game runs** (`saves-backup/game.lock`, the same marker
 Restore uses) and **disabled while the game installs**. The sizes shown next to them are measured when the tab opens.
 

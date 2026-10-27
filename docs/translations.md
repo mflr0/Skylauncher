@@ -60,5 +60,7 @@ things are particular to them:
 - **The library's names** (elements, types, versions) are English in the shared library; the page translates them with
   `ElementName`, `CategoryLabel` and `KindLabel` (tables of `N_`). The library's own French (`LevelText`, `SeatTag`) is
   asked for with `French()`.
-- **Data stays as it is**: the catalogue's toy and version names, Giants' hat names, and a figure's own label.
+- **Data stays as it is**: the catalogue's toy and version names, Giants' hat names, and a figure's own label. A swapper's name
+  ("Doom Stone", "Boom Jet / Wash Buckler") is data too; the words around it ("Swapper", "Top: ... · bottom: ...", "Change the
+  bottom", "Change the top") are translated, with the Toy Box's French ("Changer le bas", "Changer le haut").
 - **A count with a plural** is two strings (`{} figure`, `{} figures`), as everywhere.

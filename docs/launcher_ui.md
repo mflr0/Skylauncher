@@ -38,7 +38,7 @@ is easy to iterate without touching the game runtime.
 The launcher opens on Home, the menu page (the SKYLAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
 GitHub issue) and the GitHub link bottom right. The launcher's own language is in Settings > Launcher > Language
 (`docs/translations.md`); the game's text and voice languages are in that game's settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
-1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later",
+1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure, Giants and Swap Force enabled, the others "Coming later",
    SuperChargers Racing included), then COLLECTION and the Settings gear at the bottom. Each enabled row shows its game's icon
    and its live state ("Open" until the game is first shown, then the states in "A game's states"); the
    selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
@@ -57,7 +57,8 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
      HD texture packs (and their folder), Advanced > dump textures. The game's own copy, `[<game>.video]` (docs/settings.md).
    - Language: game text and game voices (`[<game>] language`, `voice_language`). Giants' disc has twelve languages for both (English,
      French, German, Spanish, Latin-American Spanish `es-419`, Italian, Dutch, Portuguese, Swedish, Norwegian, Danish, Finnish) and its
-     voices default to **Same as text** (an empty `voice_language`); Spyro's Adventure has ten, its voices default to English.
+     voices default to **Same as text** (an empty `voice_language`); Spyro's Adventure has ten, its voices default to English; Swap Force's
+     disc has English and French.
    - Disc: the image's file name and state; **Choose... / Change...**, **Remove** (the launcher forgets it; the file is not
      touched), **Show in folder**. Disabled while a check or an install runs.
    - Saves: **Open saves folder** and the save backups with Restore (held, refused while the game runs).
@@ -81,7 +82,7 @@ in the sidebar (`[launcher] game=`); the other is one click away.
 1. **Left sidebar** (grey, fixed width).
    - The title, **SKYLAUNCHER**, with the launcher's version beside it, small and dim (`v0.4.2`, from
      `SKYLAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" and YOUR GAMES.
-   - The seven games as full-width rows (Spyro's Adventure and Giants enabled, the others "Coming later", SuperChargers
+   - The seven games as full-width rows (Spyro's Adventure, Giants and Swap Force enabled, the others "Coming later", SuperChargers
      Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
      art with "Skylanders" on it, in the row's left column (`GameLogoW` x `GameLogoH`); before that, and for the games
      coming later (no disc, so never any game art), a neutral badge: the initial on the game's colour.
@@ -90,7 +91,7 @@ in the sidebar (`[launcher] game=`); the other is one click away.
    - COLLECTION and the Settings gear at the bottom, their icons in the logos' column and their labels in the names'.
    - Rows are reachable with the keyboard and the pad like the others.
 2. **Play** (the game page, no tabs).
-   - The backdrop is the game's own painting from the disc (SSA: the painted Skylands sky; Giants: the main menu's sky),
+   - The backdrop is the game's own painting from the disc (SSA: the painted Skylands sky; Giants: the main menu's sky; Swap Force: the main menu's painted sky),
      cropped to fill the page and shaded (`DrawBackdrop`: darker at the top, light behind the logo, dark towards the band,
      a shadow along the sidebar) so the logo and white text read on any painting. Before any disc: the drawn night sky.
    - The logo, large and centred, with a soft shadow, **falls in** on each arrival (see "The logo's arrival"). Before the
@@ -189,6 +190,7 @@ What belongs to the game on its page is drawn in **the game's own colours**, tak
 |---|---|---|
 | Spyro's Adventure | the logo's sky blue to deep blue, navy ink | `SpyrosAdventureStyle` |
 | Giants | the logo's gold to orange, dark brown ink | `GiantsStyle` |
+| Swap Force | the logo's lime to green, dark green ink | `SwapForceStyle` |
 | any other | the launcher's own blue | |
 
 **The action button** (`App::DrawMainAction(at, {label, enabled, progress})`, the owner's choice of 2026-10-25, "flat and
@@ -196,7 +198,7 @@ crisp"): one split button, `PlayButtonW` + `PlayGearW` by `PlayButtonH` (300 + 6
 - Flat: a light gradient between the game's two colours (20 % to 58 % of the way), `Radius` corners, no outline, a soft
   shadow, a hairline of light along the top. The label in Bungee, 40 % of the height (smaller if it would not fit), centred
   on its capitals and placed on whole pixels; its ink is white when that reads at 3:1 on the fill, else the game's dark
-  ink (navy for SSA, brown for Giants), and it never changes under the pointer.
+  ink (navy for SSA, brown for Giants, dark green for Swap Force), and it never changes under the pointer.
 - The game's settings: a gear in the right segment, behind a dark and a light hairline; its tooltip "<game> settings".
 - States, each half on its own: under the pointer 10 % lighter, pressed 10 % darker; **focused** (keyboard, pad): the
   focused half lit as under the pointer and one accent ring around the whole button (ImGui's own ring hidden there);
@@ -265,7 +267,7 @@ Windows is not built or run here: its `.ico` bytes and every name and argument a
 the one standard COM call (`#ifdef _WIN32`, checked to compile with MinGW) and needs a look on a real PC.
 
 ## Command line
-`Skylauncher [--game <id>] [--play] [--help]`: `--game ssa|giants` opens that game's page (else the game shown last),
+`Skylauncher [--game <id>] [--play] [--help]`: `--game ssa|giants|swapforce` opens that game's page (else the game shown last),
 `--play` starts it once its disc is checked and it is built. Anything else is ignored with a line on stderr.
 
 ## Collection
@@ -281,12 +283,12 @@ provider (`src/shared/art/game_art.h`, the same code as the game's Toy Box; SSAR
 `LauncherAssets::Provider::ExtractFromDisc` = `art::Extract(game, disc, titleIcon)`. One flow for every game; what
 differs per game is the provider's table.
 
-| Role | Spyro's Adventure | Giants | File |
-| --- | --- | --- | --- |
-| Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 1033x541, with the plate and the medallions) | `<data>/<Game>/launcher-cache/logo.png` |
-| Background (game page, Home) | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | `.../background.png` |
-| Title icon | `default.xex` XDBF resource | the same | `.../title_icon.png` |
-| Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px), 4 items and 3 family icons (potion, compass, paw) of `uigameimage.str`: 81 | the collection screen's 123 portraits (256 px) | `<data>/<Game>/portraits/` |
+| Role | Spyro's Adventure | Giants | Swap Force | File |
+| --- | --- | --- | --- | --- |
+| Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 1033x541, with the plate and the medallions) | the title picture of `defaultloadscreen.pak` (`juicestandard_title_10.igz`, 872x400) | `<data>/<Game>/launcher-cache/logo.png` |
+| Background (game page, Home) | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | the main menu's background of `juicedomain_frontend.pak` (1280x720) | `.../background.png` |
+| Title icon | `default.xex` XDBF resource | the same | the same | `.../title_icon.png` |
+| Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px), 4 items and 3 family icons (potion, compass, paw) of `uigameimage.str`: 81 | the collection screen's 123 portraits (256 px) | the toy collection's portraits and the collectible icons of `toycollectionimages.pak` and `collectibleicons.pak`: 209 | `<data>/<Game>/portraits/` |
 
 - Already cached pictures are kept (a second check reads nothing); `manifest.ini` records the reader's version and what
   was found. Deleting the folders is always safe. The cache of older launchers (`SSA/launcher-cache/<title id>/`, for every
@@ -377,7 +379,7 @@ repository's working copy (its own HOME, the offscreen driver).
 ## Notes
 - Drag & drop ISO is supported through `SDL_EVENT_DROP_FILE`.
 - Verification progress is saved to `launcher.ini`; the SSA title/icon come from the player's own XEX.
-- The game catalog lives in `LauncherGameCatalog()`; SSA and Giants are enabled.
+- The game catalog lives in `LauncherGameCatalog()`; SSA, Giants and Swap Force are enabled.
 - **Switching games is in place.** Choosing the other game in the sidebar keeps the window: the pages draw that game's state
   (`App::SelectGame`). Each game the player opens has a `GameSlot` for the session: its disc and check, art and icon, install
   (progress, kit download, built game), save backups and collection page (the collection's game filter starts on that game).
@@ -397,5 +399,7 @@ repository's working copy (its own HOME, the offscreen driver).
   by Delete and by the pad's X, checking after every try that only that seat is empty. It is run by `SkylauncherTest`.
 - `SkylauncherTest` checks verification, settings (`tests/settings_test.cpp`: per-game video, the command line, the shortcut files,
   delete data and uninstall on scratch folders), font/text helpers, the disc texture decoder, the seat X and the in-place game switch
-  (build it with `--target SkylauncherTest FakeSSABuild`; set `SKYLAUNCHER_TEST_GIANTS_ISO` for the switch).
+  (build it with `--target SkylauncherTest FakeSSABuild`; set `SKYLAUNCHER_TEST_GIANTS_ISO` for the switch, and
+  `SKYLAUNCHER_TEST_SWAPFORCE_ISO` for the Swap Force disc and its pictures). A swapper in the Collection is one card
+  (`docs/collection_ui.md`, "Swappers").
 - `launcher: ui scale` is logged once, then only when the scale changes (a display change, Ctrl +/-/0), not at every window event.

@@ -27,6 +27,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `ssa` | `language` | `en` `fr` `de` `es` `it` `nl` `sv` `no` `da` `fi` | Text language | yes |
 | `ssa` | `voice_language` | same codes | Voice language | yes |
 | `giants` | `language`, `voice_language` | `en` `fr` `de` `es` `es-419` `it` `nl` `pt` `sv` `no` `da` `fi` | Text and voice language (the disc's twelve); `voice_language` empty or absent: the voices follow the text | yes |
+| `swapforce` | `language`, `voice_language` | `en` `fr` | Text and voice language (the disc's two) | yes |
 | `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes (the key is per game: see "Per-game video" below) |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
 | `video` | `fps_limit` | `30`, `60` | Frame rate cap (the game is made for 30; 60 is experimental). Other values the runtime reads as 60 | yes |
@@ -48,9 +49,9 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 
 ## Per-game video
 
-The runtime reads one `[video]` section, but the two games do not have to share it. Each game keeps its own copy of the
+The runtime reads one `[video]` section, but the games do not have to share it. Each game keeps its own copy of the
 nine keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
-`anisotropy`, `aspect`, `texture_packs`, `texture_dump`) in **`[ssa.video]`** and **`[giants.video]`**:
+`anisotropy`, `aspect`, `texture_packs`, `texture_dump`) in **`[ssa.video]`**, **`[giants.video]`** and **`[swapforce.video]`**:
 
 | Section | Key | Meaning |
 | --- | --- | --- |
