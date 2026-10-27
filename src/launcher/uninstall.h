@@ -35,6 +35,7 @@ namespace uninstall
         GameData,  // the copies of the discs' game data
         Tools,     // the kits and the compilers downloaded
         Caches,    // shader caches, the art cache, portraits, logs
+        OldFolders, // the folders of the layout before 0.3.1
         Settings,  // launcher.ini
         Shortcuts, // the desktop shortcuts the launcher made
         Launcher,  // Skylauncher itself
@@ -65,7 +66,7 @@ namespace uninstall
         InUse,      // a game or a figure in use
         NotRemoved, // the system refused (the error is in `detail`)
         Unfit,      // not a launcher we know how to remove (not a .app, .exe...)
-        Kept,       // other files in the figure folder
+        Kept,       // left on purpose: other files in the figure folder, the Xbox signing keys
     };
     struct Left
     {
@@ -91,6 +92,7 @@ namespace uninstall
         std::filesystem::path home;         // the user's home folder, never a target (nor anything that holds it)
         std::filesystem::path root;         // datadir::Root(): <data>/Skylanders
         std::filesystem::path launcherData; // Skylauncher's own data folder (the root unless SKYLAUNCHER_DATA says otherwise)
+        std::vector<std::filesystem::path> oldFolders; // the pre-0.3.1 folders (datadir::OldRoots) that still exist
         std::filesystem::path settingsFile; // launcher.ini
         std::filesystem::path collection;   // the figure folder
         std::filesystem::path desktop;      // where the shortcuts are

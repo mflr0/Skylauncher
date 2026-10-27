@@ -711,6 +711,7 @@ Games	Jeux
 Game data copies	Copies des données de jeu
 Game tools	Outils de jeu
 Caches and logs	Caches et journaux
+Older folders	Anciens dossiers
 Settings	Réglages
 Desktop shortcuts	Raccourcis du bureau
 Also delete my saves and my figures	Supprimer aussi mes sauvegardes et mes figurines
@@ -736,3 +737,4 @@ Skylauncher can't remove itself from here: delete it by hand.	Skylauncher ne peu
 {} is a disc image: it stays.	{} est une image disque : elle reste.
 {} couldn't be removed.	{} n'a pas pu être supprimé.
 Other files in the figures folder stay.	Les autres fichiers du dossier des figurines restent.
+Kept: Xbox signing keys	Gardé : clés de signature Xbox

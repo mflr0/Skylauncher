@@ -20,6 +20,7 @@ namespace launcher_ui
             case Group::GameData: return Tr("Game data copies");
             case Group::Tools: return Tr("Game tools");
             case Group::Caches: return Tr("Caches and logs");
+            case Group::OldFolders: return Tr("Older folders");
             case Group::Settings: return Tr("Settings");
             case Group::Shortcuts: return Tr("Desktop shortcuts");
             case Group::Launcher: return "Skylauncher";
@@ -53,7 +54,7 @@ namespace launcher_ui
             case Why::NotRemoved: return Tf("{} couldn't be removed.", NameOf(left));
             case Why::Unfit: return left.group == Group::Launcher ? std::string(Tr("Skylauncher can't remove itself from here: delete it by hand."))
                                                                     : Tf("{} couldn't be removed.", NameOf(left));
-            case Why::Kept: return Tr("Other files in the figures folder stay.");
+            case Why::Kept: return left.group == Group::OldFolders ? Tr("Kept: Xbox signing keys") : Tr("Other files in the figures folder stay.");
             }
             return {};
         }
@@ -183,7 +184,7 @@ namespace launcher_ui
             if (has)
                 row(game.name, LauncherFormatSize(bytes), Text), any = true;
         }
-        for (Group group : { Group::GameData, Group::Tools, Group::Caches, Group::Settings, Group::Shortcuts, Group::Launcher })
+        for (Group group : { Group::GameData, Group::Tools, Group::Caches, Group::OldFolders, Group::Settings, Group::Shortcuts, Group::Launcher })
             if (plan.Has(group))
             {
                 row(GroupName(group), LauncherFormatSize(plan.Bytes(group)), Text);
