@@ -55,8 +55,8 @@ Another release is refused with a message. If you own one, open an issue with it
    - **Mac:** `ArkeyanLauncher-macOS.dmg`. The app is not notarized: the first time, right-click it and choose Open.
    - **Linux:** `ArkeyanLauncher-x86_64.AppImage`, after `chmod +x`.
 2. Drop your `.iso` on the window, or click the button to choose it. The disc is checked.
-3. Click **INSTALL**. The game is built from your disc. It takes about 10 minutes for Spyro's Adventure and 15 for
-   Giants, and happens once.
+3. Click **INSTALL**. The game is built from your disc. It takes 10 to 20 minutes depending on the game, and happens
+   once.
 4. Click **PLAY**.
 
 ## Controls
@@ -115,7 +115,7 @@ Portal of Power. Then click **Test the portal**.
 - Settings (the gear) > Support > **Copy game log** copies the log so you can send it to us. **Open logs folder** shows the
   files.
 - Everything is in one "Skylanders" folder: `%APPDATA%\Skylanders\` on Windows, `~/Library/Application Support/Skylanders/`
-  on Mac, `~/.local/share/Skylanders/` on Linux. The logs are in its `logs/` and `SSA/` folders.
+  on Mac, `~/.local/share/Skylanders/` on Linux. The logs are in its `logs/` folder and in each game's folder.
 - If the game stops with an error, a window offers Copy log and Report.
 - Updates (Arkeyan Launcher's and each game's) are looked for at every start; an offline start says nothing. Every download is checked against the release's SHA-256.
 
