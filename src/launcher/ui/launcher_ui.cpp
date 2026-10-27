@@ -1533,7 +1533,7 @@ namespace launcher_ui
         ImGui::PopFont();
 
         ImVec2 iconAt(size.x - Pad - Icon, size.y - Pad - Icon);
-        ImGui::SetCursorScreenPos(ImVec2(iconAt.x - 14 - ReportW, iconAt.y));
+        ImGui::SetCursorScreenPos(ImVec2(iconAt.x - 14 - PillWidth(Tr("Report a bug"), ReportW, true), iconAt.y));
         if (PillButton(Tr("Report a bug"), false, ReportW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
             SDL_OpenURL((std::string(Project) + "/issues/new").c_str());
         if (ImGui::IsItemHovered())
@@ -1824,7 +1824,8 @@ namespace launcher_ui
         // The game's other settings (video, languages, saves, data) are behind the gear next to the main button.
         if (ready && !installing && !m_s->installView && !m_s->fromCopy) // the copy replaces the disc image
         {
-            constexpr float ChangeDiscW = 160;
+            constexpr float ChangeDiscMin = 160;
+            const float ChangeDiscW = PillWidth(Tr("Change disc..."), ChangeDiscMin, true);
             ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
             if (PillButton(Tr("Change disc..."), false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
@@ -2242,7 +2243,7 @@ namespace launcher_ui
             bool keep = PillButton(Tr(strings::KeepInstalling), true, 200, true);
             if (ImGui::IsWindowAppearing())
                 ImGui::SetItemDefaultFocus();
-            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
+            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - PillWidth(Tr(strings::Quit), 120, true));
             bool quit = PillButton(Tr(strings::Quit), false, 120, true);
             if (keep || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {

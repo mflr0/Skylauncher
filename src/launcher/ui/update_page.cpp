@@ -250,7 +250,7 @@ namespace launcher_ui
             ImGui::EndChild();
             if (PillButton(Tr("Release page"), false, 160) && !state.launcher.pageUrl.empty())
                 SDL_OpenURL(state.launcher.pageUrl.c_str());
-            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 2 * 140 - ImGui::GetStyle().ItemSpacing.x);
+            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - PillWidth(Tr("Close"), 140) - PillWidth(Tr("Update now"), 140, true) - ImGui::GetStyle().ItemSpacing.x);
             if (PillButton(Tr("Close"), false, 140) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
                 m_whatsNewOpen = false;

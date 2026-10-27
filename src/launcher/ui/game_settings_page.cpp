@@ -43,7 +43,7 @@ namespace launcher_ui
         ImGui::SetScrollX(0.0f);
 
         Title(m_s->game.name, HeadlineSize, Text);
-        ImGui::SameLine(width - 150);
+        ImGui::SameLine(width - PillWidth(Tr("Back"), 120) - 30);
         if (PillButton(Tr("Back"), false, 120))
             GoTo(Page::Play);
         ImGui::PushFont(nullptr, SmallSize);

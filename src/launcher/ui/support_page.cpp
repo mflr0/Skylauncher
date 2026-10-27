@@ -144,7 +144,7 @@ namespace launcher_ui
                 SDL_SetClipboardText(m_reportText.c_str());
                 Toast(Tr("Report copied"));
             }
-            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - 120);
+            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - PillWidth(Tr("Close"), 120));
             // B / Escape close it, as every dialog (A presses the focused button).
             if (PillButton(Tr("Close"), false, 120) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
             {
