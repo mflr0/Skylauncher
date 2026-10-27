@@ -131,6 +131,7 @@ add_library(SkylauncherCore STATIC
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
     src/shared/collection/save_backup.cpp
+    src/shared/collection/search.cpp
     src/shared/collection/upgrades.cpp
     src/shared/art/alchemy_archive.cpp
     src/shared/art/game_art.cpp

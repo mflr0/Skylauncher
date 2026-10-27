@@ -273,7 +273,7 @@ the one standard COM call (`#ifdef _WIN32`, checked to compile with MinGW) and n
 ## Collection
 See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favourites, backups
 and six-game catalogue) with the Toy Box's model: the portal at the next start (the game's seats on top), the bar
-(search, Element, Game, Type), the shelf (every figure once, favourites first), the figure sheet (Put on the portal, Edit,
+(the search field and Filters: Element, Game, Type, Sort by; the tags), the shelf (every figure once, favourites first), the figure sheet (Put on the portal, Edit,
 Favourite, `...`, Details), Add a figure and Manage. The icons are the shown game's portraits from its disc, else the
 other game's, else the toy's family picture, else the generated ones (`figures::IconStyle`): "Disc art" below.
 

@@ -3,6 +3,7 @@
 // The Collection page's data, with no UI: the shared collection (SSARecomp's library, src/shared/collection), the seats
 // of the game's next session, and what changes on disk while a game runs (docs/collection_ui.md).
 #include "shared/collection/collection.h"
+#include "shared/collection/search.h"
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -56,7 +57,8 @@ namespace launcher_ui
         int element = -1;      // a collection::Element
         std::string game;      // the game a toy came with ("giants")
         int category = -1;     // a collection::Category
-        std::string text;      // in the name, the nickname, the toy's name or the file name, any case
+        std::string text;      // the smart search (collection::SearchMatches): names, elements, games, types, versions, levels
+        collection::Sort sort = collection::Sort::Recent;
         int seat = -1;         // choosing for this seat of the model's game: only what goes there and the game reads
     };
 
@@ -87,7 +89,8 @@ namespace launcher_ui
         bool DeleteCard(const std::string& path, std::string* error);
         std::vector<std::string> OnPortal() const; // the seated paths
         // The figures the page shows, into `shown`, cut by collection::Group's shelf for Game(): every figure once,
-        // favourites first, then what the game took (newest first), then by element; unknown toys and the toys the game
+        // favourites first, then what the game took (newest first), then by element (Sort::Recent; the other sorts ignore
+        // favourites); unknown toys and the toys the game
         // does not read after (none of those when choosing for a seat). The untouched starters the game made on its own
         // are left out unless seated; `hidden` (optional) counts them.
         std::vector<collection::Section> Shelf(const ShelfFilter& filter, std::vector<collection::Figure>& shown, int* hidden = nullptr) const;

@@ -107,9 +107,21 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Header**: COLLECTION, "14 figures · 3 favourites", the portal status; `+ Add a figure` and `...` (Trash, Backups,
   Import and export, Unknown toys, Tidy the starters: Manage on that tab; Show the collection folder).
 - **The seats** (above).
-- **The bar**: "Search by name or nickname" (label, nickname, toy name, file name) and three menus, **Element**,
-  **Game** (the game a toy came with), **Type** (the types the collection has). A set filter shows its value, lit
-  ("Water v"). Nothing matches: "No figure matches" and "Clear the search and the filters".
+- **The bar** (2026-10-27, the Toy Box's too, same words and order; `docs/runtime/host/toybox_ux.md` of the game's repo
+  holds the design): the **search field** first and wide ("Name, element, game, level..."), then one **Filters** button
+  ("Filters · 2" when two are on) opening a small panel of four drop-downs, **Element**, **Game** (the game a toy came
+  with), **Type** (the types the collection has) and **Sort by** (Recent, Name, Level, Element, Game), and **Clear all**.
+  Under the bar, only when something is on, the **tags**: one per filter with an x ("Water x", "Sort: Level x"), **Clear
+  all**, and the count at the right ("12 figures", "1 figure"; French "12 figurines"). Nothing matches: "No figure
+  matches" and "Clear the search and the filters". The designer's look is untouched: the field, the pill button and the
+  popup are the launcher's own widgets; the tags are pills in her greys and blue.
+- **The smart search** (`collection::SearchMatches`, shared with the game): the words all have to match; a name
+  (label, nickname, toy, version, file), an element ("fire", "feu"), a game ("giants", "swap force"), a type ("item",
+  "objet", "adventure", "mini", "swapper"), a version ("legendary", "lightcore"), "level 10" / "niveau 10"; case and
+  accents do not matter, English and French both always work, and one typo is tolerated in a word of 5 letters or more
+  ("giatns"). A swapper is found by either half and stays one card.
+- **Sort**: Recent (the default: favourites first, then what the game took, then by element), Name, Level (highest
+  first), Element, Game. The other four ignore favourites. `ShelfFilter::sort`.
 - **The shelf** (`CollectionModel::Shelf`, `collection::Group` Smart for the portal's game): every figure once,
   favourites first, then the ones that game took (newest first), then by element; "Unknown toys" and "Not for
   Spyro's Adventure" (greyed: they can't go on this portal) after it. The untouched starters the game made on its own
@@ -160,7 +172,7 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Gamepad**: d-pad moves (ImGui navigation; down from a seat to the shelf, up from its first row back to the seats), A
   chooses (a seat: choose for it; a card: put it on the seat being chosen for, else its sheet), B goes back (closes the
   overlay one step, stops choosing, clears the search; then out of the page), X opens the sheet (on a seat: takes its
-  figure off), Y the search, LB/RB choose for the previous/next seat. Cards scrolled out of view aren't drawn; Manage and
+  figure off), Y the search (the bar's search, Filters and tags are on the way up from the shelf), LB/RB choose for the previous/next seat. Cards scrolled out of view aren't drawn; Manage and
   the sheet read the trash and the backups once per change of the collection.
 
 ## Files
@@ -176,18 +188,19 @@ At the first visit to the page (`CollectionPage::Open`):
   backups, restore, reset, duplicate, trash, import dedupe, JSON locks (live, stale), seats and `portal.txt`, live
   refresh, settings move, unknown toy naming, icons for every catalogue toy (and the family's mark on items and packs),
   **the shelf** (every figure once, none left out, favourites first; choosing for the Magic item seat shows only the
-  item; for a player seat only characters; the Element, Game and search filters), the card's level ("Level 10"), and
+  item; for a player seat only characters; the Element, Game and search filters, the smart search in both languages with a typo and a level, the sort), the card's level ("Level 10"), and
   that Giants and Swap Force can be prepared but not the games without a runtime, **the swapper cards** (a swapper once on the
   shelf whichever half a search or a filter matches, one seat and two lines of `portal.txt` for it, a bottom first in the
   file still one seat, Change the bottom, Delete and Undelete of both halves, a lone half deleted alone). Seat X: 12 of 12. Everything runs in a scratch
   folder (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
 - Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `46-add-standard-version`: the shelf, choosing for Player 1 and for the Magic
+  refuses without it) and writes `20-collection` to `52-sort-name`: the shelf, choosing for Player 1 and for the Magic
   item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
   backups), the live portal (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
   its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on, Swap Force's portal with a
   swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (Standard and the others, no
-  second row with the toy's own name). Set `SKYLANDERS_DATA`
+  second row with the toy's own name), then the smart search (an element, a level, a typo: `47-` to `49-`), the Filters panel
+  (`50-`), the tags with a count (`51-`) and a sort (`52-`). Set `SKYLANDERS_DATA`
   to a folder holding the discs' cached pictures to see them (else the drawn icons).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the

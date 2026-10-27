@@ -1,7 +1,6 @@
 #pragma once
 
-// The Collection page: the portal at the next start (the seats of the chosen game), the bar (search, Element, Game,
-// Type, Add a figure), the shelf (every figure once, favourites first), the figure sheet, Add a figure and Manage
+// The Collection page: the portal at the next start (the seats of the chosen game), the bar (search, Filters), the shelf (every figure once, favourites first), the figure sheet, Add a figure and Manage
 // (docs/collection_ui.md). The figures are the shared collection's (SSARecomp's library); the
 // look is the launcher's. Drawn by App's widgets (a friend), in collection_page.cpp, collection_figure.cpp,
 // collection_add.cpp and collection_manage.cpp.
@@ -80,7 +79,9 @@ namespace launcher_ui
         void TakeOff(size_t seat);
         void Choose(int seat);  // the next card picked goes on this seat; -1: stop choosing
         void DrawBar();
-        bool FilterMenu(const char* id, const char* all, const std::string& current, float width, const std::function<void()>& items);
+        void DrawTags();
+        void ClearFilters();
+        int FoundCount() const;
         void DrawList();
         bool DrawCard(const collection::Figure& figure, float width, bool dim);
         void DrawOverlay();
@@ -146,8 +147,10 @@ namespace launcher_ui
         std::vector<collection::Figure> m_list;
         std::vector<collection::Section> m_sections;
         int m_hiddenStarters = 0;
-        ShelfFilter m_filter;           // Element, Game, Type (the search is m_search)
+        ShelfFilter m_filter;           // Element, Game, Type, Sort (the search is m_search)
         char m_search[64] = {};
+        bool m_openFilters = false;     // the screenshot test opens the Filters panel, and closes it at the next screen
+        bool m_closeFilters = false;
         bool m_focusSearch = false;     // Y, F3: the search box takes the keyboard next frame
         int m_choosing = -1;            // the seat the next card goes on (a seat clicked, A, LB/RB); -1: browsing
         std::vector<ImVec2> m_crossAt;  // where each seat's X was drawn this frame (-1: none), for the test

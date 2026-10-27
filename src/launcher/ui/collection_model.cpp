@@ -345,11 +345,7 @@ namespace launcher_ui
     {
         const collection::Game* game = Game();
         const collection::Catalogue& catalogue = collection::Catalogue::Get();
-        auto lower = [](std::string text) {
-            std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(tolower(c)); });
-            return text;
-        };
-        std::string text = lower(std::string(Trimmed(filter.text)));
+        std::string text = Trimmed(filter.text);
         std::vector<std::string> seated = OnPortal();
         shown.clear();
         if (hidden != nullptr)
@@ -377,13 +373,8 @@ namespace launcher_ui
                 (filter.category >= 0 && (toy == nullptr || int(toy->category) != filter.category)) ||
                 (!filter.game.empty() && (toy == nullptr || toy->game != filter.game)))
                 continue;
-            if (!text.empty())
-            {
-                std::string words = figure.label + "\n" + figures::NicknameUtf8(figure.stats) + "\n" + figure.DisplayName() + "\n" +
-                    (toy != nullptr ? toy->name : std::string()) + "\n" + figure.file;
-                if (lower(words).find(text) == std::string::npos)
-                    continue;
-            }
+            if (!text.empty() && !collection::SearchMatches(text, collection::CardOf(figures, i), gameId))
+                continue;
             passes[i] = 1;
         }
         std::map<std::string, size_t> byFile;
@@ -399,7 +390,7 @@ namespace launcher_ui
             if (!hiddenStarter[i] && (passes[i] || partnerPasses))
                 shown.push_back(figures[i]);
         }
-        return collection::Group(shown, collection::GroupBy::Smart, collection::OrderBy::Recent, gameId);
+        return collection::Shelf(shown, filter.sort, gameId);
     }
 
     std::vector<std::string> CollectionModel::OnPortal() const

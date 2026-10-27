@@ -298,8 +298,8 @@ namespace launcher_ui
     // The shelf: the filters, the search and the seat being chosen for, cut into the shelf's sections.
     void CollectionPage::Rebuild()
     {
-        std::string key = fmt::format("{}|{}|{}|{}|{}|{}|{}", m_generation, m_search, m_choosing, m_filter.element, m_filter.game,
-            m_filter.category, m_model.gameId);
+        std::string key = fmt::format("{}|{}|{}|{}|{}|{}|{}|{}", m_generation, m_search, m_choosing, m_filter.element, m_filter.game,
+            m_filter.category, int(m_filter.sort), m_model.gameId);
         if (key == m_listKey)
             return;
         m_listKey = key;
@@ -830,32 +830,7 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + H + 16));
     }
 
-    // A filter of the bar: a button with the filter's name, or its value when one is chosen, and a menu of the values.
-    bool CollectionPage::FilterMenu(const char* id, const char* all, const std::string& current, float width, const std::function<void()>& items)
-    {
-        std::string label = (current.empty() ? std::string(Tr(all)) : current) + "##" + id;
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        bool set = !current.empty();
-        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 19);
-        bool pressed = m_app.PillButton(label.c_str(), false, width, set, set ? AccentDark : PanelRaised, set ? Accent : PanelRaisedHover,
-            set ? AccentDark : PanelRaisedActive, 1);
-        m_navBar = m_navBar || ImGui::IsItemFocused();
-        ImGui::PopStyleVar();
-        std::string popup = std::string("##menu") + id;
-        if (pressed)
-            ImGui::OpenPopup(popup.c_str());
-        ImGui::SetNextWindowPos(ImVec2(at.x, at.y + 44));
-        ImGui::SetNextWindowSizeConstraints(ImVec2(width, 0), ImVec2(FLT_MAX, 420));
-        bool open = ImGui::BeginPopup(popup.c_str());
-        if (open)
-        {
-            items();
-            ImGui::EndPopup();
-        }
-        return open;
-    }
-
-    // The bar: what the shelf is for (a seat being chosen for), the search and the three filters.
+    // The bar: what the shelf is for (a seat being chosen for), the search and Filters.
     void CollectionPage::DrawBar()
     {
         const collection::Game* game = m_model.Game();
@@ -884,9 +859,11 @@ namespace launcher_ui
             ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + 50));
         }
 
-        // Search, Element, Game, Type.
-        constexpr float MenuW = 150, Gap = 8;
-        float searchW = std::max(160.0f, ImGui::GetContentRegionAvail().x - 3 * (MenuW + Gap));
+        // The search first and wide, then Filters (Element, Game, Type, Sort by in one small panel); when something is on, its tags
+        // (an x removes one), Clear all and the count of figures found.
+        constexpr float FiltersW = 130, Gap = 8;
+        int active = (m_filter.element >= 0) + !m_filter.game.empty() + (m_filter.category >= 0) + (m_filter.sort != collection::Sort::Recent);
+        float searchW = std::max(200.0f, ImGui::GetContentRegionAvail().x - FiltersW - Gap);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(14, 11));
         ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 19);
         ImGui::SetNextItemWidth(searchW);
@@ -895,37 +872,160 @@ namespace launcher_ui
             ImGui::SetKeyboardFocusHere();
             m_focusSearch = false;
         }
-        ImGui::InputTextWithHint("##search", Tr("Search by name or nickname"), m_search, sizeof(m_search));
+        ImGui::InputTextWithHint("##search", Tr("Name, element, game, level…"), m_search, sizeof(m_search));
         m_navBar = ImGui::IsItemFocused();
         ImGui::PopStyleVar(2);
         ImGui::SameLine(0, Gap);
 
-        FilterMenu("element", N_("Element"), m_filter.element >= 0 ? ElementName(collection::Element(m_filter.element)) : "", MenuW, [&] {
-            if (ImGui::Selectable(Tr("All elements"), m_filter.element < 0))
-                m_filter.element = -1;
-            for (collection::Element element : MenuElements)
-                if (ImGui::Selectable(ElementName(element).c_str(), m_filter.element == int(element)))
-                    m_filter.element = int(element);
-        });
-        ImGui::SameLine(0, Gap);
-        FilterMenu("game", N_("Game"), m_filter.game.empty() ? "" : ShortGameName(m_filter.game), MenuW, [&] {
-            if (ImGui::Selectable(Tr("All games"), m_filter.game.empty()))
-                m_filter.game.clear();
-            for (const collection::Game& g : collection::Catalogue::Get().Games())
-                if (ImGui::Selectable(ShortGameName(g.id).c_str(), m_filter.game == g.id))
-                    m_filter.game = g.id;
-        });
-        ImGui::SameLine(0, Gap);
-        FilterMenu("type", N_("Type"), m_filter.category >= 0 ? CategoryLabel(Category(m_filter.category)) : "", MenuW, [&] {
-            if (ImGui::Selectable(Tr("All types"), m_filter.category < 0))
-                m_filter.category = -1;
-            // The types the collection has.
-            for (int category = 0; category < int(Category::Count); category++)
-                if (std::any_of(m_model.figures.begin(), m_model.figures.end(), [&](const Figure& f) { return f.toy != nullptr && int(f.toy->category) == category; }))
-                    if (ImGui::Selectable(CategoryLabel(Category(category)).c_str(), m_filter.category == category))
-                        m_filter.category = category;
-        });
+        std::string filters = std::string(Tr("Filters")) + (active > 0 ? fmt::format(" · {}", active) : std::string()) + "##filters";
+        ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 19);
+        bool pressed = m_app.PillButton(filters.c_str(), false, FiltersW, active > 0, active > 0 ? AccentDark : PanelRaised,
+            active > 0 ? Accent : PanelRaisedHover, active > 0 ? AccentDark : PanelRaisedActive, 1);
+        m_navBar = m_navBar || ImGui::IsItemFocused();
+        ImGui::PopStyleVar();
+        if (pressed || m_openFilters)
+            ImGui::OpenPopup("##filtersmenu");
+        m_openFilters = false;
+        constexpr float PanelW = 400;
+        ImGui::SetNextWindowPos(ImVec2(at.x + FiltersW - PanelW, at.y + 44));
+        ImGui::SetNextWindowSizeConstraints(ImVec2(PanelW, 0), ImVec2(PanelW, 420));
+        if (ImGui::BeginPopup("##filtersmenu"))
+        {
+            if (m_closeFilters)
+                ImGui::CloseCurrentPopup();
+            m_closeFilters = false;
+            auto row = [&](const char* label, const char* id, const std::string& value, const std::function<void()>& items) {
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr(label));
+                ImGui::SameLine(110);
+                ImGui::SetNextItemWidth(PanelW - 110 - 16);
+                if (ImGui::BeginCombo(id, value.c_str()))
+                {
+                    items();
+                    ImGui::EndCombo();
+                }
+            };
+            row(N_("Element"), "##element", m_filter.element >= 0 ? ElementName(collection::Element(m_filter.element)) : Tr("All elements"), [&] {
+                if (ImGui::Selectable(Tr("All elements"), m_filter.element < 0))
+                    m_filter.element = -1;
+                for (collection::Element element : MenuElements)
+                    if (ImGui::Selectable(ElementName(element).c_str(), m_filter.element == int(element)))
+                        m_filter.element = int(element);
+            });
+            row(N_("Game"), "##game", m_filter.game.empty() ? Tr("All games") : ShortGameName(m_filter.game), [&] {
+                if (ImGui::Selectable(Tr("All games"), m_filter.game.empty()))
+                    m_filter.game.clear();
+                for (const collection::Game& g : collection::Catalogue::Get().Games())
+                    if (ImGui::Selectable(ShortGameName(g.id).c_str(), m_filter.game == g.id))
+                        m_filter.game = g.id;
+            });
+            row(N_("Type"), "##type", m_filter.category >= 0 ? CategoryLabel(Category(m_filter.category)) : Tr("All types"), [&] {
+                if (ImGui::Selectable(Tr("All types"), m_filter.category < 0))
+                    m_filter.category = -1;
+                // The types the collection has.
+                for (int category = 0; category < int(Category::Count); category++)
+                    if (std::any_of(m_model.figures.begin(), m_model.figures.end(), [&](const Figure& f) { return f.toy != nullptr && int(f.toy->category) == category; }))
+                        if (ImGui::Selectable(CategoryLabel(Category(category)).c_str(), m_filter.category == category))
+                            m_filter.category = category;
+            });
+            row(N_("Sort by"), "##sort", collection::SortLabel(m_filter.sort, French()), [&] {
+                for (int sort = 0; sort < int(collection::Sort::Count); sort++)
+                    if (ImGui::Selectable(collection::SortLabel(collection::Sort(sort), French()).c_str(), m_filter.sort == collection::Sort(sort)))
+                        m_filter.sort = collection::Sort(sort);
+            });
+            ImGui::Dummy(ImVec2(0, 2));
+            ImGui::BeginDisabled(active == 0 && m_search[0] == 0);
+            if (ImGui::Button((std::string(Tr("Clear all")) + "##clearpanel").c_str(), ImVec2(ImGui::GetContentRegionAvail().x, 34)))
+                ClearFilters();
+            ImGui::EndDisabled();
+            ImGui::EndPopup();
+        }
         ImGui::Dummy(ImVec2(0, 4));
+        DrawTags();
+    }
+
+    void CollectionPage::ClearFilters()
+    {
+        m_search[0] = 0;
+        m_filter = ShelfFilter{};
+    }
+
+    // What is on, as small tags with an x (the search is the field's own text), Clear all, and how many figures are found.
+    void CollectionPage::DrawTags()
+    {
+        std::vector<std::pair<std::string, int>> tags; // the label and the filter it is
+        if (m_filter.element >= 0)
+            tags.push_back({ ElementName(collection::Element(m_filter.element)), 0 });
+        if (!m_filter.game.empty())
+            tags.push_back({ ShortGameName(m_filter.game), 1 });
+        if (m_filter.category >= 0)
+            tags.push_back({ CategoryLabel(Category(m_filter.category)), 2 });
+        if (m_filter.sort != collection::Sort::Recent)
+            tags.push_back({ Tf("Sort: {}", collection::SortLabel(m_filter.sort, French())), 3 });
+        if (tags.empty() && m_search[0] == 0)
+            return;
+
+        constexpr float H = 28, Gap = 8;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+        ImGui::PushFont(m_app.m_boldFont, SmallSize);
+        // A pill drawn by hand: a focusable button, the label, and an x when `cross`.
+        auto pill = [&](const std::string& label, const char* id, bool cross, bool accent) {
+            float width = ImGui::CalcTextSize(label.c_str()).x + (cross ? 44 : 28);
+            ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + width, min.y + H);
+            ImGui::PushID(id);
+            bool pressed = ImGui::InvisibleButton("##tag", ImVec2(width, H), ImGuiButtonFlags_EnableNav);
+            bool hovered = ImGui::IsItemHovered();
+            m_navBar = m_navBar || ImGui::IsItemFocused();
+            m_app.FocusRing(H / 2);
+            ImGui::PopID();
+            draw->AddRectFilled(min, max, Rgb(accent ? AccentDark : hovered ? PanelRaisedHover : PanelRaised, accent ? 120 : 255), H / 2);
+            if (accent)
+                draw->AddRect(min, max, Rgb(Accent), H / 2);
+            draw->AddText(ImVec2(min.x + 14, min.y + (H - ImGui::GetFontSize()) / 2), Rgb(Text), label.c_str());
+            if (cross)
+            {
+                ImVec2 c(max.x - 17, (min.y + max.y) / 2);
+                draw->AddLine(ImVec2(c.x - 4, c.y - 4), ImVec2(c.x + 4, c.y + 4), Rgb(Text), 1.8f);
+                draw->AddLine(ImVec2(c.x - 4, c.y + 4), ImVec2(c.x + 4, c.y - 4), Rgb(Text), 1.8f);
+            }
+            return pressed;
+        };
+        int remove = -1;
+        for (size_t i = 0; i < tags.size(); i++)
+        {
+            if (i > 0)
+                ImGui::SameLine(0, Gap);
+            if (pill(tags[i].first, tags[i].first.c_str(), true, true))
+                remove = tags[i].second;
+        }
+        if (!tags.empty())
+            ImGui::SameLine(0, Gap);
+        if (pill(Tr("Clear all"), "##clear", false, false))
+            ClearFilters();
+        std::string count = collection::FigureCount(FoundCount(), French());
+        ImGui::SameLine(0, 0);
+        ImGui::SetCursorScreenPos(ImVec2(right - ImGui::CalcTextSize(count.c_str()).x, ImGui::GetCursorScreenPos().y + (H - ImGui::GetFontSize()) / 2));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", count.c_str());
+        ImGui::PopFont();
+        switch (remove)
+        {
+        case 0: m_filter.element = -1; break;
+        case 1: m_filter.game.clear(); break;
+        case 2: m_filter.category = -1; break;
+        case 3: m_filter.sort = collection::Sort::Recent; break;
+        default: break;
+        }
+        ImGui::Dummy(ImVec2(0, 4));
+    }
+
+    int CollectionPage::FoundCount() const
+    {
+        int count = 0;
+        for (const Section& section : m_sections)
+            count += int(section.items.size());
+        return count;
     }
 
     bool CollectionPage::DrawCard(const Figure& figure, float width, bool dim)
@@ -1048,10 +1148,7 @@ namespace launcher_ui
                 Reload();
             }
             else if (!none && filtered && m_app.PillButton(Tr("Clear the search and the filters"), false, 300, true))
-            {
-                m_search[0] = 0;
-                m_filter = ShelfFilter{};
-            }
+                ClearFilters();
             else if (!none && !filtered && m_app.PillButton((std::string(Tr("+  Add a figure")) + "##empty").c_str(), true, 200, true))
             {
                 m_overlay = Overlay::Add;

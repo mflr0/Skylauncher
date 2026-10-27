@@ -671,7 +671,11 @@ Not available for {} yet	Pas encore disponible pour {}
 {} min	{} min
 {} · type {} · variant {:04X}	{} · type {} · variante {:04X}
 {}: {} taken off	{} : {} retirée
-Search by name or nickname	Rechercher par nom ou surnom
+Name, element, game, level…	Nom, élément, jeu, niveau…
+Filters	Filtres
+Sort by	Trier par
+Sort: {}	Tri : {}
+Clear all	Tout effacer
 Versions	Versions
 Change...	Changer...
 Copies the disc's files so the disc image is no longer needed.	Copie les fichiers du disque : l'image disque ne sera plus nécessaire.

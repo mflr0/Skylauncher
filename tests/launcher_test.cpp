@@ -415,6 +415,29 @@ namespace
             model.Shelf(text, shown);
             EXPECT(std::any_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == gill; }) &&
                 std::none_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == spyro || f.path == anvil; }));
+            // The smart search (collection::SearchMatches): elements and toy types in both languages, a typo, a level, the sort.
+            auto has = [&](const std::string& query, const std::string& path, collection::Sort sort = collection::Sort::Recent) {
+                launcher_ui::ShelfFilter filter;
+                filter.text = query;
+                filter.sort = sort;
+                model.Shelf(filter, shown);
+                return std::any_of(shown.begin(), shown.end(), [&](const collection::Figure& f) { return f.path == path; });
+            };
+            EXPECT(has("water", gill) && has("eau", gill) && has("EAU", gill) && !has("fire", gill) && !has("feu", gill));
+            EXPECT(has("level 10", gill) && has("niveau 10", gill) && !has("niveau 9", gill) && has("niveau 10 eau", gill) && !has("niveau 10 feu", gill));
+            EXPECT(has("objet", anvil) && has("item", anvil) && !has("objet", gill) && has("spyro", gill) && has("splsh", gill)); // a typo in a 5-letter word
+            EXPECT(has("ssa", gill) && !has("giants", gill));
+            {
+                launcher_ui::ShelfFilter byName;
+                byName.sort = collection::Sort::Name;
+                model.Shelf(byName, shown);
+                std::vector<std::string> names;
+                for (const collection::Section& section : model.Shelf(byName, shown))
+                    if (section.kind == collection::Section::Kind::Shelf)
+                        for (size_t i : section.items)
+                            names.push_back(collection::Fold(collection::CardName(collection::CardOf(shown, i))));
+                EXPECT(names.size() > 2 && std::is_sorted(names.begin(), names.end()));
+            }
             launcher_ui::ShelfFilter later;
             later.game = "giants";
             EXPECT(model.Shelf(later, shown).empty() && shown.empty()); // no Giants toy here

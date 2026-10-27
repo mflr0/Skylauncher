@@ -282,7 +282,8 @@ namespace launcher_ui
             "25-figure-details", "26-figure-delete", "27-edit", "28-add-a-figure", "29-add-later-game", "30-manage-trash", "31-manage-backups",
             "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
             "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet", "42-swapforce-portal", "43-swapper-sheet",
-            "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-standard-version" };
+            "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-standard-version", "47-search-element", "48-search-level",
+            "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -401,6 +402,7 @@ namespace launcher_ui
         m_filter = ShelfFilter{};
         m_search[0] = 0;
         m_addSearch[0] = 0;
+        m_closeFilters = true;
         auto figureOf = [&](uint16_t type) -> std::string {
             for (const Figure& figure : m_model.figures)
                 if (figure.type == type && !collection::UntouchedStarter(figure) && figure.level > 1)
@@ -597,6 +599,33 @@ namespace launcher_ui
             m_addToy = 103;
             m_addCategory = -1;
             m_addVersion = 0;
+            break;
+        case 27: // the smart search: an element, a level, a typo (both languages), then the Filters panel, its tags and a sort
+        case 28:
+        case 29:
+        case 30:
+        case 31:
+        case 32:
+            SelectPortalGame("ssa");
+            if (step == 27)
+                std::snprintf(m_search, sizeof(m_search), "%s", French() ? "feu" : "fire");
+            else if (step == 28)
+                std::snprintf(m_search, sizeof(m_search), "%s", French() ? "niveau 10" : "level 10");
+            else if (step == 29)
+                std::snprintf(m_search, sizeof(m_search), "%s", French() ? "legendiare" : "legendray");
+            else if (step == 30)
+            {
+                m_openFilters = true;
+                m_closeFilters = false;
+            }
+            else if (step == 31)
+            {
+                m_filter.element = int(collection::Element::Water);
+                m_filter.game = "ssa";
+                m_filter.sort = collection::Sort::Level;
+            }
+            else
+                m_filter.sort = collection::Sort::Name;
             break;
         default: break;
         }
