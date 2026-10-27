@@ -163,6 +163,7 @@ INSTALL	INSTALLER
 INSTALLATION INTERRUPTED	INSTALLATION INTERROMPUE
 INSTALLATION STOPPED	INSTALLATION ARRÊTÉE
 INSTALLING THE GAME	INSTALLATION DU JEU
+UPDATING THE GAME	MISE À JOUR DU JEU
 INSTALLING...	INSTALLATION...
 The install stops and can resume later.	L'installation s'arrête ; vous pourrez la reprendre.
 Builds the game on your PC: about {} min, {} GB, internet needed once.	Construit le jeu sur votre PC : environ {} min, {} Go, internet requis une fois.
@@ -697,3 +698,41 @@ Update {} to {}: {}, up to about {} min.	Mise à jour de {} à {} : {}, jusqu'�
 Update to {}: {}, up to about {} min.	Mise à jour vers {} : {}, jusqu'à environ {} min.
 no download	aucun téléchargement
 {} download	{} à télécharger
+Remove Skylauncher	Retirer Skylauncher
+Uninstall everything...	Tout désinstaller...
+Uninstall everything	Tout désinstaller
+Removes the games, their files and Skylauncher.	Retire les jeux, leurs fichiers et Skylauncher.
+Wait for the game to finish.	Attendez que le jeu ait fini.
+Hold to delete all of this.	Maintenez pour tout supprimer.
+What goes	Ce qui sera supprimé
+Your disc images are never touched.	Vos images disque ne sont jamais touchées.
+Nothing to remove.	Rien à supprimer.
+Games	Jeux
+Game data copies	Copies des données de jeu
+Game tools	Outils de jeu
+Caches and logs	Caches et journaux
+Settings	Réglages
+Desktop shortcuts	Raccourcis du bureau
+Also delete my saves and my figures	Supprimer aussi mes sauvegardes et mes figurines
+Export first	Exporter d'abord
+No saves or figures yet.	Pas encore de sauvegardes ni de figurines.
+Saves {}, figures {}.	Sauvegardes {}, figurines {}.
+Total	Total
+{} is running: quit it first.	{} est en cours : quittez-le d'abord.
+A figure is in use: quit the game first.	Une figurine est utilisée : quittez d'abord le jeu.
+The data folder isn't safe to remove.	Le dossier de données ne peut pas être supprimé sans risque.
+A game is running: quit it first.	Un jeu est en cours : quittez-le d'abord.
+Nothing was removed	Rien n'a été supprimé
+Everything is removed	Tout est supprimé
+Removed, except	Supprimé, sauf
+{} freed.	{} libérés.
+and {} more	et {} autres
+Skylauncher goes to the Trash when you quit.	Skylauncher ira à la corbeille quand vous quitterez.
+Skylauncher deletes itself when you quit.	Skylauncher se supprimera quand vous quitterez.
+{} is not in its folder: it stays.	{} n'est pas dans son dossier : il reste.
+{} is a link: it stays.	{} est un lien : il reste.
+Skylauncher can't remove itself from here: delete it by hand.	Skylauncher ne peut pas se supprimer d'ici : supprimez-le à la main.
+{} is outside Skylauncher's folders: it stays.	{} est hors des dossiers de Skylauncher : il reste.
+{} is a disc image: it stays.	{} est une image disque : elle reste.
+{} couldn't be removed.	{} n'a pas pu être supprimé.
+Other files in the figures folder stay.	Les autres fichiers du dossier des figurines restent.

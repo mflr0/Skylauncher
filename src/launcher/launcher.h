@@ -75,6 +75,8 @@ using LauncherConfig = std::map<std::string, std::map<std::string, std::string>>
 std::string LauncherConfigPath();
 LauncherConfig LoadLauncherConfig(const std::string& path);
 bool SaveLauncherConfig(const std::string& path, const LauncherConfig& config);
+// After "Uninstall everything" has removed the settings file: SaveLauncherConfig writes nothing any more.
+void FreezeLauncherConfig();
 
 // The command line: `--game <id>` opens that game, `--play` starts it once its disc is checked (the desktop shortcut runs
 // `Skylauncher --game <id> --play`), `--help` shows the options. Anything else is listed in `unknown` and ignored.

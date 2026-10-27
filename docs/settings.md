@@ -48,6 +48,9 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `collection` | `favourites` | figure file names, comma separated | Old favourites; moved once into the shared collection's `collection.json` | read once (see `collection_ui.md`) |
 | `collection` | `moved` | `1` | Set once the old favourites and `[portal] place` were moved | launcher only |
 
+Removing the settings: Settings > Launcher > Uninstall everything deletes `launcher.ini` with everything else (`docs/install.md`, "Uninstall everything");
+the launcher then writes no settings until it is started again.
+
 ## Per-game video
 
 The runtime reads one `[video]` section, but the games do not have to share it. Each game keeps its own copy of the

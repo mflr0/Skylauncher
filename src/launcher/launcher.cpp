@@ -368,8 +368,14 @@ LauncherConfig LoadLauncherConfig(const std::string& path)
     return config;
 }
 
+namespace { bool g_configFrozen = false; }
+
+void FreezeLauncherConfig() { g_configFrozen = true; }
+
 bool SaveLauncherConfig(const std::string& path, const LauncherConfig& config)
 {
+    if (g_configFrozen)
+        return true; // the settings were uninstalled: nothing writes them back
     std::string text = "# Launcher settings: one [section] per game.\n";
     for (const auto& [section, values] : config)
     {

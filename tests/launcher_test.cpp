@@ -769,6 +769,7 @@ void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::
     const std::string& gamesJson = {}); // tests/shell_test.cpp
 int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
 int I18nChecks(); // tests/i18n_test.cpp
+int UninstallChecks(const std::filesystem::path& scratch); // tests/uninstall_test.cpp
 int CopyChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso); // tests/copy_test.cpp
 
 // The launcher window switching games in place (App::TestSwitchScript, in an offscreen window): both discs checked, a
@@ -966,6 +967,12 @@ int main(int argc, char** argv)
         int failures = I18nChecks();
         return failures == 0 ? 0 : 1;
     }
+    if (getenv("SKYLAUNCHER_TEST_UNINSTALL_ONLY") != nullptr) // only "Uninstall everything" (quick to rerun)
+    {
+        int failures = UninstallChecks(scratch);
+        printf("%d failures\n", failures);
+        return failures == 0 ? 0 : 1;
+    }
     if (getenv("SKYLAUNCHER_TEST_COPY_ONLY") != nullptr) // only "Copy the game data" (quick to rerun)
     {
         int failures = CopyChecks(scratch, iso.string(), getenv("SKYLAUNCHER_TEST_GIANTS_ISO") != nullptr ? getenv("SKYLAUNCHER_TEST_GIANTS_ISO") : "");
@@ -985,6 +992,7 @@ int main(int argc, char** argv)
     InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);
     g_failures += SettingsChecks(scratch / "settings");
+    g_failures += UninstallChecks(scratch);
     g_failures += I18nChecks();
 
     // FIPS 180-4 examples, covering one- and two-block padding.

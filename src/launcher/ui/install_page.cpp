@@ -327,7 +327,7 @@ namespace launcher_ui
         float left = ImGui::GetCursorScreenPos().x;
 
         // Title, and on its right the percentage, or once stopped a close button.
-        const char* title = failed ? Tr("INSTALLATION STOPPED") : interrupted ? Tr("INSTALLATION INTERRUPTED") : Tr("INSTALLING THE GAME");
+        const char* title = failed ? Tr("INSTALLATION STOPPED") : interrupted ? Tr("INSTALLATION INTERRUPTED") : Tr(m_s->installed.runtime.empty() ? N_("INSTALLING THE GAME") : N_("UPDATING THE GAME")); // a built game being rebuilt is an update
         ImVec2 titleAt = ImGui::GetCursorScreenPos();
         Title(title, TitleSize, failed ? Danger : Text);
         if (failed || interrupted)

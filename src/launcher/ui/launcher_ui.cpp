@@ -377,6 +377,7 @@ namespace launcher_ui
             m_testCopy = SDL_getenv("SSA_LAUNCHER_TEST_COPY") != nullptr;
             m_testSeatX = SDL_getenv("SSA_LAUNCHER_TEST_SEATX") != nullptr;
             m_testButtons = SDL_getenv("SSA_LAUNCHER_TEST_BUTTONS") != nullptr;
+            m_testUninstall = SDL_getenv("SSA_LAUNCHER_TEST_UNINSTALL") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -1028,6 +1029,8 @@ namespace launcher_ui
         bool inputDown = mouse || ImGui::IsKeyDown(ImGuiKey_Space) || ImGui::IsKeyDown(ImGuiKey_Enter) ||
             ImGui::IsKeyDown(ImGuiKey_KeypadEnter) || ImGui::IsKeyDown(ImGuiKey_GamepadFaceDown);
         bool done = false;
+        if (m_testHoldAt != 0 && m_un.holdId != 0 && ImGui::GetItemID() == m_un.holdId) // the screenshot test holds it down
+            held = inputDown = true;
         float fill = m_hold.Update(ImGui::GetItemID(), held, inputDown, SDL_GetTicks(), done);
 
         // Colours through GetColorU32: they fade with the rest under BeginDisabled.
@@ -1287,7 +1290,7 @@ namespace launcher_ui
                     slot = opened.get();
             // Selected only once the player has picked it: Play is that game's page.
             bool selected = (m_page == Page::Play || m_page == Page::GameSettings) && std::string_view(entry.id) == m_s->game.id;
-            if (row("game", GameRowH, selected, entry.enabled, position))
+            if (row("game", GameRowH, selected, entry.enabled && !m_uninstalled, position))
             {
                 if (std::string_view(entry.id) != m_s->game.id)
                     SelectGame(*FindGame(entry.id));
@@ -1311,16 +1314,35 @@ namespace launcher_ui
                 draw->AddText(ImVec2(badge.x - letterSize.x / 2, badge.y - letterSize.y / 2), Rgb(BadgeInk), letter);
                 ImGui::PopFont();
             }
-            // The name, as large as fits; the disc's state under it.
+            // The name, as large as fits; the game's version small after it on the same line; the disc's state under it.
+            const std::string version = slot != nullptr && entry.enabled ? GameVersion(*slot) : std::string();
+            const std::string versionText = version.empty() ? std::string() : "\xC2\xB7 " + version;
             float nameX = position.x + GameTextX, nameW = rowW - GameTextX - 10, nameSize = SidebarTextSize - 1;
+            auto versionWidth = [&] {
+                if (versionText.empty())
+                    return 0.0f;
+                ImGui::PushFont(nullptr, SidebarSmallSize - 2);
+                float width = ImGui::CalcTextSize(versionText.c_str()).x;
+                ImGui::PopFont();
+                return width;
+            };
+            const float versionW = versionWidth() + (versionText.empty() ? 0.0f : 6.0f); // 6: the gap after the name
             ImGui::PushFont(m_boldFont, nameSize);
-            while (nameSize > SidebarSmallSize && ImGui::CalcTextSize(entry.name).x > nameW)
+            while (nameSize > SidebarSmallSize && ImGui::CalcTextSize(entry.name).x + versionW > nameW)
             {
                 ImGui::PopFont();
                 ImGui::PushFont(m_boldFont, --nameSize);
             }
             draw->AddText(ImVec2(nameX, position.y + 9), Rgb(entry.enabled ? SidebarInk : TextDim), entry.name);
+            float nameEnd = nameX + ImGui::CalcTextSize(entry.name).x;
             ImGui::PopFont();
+            if (!versionText.empty())
+            {
+                ImGui::PushFont(nullptr, SidebarSmallSize - 2);
+                draw->AddText(ImVec2(nameEnd + 6, position.y + 9 + (nameSize - ImGui::GetFontSize()) * 0.8f),
+                    Rgb(TextSecondary), versionText.c_str());
+                ImGui::PopFont();
+            }
             ImGui::PushFont(nullptr, SidebarSmallSize - 2);
             SlotLine line = entry.enabled ? SlotStatus(slot) : SlotLine{ Tr("Coming later"), Accent };
             float statusX = nameX, statusY = position.y + 32;
@@ -1545,11 +1567,7 @@ namespace launcher_ui
             draw->AddRect(ImVec2(position.x + 6, position.y + 6), ImVec2(end.x - 6, end.y - 6), Rgb(AccentDark), RadiusLarge, 4.0f);
 
         // The logo (else the game's name), as large as fits and centred between the language menu and the disc status.
-        // The game's version takes a line above the disc's lines: the logo's area and the lines rise by it.
-        const GameUpdate* offered = UpdateAvailable() ? PendingUpdate(*m_s) : nullptr;
-        const float notesH = offered != nullptr && !offered->notes.empty() ? 22.0f : 0.0f;
-        const float versionH = (GameVersion(*m_s).empty() || m_s->installView ? 0.0f : 22.0f) + notesH;
-        float areaTop = position.y + Pad * 2.5f, areaBottom = end.y - 128 - versionH, areaH = areaBottom - areaTop;
+        float areaTop = position.y + Pad * 2.5f, areaBottom = end.y - 128, areaH = areaBottom - areaTop;
         const ArtTexture* logo = m_s->logo ? &m_s->logo : CachedArt(m_s->game.id, LauncherAssets::Role::Logo, 0);
         if (m_s->installView)
         {
@@ -1574,19 +1592,11 @@ namespace launcher_ui
         }
 
         // The disc, bottom left of the hero: the image's file name, its status under it ("Change disc..." on the right).
-        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 116 - versionH));
+        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 116));
         ImGui::BeginGroup();
         if (!m_s->installView) // the progress card takes the whole hero
         {
             ImGui::BeginGroup();
-            // The game's version on top ("Giants 0.8.2"), then the file name, then "DISC IMAGE:" and the status.
-            if (std::string version = GameVersion(*m_s); !version.empty() && !m_s->installView)
-            {
-                std::string name = m_s->game.name;
-                if (size_t colon = name.find(": "); colon != std::string::npos)
-                    name.erase(0, colon + 2);
-                BoldText(fmt::format("{} {}", name, version).c_str(), TextSecondary);
-            }
             // The file name on top, then "DISC IMAGE:" and the status on the line below.
             std::string file = m_s->fromCopy ? Tr("Copied game data")
                 : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
@@ -1814,7 +1824,7 @@ namespace launcher_ui
         if (ready && !installing && !m_s->installView && !m_s->fromCopy) // the copy replaces the disc image
         {
             constexpr float ChangeDiscW = 160;
-            ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112 - notesH));
+            ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
             if (PillButton(Tr("Change disc..."), false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
                 Browse();
@@ -1992,7 +2002,7 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 4));
         int tab = int(m_tab);
         DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
-        m_tab = SettingsTab(tab);
+        m_tab = m_uninstalled ? SettingsTab::Launcher : SettingsTab(tab); // once uninstalled the window shows the result only
         BeginCard("##settings", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY);
         switch (m_tab)
         {
@@ -2002,11 +2012,18 @@ namespace launcher_ui
         case SettingsTab::About: DrawAbout(); break;
         }
         EndCard();
+        if (m_testUninstall && m_testScrollEnd)
+            ImGui::SetScrollHereY(1.0f); // the screenshot test shows the bottom of the tab
         ImGui::EndChild();
     }
 
     void App::DrawLauncherTab()
     {
+        if (m_un.stage != UninstallStage::Closed)
+        {
+            DrawUninstall(); // the list and the result take the tab
+            return;
+        }
         DrawLauncherLanguage();
         ImGui::Dummy(ImVec2(0, 16));
         Title(Tr("Updates"), TitleSize, Text);
@@ -2025,6 +2042,8 @@ namespace launcher_ui
         ImGui::TextWrapped("%s", Tr(strings::DataFolderHint));
         ImGui::PopStyleColor();
         ImGui::PopFont();
+        ImGui::Dummy(ImVec2(0, 16));
+        DrawUninstallSection();
     }
 
     namespace
@@ -2090,6 +2109,8 @@ namespace launcher_ui
 
     void App::GoTo(Page page)
     {
+        if (m_uninstalled)
+            return; // nothing else to do in a launcher that has removed itself (and nothing to write back)
         if ((page == Page::Settings || page == Page::Collection) && (m_page == Page::Home || m_page == Page::Play))
             m_backPage = m_page;
         else if (page == Page::GameSettings)
@@ -2301,8 +2322,11 @@ namespace launcher_ui
             static const char* const NavNames[] = { "40-nav-start", "41-nav-sidebar", "42-nav-down", "43-nav-collection", "44-nav-search",
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
+            static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
             if (m_testButtons || m_testSidebar || m_testCopy || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
+            else if (m_testUninstall)
+                Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
             else if (m_testNav)
                 Screenshot(NavNames[std::min<int>(m_testStep, int(std::size(NavNames)) - 1)]);
             else if (m_testSeatX)
@@ -3104,6 +3128,11 @@ namespace launcher_ui
         if (m_testUpdate)
         {
             TestUpdateScript(now);
+            return;
+        }
+        if (m_testUninstall)
+        {
+            TestUninstallScript(now);
             return;
         }
         if (m_testButtons)

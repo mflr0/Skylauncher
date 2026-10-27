@@ -145,11 +145,64 @@ Restore uses) and **disabled while the game installs**. The sizes shown next to 
 | **Reinstall** (held a second) | nothing is deleted: SSABuild builds again (incremental) | all of it |
 
 After an uninstall the disc is still known, so INSTALL builds the game again and the saves are where they were. To remove
-everything the launcher keeps for a game, uninstall, then delete saves and data, then delete the game's folder by hand.
+everything the launcher keeps for a game, uninstall, then delete saves and data, then delete the game's folder by hand; to remove everything of every game
+and the launcher, see "Uninstall everything" below.
 **Remove** (Disc tab) only makes the launcher forget the image (`[<game>] iso=` goes): the file is not touched.
 The copied game data (`<Game>/gamedata/`, "Copy files" in the Disc tab, `docs/launcher_ui.md` "Game data") is kept by **Uninstall** and
 untouched by the two delete buttons, like the disc image: only **Remove the copy** (Disc tab) deletes it, and the disc image comes back.
 The code is `src/launcher/game_settings.{h,cpp}` (no UI; `SkylauncherTest` runs it on scratch folders, `tests/settings_test.cpp`).
+
+### Uninstall everything
+
+Settings (the gear) > Launcher > **Remove Skylauncher** > **Uninstall everything...** (`docs/launcher_ui.md`, "Uninstall everything") removes what
+Skylauncher and the games put on the machine, after a list with sizes and a held button. The code is `src/launcher/uninstall.{h,cpp}` (no UI:
+a **plan** that only measures, then the run), the window is `ui/uninstall_page.cpp`.
+
+| Goes | What it is |
+| --- | --- |
+| Games | each game's folder (`SSA/`, `Giants/`, `SwapForce/`) but the player's data below: the built game, its install logs, `layout.txt`, the shortcut icon |
+| Game data copies | `<Game>/gamedata/` |
+| Game tools | `kit/` and `toolchains/` |
+| Caches and logs | `pipelines.bin`, `launcher-cache/`, `portraits/`, the games' `*.log`, `logs/` |
+| Settings | `launcher.ini` (the remembered discs go with it) |
+| Desktop shortcuts | the `<Game>.app`, `.lnk` or `.desktop` the launcher made, only if it holds `--game` |
+| Skylauncher | the `.app` (macOS), the `.exe` (Windows), the AppImage (Linux), and the `.old` an update left beside it |
+| **Only with the box "Also delete my saves and my figures"** | the saves (`saves/`, `saves-backup/`, `portal.txt`), the games' `figures/` and `textures/`, and the collection: the figures (`.sky`, `.bin`, `.dmp`), `.lock`, `collection.json`, `backups/` and `trash/` |
+
+**What is never removed**: the disc images (a path `[<game>] iso=` remembers, and any `.iso` / `.xiso` file, wherever it is, even in a game's folder:
+the folder stays around it and the result says so); a game the player moved out of its folder (the settings' `[install.*] runtime=` is outside the games'
+folders: said, not touched); other files in the data folder or in the figure folder (said as "Other files in the figures folder stay"); the
+older-layout folders of before 0.3.1, which the first start moved (`datadir::MigrateOnce`); the data folder itself unless it is empty at the end.
+
+**Safety, because it deletes** (all in `uninstall.cpp`, and checked again at run time, so a plan cannot be forged):
+- Targets come only from the `Environment`: the data root (`datadir::Root()`), Skylauncher's data folder (`SKYLAUNCHER_DATA`), each game's folder,
+  the shared figure folder, the settings file, the Desktop shortcuts and the launcher. Nothing is searched for.
+- A path must be absolute, without `..`, not the filesystem root nor a folder straight under it, not the home folder nor a folder that holds it, not a
+  link, and strictly inside the data root or the launcher's data folder (links resolved). The figure folder and the settings file may be
+  elsewhere only because the environment names them (`SSA_COLLECTION`, `SSA_LAUNCHER_INI`). A data folder that fails refuses everything.
+  Saves kept elsewhere (`SSA_SAVE_DIR`) are not ours: left, and said.
+- Inside a game's folder a link goes as a link and is never followed; the figure folder is cleaned by name only (its links stay).
+- A game that runs (`saves-backup/game.lock`) or a figure on a running portal stops everything; so does an install or a disc check in the window.
+
+**The launcher itself** is the last step, done after the window has quit by a small helper the launcher starts (`StartScheduled`; the command is
+`ScheduleCommand`, pure and tested): it waits for the launcher's process to end (a minute at most), then
+- **macOS**: `/bin/sh` moves the `.app` (and its `.old`) into `~/.Trash`, with a free name ("Skylauncher 1.app") when one is taken. The `.app` must be a
+  bundle (`Contents/MacOS`) whose folder is writable (the same rule as updates; run from a disk image it cannot be moved: the result says to delete it by hand);
+- **Windows**: a hidden `powershell.exe` (`-EncodedCommand`, so no quoting) waits for the process, then deletes the `.exe` and its `.old`, retrying for 20 s
+  (an exe cannot delete itself while it runs);
+- **Linux**: `/bin/sh` deletes the AppImage (`$APPIMAGE`) and its `.old`. A launcher started another way (a build folder) has no path to remove: the result
+  says to delete it by hand.
+A launcher path that is not of this system's kind (not a `.app`, not an `.exe`), a link, a disc image, inside the data folder or in a system folder
+(Linux) is refused: `PlanLauncherRemoval`. When the rest could not run (a game plays) the helper is not started.
+
+**Tests** (`tests/uninstall_test.cpp`, in `SkylauncherTest`; `SKYLAUNCHER_TEST_UNINSTALL_ONLY=1` runs only them): scratch trees with each system's
+layout (the paths are pure; the data folder of each system, the shortcut names); the plan with exact sizes and nothing touched; the run without and with
+the tick; disc images, links, the player's own files kept; unsafe roots (`/`, a folder under it, home, a folder holding it, relative, `..`), a forged plan,
+a moved game, a game running; the launcher removal's refusals per system; the commands (Windows decoded back from its encoding); and the macOS and Linux
+helper scripts **run for real** on a dummy bundle or file copied into the scratch folder, with a scratch Trash, on a process that is already gone and on one
+that is still running. The real launcher, the real Trash and the real data folders are never named: `ThisMachine` ignores the real launcher while any of
+`SKYLANDERS_DATA`, `SKYLAUNCHER_DATA`, `SSA_LAUNCHER_INI` or `SSA_COLLECTION` is set, and takes a dummy only from `SKYLAUNCHER_UNINSTALL_SELF` (on
+macOS together with `SKYLAUNCHER_UNINSTALL_TRASH`).
 
 ### Housekeeping
 

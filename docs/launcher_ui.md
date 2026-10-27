@@ -49,7 +49,7 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
    stays the main button while there is no disc.
 3. Collection - see below.
 4. Settings (the gear) - **the launcher's own settings and what both games share**, in four tabs: Controls (device, portal, glyphs,
-   keyboard bindings), Launcher (language slot, updates, data folder), Support (report a problem, logs), About (version, credits).
+   keyboard bindings), Launcher (language slot, updates, data folder, **Remove Skylauncher**: "Uninstall everything", below), Support (report a problem, logs), About (version, credits).
    Clicking a game goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
 5. Game settings (the Settings button on a game's Play page) - **that game's own settings**, five tabs (the sidebar keeps the
    game selected; B / Escape or **Back** return to its Play page):
@@ -136,8 +136,9 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 **UPDATE** (`docs/updates.md`): the page says the version built and the one on offer ("Update 0.8.0 to 0.8.1: no download, up to
 about 15 min.", the release's notes for the game under it) and the main button reads UPDATE; one click fetches the kit if it is
 needed, rebuilds the game (SSABuild is incremental) and PLAY is back. Under the button a small link, **Play without updating**,
-plays what is built (offline, in a hurry): it sets the offer aside until the launcher is closed. The game's version ("Giants 0.8.2")
-is the first line of the disc's lines on the page. No tools are ever downloaded without a click on INSTALL or UPDATE.
+plays what is built (offline, in a hurry): it sets the offer aside until the launcher is closed. The game's version is small, in the
+secondary text colour, after its name in the sidebar ("Giants · 0.8.2"); nothing on the page moves for it. While UPDATE runs the progress card is titled
+"UPDATING THE GAME" ("INSTALLING THE GAME" for a first install). No tools are ever downloaded without a click on INSTALL or UPDATE.
 
 "Ready to play" needs both the build and a verified source: the disc image, **or the copied game data** ("Game data" below).
 With no source or a refused one the game says what it needs, even if it was built (the game reads the disc image while it runs). The Play page's disc line says more
@@ -334,6 +335,26 @@ The launcher's texts are short. A player reads them to decide or to know what to
    not "Create a desktop shortcut").
 
 Developer details (the runtime's name, an option's file, the SHA-256 a check uses) belong in these docs, not in the window.
+
+## Uninstall everything
+Settings > Launcher > **Remove Skylauncher** > **Uninstall everything...** opens, in the tab, the list of what goes (`ui/uninstall_page.cpp`;
+what it removes and the safety rules are in `docs/install.md`, "Uninstall everything"):
+
+- **What goes**: one row per built game, then Game data copies, Game tools, Caches and logs, Settings, Desktop shortcuts and Skylauncher,
+  each with its size, and the **Total**. "Your disc images are never touched." sits under the title.
+- **Also delete my saves and my figures** (a toggle, off by default) adds Saves and Figures to the list and to the Total; **Export first**
+  beside it is the collection's export of every figure (a folder to choose). Under it: "Saves X, figures Y."
+- What the launcher already knows will stay is said under the Total ("SGRecomp.app is not in its folder: it stays.").
+- **Uninstall everything** is a hold button (a second; the existing pattern, `HoldConfirm`); **Cancel** goes back. Both are disabled while a game
+  runs, installs or is being checked, and the reason is said in red above them.
+- After it ran, the tab shows the result: "Everything is removed", or "Removed, except" with one line for each thing that stayed
+  (a disc image in a game's folder, a game the player moved, a link, a file the system refused), the size freed, and where the launcher
+  goes ("Skylauncher goes to the Trash when you quit." on macOS, "...deletes itself when you quit." elsewhere). **Quit** closes the window. Until
+  then the window does nothing else: the sidebar and the tabs are off and the settings file is no longer written (`FreezeLauncherConfig`).
+
+The screenshot test is `SSA_LAUNCHER_TEST_UNINSTALL=1` with `SSA_LAUNCHER_SHOTS` on a scratch data tree (`SKYLANDERS_DATA`, `SKYLAUNCHER_DATA`,
+`SSA_LAUNCHER_INI`, `SSA_COLLECTION`); `SKYLAUNCHER_UNINSTALL_SELF` names a dummy bundle to stand for the launcher and, on macOS,
+`SKYLAUNCHER_UNINSTALL_TRASH` a scratch folder to stand for the Trash (without them a scratch run never removes the launcher).
 
 ## Size on high-DPI screens
 Every size is in launcher points. `App::UpdateUiScale` picks how many window units a point is: `[launcher] ui_scale`, else

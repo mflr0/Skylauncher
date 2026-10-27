@@ -13,6 +13,7 @@
 #include "launcher/launcher.h"
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/portal_status.h"
+#include "launcher/uninstall.h"
 #include "launcher/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
 #include "launcher/ui/hold_confirm.h"
@@ -307,6 +308,13 @@ namespace launcher_ui
         void RefreshDataSizes();
         void RunDataAction(const DataResult& result, const char* done); // the toast, and the lists read again
         void RunUninstall(const DataResult& result);
+        // "Uninstall everything" (uninstall_page.cpp), in Settings > Launcher: the list, the tick, the hold, the result.
+        void DrawUninstallSection();
+        void DrawUninstall();
+        void OpenUninstall();
+        void RunUninstallEverything();
+        void ExportFiguresFirst(); // collection_manage.cpp: the existing export, of every figure
+        void TestUninstallScript(uint64_t now);
         // The tabs of a settings page: words on one line, an accent line under the selected one; LB / RB change tab.
         // True when the tab changed (by a click or a bumper).
         bool DrawTabBar(const char* const* labels, int count, int* current);
@@ -492,6 +500,23 @@ namespace launcher_ui
         GameSlot* m_s = nullptr;
 
         HoldConfirm m_hold;
+
+        enum class UninstallStage { Closed, List, Result };
+        struct UninstallState
+        {
+            UninstallStage stage = UninstallStage::Closed;
+            uninstall::Environment env;
+            uninstall::Plan plan;
+            bool tick = false; // "Also delete my saves and my figures"
+            uninstall::Result result;
+            std::vector<uninstall::Left> notices; // what stays, as the plan knew it, for the result message
+            bool launcherScheduled = false;
+            uint32_t holdId = 0; // the hold button's ImGui ID, for the screenshot test
+        } m_un;
+        bool m_uninstalled = false;    // done: the window only shows the result and quits
+        bool m_testUninstall = false;  // SSA_LAUNCHER_TEST_UNINSTALL: the uninstall screens
+        bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
+        uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)
 
         // The game page's logo drop: when it began, and what was shown last frame (a new arrival starts it again).
         uint64_t m_logoDropAt = 0;

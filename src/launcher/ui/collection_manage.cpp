@@ -88,6 +88,19 @@ namespace launcher_ui
         Toast(count == 1 ? Tf("Exported {} figure to {}", count, folder) : Tf("Exported {} figures to {}", count, folder));
     }
 
+    // "Export first" before uninstalling: every figure of the collection, to a folder the player picks.
+    void App::ExportFiguresFirst()
+    {
+        std::string folder = ChooseFolder(m_window, Tr("Export the figures to"));
+        if (folder.empty())
+            return;
+        std::vector<std::string> paths;
+        for (const Figure& figure : collection::List())
+            paths.push_back(figure.path);
+        int count = collection::Export(paths, folder);
+        Toast(count == 1 ? Tf("Exported {} figure to {}", count, folder) : Tf("Exported {} figures to {}", count, folder));
+    }
+
     void CollectionPage::DrawManage(ImVec2 size)
     {
         m_app.Title(Tr("MANAGE"), HeadlineSize - 6, Text);
