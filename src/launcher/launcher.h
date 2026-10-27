@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shared/art/disc_languages.h"
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -51,6 +52,7 @@ struct GameSourceCheck
     std::string message; // why the source can't be used, for the player
     std::string xexSha256; // the verified default.xex (Ok only): which installed game belongs to this disc
     std::string otherGame; // WrongGame, when the disc is another supported game: its id ("This disc is Spyro's Adventure")
+    art::DiscLanguages languages; // the text and voice languages the disc holds (Ok only; empty lists: not known)
 };
 
 std::string Sha256Hex(std::span<const uint8_t> data); // lowercase hex
@@ -109,6 +111,13 @@ struct LanguageChoice
     std::string voice;
 };
 LanguageChoice ResolveLanguages(const GameInfo& game);
+
+// The languages the game's disc holds, kept in the game's section after each disc check ("disc_text_languages",
+// "disc_voice_languages": codes joined by commas) so a restart shows them before the disc is read again. Empty lists remove the keys.
+void StoreDiscLanguages(LauncherConfig& config, std::string_view game, const art::DiscLanguages& languages);
+art::DiscLanguages StoredDiscLanguages(const LauncherConfig& config, std::string_view game);
+// Whether a language list offers `code`: the empty list (not known) offers every code, and the empty code ("Same as text") is always offered.
+bool OffersLanguage(const std::vector<std::string>& onDisc, std::string_view code);
 
 // Picks the game's disc image: the command-line path, else the remembered one, else asks with a file dialog
 // and remembers the answer. `--select-iso` or holding Option (macOS) at startup asks again.

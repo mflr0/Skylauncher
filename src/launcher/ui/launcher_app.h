@@ -85,22 +85,47 @@ namespace launcher_ui
     inline constexpr Choice GiantsLanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
         { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" }, { "sv", "Svenska" },
         { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
-    // Swap Force's disc has English and French.
-    inline constexpr Choice SwapForceLanguageChoices[] = { { "en", "English" }, { "fr", "Français" } };
+    // Swap Force's disc has English and French (USA, Australia) or Spanish and Italian (Europe).
+    inline constexpr Choice SwapForceLanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "es", "Español" }, { "it", "Italiano" } };
     inline constexpr Choice GiantsVoiceChoices[] = { { "", N_("Same as text") }, { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" },
         { "es", "Español" }, { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" },
         { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
 
-    template<size_t N>
-    int ChoiceIndex(const Choice (&choices)[N], const std::string& value, int fallback)
+    inline int ChoiceIndex(std::span<const Choice> choices, const std::string& value, int fallback)
     {
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < choices.size(); i++)
             if (value == choices[i].value)
                 return int(i);
-        for (size_t i = 0; i < N; i++)
+        for (size_t i = 0; i < choices.size(); i++)
             if (choices[i].aliases != nullptr && (" " + std::string(choices[i].aliases) + " ").find(" " + value + " ") != std::string::npos)
                 return int(i);
         return fallback;
+    }
+
+    // The language choices a disc holds (OffersLanguage, launcher.h), in their order; every choice when the list is empty (not known).
+    inline std::vector<Choice> ChoicesOnDisc(std::span<const Choice> choices, const std::vector<std::string>& onDisc)
+    {
+        std::vector<Choice> shown;
+        for (const Choice& choice : choices)
+            if (OffersLanguage(onDisc, choice.value))
+                shown.push_back(choice);
+        return shown;
+    }
+
+    // A game's text (`voice` false) or voice language choices: those its disc holds (stored at the last disc check), else today's full
+    // list (a game checked before this was stored; Swap Force's was English and French). The choice shown when the saved one is not
+    // among them is the first, the game's default.
+    inline std::vector<Choice> GameLanguageChoices(const LauncherConfig& config, std::string_view game, bool voice)
+    {
+        art::DiscLanguages onDisc = StoredDiscLanguages(config, game);
+        if (game == "swapforce" && onDisc.text.empty())
+            onDisc.text = onDisc.voice = { "en", "fr" };
+        std::span<const Choice> all = LanguageChoices;
+        if (game == "swapforce")
+            all = SwapForceLanguageChoices;
+        else if (game == "giants")
+            all = voice ? std::span<const Choice>(GiantsVoiceChoices) : std::span<const Choice>(GiantsLanguageChoices);
+        return ChoicesOnDisc(all, voice ? onDisc.voice : onDisc.text);
     }
 
     // ---- Files and images -----------------------------------------------------------------------------------------
@@ -383,7 +408,7 @@ namespace launcher_ui
         // The keyboard and pad focus around the last item, for the widgets drawn over an InvisibleButton; `gap` < 0 draws
         // it inside (rows that touch the window's edges).
         void FocusRing(float rounding, float gap = 4, ImDrawFlags flags = 0);
-        template<size_t N> bool Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width = -1);
+        bool Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
         bool BeginSettingsTable(const char* id);
         void EndSettingsTable();
@@ -562,9 +587,9 @@ namespace launcher_ui
         uint64_t m_testAt = 0;
     };
 
-    template<size_t N>
-    bool App::Combo(const char* label, const char* section, const char* key, const Choice (&choices)[N], int fallback, float width)
+    inline bool App::Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width)
     {
+        const size_t N = choices.size();
         int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
         bool changed = false;
         ImGui::SetNextItemWidth(width);

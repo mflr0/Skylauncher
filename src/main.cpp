@@ -9,6 +9,7 @@
 #include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <algorithm>
 #include <cstdio>
 #include <fmt/format.h>
 #include <string>
@@ -121,8 +122,23 @@ int main(int argc, char** argv)
     SaveLauncherConfig(configPath, config);
     pass("SKY_PORTAL", "portal", "mode");
     pass("SKY_PORTAL_PLACE", "portal", "place");
-    pass("SKY_LANGUAGE", game->id, "language");
-    pass("SKY_VOICE_LANGUAGE", game->id, "voice_language");
+    // A language the disc does not hold is not passed as is: the text takes the disc's first language and the voices
+    // follow the text, which is what the Language tab shows then. Nothing known about the disc: passed as saved.
+    const art::DiscLanguages onDisc = StoredDiscLanguages(config, game->id);
+    auto passLanguage = [&](const char* variable, const char* key, const std::vector<std::string>& held, bool firstHeld) {
+        auto entry = config.find(game->id);
+        if (entry == config.end())
+            return;
+        auto value = entry->second.find(key);
+        if (value == entry->second.end() || value->second.empty())
+            return;
+        if (held.empty() || std::find(held.begin(), held.end(), value->second) != held.end())
+            SetGameVariable(variable, value->second.c_str());
+        else if (firstHeld)
+            SetGameVariable(variable, held.front().c_str());
+    };
+    passLanguage("SKY_LANGUAGE", "language", onDisc.text, true);
+    passLanguage("SKY_VOICE_LANGUAGE", "voice_language", onDisc.voice, false);
 
     // A game built before the one data folder would look for its saves and settings in the older folders, which the
     // migration emptied: point it at the new ones until "Update the game" rebuilds it (docs/install.md, "Older builds").

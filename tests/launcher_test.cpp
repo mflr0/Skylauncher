@@ -1008,7 +1008,7 @@ int main(int argc, char** argv)
     const GameInfo* giants = FindGame("giants");
     EXPECT(g_games.size() == 3 && giants != nullptr && std::string(giants->runtime) == "SGRecomp" && giants->releases.size() == 1);
     const GameInfo* swapForce = FindGame("swapforce");
-    EXPECT(swapForce != nullptr && std::string(swapForce->runtime) == "SSFRecomp" && swapForce->releases.size() == 1 &&
+    EXPECT(swapForce != nullptr && std::string(swapForce->runtime) == "SSFRecomp" && swapForce->releases.size() == 2 &&
         swapForce->releases[0].titleId == 0x415608E9 && std::string(swapForce->releases[0].defaultXexSha256).size() == 64);
     EXPECT(std::string(LauncherTheme::StyleOf("swapforce").top == LauncherTheme::SwapForceStyle.top ? "own" : "launcher") == "own" &&
         LauncherTheme::StyleOf("swapforce").top != LauncherTheme::StyleOf("giants").top);
@@ -1018,6 +1018,17 @@ int main(int argc, char** argv)
     auto start = Clock::now();
     EXPECT(Check(iso) == GameSourceStatus::Ok);
     EXPECT(CheckGameSource(iso.string(), game).xexSha256 == game.releases[0].defaultXexSha256);
+    {
+        art::DiscLanguages held = CheckGameSource(iso.string(), game).languages;
+        printf("Spyro's Adventure languages: text %s, voices %s\n", art::JoinLanguages(held.text).c_str(), art::JoinLanguages(held.voice).c_str());
+        EXPECT(held.text.size() == 10 && held.voice.size() == 10);
+    }
+    if (const char* europeIso = skyenv::Get("SKY_LAUNCHER_TEST_SWAPFORCE_EU_ISO"); europeIso != nullptr && FindGame("swapforce") != nullptr)
+    {
+        GameSourceCheck europe = CheckGameSource(europeIso, *FindGame("swapforce"));
+        printf("Swap Force (Europe) languages: text %s, voices %s\n", art::JoinLanguages(europe.languages.text).c_str(), art::JoinLanguages(europe.languages.voice).c_str());
+        EXPECT(europe.status == GameSourceStatus::Ok && art::JoinLanguages(europe.languages.text) == "es,it" && art::JoinLanguages(europe.languages.voice) == "es,it");
+    }
     printf("  verified in %lld ms\n", milliseconds(start));
 
     DiscFileSystem disc;
@@ -1138,6 +1149,8 @@ int main(int argc, char** argv)
         EXPECT(own.status == GameSourceStatus::Ok && own.xexSha256 == giants->releases[0].defaultXexSha256);
         EXPECT(CheckGameSource(giantsIso, game).status == GameSourceStatus::WrongGame);
         EXPECT(CheckGameSource(iso.string(), *giants).status == GameSourceStatus::WrongGame);
+        printf("Giants languages: text %s, voices %s\n", art::JoinLanguages(own.languages.text).c_str(), art::JoinLanguages(own.languages.voice).c_str());
+        EXPECT(own.languages.text.size() == 12 && own.languages.voice.size() == 12);
         printf("Switching games in the window:\n");
         SwitchChecks(scratch, iso.string(), giantsIso);
         printf("The sidebar line through an install and an update:\n");
@@ -1148,6 +1161,8 @@ int main(int argc, char** argv)
         printf("Swap Force disc image:\n");
         GameSourceCheck own = CheckGameSource(swapIso, *swapForce);
         EXPECT(own.status == GameSourceStatus::Ok && own.xexSha256 == swapForce->releases[0].defaultXexSha256);
+        printf("Swap Force (USA) languages: text %s, voices %s\n", art::JoinLanguages(own.languages.text).c_str(), art::JoinLanguages(own.languages.voice).c_str());
+        EXPECT(art::JoinLanguages(own.languages.text) == "en,fr" && art::JoinLanguages(own.languages.voice) == "en,fr");
         EXPECT(CheckGameSource(swapIso, game).status == GameSourceStatus::WrongGame);
         if (giants != nullptr)
             EXPECT(CheckGameSource(swapIso, *giants).status == GameSourceStatus::WrongGame);
