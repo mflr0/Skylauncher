@@ -1,7 +1,7 @@
 #pragma once
 
 // Each game's own pictures, read from the player's disc and cached as PNG files in the game's data folder: its logo,
-// its background art, its title icon, its toy portraits and (Giants) its large toy artworks. One flow for every game; what differs per game (which
+// its background art, its title icon, its toy portraits and (Giants, Swap Force) its large toy artworks. One flow for every game; what differs per game (which
 // archive, which picture) is the table in game_art.cpp. Used by the in-game Toy Box and by Skylauncher (game page,
 // sidebar, collection). Nothing is shipped or downloaded. docs/runtime/host/game_art.md.
 #include <cstdint>
@@ -56,7 +56,7 @@ namespace art
     // The cached picture of `role` for `game`, empty if there is none yet.
     std::string CachedPath(std::string_view game, Role role);
 
-    // True for a game whose pictures this file knows how to read ("ssa", "giants").
+    // True for a game whose pictures this file knows how to read (those with a manifest: "ssa", "giants", "swapforce").
     bool Known(std::string_view game);
 
     enum Parts

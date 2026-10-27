@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "game": "swapforce",
+  "engine": "alchemy",
+  "about": "Where Swap Force keeps its pictures on the disc (docs/runtime/host/game_art.md, games/swapforce/docs/art.md). Names only: the pictures are read from the player's own disc.",
+  "logo": { "archive": "archives/defaultloadscreen.pak", "entry": "textures\\juicestandard_title_10.igz" },
+  "background": { "archive": "archives/juicedomain_frontend.pak", "entry": "textures\\juicestandard_mainmenu_background_10.igz" },
+  "portraits": { "materials": [
+    { "archive": "archives/toycollectionimages.pak", "folder": "materialinstances\\toycollection\\" },
+    { "archive": "archives/collectibleicons.pak", "folder": "materialinstances\\haticon_ufo_materials" } ] },
+  "artworks": { "materials": [
+    { "archive": "archives/faceoffportraitsimages.pak", "folder": "materialinstances\\portrait_faceoff\\",
+      "ending": "_fullscreen_materials.igz" } ] }
+}

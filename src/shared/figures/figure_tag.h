@@ -1,7 +1,8 @@
 #pragma once
 
 // Reading and editing what Spyro's Adventure stores on a figure. Layout (docs/runtime/host/figures.md):
-// - sector 0 (blocks 0-3) is plain: serial, toy type, variant, header CRC; blocks 4-7 are plain and unused;
+// - sector 0 (blocks 0-3) is plain: serial, toy type, variant, header CRC; blocks 4-7 are plain (Swap Force writes block 6,
+//   kept as it is here);
 // - blocks 8-63 except the sector trailers are AES-128 encrypted, each with its own key:
 //   MD5(block 0 | block 1 | block number | " Copyright (C) 2010 Activision. All Rights Reserved. "); zero blocks stay zero;
 // - the progress is stored twice, in area A (blocks 8-16) and area B (blocks 36-44), 7 data blocks each; the title

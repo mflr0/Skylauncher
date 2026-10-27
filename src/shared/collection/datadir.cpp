@@ -86,6 +86,8 @@ namespace datadir
 
     std::string GameFolderName(std::string_view id)
     {
+        if (id == "swapforce")
+            return "SwapForce"; // the one exception: two words
         std::string name(id);
         if (name.size() <= 3)
             std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return char(std::toupper(c)); });

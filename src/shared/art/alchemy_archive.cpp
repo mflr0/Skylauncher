@@ -293,9 +293,10 @@ namespace art::alchemy
     {
         // [Alchemy] Where each IGA version keeps its tables. The file starts "IGA\x1a", u32 version, u32 table size,
         // u32 entry count; then the header's other fields, u32 name hashes[n] and the entries { u32 offset, u32 size,
-        // u32 mode }. v8 is Giants' [V: every archive of its disc]; v10 and v11 (the later games) are from public format
-        // descriptions, never seen here [?]: v10 adds the counts of large, medium and small chunk blocks before the name
-        // table, v11 makes the name table's position 64-bit.
+        // u32 mode } (v10: a leading u32 first). v8 is Giants' [V: every archive of its disc]. v10 is Swap Force's [V:
+        // every archive of its disc]: big-endian throughout (the magic reads "\x1aAGI"), header 0x38, the name table's
+        // position at 0x2C and size at 0x30, 16-byte entries, chunks 0x800-aligned (games/swapforce/docs/art.md). v11
+        // (the later games) is from public format descriptions, never seen here [?]: the name table's position 64-bit.
         struct IgaLayout
         {
             uint32_t version;
@@ -303,12 +304,15 @@ namespace art::alchemy
             uint32_t namesAt;    // header offset of the name table's file position
             uint32_t namesSize;  // ... and of its size
             bool namesAt64;      // the position is 64-bit (little-endian)
+            bool bigEndian;      // every header and table field (not the chunks' u16 sizes)
+            uint32_t entrySize;  // bytes per entry; { offset, size, mode } are its last three words
+            uint32_t chunkAlign; // compressed chunks start at multiples of this
             bool verified;
         };
         constexpr IgaLayout IgaLayouts[] = {
-            { 8, 0x34, 0x1C, 0x20, false, true },
-            { 10, 0x34, 0x28, 0x2C, false, false },
-            { 11, 0x38, 0x28, 0x30, true, false },
+            { 8, 0x34, 0x1C, 0x20, false, false, 12, 0x100, true },
+            { 10, 0x38, 0x2C, 0x30, false, true, 16, 0x800, true },
+            { 11, 0x38, 0x28, 0x30, true, false, 12, 0x100, false },
         };
     }
 
@@ -323,22 +327,27 @@ namespace art::alchemy
     std::optional<IgaArchive> IgaArchive::Open(Reader reader, uint64_t length)
     {
         uint8_t header[0x38] = {};
-        if (length < 0x34 || !reader(0, size_t(std::min<uint64_t>(length, sizeof(header))), header) || memcmp(header, "IGA\x1a", 4) != 0)
+        if (length < 0x34 || !reader(0, size_t(std::min<uint64_t>(length, sizeof(header))), header))
             return std::nullopt;
+        const bool big = memcmp(header, "\x1a" "AGI", 4) == 0;
+        if (!big && memcmp(header, "IGA\x1a", 4) != 0)
+            return std::nullopt;
+        auto u32 = [big](const uint8_t* p) { return big ? ReadBe32(p) : Le32(p); };
         const IgaLayout* layout = nullptr;
         for (const IgaLayout& candidate : IgaLayouts)
-            if (Le32(header + 4) == candidate.version)
+            if (u32(header + 4) == candidate.version && candidate.bigEndian == big)
                 layout = &candidate;
         if (layout == nullptr || length < layout->header)
             return std::nullopt;
-        uint32_t count = Le32(header + 0x0C), namesSize = Le32(header + layout->namesSize);
-        uint64_t namesAt = Le32(header + layout->namesAt);
+        uint32_t count = u32(header + 0x0C), namesSize = u32(header + layout->namesSize);
+        uint64_t namesAt = u32(header + layout->namesAt);
         if (layout->namesAt64)
-            namesAt |= uint64_t(Le32(header + layout->namesAt + 4)) << 32;
-        if (count == 0 || count > 0x100000 || layout->header + 16 * uint64_t(count) > length)
+            namesAt |= uint64_t(u32(header + layout->namesAt + 4)) << 32;
+        const size_t stride = 4 + layout->entrySize;
+        if (count == 0 || count > 0x100000 || layout->header + stride * uint64_t(count) > length)
             return std::nullopt;
-        // u32 hashes[n], then n x { u32 offset, u32 size, u32 mode }.
-        std::vector<uint8_t> tables(16 * size_t(count));
+        // u32 hashes[n], then n entries ending in { u32 offset, u32 size, u32 mode }.
+        std::vector<uint8_t> tables(stride * size_t(count));
         if (!reader(layout->header, tables.size(), tables.data()))
             return std::nullopt;
         IgaArchive archive;
@@ -346,11 +355,12 @@ namespace art::alchemy
         archive.m_length = length;
         archive.m_version = layout->version;
         archive.m_verified = layout->verified;
+        archive.m_chunkAlign = layout->chunkAlign;
         archive.m_entries.resize(count);
         for (uint32_t i = 0; i < count; i++)
         {
-            const uint8_t* entry = &tables[4 * size_t(count) + 12 * size_t(i)];
-            archive.m_entries[i] = { Le32(entry), Le32(entry + 4), Le32(entry + 8), {} };
+            const uint8_t* entry = &tables[4 * size_t(count) + layout->entrySize * size_t(i) + layout->entrySize - 12];
+            archive.m_entries[i] = { u32(entry), u32(entry + 4), u32(entry + 8), {} };
         }
         // The name table: u32 offsets[n] from the table's start, then the NUL-terminated names.
         if (namesSize >= 4 * uint64_t(count) && namesSize < 0x4000000 && namesAt + namesSize <= length)
@@ -360,7 +370,7 @@ namespace art::alchemy
             {
                 for (uint32_t i = 0; i < count; i++)
                 {
-                    uint32_t at = Le32(&names[4 * size_t(i)]);
+                    uint32_t at = u32(&names[4 * size_t(i)]);
                     if (at >= names.size())
                         continue;
                     const uint8_t* end = static_cast<const uint8_t*>(memchr(&names[at], 0, names.size() - at));
@@ -393,8 +403,9 @@ namespace art::alchemy
         if (!m_verified && entry.flags >> 28 != 2)
             return {};
 
-        // Chunked: 0x8000 bytes of output per chunk, each chunk at a 0x100-aligned offset, [u16 n][LZMA props][n bytes]
-        // or stored (a chunk that doesn't start with the props).
+        // Chunked: 0x8000 bytes of output per chunk, each chunk at an aligned offset (0x100; v10: 0x800),
+        // [u16 n, little-endian in every version][LZMA props][n bytes] or stored (a chunk that doesn't start with the props).
+        const uint64_t align = m_chunkAlign - 1;
         std::vector<uint8_t> out;
         out.reserve(size);
         uint64_t p = entry.offset;
@@ -412,7 +423,7 @@ namespace art::alchemy
                 out.resize(at + want);
                 if (body.empty() || LzmaDecodeRaw(body.data(), body.size(), out.data() + at, want) != want)
                     return {};
-                p = (p + 7 + n + 0xFF) & ~uint64_t(0xFF);
+                p = (p + 7 + n + align) & ~align;
             }
             else
             {
@@ -420,7 +431,7 @@ namespace art::alchemy
                 if (raw.empty())
                     return {};
                 out.insert(out.end(), raw.begin(), raw.end());
-                p = (p + want + 0xFF) & ~uint64_t(0xFF);
+                p = (p + want + align) & ~align;
             }
         }
         return out;
@@ -445,31 +456,50 @@ namespace art::alchemy
     {
         // [Alchemy] What changes between IGZ versions, as far as pictures go. The file starts "IGZ\x01" and a BE32
         // version, then a table of sections (section 0 holds the object tables, the "fixups"; the others are memory
-        // pools). v6 is Giants' [V: every archive of its disc]. v7 to v9 (the later games) are from public format
-        // descriptions, never seen here [?]: fixup records named by a four-character tag (TMET, EXID, RVTB, RHND...)
-        // with a 16-byte header from the section's start, sections listed as { id, offset, size, alignment }, a
-        // pointer's pool in its top 5 bits; igImage2's fields are assumed where v6 has them.
+        // pools). v6 is Giants' [V: every archive of its disc]. v7 is Swap Force's [V: its disc, 2026-10-27]: sections at
+        // 0x14 as { ?, offset, size, alignment }, records named by a four-character tag stored byte-swapped ("TMET"
+        // reads "TEMT") with a 16-byte header { tag, count, length, data start }, memory handles in TMHN as { kind << 24
+        // | size, pool << 27 | offset }, a pointer's pool in its top 5 bits, igImage2's name an index in the strings
+        // (TSTR), its other fields where v6 has them. v8 and v9 (the later games) are from public format descriptions,
+        // never seen here [?]: tags not swapped, sections { id, offset, size, alignment } at 0x10, handles in RHND.
         struct IgzLayout
         {
             uint32_t version;
+            uint32_t sectionTable;               // where the section entries start
             uint32_t sectionOffset, sectionSize; // word index of a section entry's offset and size
             bool tagged;                         // records named by a four-character tag (else a number)
             bool ownHeader;                      // section 0 starts with its own header, its length at +0x0C (v6)
             uint32_t countAt, lengthAt, startAt; // a record's count, length and data start (from the record)
-            uint32_t tables[4];                  // types, external ids, objects, memory handles: v6's numbers or tags
+            uint32_t tables[6];                  // types, external ids, objects, memory handles, strings, dependencies
             uint32_t poolShift;                  // a pointer's pool index is above this bit
+            uint32_t handleSizeBits;             // a memory handle's size is its first word's low bits (the kind above)
+            bool nameIsString;                   // igImage2's name is an index in the strings (else a pointer)
             uint32_t imageName, imageWidth, imageFormat, imageHandle, imageSize; // igImage2's fields
             bool verified;
         };
-        enum Table { Types, ExternalIds, Objects, Handles };
+        enum Table { Types, ExternalIds, Objects, Handles, Strings, Dependencies };
         constexpr uint32_t Tag(const char (&t)[5]) { return uint32_t(uint8_t(t[0])) << 24 | uint32_t(uint8_t(t[1])) << 16 | uint32_t(uint8_t(t[2])) << 8 | uint8_t(t[3]); }
-        constexpr uint32_t TaggedTables[4] = { Tag("TMET"), Tag("EXID"), Tag("RVTB"), Tag("RHND") };
+        constexpr uint32_t Swapped(const char (&t)[5]) { return uint32_t(uint8_t(t[3])) << 24 | uint32_t(uint8_t(t[2])) << 16 | uint32_t(uint8_t(t[1])) << 8 | uint8_t(t[0]); }
+        constexpr uint32_t None = 0xFFFFFFFF; // a table this version does not have
         constexpr IgzLayout IgzLayouts[] = {
-            { 6, 0, 1, false, true, 12, 16, 20, { 0, 2, 5, 0xA }, 24, 0x08, 0x30, 0x3C, 0x48, 0x60, true },
-            { 7, 1, 2, true, false, 4, 8, 12, { TaggedTables[0], TaggedTables[1], TaggedTables[2], TaggedTables[3] }, 27, 0x08, 0x30, 0x3C, 0x48, 0x60, false },
-            { 8, 1, 2, true, false, 4, 8, 12, { TaggedTables[0], TaggedTables[1], TaggedTables[2], TaggedTables[3] }, 27, 0x08, 0x30, 0x3C, 0x48, 0x60, false },
-            { 9, 1, 2, true, false, 4, 8, 12, { TaggedTables[0], TaggedTables[1], TaggedTables[2], TaggedTables[3] }, 27, 0x08, 0x30, 0x3C, 0x48, 0x60, false },
+            { 6, 0x10, 0, 1, false, true, 12, 16, 20, { 0, 2, 5, 0xA, None, None }, 24, 28, false, 0x08, 0x30, 0x3C, 0x48, 0x60, true },
+            { 7, 0x14, 1, 2, true, false, 4, 8, 12, { Swapped("TMET"), Swapped("EXID"), Swapped("RVTB"), Swapped("TMHN"), Swapped("TSTR"), Swapped("TDEP") },
+              27, 24, true, 0x08, 0x30, 0x3C, 0x48, 0x60, true },
+            { 8, 0x10, 1, 2, true, false, 4, 8, 12, { Tag("TMET"), Tag("EXID"), Tag("RVTB"), Tag("RHND"), Tag("TSTR"), Tag("TDEP") }, 27, 28, false, 0x08, 0x30, 0x3C, 0x48, 0x60, false },
+            { 9, 0x10, 1, 2, true, false, 4, 8, 12, { Tag("TMET"), Tag("EXID"), Tag("RVTB"), Tag("RHND"), Tag("TSTR"), Tag("TDEP") }, 27, 28, false, 0x08, 0x30, 0x3C, 0x48, 0x60, false },
         };
+
+        // The NUL-terminated strings of a record, `count` of them.
+        std::vector<std::string> StringList(const IgzFile& file, size_t start, size_t end, uint32_t count)
+        {
+            std::vector<std::string> out;
+            for (size_t p = start; out.size() < count && p < end;)
+            {
+                out.push_back(file.String(p));
+                p += out.back().size() + 1;
+            }
+            return out;
+        }
     }
 
     std::vector<FormatVersion> IgzVersions()
@@ -497,11 +527,12 @@ namespace art::alchemy
         const IgzLayout& layout = IgzLayouts[file.m_layout];
         file.m_bytes = std::move(bytes);
         const std::vector<uint8_t>& b = file.m_bytes;
-        // Sections at 0x10, 16 bytes each, until an empty one.
+        // Sections (at 0x10, v7 0x14), 16 bytes each, until an empty one.
         std::vector<std::pair<uint64_t, uint64_t>> sections;
-        for (int i = 0; i < 16; i++)
+        for (uint32_t i = 0; i < 16; i++)
         {
-            uint32_t offset = ReadBe32(&b[0x10 + 16 * i + 4 * layout.sectionOffset]), size = ReadBe32(&b[0x10 + 16 * i + 4 * layout.sectionSize]);
+            const uint32_t entry = layout.sectionTable + 16 * i;
+            uint32_t offset = ReadBe32(&b[entry + 4 * layout.sectionOffset]), size = ReadBe32(&b[entry + 4 * layout.sectionSize]);
             if (offset == 0 || size == 0)
                 break;
             sections.emplace_back(offset, size);
@@ -521,22 +552,17 @@ namespace art::alchemy
                      start = ReadBe32(&b[p + layout.startAt]);
             if (length < header || p + length > end || start > length)
                 break;
-            for (uint32_t table = 0; table < 4; table++)
+            for (uint32_t table = 0; table < std::size(layout.tables); table++)
                 if (id == layout.tables[table])
                     file.m_fixups.push_back({ table, Fixup{ count, p + start, p + length } });
             p += length;
         }
         // The class names, one NUL-terminated string each: an object's first word is its index here.
         if (const Fixup* types = file.FindFixup(Types))
-        {
-            size_t p = types->start;
-            for (uint32_t i = 0; i < types->count && p < types->end; i++)
-            {
-                std::string name = file.String(p);
-                p += name.size() + 1;
-                file.m_types.push_back(std::move(name));
-            }
-        }
+            file.m_types = StringList(file, types->start, types->end, types->count);
+        // v7: the strings the objects name by index (TSTR).
+        if (const Fixup* strings = file.FindFixup(Strings))
+            file.m_strings = StringList(file, strings->start, strings->end, strings->count);
         if (file.m_types.empty() || file.FindFixup(Objects) == nullptr)
             return std::nullopt;
         return file;
@@ -627,7 +653,12 @@ namespace art::alchemy
             uint32_t size = Be32(object + ImageWidth);
             picture.width = size >> 16;
             picture.height = size & 0xFFFF;
-            if (auto name = Pointer(Be32(object + ImageName)); name && Be32(object + ImageName) != 0)
+            if (layout.nameIsString)
+            {
+                if (uint32_t index = Be32(object + ImageName); index < m_strings.size())
+                    picture.name = m_strings[index];
+            }
+            else if (auto name = Pointer(Be32(object + ImageName)); name && Be32(object + ImageName) != 0)
                 picture.name = String(*name);
             // The format: 0x80000000 | an index in the external ids, whose first word is the format name's hash.
             uint32_t format = Be32(object + ImageFormat);
@@ -641,24 +672,40 @@ namespace art::alchemy
 
     std::vector<uint8_t> IgzFile::Pixels(const Picture& picture) const
     {
-        // The pixels are a memory handle: { u32 size | flags << 28, u32 pointer }, by index.
+        // The pixels are a memory handle: { u32 size | flags << 28 (v7: kind << 24), u32 pointer }, by index.
         const Fixup* handles = FindFixup(Handles);
-        uint32_t handle = Be32(picture.object + IgzLayouts[m_layout].imageHandle);
+        const IgzLayout& layout = IgzLayouts[m_layout];
+        uint32_t handle = Be32(picture.object + layout.imageHandle);
         if (handles == nullptr || handle >= handles->count)
             return {};
         uint64_t record = handles->start + 8 * uint64_t(handle);
-        uint32_t size = Be32(record) & 0x0FFFFFFF;
+        uint32_t size = Be32(record) & ((1u << layout.handleSizeBits) - 1);
         auto at = Pointer(Be32(record + 4));
         if (!at || size == 0 || *at + size > m_bytes.size())
             return {};
         return std::vector<uint8_t>(m_bytes.begin() + ptrdiff_t(*at), m_bytes.begin() + ptrdiff_t(*at + size));
     }
 
+    std::vector<std::string> IgzFile::Dependencies() const
+    {
+        // v7 TDEP: { name, path } pairs of NUL-terminated strings, `count` pairs.
+        std::vector<std::string> out;
+        if (const Fixup* dependencies = FindFixup(Table::Dependencies))
+        {
+            std::vector<std::string> strings = StringList(*this, dependencies->start, dependencies->end, 2 * dependencies->count);
+            for (size_t i = 1; i < strings.size(); i += 2)
+                out.push_back(strings[i]);
+        }
+        return out;
+    }
+
     bool TextureFormatOf(uint32_t hash, Texture& texture)
     {
         // Format names hashed by the engine (external ids). Seen on Giants' disc (2026-10-25, every archive): B9BCDC57
         // (30315 pictures, DXT5 tiled), DC78A2E3 (27947, DXT1 tiled), 19E29222 (132, 8 bits per texel, tiled:
-        // "format_tfl8" lookup ramps). The linear and DXT3 ones are from public format lists, not seen on this disc.
+        // "format_tfl8" lookup ramps). On Swap Force's (2026-10-27): 049D7FAA, DXT5 linear, its rows 32 blocks apart
+        // (every UI picture: the logo, the menus, the collection icons, the face-off portraits). The other linear and
+        // the DXT3 ones are from public format lists, not seen on either disc.
         struct Known
         {
             uint32_t hash;
@@ -691,6 +738,10 @@ namespace art::alchemy
             return false;
         texture.width = picture.width;
         texture.height = picture.height;
+        // [Alchemy] Linear pictures keep rows of a multiple of 32 blocks ([V] Swap Force: a 192-texel DXT5 icon's rows are
+        // 1024 bytes, not the 768 that 256-byte alignment gives).
+        if (!texture.tiled)
+            texture.pitch = ((picture.width + 3) / 4 + 31) / 32 * 32 * 4;
         std::vector<uint8_t> pixels = file.Pixels(picture);
         if (pixels.empty() || !DecodeTexture(pixels.data(), pixels.size(), texture, out))
             return false;

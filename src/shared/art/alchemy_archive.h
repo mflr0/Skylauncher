@@ -2,7 +2,8 @@
 
 // [Alchemy] IGA archives (the .arc and .bld files) and the IGZ files inside them, as far as reading pictures and shaders
 // needs. One reader for every version, each a row of a table in the .cpp: IGA v8 and IGZ v6 (Giants) are verified on the
-// disc; IGA v10/v11 and IGZ v7-v9 (the later games) follow public format descriptions and were never seen here [?].
+// disc; IGA v10 and IGZ v7 (Swap Force, big-endian) are verified on its disc; IGA v11 and IGZ v8-v9 (the later games)
+// follow public format descriptions [?] (games/swapforce/docs/art.md).
 // Formats: games/giants/docs/shaders.md (IGA, IGZ sections), games/giants/docs/art.md (IGZ objects and images),
 // docs/runtime/host/game_art.md (the versions). Shared by the runtime, SSABuild and Skylauncher.
 #include "xenos_texture.h"
@@ -60,6 +61,7 @@ namespace art::alchemy
         uint64_t m_length = 0;
         uint32_t m_version = 0;
         bool m_verified = false;
+        uint32_t m_chunkAlign = 0x100;
         std::vector<Entry> m_entries;
     };
 
@@ -74,7 +76,7 @@ namespace art::alchemy
 
         struct Picture
         {
-            std::string name;     // the source path ("levels/includes/.../portraits/cynder.png"); empty in streamed .arc files
+            std::string name;     // the source path ("levels/includes/.../portraits/cynder.png"; v7: the .tga it was made from); empty in streamed .arc files
             uint32_t width = 0, height = 0;
             uint32_t format = 0;  // the format's hash (an external id); see TextureFormatOf
             uint64_t object = 0;  // file offset of the igImage2
@@ -84,6 +86,10 @@ namespace art::alchemy
         std::vector<uint8_t> Pixels(const Picture& picture) const;
 
         const std::vector<uint8_t>& Bytes() const { return m_bytes; }
+
+        // v7: the files this one depends on (its TDEP record), as paths: a material names its texture this way
+        // ("textures:/JuiceStandard_Collections_Zook_10.igz"). Empty for v6.
+        std::vector<std::string> Dependencies() const;
 
         // The objects themselves, for readers of other data than pictures (the scripts' toy tables: game_text.cpp).
         // File offsets of every object, in file order.
@@ -111,6 +117,7 @@ namespace art::alchemy
         std::vector<uint64_t> m_pools; // file offsets of sections 1.. (a pointer's pool n is section n + 1)
         std::vector<std::pair<uint32_t, Fixup>> m_fixups;
         std::vector<std::string> m_types;
+        std::vector<std::string> m_strings; // v7: TSTR
     };
 
     // The texture layout of a picture format hash; false for a format not known. Known: the DXT1, DXT3 and DXT5 hashes

@@ -317,6 +317,14 @@ namespace art
             std::string compose, plate;  // a composition step ("sprite_sheet_logo") and the second picture it uses
         };
 
+        // [Alchemy] A folder of material instances in an archive, each naming its texture, an entry of the same archive
+        // (Swap Force: "materialinstances\toycollection\collection_zook_normal.igz" names
+        // "textures:/JuiceStandard_Collections_Zook_10.igz"). The picture is named after the material.
+        struct Materials
+        {
+            std::string archive, folder, ending; // the entries whose name starts with `folder` (and ends with `ending`)
+        };
+
         struct Manifest
         {
             std::string game;
@@ -325,6 +333,7 @@ namespace art
             // the catalogue's internal name, lower case) and, with `images`, the catalogue's other images. [Alchemy]:
             // every square picture of the archive's entry under `folder`, named as on the disc.
             Source portraits;
+            std::vector<Materials> portraitMaterials; // [Alchemy] instead of the archive's entry: materials, by folder
             std::vector<std::string> pictures;
             bool images = false;
             std::string folder;
@@ -332,9 +341,18 @@ namespace art
             // versus screen), named after the entry's picture ("ui_pvp_sprites/eruptorseries2.png/0x....igz").
             Source artworks;
             std::string artworksFolder;
+            std::vector<Materials> artworkMaterials;
             // The toys' upgrades (game_text.cpp): the manifest's "upgrades" part as it is.
             collection::Json upgrades;
         };
+
+        std::vector<Materials> ReadMaterials(const collection::Json& json)
+        {
+            std::vector<Materials> out;
+            for (const collection::Json& item : json.Items())
+                out.push_back({ item["archive"].AsString(), item["folder"].AsString(), item["ending"].AsString() });
+            return out;
+        }
 
         Source ReadSource(const collection::Json& json)
         {
@@ -364,8 +382,10 @@ namespace art
                         m.pictures.push_back(name.AsString());
                     m.images = json["portraits"]["images"].AsBool();
                     m.folder = json["portraits"]["folder"].AsString();
+                    m.portraitMaterials = ReadMaterials(json["portraits"]["materials"]);
                     m.artworks = ReadSource(json["artworks"]);
                     m.artworksFolder = json["artworks"]["folder"].AsString();
+                    m.artworkMaterials = ReadMaterials(json["artworks"]["materials"]);
                     m.upgrades = json["upgrades"];
                     if (!m.game.empty())
                         out.push_back(std::move(m));
@@ -496,19 +516,69 @@ namespace art
             return present;
         }
 
+        // True when every picture of `names` (the catalogue's portraits or artworks) is in `folder`.
+        bool Complete(const std::map<uint32_t, std::string>& names, const std::filesystem::path& folder)
+        {
+            bool complete = !names.empty();
+            for (const auto& [key, name] : names)
+                complete = complete && Exists(folder / (name + ".png"));
+            return complete;
+        }
+
+        // [Alchemy] Every material instance under each source's folder: its texture's first picture, named after the
+        // material ("collection_zook_normal.png"). Swap Force (IGZ v7): the material names its texture in its
+        // dependencies (TDEP), and the texture is an entry of the same archive ("textures\<name>.igz").
+        int AlchemyMaterials(const std::vector<Materials>& sources, const Disc& disc, const std::filesystem::path& folder)
+        {
+            int present = CountPngs(folder);
+            for (const Materials& source : sources)
+            {
+                auto archive = OpenArchive(disc, source.archive);
+                if (!archive)
+                {
+                    fprintf(stderr, "[art] cannot read %s of the disc\n", source.archive.c_str());
+                    continue;
+                }
+                const std::string under = Lower(source.folder), ending = Lower(source.ending);
+                for (size_t i = 0; i < archive->Count(); i++)
+                {
+                    std::string name = Lower(archive->Name(i));
+                    if (under.empty() || !name.starts_with(under) || !name.ends_with(".igz") || !name.ends_with(ending))
+                        continue;
+                    name = name.substr(0, name.size() - 4);
+                    name = name.substr(name.find_last_of("\\/") + 1);
+                    std::filesystem::path path = folder / (name + ".png");
+                    if (Exists(path))
+                        continue;
+                    std::optional<alchemy::IgzFile> material = alchemy::IgzFile::Parse(archive->Read(i));
+                    for (const std::string& dependency : material ? material->Dependencies() : std::vector<std::string>{})
+                    {
+                        std::string texture = Lower(dependency);
+                        if (!texture.starts_with("textures:/"))
+                            continue;
+                        std::optional<alchemy::IgzFile> scene = OpenScene(*archive, "textures\\" + texture.substr(10));
+                        std::vector<alchemy::IgzFile::Picture> pictures = scene ? scene->Pictures() : std::vector<alchemy::IgzFile::Picture>{};
+                        Image image;
+                        if (!pictures.empty() && alchemy::DecodePicture(*scene, pictures[0], image) && SavePng(image, path))
+                            present++;
+                        break;
+                    }
+                }
+            }
+            return present;
+        }
+
         // [Alchemy] Every square picture of the entry under the manifest's folder (Giants' collection screen: all
         // Skylanders and their decos, sidekicks and items), named as on the disc ("eruptor_lightcore.png"). Done when
         // every portrait the catalogue's "portraits" names is there.
         int AlchemyPortraits(const Manifest& m, const Disc& disc, const std::filesystem::path& folder)
         {
             const collection::Game* game = collection::Catalogue::Get().FindGame(m.game);
-            bool complete = game != nullptr && !game->portraits.empty();
-            if (game != nullptr)
-                for (const auto& [key, name] : game->portraits)
-                    complete = complete && Exists(folder / (name + ".png"));
             int present = CountPngs(folder);
-            if (complete)
+            if (game != nullptr && Complete(game->portraits, folder))
                 return present;
+            if (!m.portraitMaterials.empty())
+                return AlchemyMaterials(m.portraitMaterials, disc, folder);
             auto archive = OpenArchive(disc, m.portraits.archive);
             std::optional<alchemy::IgzFile> scene = archive ? OpenScene(*archive, m.portraits.entry) : std::nullopt;
             if (!scene)
@@ -537,12 +607,12 @@ namespace art
         int AlchemyArtworks(const Manifest& m, const Disc& disc, const std::filesystem::path& folder)
         {
             const collection::Game* game = collection::Catalogue::Get().FindGame(m.game);
-            bool complete = game != nullptr && !game->artworks.empty();
-            if (game != nullptr)
-                for (const auto& [key, name] : game->artworks)
-                    complete = complete && Exists(folder / (name + ".png"));
             int present = CountPngs(folder);
-            if (complete || m.artworks.archive.empty() || m.artworksFolder.empty())
+            if (game != nullptr && Complete(game->artworks, folder))
+                return present;
+            if (!m.artworkMaterials.empty())
+                return AlchemyMaterials(m.artworkMaterials, disc, folder);
+            if (m.artworks.archive.empty() || m.artworksFolder.empty())
                 return present;
             auto archive = OpenArchive(disc, m.artworks.archive);
             if (!archive)
@@ -573,7 +643,7 @@ namespace art
         {
             if (!m.portraits.stream.empty())
                 return LuxPortraits(m, disc, folder);
-            if (!m.portraits.archive.empty())
+            if (!m.portraits.archive.empty() || !m.portraitMaterials.empty())
                 return AlchemyPortraits(m, disc, folder);
             return CountPngs(folder);
         }
@@ -677,7 +747,7 @@ namespace art
             std::filesystem::create_directories(portraits, error);
             result.portraits = ReadPortraits(*where, disc, portraits);
         }
-        if ((parts & Artworks) && where != nullptr && !where->artworks.archive.empty() && !portraits.empty())
+        if ((parts & Artworks) && where != nullptr && (!where->artworks.archive.empty() || !where->artworkMaterials.empty()) && !portraits.empty())
         {
             std::filesystem::path artworks = ArtworkFolder(game);
             std::filesystem::create_directories(artworks, error);

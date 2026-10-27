@@ -61,6 +61,9 @@ namespace collection
         bool favourite = false;
         std::string lastGame, lastUsed;
         std::string origin;        // "created" (Add a figure, a duplicate), "imported", "portal" (copy of a real toy); empty: older
+        // A Swap Force half linked to the other half of its swapper (file name; empty: none, the half is a card of its
+        // own). Set only when the link is good: both dumps exist, link each other, and are one top and one bottom.
+        std::string partner;
         struct Use
         {
             std::string game, lastUsed; // ISO 8601, UTC
@@ -76,6 +79,8 @@ namespace collection
         // What to show: the edition the player picked, else the variant's.
         VariantKind Kind() const { return editionKind != VariantKind::Base ? editionKind : variantInfo.kind; }
         std::string DisplayName() const;
+        bool IsSwapTop() const;
+        bool IsSwapBottom() const;
         // When this game last took it ("" if never).
         std::string LastUsedIn(const std::string& game) const;
     };
@@ -101,6 +106,16 @@ namespace collection
     bool Read(const std::string& path, Figure& figure);
     // Every dump of the folder that passes the filter, by category, element, toy type, variant, file name.
     std::vector<Figure> List(const Filter& filter = {});
+
+    // A new never-played swapper: both halves, linked (the toy types of a top and a bottom, 2000-2015 and 1000-1015; a
+    // variant for each). Returns the paths; both empty on failure (nothing is left behind).
+    struct SwapperPaths
+    {
+        std::string top, bottom;
+    };
+    SwapperPaths CreateSwapper(uint16_t topType, uint16_t bottomType, uint16_t topVariant = 0, uint16_t bottomVariant = 0);
+    // The other half of the same swapper: 2003 gives 1003 and 1003 gives 2003; 0 for any other toy.
+    uint16_t MatchingHalf(uint16_t type);
 
     // A new never-played figure: "<type> <name>.sky" (" (2)"... if taken), or `file` if given. Returns its path,
     // empty on failure. The player made it: it counts as theirs (origin "created").
@@ -134,8 +149,51 @@ namespace collection
     bool Restore(const std::string& path, const std::string& backup, std::string* error = nullptr);
     // Clears both progress areas (the game starts the figure anew); serial, toy and variant stay. Backed up first.
     bool ResetToNew(const std::string& path, std::string* error = nullptr);
-    // A copy with a new serial and the same progress ("<name> (copy)"), its metadata copied. Returns its path.
+    // A copy with a new serial and the same progress ("<name> (copy)"), its metadata copied. Returns its path. A swapper's
+    // half (it has a partner) is copied with the other half and the two copies are linked; the path is the copy of the half
+    // asked for.
     std::string Duplicate(const std::string& path, std::string* error = nullptr);
+
+    // --- Swappers: two dumps, one card (docs/runtime/host/collection.md "Swappers") ------------------------------------------
+
+    // A swapper is a top (2000-2015, SwapTop) and a bottom (1000-1015, SwapBottom), each a dump of its own, linked by a
+    // "partner" entry on both in collection.json. The link follows Rename, goes to the trash with a deleted half and comes
+    // back with it (Undelete), and is never used unless both sides agree (Figure::partner). A half without a link stays a
+    // card of its own. Games and Skylauncher show a linked pair as ONE card.
+    //
+    // Links the two dumps (one top, one bottom, either order). Each one's earlier partner is left unlinked, a card of its
+    // own. Refused unless one is a top and the other a bottom, and while a game uses any of the four.
+    bool Pair(const std::string& a, const std::string& b, std::string* error = nullptr);
+    // Cuts the half's link (both sides). True also when it had none.
+    bool Unpair(const std::string& path, std::string* error = nullptr);
+    // "Change the bottom" / "Change the top": the card of `keep` takes `replacement` (a dump of the other category) as its
+    // other half. The old half becomes a card of its own; if `replacement` was part of another swapper, that one gets the old
+    // half instead, so no card disappears. Same refusals as Pair.
+    bool ChangeHalf(const std::string& keep, const std::string& replacement, std::string* error = nullptr);
+
+    // What a shelf shows for one figure or one swapper: `first` is the figure itself, or a swapper's top (it stands for
+    // the card: its name, label, favourite, last use and picture, "Level N"); `second` is the swapper's bottom, null for
+    // any other figure (also a half with no partner).
+    struct Card
+    {
+        const Figure* first = nullptr;
+        const Figure* second = nullptr;
+
+        bool Swapper() const { return second != nullptr; }
+        // A swapper is busy when either half is.
+        bool Busy() const { return first->lock.Busy() || (second != nullptr && second->lock.Busy()); }
+        // Both halves of a swapper, else the one figure: what goes on the portal, and what Delete, Export... apply to.
+        std::vector<const Figure*> Halves() const;
+    };
+    // The cards of `list` in its order: a swapper whose two halves are both in the list once (as its top's place).
+    std::vector<Card> Cards(const std::vector<Figure>& list);
+    // The card the figure `list[index]` belongs to (a bottom gives its swapper's card).
+    Card CardOf(const std::vector<Figure>& list, size_t index);
+    // The card's name: the top's label if the player gave one; else the swapper's name when both halves are the same
+    // swapper ("Wash Buckler"); else both ("Boom Jet / Wash Buckler"); the figure's DisplayName for a single figure.
+    std::string CardName(const Card& card);
+    // LevelText of the card's first figure (a swapper's top carries the level), `game` as for LevelText.
+    std::string CardLevelText(const Card& card, const std::string& game, bool french = false);
 
     // --- Ownership and the tidy ------------------------------------------------------------------------------------------
 
@@ -224,7 +282,7 @@ namespace collection
         Kind kind;
         int value = 0;            // the element, category, variant kind, level or letter
         std::string game;         // Kind::Game
-        std::vector<size_t> items; // indices into the list
+        std::vector<size_t> items; // indices into the list; a linked swapper is its top's index only (the bottom is left out)
     };
     // Sections of `list` for `game`. Smart is the shelf (Toy Box and Skylauncher alike): one section where every figure
     // shows once, favourites first, then the figures `game` took (newest first), then by element and category, a

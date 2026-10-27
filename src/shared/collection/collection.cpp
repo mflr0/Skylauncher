@@ -281,6 +281,16 @@ namespace collection
         return !edition.empty() ? edition : variantInfo.name;
     }
 
+    bool Figure::IsSwapTop() const
+    {
+        return toy != nullptr && toy->category == Category::SwapTop;
+    }
+
+    bool Figure::IsSwapBottom() const
+    {
+        return toy != nullptr && toy->category == Category::SwapBottom;
+    }
+
     bool HasProgress(const Figure& figure)
     {
         return figure.toy != nullptr && figure.toy->category <= Category::Mini;
@@ -431,6 +441,17 @@ namespace collection
             figure.origin = entry["origin"].AsString();
             for (const auto& [game, use] : entry["games"].Members())
                 figure.uses.push_back({ game, use["last_used"].AsString(), int(use["uses"].AsInt()) });
+
+            // A swapper's link counts when the other dump is there, links back, and is the other half.
+            const std::string& partner = entry["partner"].AsString();
+            if (!partner.empty() && (figure.IsSwapTop() || figure.IsSwapBottom()) &&
+                index["figures"][partner]["partner"].AsString() == figure.file)
+            {
+                FigureData other;
+                const Toy* otherToy = LoadDump(Directory(path) + "/" + partner, other) ? catalogue.Find(figures::ToyType(other)) : nullptr;
+                if (otherToy != nullptr && otherToy->category == (figure.IsSwapTop() ? Category::SwapBottom : Category::SwapTop))
+                    figure.partner = partner;
+            }
             return true;
         }
     }
@@ -456,27 +477,42 @@ namespace collection
         std::string text = Lower(filter.text);
         std::vector<Figure> list;
         Json index = LoadJson(PathOf(IndexName));
-        for (const std::string& name : DumpNames(Folder()))
-        {
-            Figure figure;
-            if (!ReadWith(PathOf(name), index, figure))
-                continue;
+        auto passes = [&](const Figure& figure) {
             if (!filter.game.empty() && !catalogue.Accepts(filter.game, figure.type))
-                continue;
+                return false;
             if (filter.category >= 0 && (figure.toy == nullptr || int(figure.toy->category) != filter.category))
-                continue;
+                return false;
             if (filter.element >= 0 && (figure.toy == nullptr || int(figure.toy->element) != filter.element))
-                continue;
+                return false;
             if ((filter.kind >= 0 && int(figure.Kind()) != filter.kind) || (filter.favouritesOnly && !figure.favourite))
-                continue;
+                return false;
             if (!text.empty())
             {
                 std::string haystack = Lower(figure.variantInfo.name + "\n" + figure.label + "\n" + figure.edition + "\n"
                     + figures::NicknameUtf8(figure.stats) + "\n" + figure.file);
                 if (haystack.find(text) == std::string::npos)
-                    continue;
+                    return false;
             }
-            list.push_back(std::move(figure));
+            return true;
+        };
+        // A swapper is one card: it is listed (both halves) when either half passes the filter.
+        std::vector<Figure> all;
+        std::vector<bool> pass;
+        std::map<std::string, size_t> byFile;
+        for (const std::string& name : DumpNames(Folder()))
+        {
+            Figure figure;
+            if (!ReadWith(PathOf(name), index, figure))
+                continue;
+            pass.push_back(passes(figure));
+            byFile[figure.file] = all.size();
+            all.push_back(std::move(figure));
+        }
+        for (size_t i = 0; i < all.size(); i++)
+        {
+            auto other = all[i].partner.empty() ? byFile.end() : byFile.find(all[i].partner);
+            if (pass[i] || (other != byFile.end() && pass[other->second]))
+                list.push_back(std::move(all[i]));
         }
         std::stable_sort(list.begin(), list.end(), [](const Figure& a, const Figure& b) {
             if (Order(a) != Order(b))
@@ -524,6 +560,40 @@ namespace collection
         if (!path.empty())
             SetOrigin(path, "created");
         return path;
+    }
+
+    uint16_t MatchingHalf(uint16_t type)
+    {
+        if (type >= 2000 && type <= 2015)
+            return uint16_t(type - 1000);
+        if (type >= 1000 && type <= 1015)
+            return uint16_t(type + 1000);
+        return 0;
+    }
+
+    SwapperPaths CreateSwapper(uint16_t topType, uint16_t bottomType, uint16_t topVariant, uint16_t bottomVariant)
+    {
+        const Catalogue& catalogue = Catalogue::Get();
+        const Toy* top = catalogue.Find(topType);
+        const Toy* bottom = catalogue.Find(bottomType);
+        if (top == nullptr || bottom == nullptr || top->category != Category::SwapTop || bottom->category != Category::SwapBottom)
+            return {};
+        SwapperPaths made;
+        made.top = CreateUnmarked(topType, topVariant, {});
+        made.bottom = CreateUnmarked(bottomType, bottomVariant, {});
+        if (!made.top.empty() && !made.bottom.empty())
+        {
+            SetOrigin(made.top, "created");
+            SetOrigin(made.bottom, "created");
+            if (Pair(made.top, made.bottom))
+                return made;
+        }
+        for (const std::string& path : { made.top, made.bottom })
+        {
+            if (!path.empty())
+                SDL_RemovePath(path.c_str());
+        }
+        return {};
     }
 
     int CreateMissing(const std::vector<uint16_t>& types)
@@ -594,6 +664,13 @@ namespace collection
             {
                 Json entry = entries[FileName(path)];
                 entries.Erase(FileName(path));
+                const std::string partner = entry["partner"].AsString();
+                if (!partner.empty() && entries[partner]["partner"].AsString() == FileName(path))
+                {
+                    Json other = entries[partner];
+                    other.Set("partner", name);
+                    entries.Set(partner, std::move(other));
+                }
                 entries.Set(name, std::move(entry));
                 index.Set("figures", std::move(entries));
             }
@@ -731,35 +808,205 @@ namespace collection
         return SaveDump(path, tag) || Refuse(error, "cannot write the file");
     }
 
+    namespace
+    {
+        // One dump, copied with its progress and metadata (not its link).
+        std::string DuplicateHalf(const std::string& path, std::string* error)
+        {
+            Figure figure;
+            FigureData tag;
+            if (!Read(path, figure) || !LoadDump(path, tag))
+                return Refuse(error, "not a figure dump"), std::string();
+            // Same progress under a new serial: every block's key depends on blocks 0 and 1, so decrypt and encrypt again.
+            FigureData plain = figures::Decrypt(tag);
+            FigureData copy = figures::CreateFigure(figure.type, figure.variant);
+            for (size_t block = 4; block < FigureBlockCount; block++)
+            {
+                if (block % 4 != 3)
+                    memcpy(copy.data() + block * FigureBlockSize, plain.data() + block * FigureBlockSize, FigureBlockSize);
+            }
+            size_t dot = figure.file.find_last_of('.');
+            std::string stem = dot == std::string::npos ? figure.file : figure.file.substr(0, dot);
+            std::string target = SaveNew(figures::Encrypt(copy), stem + " (copy).sky");
+            if (target.empty())
+                return Refuse(error, "cannot write the copy"), std::string();
+            UpdateFigure(target, [&](Json& entry) {
+                entry.Set("label", figure.DisplayName() + " (copy)");
+                entry.Set("origin", "created");
+                if (!figure.edition.empty())
+                {
+                    entry.Set("edition", figure.edition);
+                    entry.Set("edition_kind", VariantKindId(figure.editionKind));
+                }
+            });
+            return target;
+        }
+    }
+
     std::string Duplicate(const std::string& path, std::string* error)
     {
         Figure figure;
-        FigureData tag;
-        if (!Read(path, figure) || !LoadDump(path, tag))
+        if (!Read(path, figure))
             return Refuse(error, "not a figure dump"), std::string();
-        // Same progress under a new serial: every block's key depends on blocks 0 and 1, so decrypt and encrypt again.
-        FigureData plain = figures::Decrypt(tag);
-        FigureData copy = figures::CreateFigure(figure.type, figure.variant);
-        for (size_t block = 4; block < FigureBlockCount; block++)
+        std::string copy = DuplicateHalf(path, error);
+        if (!copy.empty() && !figure.partner.empty())
         {
-            if (block % 4 != 3)
-                memcpy(copy.data() + block * FigureBlockSize, plain.data() + block * FigureBlockSize, FigureBlockSize);
+            std::string other = DuplicateHalf(PathOf(figure.partner), nullptr);
+            if (!other.empty())
+                Pair(copy, other);
         }
-        size_t dot = figure.file.find_last_of('.');
-        std::string stem = dot == std::string::npos ? figure.file : figure.file.substr(0, dot);
-        std::string target = SaveNew(figures::Encrypt(copy), stem + " (copy).sky");
-        if (target.empty())
-            return Refuse(error, "cannot write the copy"), std::string();
-        UpdateFigure(target, [&](Json& entry) {
-            entry.Set("label", figure.DisplayName() + " (copy)");
-            entry.Set("origin", "created");
-            if (!figure.edition.empty())
+        return copy;
+    }
+
+    // --- Swappers --------------------------------------------------------------------------------------------------------
+
+    namespace
+    {
+        // Whether the half or its partner is in use by another process (the reason in `error`).
+        bool InUse(const Figure& figure, std::string* error)
+        {
+            for (const std::string& path : { figure.path, figure.partner.empty() ? std::string() : PathOf(figure.partner) })
             {
-                entry.Set("edition", figure.edition);
-                entry.Set("edition_kind", VariantKindId(figure.editionKind));
+                LockInfo lock = GetLock(path);
+                if (!path.empty() && lock.Busy())
+                {
+                    Refuse(error, FileName(path) + " is in use by " + lock.game);
+                    return true;
+                }
             }
+            return false;
+        }
+
+        // Writes (or, with an empty `to`, removes) the "partner" entry of the dump `file`.
+        void SetLink(Json& entries, const std::string& file, const std::string& to)
+        {
+            if (to.empty() && !entries.Has(file))
+                return;
+            Json entry = entries[file].IsObject() ? entries[file] : Json::Object();
+            if (to.empty())
+                entry.Erase("partner");
+            else
+                entry.Set("partner", to);
+            entries.Set(file, std::move(entry));
+        }
+    }
+
+    bool Pair(const std::string& a, const std::string& b, std::string* error)
+    {
+        Figure fa, fb;
+        if (!Read(a, fa) || !Read(b, fb))
+            return Refuse(error, "not a figure dump");
+        if (!((fa.IsSwapTop() && fb.IsSwapBottom()) || (fa.IsSwapBottom() && fb.IsSwapTop())))
+            return Refuse(error, "a swapper is one top and one bottom");
+        if (InUse(fa, error) || InUse(fb, error))
+            return false;
+        bool done = UpdateIndex([&](Json& index) {
+            Json entries = index["figures"].IsObject() ? index["figures"] : Json::Object();
+            for (const Figure* figure : { &fa, &fb })
+            {
+                if (!figure->partner.empty())
+                    SetLink(entries, figure->partner, {});
+            }
+            SetLink(entries, fa.file, fb.file);
+            SetLink(entries, fb.file, fa.file);
+            index.Set("figures", std::move(entries));
         });
-        return target;
+        return done || Refuse(error, "collection.json cannot be updated");
+    }
+
+    bool Unpair(const std::string& path, std::string* error)
+    {
+        Figure figure;
+        if (!Read(path, figure))
+            return Refuse(error, "not a figure dump");
+        if (figure.partner.empty())
+            return true;
+        if (InUse(figure, error))
+            return false;
+        bool done = UpdateIndex([&](Json& index) {
+            Json entries = index["figures"].IsObject() ? index["figures"] : Json::Object();
+            SetLink(entries, figure.file, {});
+            SetLink(entries, figure.partner, {});
+            index.Set("figures", std::move(entries));
+        });
+        return done || Refuse(error, "collection.json cannot be updated");
+    }
+
+    bool ChangeHalf(const std::string& keep, const std::string& replacement, std::string* error)
+    {
+        Figure kept, other;
+        if (!Read(keep, kept) || !Read(replacement, other))
+            return Refuse(error, "not a figure dump");
+        if (kept.partner == other.file)
+            return true;
+        std::string oldHalf = kept.partner.empty() ? std::string() : PathOf(kept.partner);
+        std::string displaced = other.partner.empty() ? std::string() : PathOf(other.partner);
+        if (!Pair(keep, replacement, error))
+            return false;
+        // The replacement's old swapper takes the half that was left over: it has the category `kept` has.
+        if (!oldHalf.empty() && !displaced.empty())
+            Pair(displaced, oldHalf);
+        return true;
+    }
+
+    std::vector<const Figure*> Card::Halves() const
+    {
+        std::vector<const Figure*> halves = { first };
+        if (second != nullptr)
+            halves.push_back(second);
+        return halves;
+    }
+
+    std::vector<Card> Cards(const std::vector<Figure>& list)
+    {
+        std::map<std::string, size_t> byFile;
+        for (size_t i = 0; i < list.size(); i++)
+            byFile[list[i].file] = i;
+        std::vector<Card> cards;
+        for (const Figure& figure : list)
+        {
+            auto other = figure.partner.empty() ? byFile.end() : byFile.find(figure.partner);
+            if (other == byFile.end())
+                cards.push_back({ &figure, nullptr });
+            else if (figure.IsSwapTop())
+                cards.push_back({ &figure, &list[other->second] });
+        }
+        return cards;
+    }
+
+    Card CardOf(const std::vector<Figure>& list, size_t index)
+    {
+        const Figure& figure = list[index];
+        for (const Figure& other : list)
+        {
+            if (!figure.partner.empty() && other.file == figure.partner)
+                return figure.IsSwapTop() ? Card{ &figure, &other } : Card{ &other, &figure };
+        }
+        return { &figure, nullptr };
+    }
+
+    std::string CardName(const Card& card)
+    {
+        if (card.second == nullptr || !card.first->label.empty())
+            return card.first->DisplayName();
+        auto plain = [](std::string name) {
+            for (const char* suffix : { " (top)", " (bottom)" })
+            {
+                size_t length = strlen(suffix);
+                if (name.size() > length && name.compare(name.size() - length, length, suffix) == 0)
+                    name.erase(name.size() - length);
+            }
+            return name;
+        };
+        // 2000 + n and 1000 + n are the same swapper's top and bottom.
+        if (card.first->type - 2000 == card.second->type - 1000)
+            return plain(card.first->DisplayName());
+        return plain(card.first->DisplayName()) + " / " + plain(card.second->DisplayName());
+    }
+
+    std::string CardLevelText(const Card& card, const std::string& game, bool french)
+    {
+        return LevelText(*card.first, game, french);
     }
 
     // --- Ownership and the tidy ------------------------------------------------------------------------------------------
@@ -1214,9 +1461,15 @@ namespace collection
             sections.push_back({ kind, value, gameId, std::move(items) });
         };
 
+        // A linked swapper is one card, its top's: its bottom is left out.
+        std::map<std::string, size_t> byFile;
+        for (size_t i = 0; i < list.size(); i++)
+            byFile[list[i].file] = i;
         std::vector<size_t> main, unknown, others;
         for (size_t i = 0; i < list.size(); i++)
         {
+            if (list[i].IsSwapBottom() && !list[i].partner.empty() && byFile.count(list[i].partner) != 0)
+                continue;
             if (list[i].toy == nullptr)
                 unknown.push_back(i);
             else if (foreign(list[i]))
