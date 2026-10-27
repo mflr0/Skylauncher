@@ -286,6 +286,36 @@ namespace
             os == Os::MacOS ? "macOS" : os == Os::Windows ? "Windows" : "Linux");
     }
 
+    // ---- The folders of the layout before 0.3.1 ---------------------------------------------------------------------
+
+    void OldFolderChecks(const fs::path& base)
+    {
+        Tree tree = MakeTree(base / "old-folders", Os::Linux);
+        const fs::path old = tree.base / "home" / "SSARecomp";
+        const fs::path gone = tree.base / "home" / "Skylauncher";
+        Put(old / "a.txt", 10);
+        Put(old / "xbox-signing" / "key", 20);
+        Put(gone / "b.txt", 30);
+        Environment env = tree.env;
+        env.oldFolders = { old, gone };
+
+        Plan plan = MakePlan(env);
+        bool listed = false, kept = false;
+        for (const Item& item : plan.items)
+            if (item.group == Group::OldFolders && item.path == old / "a.txt")
+                listed = item.bytes == 10;
+        for (const Left& left : plan.left)
+            if (left.why == Why::Kept && left.group == Group::OldFolders && left.path == old / "xbox-signing")
+                kept = true;
+        UN_EXPECT(listed && kept);
+        UN_EXPECT(std::none_of(plan.items.begin(), plan.items.end(), [&](const Item& item) { return item.path.filename() == "xbox-signing"; }));
+
+        RunUninstall(plan, env, false);
+        UN_EXPECT(!Has(old / "a.txt") && Has(old / "xbox-signing" / "key") && Has(old));
+        UN_EXPECT(!Has(gone)); // its entries went, and it was empty
+        printf("Uninstall of the pre-0.3.1 folders: their entries go, xbox-signing stays, an emptied folder goes\n");
+    }
+
     void RefusalChecks(const fs::path& base)
     {
         Tree tree = MakeTree(base / "refuse", Os::Linux);
@@ -612,6 +642,7 @@ int UninstallChecks(const fs::path& scratch)
     LayoutChecks();
     for (Os os : { Os::MacOS, Os::Windows, Os::Linux })
         PlanAndRunChecks(base, os);
+    OldFolderChecks(base);
     RefusalChecks(base);
     LauncherChecks(base);
     MachineChecks(base);

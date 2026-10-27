@@ -268,6 +268,10 @@ namespace uninstall
             }
             if (declared && (path == env.collection || path == env.settingsFile))
                 return std::nullopt;
+            // The pre-0.3.1 folders are roots too; a link standing for one is refused above.
+            for (const fs::path& folder : env.oldFolders)
+                if (!IsLink(folder) && Inside(path, folder))
+                    return std::nullopt;
             if (Inside(path, env.root) || Inside(path, env.launcherData))
                 return std::nullopt;
             return Why::Outside;
@@ -414,6 +418,26 @@ namespace uninstall
         add(Group::Figures, {}, env.collection, true, true);
         add(Group::Settings, {}, env.settingsFile, true);
 
+        // The folders of the layout before 0.3.1: their entries go; xbox-signing is kept.
+        for (const fs::path& folder : env.oldFolders)
+        {
+            if (!Exists(folder))
+                continue;
+            if (!SafePath(folder, env.home) || IsLink(folder))
+            {
+                plan.left.push_back({ IsLink(folder) ? Why::Link : Why::Unsafe, Group::OldFolders, folder, {} });
+                continue;
+            }
+            std::error_code error;
+            for (const fs::directory_entry& entry : ListDirectory(folder, error))
+            {
+                if (entry.path().filename() == "xbox-signing")
+                    plan.left.push_back({ Why::Kept, Group::OldFolders, entry.path(), {} });
+                else
+                    add(Group::OldFolders, {}, entry.path());
+            }
+        }
+
         for (const GameEntry& game : env.games)
         {
             if (env.desktop.empty())
@@ -512,7 +536,8 @@ namespace uninstall
             result.freed += remover.freed;
             result.removed += gone ? 1 : 0;
         }
-        // The folders that are empty now (the games', then the data folders); a folder with something in it stays.
+        // The folders that are empty now (the games', the data folders', the pre-0.3.1 ones); a folder with something in it
+        // stays.
         std::error_code error;
         for (const GameEntry& game : env.games)
             if (!Refuse(game.folder, env) && Exists(game.folder))
@@ -520,6 +545,9 @@ namespace uninstall
         for (const fs::path& base : { env.launcherData, env.root })
             if (SafePath(base, env.home) && Exists(base))
                 fs::remove(base, error);
+        for (const fs::path& folder : env.oldFolders)
+            if (SafePath(folder, env.home) && !IsLink(folder) && Exists(folder))
+                fs::remove(folder, error);
         return result;
     }
 
@@ -747,6 +775,21 @@ namespace uninstall
             // A scratch run never reaches the real launcher, nor the real Trash.
             if (dummy != nullptr && *dummy != 0 && (env.os != Os::MacOS || !env.trash.empty()))
                 env.launcherSelf = datadir::FromText(dummy);
+        }
+        // The folders of the layout before 0.3.1, when they still exist and are not the data folders themselves. A scratch
+        // run never names the real ones (they would be the player's own).
+        if (!ScratchRun())
+        {
+            const datadir::OldRoots old = datadir::RealOldRoots();
+            for (const fs::path& folder : { old.ssarecomp, old.skylauncher, old.localSsarecomp })
+            {
+                if (folder.empty() || !Exists(folder))
+                    continue;
+                if (folder == env.root || folder == env.launcherData || Inside(folder, env.root) || Inside(folder, env.launcherData))
+                    continue;
+                if (std::find(env.oldFolders.begin(), env.oldFolders.end(), folder) == env.oldFolders.end())
+                    env.oldFolders.push_back(folder);
+            }
         }
         for (const GameInfo& info : g_games)
         {
