@@ -303,7 +303,7 @@ namespace figures
             if (extra[5] != 0)
                 stats.hat = extra[5];
             stats.swapForceExperience = Le32(extra + 8);
-            stats.wowPow = uint8_t((extra[6] >> 6) | (extra[7] & 1) << 2);
+            stats.wowPow = extra[6] & 1;
         }
         return AreaState::Valid;
     }
@@ -401,8 +401,7 @@ namespace figures
             if (stats.hat != (extra[5] != 0 ? extra[5] : stats.ssaHat))
                 extra[5] = uint8_t(std::min<uint16_t>(stats.hat, 0xFF));
             Put32(extra + 8, stats.swapForceExperience);
-            extra[6] = uint8_t((extra[6] & 0x3F) | (stats.wowPow & 3) << 6);
-            extra[7] = uint8_t((extra[7] & 0xFE) | (stats.wowPow >> 2 & 1));
+            extra[6] = uint8_t((extra[6] & 0xFE) | (stats.wowPow & 1));
             uint8_t sequence = newestExtra >= 0 ? extra[2] : stats.extraSequence;
             for (int i = 0; i < 2; i++)
             {
