@@ -1,6 +1,7 @@
 #include "launcher/updater.h"
 #include "launcher/i18n.h"
 #include "launcher/launcher.h"
+#include "shared/dir_list.h"
 #include "shared/mini_json.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -573,7 +574,7 @@ bool InstallKitZip(const fs::path& zip, const fs::path& kitFolder, std::string& 
     if (!fs::exists(SSABuildIn(fresh), fsError))
     {
         std::vector<fs::path> children;
-        for (const auto& entry : fs::directory_iterator(staging, fsError))
+        for (const auto& entry : ListDirectory(staging, fsError))
             children.push_back(entry.path());
         if (children.size() == 1 && fs::exists(SSABuildIn(children[0]), fsError))
             fresh = children[0];

@@ -7,10 +7,14 @@
 #include "launcher/report.h"
 #include "launcher/updater.h"
 #include "shared/collection/save_backup.h"
+#include "shared/dir_list.h"
 #include "shared/mini_json.h"
 #include <miniz.h>
 #include <SDL3/SDL.h>
 #include <cstdio>
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
 #include <filesystem>
 #include <map>
 #include <fstream>
@@ -521,6 +525,35 @@ namespace
 {
     // Which kit a launcher builds with: what it builds (games=), from which release, and the kit next to the launcher against
     // the downloaded ones (docs/updates.md, "The kit follows the launcher").
+#if defined(_WIN32)
+    bool Superuser() { return true; } // folder permissions don't block listing the same way
+#else
+    bool Superuser() { return geteuid() == 0; }
+#endif
+
+    // Folder walks never throw: a missing, plain-file or unreadable folder lists as empty (the start crash of 0.4.1).
+    void DirectoryListChecks(const std::filesystem::path& scratch)
+    {
+        namespace fs = std::filesystem;
+        fs::path root = scratch / "dir-list";
+        fs::remove_all(root);
+        fs::create_directories(root / "a");
+        std::ofstream(root / "b.txt") << "x";
+        std::error_code error;
+        SHELL_EXPECT(ListDirectory(root, error).size() == 2 && !error);
+        SHELL_EXPECT(ListDirectory(root / "missing", error).empty());
+        SHELL_EXPECT(ListDirectory(root / "b.txt", error).empty());
+        fs::create_directories(root / "locked");
+        std::ofstream(root / "locked" / "c.txt") << "x";
+        fs::permissions(root / "locked", fs::perms::none, error);
+        bool threw = false;
+        try { SHELL_EXPECT(ListDirectory(root / "locked", error).empty() || Superuser()); }
+        catch (...) { threw = true; }
+        SHELL_EXPECT(!threw);
+        fs::permissions(root / "locked", fs::perms::owner_all, error);
+        fs::remove_all(root, error);
+    }
+
     void KitFollowChecks(const std::filesystem::path& scratch)
     {
         std::filesystem::path root = scratch / "kitfollow";
@@ -610,6 +643,7 @@ int ShellChecks(const std::filesystem::path& scratch)
     ChecklistChecks(scratch);
     GameRunChecks(scratch);
     UpdaterChecks(scratch);
+    DirectoryListChecks(scratch);
     KitFollowChecks(scratch);
     SaveBackupChecks(scratch);
     ReportChecks(scratch);

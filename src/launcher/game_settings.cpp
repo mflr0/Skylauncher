@@ -1,6 +1,7 @@
 #include "launcher/game_settings.h"
 #include "launcher/i18n.h"
 #include "launcher/game_install.h"
+#include "shared/dir_list.h"
 #include "shared/collection/datadir.h"
 #include "shared/collection/save_backup.h"
 #include <algorithm>
@@ -90,7 +91,7 @@ namespace
         std::error_code error;
         if (!fs::is_directory(folders.game, error))
             return paths;
-        for (const fs::directory_entry& entry : fs::directory_iterator(folders.game, error))
+        for (const fs::directory_entry& entry : ListDirectory(folders.game, error))
         {
             std::string name = entry.path().filename().string();
             if (Named(name, CacheNames) || (entry.is_regular_file(error) && IsGameLog(entry.path())))
@@ -177,7 +178,7 @@ GameDataSizes MeasureGameData(const GameFolders& folders)
         sizes.caches += BytesOf(path);
     std::error_code error;
     if (fs::is_directory(folders.game, error))
-        for (const fs::directory_entry& entry : fs::directory_iterator(folders.game, error))
+        for (const fs::directory_entry& entry : ListDirectory(folders.game, error))
         {
             std::string name = entry.path().filename().string();
             if (!Named(name, SaveNames) && !Named(name, CacheNames) && !Named(name, KeptNames) && !IsGameLog(entry.path()))
@@ -215,7 +216,7 @@ DataResult UninstallGame(const GameFolders& folders, LauncherConfig& config)
         return result;
     std::error_code error;
     if (fs::is_directory(folders.game, error))
-        for (const fs::directory_entry& entry : fs::directory_iterator(folders.game, error))
+        for (const fs::directory_entry& entry : ListDirectory(folders.game, error))
         {
             std::string name = entry.path().filename().string();
             if (Named(name, SaveNames) || Named(name, KeptNames) || name == "portraits" || name == "launcher-cache")

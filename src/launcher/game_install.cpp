@@ -1,6 +1,7 @@
 #include "launcher/game_install.h"
 #include "launcher/i18n.h"
 #include "launcher/updater.h"
+#include "shared/dir_list.h"
 #include "shared/collection/datadir.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -137,7 +138,7 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::stri
     std::optional<InstallKit> best;
     SemVer bestTag;
     std::error_code error;
-    for (const auto& entry : std::filesystem::directory_iterator(DownloadedKitsFolder(), error))
+    for (const auto& entry : ListDirectory(DownloadedKitsFolder(), error))
     {
         std::string name = Utf8(entry.path().filename());
         auto kit = entry.is_directory(error) && !name.starts_with(".") ? KitIn(entry.path()) : std::nullopt;
@@ -171,7 +172,7 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::stri
                 if (auto kit = KitIn(folder / name))
                     return kit;
             std::error_code error;
-            for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+            for (const auto& entry : ListDirectory(folder, error))
                 if (entry.is_directory(error) && Utf8(entry.path().filename()).starts_with("ssa-kit"))
                     if (auto kit = KitIn(entry.path()))
                         return kit;
@@ -344,7 +345,7 @@ void CleanAfterInstall(const std::filesystem::path& gameFolder, const std::files
     if (!kitFolder.empty() && fs::equivalent(kitFolder.parent_path(), root, error))
     {
         SemVer built = ParseSemVer(Utf8(kitFolder.filename()));
-        for (const auto& entry : fs::directory_iterator(root, error))
+        for (const auto& entry : ListDirectory(root, error))
         {
             SemVer tag = ParseSemVer(Utf8(entry.path().filename()));
             if (built.valid && tag.valid && entry.is_directory(error) && CompareSemVer(tag, built) < 0)
@@ -354,7 +355,7 @@ void CleanAfterInstall(const std::filesystem::path& gameFolder, const std::files
 
     // A compiler archive whose extracted copy is ready (SSABuild deletes it itself; this is for older installs).
     fs::path toolchains = LauncherDataFolder() / "toolchains";
-    for (const auto& entry : fs::directory_iterator(toolchains, error))
+    for (const auto& entry : ListDirectory(toolchains, error))
         if (entry.path().extension() == ".zip" && fs::exists(entry.path().parent_path() / entry.path().stem() / "ssabuild-ready.txt", error))
             fs::remove(entry.path(), error);
 }

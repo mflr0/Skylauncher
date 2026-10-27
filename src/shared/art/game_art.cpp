@@ -5,6 +5,7 @@
 #include "alchemy_archive.h"
 #include "game_text.h"
 #include "lux_images.h"
+#include "../dir_list.h"
 #include "../collection/catalogue.h"
 #include "../collection/datadir.h"
 #include "../collection/json.h"
@@ -450,7 +451,7 @@ namespace art
         {
             int present = 0;
             std::error_code error;
-            for (const auto& entry : std::filesystem::directory_iterator(folder, error))
+            for (const auto& entry : ListDirectory(folder, error))
                 present += entry.path().extension() == ".png";
             return present;
         }
@@ -643,10 +644,10 @@ namespace art
         {
             std::filesystem::create_directories(cache, error);
             // Before 0.4: the cache was <data>/SSA/launcher-cache/<title id>/ for every game.
-            for (const auto& entry : std::filesystem::directory_iterator(cache, error))
+            for (const auto& entry : ListDirectory(cache, error))
             {
                 std::string name = entry.path().filename().string();
-                if (entry.is_directory() && name.size() == 8 && std::all_of(name.begin(), name.end(), [](unsigned char c) { return std::isxdigit(c); }))
+                if (entry.is_directory(error) && name.size() == 8 && std::all_of(name.begin(), name.end(), [](unsigned char c) { return std::isxdigit(c); }))
                     std::filesystem::remove_all(entry.path(), error);
             }
             std::filesystem::path manifest = cache / "manifest.ini";
