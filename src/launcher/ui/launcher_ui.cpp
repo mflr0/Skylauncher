@@ -1499,8 +1499,16 @@ namespace launcher_ui
                 DrawLogo(draw, *logo, ImVec2(at.x + cardW * 0.12f, at.y + cardH * 0.08f), ImVec2(cardW * 0.76f, cardH * 0.56f));
             else
             {
-                ImGui::PushFont(m_titleFont, TitleSize + 6);
+                // The name in the title font, smaller when it would not fit the card's width with a margin.
+                float titleSize = TitleSize + 6;
+                ImGui::PushFont(m_titleFont, titleSize);
                 ImVec2 text = ImGui::CalcTextSize(entry.name);
+                if (text.x > cardW * 0.84f)
+                {
+                    ImGui::PopFont();
+                    ImGui::PushFont(m_titleFont, titleSize * cardW * 0.84f / text.x);
+                    text = ImGui::CalcTextSize(entry.name);
+                }
                 draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, at.y + cardH * 0.36f - text.y / 2), Rgb(Text), entry.name);
                 ImGui::PopFont();
             }
@@ -1509,8 +1517,18 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             SlotLine line = SlotStatus(slot);
+            // The full name; on a narrow card the short one (without "Skylanders: "), smaller if it still does not fit
+            // between the card's 20 px margins. Never cut.
+            const char* name = FindGame(entry.id) != nullptr ? FindGame(entry.id)->name : entry.name;
             ImGui::PushFont(m_boldFont, SidebarTextSize);
-            draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), FindGame(entry.id) != nullptr ? FindGame(entry.id)->name : entry.name);
+            if (ImGui::CalcTextSize(name).x > cardW - 40)
+                name = entry.name;
+            if (float nameW = ImGui::CalcTextSize(name).x; nameW > cardW - 40)
+            {
+                ImGui::PopFont();
+                ImGui::PushFont(m_boldFont, SidebarTextSize * (cardW - 40) / nameW);
+            }
+            draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), name);
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SmallSize);
             draw->AddCircleFilled(ImVec2(at.x + 24, end.y - 22), 4, Rgb(line.dot));
