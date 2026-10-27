@@ -197,7 +197,7 @@
     {"type": 217, "name": "Life Trap", "element": "life", "category": "trap", "game": "trap_team", "variants": [{"id": "0x3003", "name": "Oak Eagle", "kind": "shape"}, {"id": "0x3005", "name": "Emerald Energy", "kind": "shape"}, {"id": "0x300A", "name": "Weed Whacker", "kind": "shape"}, {"id": "0x3010", "name": "Seed Serpent", "kind": "shape"}, {"id": "0x3018", "name": "Jade Blade", "kind": "shape"}, {"id": "0x301B", "name": "Shrub Shrieker", "kind": "shape"}]},
     {"type": 218, "name": "Dark Trap", "element": "dark", "category": "trap", "game": "trap_team", "variants": [{"id": "0x3014", "name": "Dark Dagger", "kind": "shape"}]},
     {"type": 219, "name": "Light Trap", "element": "light", "category": "trap", "game": "trap_team", "variants": [{"id": "0x3015", "name": "Heavenly Hawk", "kind": "shape"}]},
-    {"type": 220, "name": "Kaos Trap", "element": "none", "category": "trap", "game": "trap_team", "variants": [{"id": "0x301E", "name": "Kaos Trap", "kind": "shape"}]},
+    {"type": 220, "name": "Kaos Trap", "element": "none", "category": "trap", "game": "trap_team", "variants": [{"id": "0x301E", "name": "Kaos Trap", "kind": "base"}]},
     {"type": 230, "name": "Hand of Fate", "element": "none", "category": "magic_item", "game": "trap_team"},
     {"type": 231, "name": "Piggy Bank", "element": "none", "category": "magic_item", "game": "trap_team"},
     {"type": 232, "name": "Rocket Ram", "element": "none", "category": "magic_item", "game": "trap_team"},

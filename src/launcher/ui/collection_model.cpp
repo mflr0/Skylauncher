@@ -425,6 +425,8 @@ namespace launcher_ui
             stats.experience = edited.experience;
         if (edited.giantsExperience != base.giantsExperience)
             stats.giantsExperience = edited.giantsExperience;
+        if (edited.swapForceExperience != base.swapForceExperience)
+            stats.swapForceExperience = edited.swapForceExperience;
         if (edited.hat != base.hat)
             stats.hat = edited.hat;
         if (edited.gold != base.gold)

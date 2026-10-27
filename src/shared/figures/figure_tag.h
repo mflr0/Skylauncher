@@ -50,7 +50,7 @@ namespace figures
         uint16_t hat = 0;              // the hat Giants shows: extra area +0x05 if set, else ssaHat. Changing it writes the
                                        // extra area only, so Spyro's Adventure keeps its own hat
         uint8_t extraSequence = 0;     // the extra area's sequence number (0 without one)
-        uint32_t swapForceExperience = 0; // extra area +0x08 (LE32): Swap Force's part (levels 16-20) [?]; read and kept,
+        uint32_t swapForceExperience = 0; // extra area +0x08 (LE32): Swap Force's part (levels 16-20, up to 101000) [V];
                                        // never counted by Spyro's Adventure or Giants
         uint8_t wowPow = 0;            // Giants' Wow Pow bought (Series 2 figures), 0 or 1: extra area +0x06 bit 0, where the
                                        // game writes it when Persephone sells it [V] (figures.md, "Upgrades")
@@ -73,25 +73,27 @@ namespace figures
 
     // Writes `stats` into both areas (sequence numbers stats.sequence + 1 and + 2) with fresh checksums. The extra
     // areas are written only when the figure needs them (Giants' experience or a hat is set) or already has them, so
-    // a figure Spyro's Adventure made stays what that game expects. Experience is clamped to 33000 + 63500.
+    // a figure Spyro's Adventure made stays what that game expects. Experience is clamped to 33000 + 63500 + 101000.
     void WriteStats(FigureData& tag, const FigureStats& stats);
 
-    // Experience needed for each level (index 0 = level 1). Spyro's Adventure caps characters at level 10, Giants at 15.
+    // Experience needed for each level (index 0 = level 1). Spyro's Adventure caps characters at level 10, Giants at 15, Swap Force at 20.
     constexpr int MaxLevel = 10;          // Spyro's Adventure
-    constexpr int MaxLevelGiants = 15;    // Giants (and later games, up to 20 in Swap Force: not needed here)
+    constexpr int MaxLevelGiants = 15;    // Giants
+    constexpr int MaxLevelSwapForce = 20; // Swap Force
     constexpr uint32_t MaxBaseExperience = 33000;     // the first area's part (level 10)
     constexpr uint32_t MaxGiantsExperience = 63500;   // the extra area's part (level 15 = 96500 in all)
-    extern const uint32_t LevelExperience[MaxLevelGiants];
+    constexpr uint32_t MaxSwapForceExperience = 101000; // the extra area's second part (level 20 = 197500 in all)
+    extern const uint32_t LevelExperience[MaxLevelSwapForce];
     int LevelForExperience(uint32_t experience, int maxLevel = MaxLevel);
-    // The level cap of a game by its catalogue id ("ssa": 10, "giants" and later: 15).
+    // The level cap of a game by its catalogue id ("ssa": 10, "swapforce": 20, "giants" and any other: 15).
     int LevelCap(const std::string& game);
 
-    // All the experience a figure has for Giants, and setting it (the first 33000 go to the first area, the rest to
-    // Giants' part). Swap Force's part is not in it: no game we run counts it.
+    // All the experience a figure has (the three parts), and setting it (the first 33000 go to the first area, the next
+    // 63500 to Giants' part, the rest to Swap Force's).
     uint32_t TotalExperience(const FigureStats& stats);
     void SetTotalExperience(FigureStats& stats, uint32_t total);
     // The experience a game with level cap `cap` counts (10: Spyro's Adventure reads the first area only), and setting
-    // it as that game would: with cap 10 only the first area's part changes, so Giants' levels 11-15 stay.
+    // it as that game would: with cap 10 only the first area's part changes, with cap 15 the first two (Swap Force's stays).
     uint32_t ExperienceFor(const FigureStats& stats, int cap);
     void SetExperienceFor(FigureStats& stats, int cap, uint32_t experience);
 

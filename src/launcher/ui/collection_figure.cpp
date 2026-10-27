@@ -161,8 +161,8 @@ namespace launcher_ui
             // bar is the figure's own way to its next level.
             uint32_t xp = figures::TotalExperience(f.stats);
             int level = f.level;
-            uint32_t from = figures::LevelExperience[std::clamp(level - 1, 0, figures::MaxLevelGiants - 1)];
-            uint32_t to = level >= figures::MaxLevelGiants ? from : figures::LevelExperience[level];
+            uint32_t from = figures::LevelExperience[std::clamp(level - 1, 0, figures::MaxLevelSwapForce - 1)];
+            uint32_t to = level >= figures::MaxLevelSwapForce ? from : figures::LevelExperience[level];
             float fraction = to > from ? std::clamp(float(xp - from) / float(to - from), 0.0f, 1.0f) : 1.0f;
             ImGui::PushFont(m_app.m_titleFont, 26);
             ImGui::TextColored(ImColor(Rgb(Text)), "%s", collection::LevelText(f, m_model.gameId, French()).c_str());
@@ -172,7 +172,7 @@ namespace launcher_ui
             draw->AddRectFilled(at, ImVec2(at.x + width, at.y + 12), Rgb(Field), 6);
             draw->AddRectFilled(at, ImVec2(at.x + width * fraction, at.y + 12), Rgb(Accent), 6);
             ImGui::Dummy(ImVec2(0, 16));
-            std::string next = level >= figures::MaxLevelGiants ? std::string(Tr(" · maximum level")) : Tf(" · {} to level {}", to - xp, level + 1);
+            std::string next = level >= figures::MaxLevelSwapForce ? std::string(Tr(" · maximum level")) : Tf(" · {} to level {}", to - xp, level + 1);
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%u XP%s", xp, next.c_str());
         }
         ImGui::Dummy(ImVec2(0, 4));
@@ -706,7 +706,7 @@ namespace launcher_ui
         if (stats)
         {
             // The limits of the portal's game: Spyro's Adventure edits its own part (up to level 10, its hat in the first
-            // area), Giants the whole (up to 15) and its hat; the rest of the figure stays as it is.
+            // area), Giants the first two parts (up to 15) and its hat, Swap Force all three (up to 20); the rest of the figure stays as it is.
             const int cap = figures::LevelCap(m_model.gameId);
             int level = figures::LevelForExperience(figures::ExperienceFor(m_edit, cap), cap);
             label(Tf("Level in {}", ShortGameName(m_model.gameId)).c_str());
@@ -777,7 +777,7 @@ namespace launcher_ui
                 figures::FigureStats edited = MergeEditedStats(current, m_editBase, m_edit, figures::NicknameUtf8(m_editBase), m_nickname);
                 // Only the name changed: no write to the figure (and no backup of it).
                 bool changed = m_edit.experience != m_editBase.experience || m_edit.giantsExperience != m_editBase.giantsExperience ||
-                    m_edit.gold != m_editBase.gold || m_edit.heroPoints != m_editBase.heroPoints || m_edit.hat != m_editBase.hat ||
+                    m_edit.swapForceExperience != m_editBase.swapForceExperience || m_edit.gold != m_editBase.gold || m_edit.heroPoints != m_editBase.heroPoints || m_edit.hat != m_editBase.hat ||
                     m_edit.upgrades != m_editBase.upgrades || m_edit.wowPow != m_editBase.wowPow || figures::NicknameUtf8(m_editBase) != Trimmed(m_nickname);
                 if (changed)
                     saved = collection::WriteStats(f.path, edited, &error);

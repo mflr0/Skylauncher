@@ -14,8 +14,8 @@ namespace launcher_ui
         // A swapper is added whole: the catalogue lists its tops only, named without the "(top)", and creating one makes both halves.
         bool IsSwapper(const Toy& toy) { return toy.category == Category::SwapTop; }
 
-        // A swapper's plain version is its "Standard": its own entry in the list would say the same twice.
-        bool PlainDuplicate(const Toy& toy, const collection::Variant& variant) { return IsSwapper(toy) && variant.kind == collection::VariantKind::Base; }
+        // A toy's "base" entry is its "Standard" (made under the id the toy is sold with): its own row would say the same twice.
+        bool PlainDuplicate(const Toy&, const collection::Variant& variant) { return variant.kind == collection::VariantKind::Base; }
 
         size_t CountVersions(const Toy& toy)
         {
@@ -174,7 +174,7 @@ namespace launcher_ui
             {
                 if (i > 0 && PlainDuplicate(*chosen, chosen->variants[i - 1]))
                     continue;
-                int count = i == 0 ? owned(chosen->type, 0, {})
+                int count = i == 0 ? owned(chosen->type, 0, {}) + (collection::StandardVariant(*chosen) != 0 ? owned(chosen->type, collection::StandardVariant(*chosen), {}) : 0)
                     : chosen->variants[i - 1].sameTag ? owned(chosen->type, -1, chosen->variants[i - 1].name) : owned(chosen->type, chosen->variants[i - 1].id, {});
                 // A row: the version's picture (the toy's own when it has none), its name, its kind and how many are owned.
                 constexpr float Row = 50;
@@ -224,7 +224,7 @@ namespace launcher_ui
                     path = collection::CreateSwapper(chosen->type, bottomType, variant != nullptr && !variant->sameTag ? variant->id : 0, bottomVariant).top;
                 }
                 else
-                    path = collection::Create(chosen->type, variant != nullptr && !variant->sameTag ? variant->id : 0);
+                    path = collection::Create(chosen->type, variant != nullptr ? (variant->sameTag ? collection::StandardVariant(*chosen) : variant->id) : collection::StandardVariant(*chosen));
                 if (path.empty())
                     Toast(Tr("Couldn't create the figure"));
                 else

@@ -711,6 +711,15 @@ void EditChecks()
     figures::SetExperienceFor(edited, figures::LevelCap("ssa"), 13000);
     saved = MergeEditedStats(high, high, edited, "Splash", "Splash");
     EXPECT(saved.experience == 13000 && saved.giantsExperience == 63500);
+    // Edited for Swap Force (cap 20): the third part is saved too; edited in Giants it stays.
+    edited = base;
+    figures::SetExperienceFor(edited, figures::LevelCap("swapforce"), figures::LevelExperience[19]);
+    saved = MergeEditedStats(now, base, edited, "Splash", "Splash");
+    EXPECT(figures::TotalExperience(saved) == 197500 && saved.swapForceExperience == 101000 && saved.gold == 2600);
+    edited = saved;
+    figures::SetExperienceFor(edited, figures::LevelCap("giants"), 40000);
+    saved = MergeEditedStats(saved, saved, edited, "Splash", "Splash");
+    EXPECT(saved.experience == 33000 && saved.giantsExperience == 7000 && saved.swapForceExperience == 101000);
     // Upgrades: changed here they win, otherwise the game's stay.
     edited = base;
     edited.upgrades = 0x0075;

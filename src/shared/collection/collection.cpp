@@ -427,7 +427,7 @@ namespace collection
             figure.toy = catalogue.Find(figure.type);
             figure.variantInfo = catalogue.Describe(figure.toy, figure.variant);
             figure.state = figures::ReadStats(tag, figure.stats);
-            figure.level = figures::LevelForExperience(figures::TotalExperience(figure.stats), figures::MaxLevelGiants);
+            figure.level = figures::LevelForExperience(figures::TotalExperience(figure.stats), figures::MaxLevelSwapForce);
             figure.lock = GetLock(path);
 
             const Json& entry = index["figures"][figure.file];
@@ -579,6 +579,11 @@ namespace collection
         if (top == nullptr || bottom == nullptr || top->category != Category::SwapTop || bottom->category != Category::SwapBottom)
             return {};
         SwapperPaths made;
+        // No version given: the standard swapper, each half under the id it is sold with.
+        if (topVariant == 0)
+            topVariant = StandardVariant(*top);
+        if (bottomVariant == 0)
+            bottomVariant = StandardVariant(*bottom);
         made.top = CreateUnmarked(topType, topVariant, {});
         made.bottom = CreateUnmarked(bottomType, bottomVariant, {});
         if (!made.top.empty() && !made.bottom.empty())
@@ -1570,7 +1575,7 @@ namespace collection
             }
             break;
         case GroupBy::Level:
-            for (int level = figures::MaxLevel; level >= 1; level--)
+            for (int level = figures::MaxLevelSwapForce; level >= 1; level--)
             {
                 std::vector<size_t> items;
                 for (size_t i : main)

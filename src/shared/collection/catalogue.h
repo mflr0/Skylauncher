@@ -122,6 +122,12 @@ namespace collection
         std::vector<Game> m_games;
     };
 
+    // A toy's "base" entry is its standard figure under the id it is sold with (Jet-Vac 0x1000, Scratch 0x2000, Legendary
+    // Bash 0x0403), not a second version: a versions list never shows it ("Standard" is that row) and "Standard" creates the
+    // figure with that id. StandardVariant is 0 when the toy has no base entry; VersionCount counts the other variants.
+    uint16_t StandardVariant(const Toy& toy);
+    size_t VersionCount(const Toy& toy);
+
     // Ids as written in the JSON files ("air", "magic_item", "lightcore"); Parse* return Count when unknown.
     const char* ElementId(Element element);
     const char* CategoryId(Category category);

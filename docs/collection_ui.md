@@ -126,12 +126,13 @@ At the first visit to the page (`CollectionPage::Open`):
   1 s, backed up first; Delete goes to the trash). Close.
 - **Edit**: in two columns, the name in the lists (empty: the toy's name) and, for a figure that keeps them, the level in
   the portal's game (Spyro's Adventure 1-10 on its own part of the experience, so a figure Giants took to 15 keeps those
-  levels; Giants 1-15), experience, Giants' **hat picker** (52 names), gold, hero points, the nickname the game shows.
+  levels; Giants 1-15 on the first two parts of the experience; Swap Force 1-20, the game's own table), experience, Giants' **hat picker** (52 names), gold, hero points, the nickname the game shows.
   Save re-reads the figure and writes only the fields changed (a game may have played it meanwhile); a name alone
   writes no stats (and makes no backup).
 - **Add a figure**: a game selector (the six games), search, a **Type** menu (as the bar's), one card per character,
   "owned x2"; the toys the game reads first, then "Later games" labelled "needs Giants". A side panel lists the versions
-  (standard, variants, same-tag editions); name (optional) and Create; "Put it on Player 1" afterwards. A toy with
+  (Standard, variants, same-tag editions); Standard makes the figure under the id the toy is sold with, and the
+  toy's own entry in the catalogue (its `base` kind) is never a second row; name (optional) and Create; "Put it on Player 1" afterwards. A toy with
   versions has a "+3" badge on its card; the panel is titled "Versions", each row with its picture (the toy's own when
   it has none) and its kind (an unknown kind from a newer `catalogue.json` shows as "Other"); the search also matches
   the versions' names ("polar" finds Whirlwind, with Polar Whirlwind chosen).
@@ -181,11 +182,12 @@ At the first visit to the page (`CollectionPage::Open`):
   file still one seat, Change the bottom, Delete and Undelete of both halves, a lone half deleted alone). Seat X: 12 of 12. Everything runs in a scratch
   folder (`SSA_COLLECTION`, `SSA_SAVE_DIR`, `SSA_MIGRATE_FROM` set by the test).
 - Screenshots: `SSA_LAUNCHER_TEST_COLLECTION=1` with `SSA_LAUNCHER_SHOTS=<dir>` seeds a scratch `SSA_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `45-swapforce-choose-player-1`: the shelf, choosing for Player 1 and for the Magic
+  refuses without it) and writes `20-collection` to `46-add-standard-version`: the shelf, choosing for Player 1 and for the Magic
   item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
   backups), the live portal (`SSA_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
   its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on, Swap Force's portal with a
-  swapper on Player 1, the swapper's sheet, Change the bottom, and choosing for Player 1. Set `SKYLANDERS_DATA`
+  swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (Standard and the others, no
+  second row with the toy's own name). Set `SKYLANDERS_DATA`
   to a folder holding the discs' cached pictures to see them (else the drawn icons).
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SSA_COLLECTION`/`SSA_SAVE_DIR`, no `SSA_PORTAL_PLACE`: its log says which figures it took and the launcher shows the

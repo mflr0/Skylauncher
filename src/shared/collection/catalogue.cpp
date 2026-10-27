@@ -252,6 +252,19 @@ namespace collection
         return toys;
     }
 
+    uint16_t StandardVariant(const Toy& toy)
+    {
+        for (const Variant& variant : toy.variants)
+            if (variant.kind == VariantKind::Base && !variant.sameTag)
+                return variant.id;
+        return 0;
+    }
+
+    size_t VersionCount(const Toy& toy)
+    {
+        return size_t(std::count_if(toy.variants.begin(), toy.variants.end(), [](const Variant& v) { return v.kind != VariantKind::Base; }));
+    }
+
     VariantInfo Catalogue::Describe(const Toy* toy, uint16_t variant) const
     {
         std::string base = toy != nullptr ? toy->name : "Unknown toy";

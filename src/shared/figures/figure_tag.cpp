@@ -163,37 +163,50 @@ namespace figures
         }
     }
 
-    // Levels 11-15 are Giants'; the last one is 33000 + 63500, the sum of the two parts.
-    const uint32_t LevelExperience[MaxLevelGiants] = { 0, 1000, 2200, 3800, 6000, 9000, 13000, 18200, 24800, 33000, 42700, 53900, 66600, 80800, 96500 };
+    // The game's own table (every hero's character data on Swap Force's disc carries these 20 entries): levels 11-15 are
+    // Giants' (96500 = 33000 + 63500), levels 16-20 Swap Force's (197500 = 96500 + 101000).
+    const uint32_t LevelExperience[MaxLevelSwapForce] = { 0, 1000, 2200, 3800, 6000, 9000, 13000, 18200, 24800, 33000, 42700, 53900, 66600, 80800, 96500,
+                                                          113700, 132400, 152600, 174300, 197500 };
 
     int LevelForExperience(uint32_t experience, int maxLevel)
     {
-        maxLevel = std::clamp(maxLevel, 1, MaxLevelGiants);
+        maxLevel = std::clamp(maxLevel, 1, MaxLevelSwapForce);
         int level = 1;
         while (level < maxLevel && experience >= LevelExperience[level])
             level++;
         return level;
     }
 
-    int LevelCap(const std::string& game) { return game == "ssa" ? MaxLevel : MaxLevelGiants; }
+    int LevelCap(const std::string& game) { return game == "ssa" ? MaxLevel : game == "swapforce" ? MaxLevelSwapForce : MaxLevelGiants; }
 
-    uint32_t TotalExperience(const FigureStats& stats) { return stats.experience + stats.giantsExperience; }
+    uint32_t TotalExperience(const FigureStats& stats) { return stats.experience + stats.giantsExperience + stats.swapForceExperience; }
 
-    uint32_t ExperienceFor(const FigureStats& stats, int cap) { return cap <= MaxLevel ? stats.experience : TotalExperience(stats); }
+    uint32_t ExperienceFor(const FigureStats& stats, int cap)
+    {
+        return cap <= MaxLevel ? stats.experience : cap <= MaxLevelGiants ? stats.experience + stats.giantsExperience : TotalExperience(stats);
+    }
 
     void SetExperienceFor(FigureStats& stats, int cap, uint32_t experience)
     {
         if (cap <= MaxLevel)
             stats.experience = std::min(experience, MaxBaseExperience);
+        else if (cap <= MaxLevelGiants)
+        {
+            // Giants counts the first two parts only; Swap Force's part stays as it is.
+            experience = std::min(experience, MaxBaseExperience + MaxGiantsExperience);
+            stats.experience = std::min(experience, MaxBaseExperience);
+            stats.giantsExperience = experience - stats.experience;
+        }
         else
             SetTotalExperience(stats, experience);
     }
 
     void SetTotalExperience(FigureStats& stats, uint32_t total)
     {
-        total = std::min(total, MaxBaseExperience + MaxGiantsExperience);
+        total = std::min(total, MaxBaseExperience + MaxGiantsExperience + MaxSwapForceExperience);
         stats.experience = std::min(total, MaxBaseExperience);
-        stats.giantsExperience = total - stats.experience;
+        stats.giantsExperience = std::min(total - stats.experience, MaxGiantsExperience);
+        stats.swapForceExperience = total - stats.experience - stats.giantsExperience;
     }
 
     FigureData Decrypt(const FigureData& tag)
@@ -333,10 +346,11 @@ namespace figures
     void WriteStats(FigureData& tag, const FigureStats& unchecked)
     {
         // Whatever the caller passes, the figure never gets more than the games allow (experience of level 10 in the
-        // first area, Giants' 63500 in the extra one, gold).
+        // first area, Giants' 63500 and Swap Force's 101000 in the extra one, gold).
         FigureStats stats = unchecked;
         stats.experience = std::min(stats.experience, MaxBaseExperience);
         stats.giantsExperience = std::min(stats.giantsExperience, MaxGiantsExperience);
+        stats.swapForceExperience = std::min(stats.swapForceExperience, MaxSwapForceExperience);
         stats.gold = std::min(stats.gold, MaxGold);
         stats.nickname.resize(std::min<size_t>(stats.nickname.size(), 16));
         stats.lastPlaced = ClampDate(stats.lastPlaced);
