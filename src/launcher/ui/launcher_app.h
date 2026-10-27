@@ -271,6 +271,9 @@ namespace launcher_ui
         };
         SlotLine SlotStatus(GameSlot* slot);
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
+        // The width of a PillButton: `width`, or wider when the label (a translation may be longer) needs it; `chevron` != 0
+        // makes room for the drawn chevron.
+        float PillWidth(const char* label, float width, bool bold = false, int chevron = 0);
 
     private:
         bool Init();
@@ -369,9 +372,6 @@ namespace launcher_ui
         bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
         bool PillButton(const char* label, bool primary = false, float width = 0, bool bold = false, unsigned fill = PanelRaised,
             unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive, int chevron = 0);
-        // The width of a PillButton: `width`, or wider when the label (a translation may be longer) needs it; `chevron` != 0
-        // makes room for the drawn chevron.
-        float PillWidth(const char* label, float width, bool bold = false, int chevron = 0);
         // A chevron drawn with two lines (no font glyph): down when `dir` > 0, up when < 0; `size` is its width.
         static void DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir);
         // Draws the label of the last item (a button whose own text was made transparent) with a chevron after it.
