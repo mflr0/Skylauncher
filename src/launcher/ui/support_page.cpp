@@ -119,6 +119,7 @@ namespace launcher_ui
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
             ImGui::BeginChild("##reporttext", ImVec2(0, -52), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
                 ImGuiWindowFlags_NoBackground);
+            ImGui::SetScrollX(0.0f);
             if (m_monoFont != nullptr)
                 ImGui::PushFont(m_monoFont, SmallSize);
             ImGui::PushTextWrapPos(0);

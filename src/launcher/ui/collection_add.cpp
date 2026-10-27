@@ -92,6 +92,7 @@ namespace launcher_ui
         constexpr float PanelW = 270;
         float listH = size.y - ImGui::GetCursorPosY() - Pad - 56;
         ImGui::BeginChild("##addtoys", ImVec2(size.x - 2 * Pad - PanelW - 14, listH), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
         constexpr float Cell = 104, Gap = 10;
         int columns = std::max(1, int((ImGui::GetContentRegionAvail().x + Gap) / (Cell + Gap)));
         const Toy* chosen = nullptr;
@@ -156,6 +157,7 @@ namespace launcher_ui
         // The versions of the chosen toy, then Create.
         ImGui::SameLine(0, 14);
         ImGui::BeginChild("##addversions", ImVec2(PanelW, listH), ImGuiChildFlags_Borders | ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
         if (chosen == nullptr)
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Pick a figure."));
         else

@@ -567,10 +567,12 @@ namespace launcher_ui
         float width = std::min(available, 1180.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
         ImGui::BeginChild("##collectioncolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
         DrawHeader(width);
         DrawSeats(width);
         DrawBar();
         ImGui::BeginChild("##shelf", ImVec2(0, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
         DrawList();
         ImGui::EndChild();
         // A figure dragged off a seat and dropped on the shelf leaves the seat.

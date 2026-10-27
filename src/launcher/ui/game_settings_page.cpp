@@ -40,6 +40,7 @@ namespace launcher_ui
         float width = std::min(available, 940.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
         ImGui::BeginChild("##gamesettingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
 
         Title(m_s->game.name, HeadlineSize, Text);
         ImGui::SameLine(width - 150);

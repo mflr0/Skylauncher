@@ -561,6 +561,7 @@ namespace launcher_ui
         std::stable_partition(rows.begin(), rows.end(), [&](const Figure* half) { return half->partner.empty(); });
 
         ImGui::BeginChild("##changehalf", ImVec2(0, std::max(160.0f, ImGui::GetContentRegionAvail().y - 64)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
         constexpr float Row = 54;
         const Figure* chosen = nullptr;
         for (const Figure* half : rows)
@@ -693,6 +694,7 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 8));
         // The fields scroll above the Save row (the upgrades list makes the sheet taller than a small window).
         ImGui::BeginChild("##editbody", ImVec2(0, std::max(200.0f, ImGui::GetContentRegionAvail().y - 64)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ImGui::SetScrollX(0.0f);
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 8));
         auto label = [](const char* text) {
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", text);
