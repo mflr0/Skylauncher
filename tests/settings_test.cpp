@@ -90,7 +90,17 @@ namespace
         config["video"]["resolution_scale"] = "3";
         StoreGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["ssa.video"]["resolution_scale"] == "3" && config["giants.video"].count("resolution_scale") == 0);
-        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 9);
+        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 10);
+
+        // Original resolution (Swap Force): kept in [swapforce.video], put in [video] when it plays, absent for the other games.
+        config["swapforce.video"]["original_resolution"] = "1";
+        ApplyGameVideo(config, "swapforce");
+        SETTINGS_EXPECT(config["video"]["original_resolution"] == "1");
+        config["video"]["original_resolution"] = "0";
+        StoreGameVideo(config, "swapforce");
+        SETTINGS_EXPECT(config["swapforce.video"]["original_resolution"] == "0");
+        ApplyGameVideo(config, "ssa");
+        SETTINGS_EXPECT(config["video"].count("original_resolution") == 0 && config["ssa.video"].count("original_resolution") == 0);
 
         // Through the settings file, sections with a dot included.
         fs::path scratch = fs::temp_directory_path() / "skylauncher-video-test.ini";

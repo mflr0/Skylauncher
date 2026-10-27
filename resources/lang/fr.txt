@@ -218,6 +218,8 @@ Auto-open Toy Box	Toy Box automatique
 Game files	Fichiers du jeu
 Opening the disc image	Ouverture de l'image disque
 Opens a new issue on GitHub	Ouvre un nouveau ticket sur GitHub
+Original resolution	Résolution d'origine
+The 3D image at the console's size, stretched to the screen.	L'image 3D à la taille de la console, étirée à l'écran.
 PLAY	JOUER
 PLAY WITH	JOUER AVEC
 Play {}	Jouer à {}

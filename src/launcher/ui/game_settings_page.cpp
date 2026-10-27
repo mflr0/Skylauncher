@@ -102,6 +102,12 @@ namespace launcher_ui
         SettingRow(Tr("Skip intro movies"), Tr("Skips the start-up logos."));
         toggle("##skipintromovies", "skip_intro_movies", "0");
 
+        if (m_s->game.id == std::string_view("swapforce"))
+        {
+            SettingRow(Tr("Original resolution"), Tr("The 3D image at the console's size, stretched to the screen."));
+            toggle("##originalresolution", "original_resolution", "0");
+        }
+
         SettingRow(Tr("VSync"), Tr("No tearing, a little more latency."));
         toggle("##vsync", "vsync", "1");
 

@@ -38,6 +38,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `video` | `aspect` | `auto` (default), `16:9` | Widescreen: `auto` shows more to the sides on a window wider than 16:9, `16:9` keeps the game's picture with bars | yes |
 | `video` | `texture_packs` | `1` (default), `0` | Use the HD textures of the game's `textures/` folder (<game> settings > Video > Show in folder) | yes |
 | `video` | `texture_dump` | `0` (default), `1` | Write the game's textures as DDS files, for pack makers (<game> settings > Video > Advanced) | yes |
+| `video` | `original_resolution` | `0` (default), `1` | Swap Force only: keep the console's 3D image (1040x620) stretched to the screen instead of the full frame (<game> settings > Video > Original resolution) | yes |
 | `input` | `device` | `auto`, `keyboard`, `gamepad` | What the game listens to | yes |
 | `input` | `gamepad` | SDL GUID | The gamepad chosen when `device=gamepad` | yes |
 | `input` | `key_<action>` | SDL key name (`Space`, `Return`, `A`...) | Keyboard binding | yes |
@@ -54,12 +55,12 @@ the launcher then writes no settings until it is started again.
 ## Per-game video
 
 The runtime reads one `[video]` section, but the games do not have to share it. Each game keeps its own copy of the
-nine keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
-`anisotropy`, `aspect`, `texture_packs`, `texture_dump`) in **`[ssa.video]`**, **`[giants.video]`** and **`[swapforce.video]`**:
+ten keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
+`anisotropy`, `aspect`, `texture_packs`, `texture_dump`, `original_resolution`) in **`[ssa.video]`**, **`[giants.video]`** and **`[swapforce.video]`**:
 
 | Section | Key | Meaning |
 | --- | --- | --- |
-| `<game>.video` | the nine `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
+| `<game>.video` | the ten `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
 
 - The first time, a game's copy starts from the `[video]` the player already had (`SeedGameVideo`).
 - **PLAY** puts the copy of the game that starts into `[video]` (keys it lacks are dropped, so the runtime's defaults apply):
