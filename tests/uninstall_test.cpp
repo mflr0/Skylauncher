@@ -286,6 +286,38 @@ namespace
             os == Os::MacOS ? "macOS" : os == Os::Windows ? "Windows" : "Linux");
     }
 
+    // ---- A scratch folder reached through a link ($TMPDIR is /var/... on macOS, really /private/var/...) ------------------
+
+    void SymlinkChecks(const fs::path& scratch)
+    {
+        // The whole plan and run, with every path written through a link to the folder that holds the trees.
+        const fs::path real = scratch / "via-link-real", link = scratch / "via-link";
+        fs::remove_all(real);
+        std::error_code error;
+        fs::remove(link, error);
+        fs::create_directories(real);
+        fs::create_symlink(real, link, error);
+        UN_EXPECT(!error);
+        for (Os os : { Os::MacOS, Os::Windows, Os::Linux })
+            PlanAndRunChecks(link, os);
+        // The links are followed in both directions: the same trees written by their real path are the same tree.
+        UN_EXPECT(Has(real / "linux" / "apps" / "Skylauncher.AppImage") && Has(real / "mac" / "apps" / "Skylauncher.app"));
+
+        // A launcher reached through a link into a system folder is still refused, and one in an ordinary folder is not.
+        const fs::path system = "/usr/bin/true";
+        if (Has(system))
+        {
+            fs::create_symlink("/usr", scratch / "via-link-usr", error);
+            Tree tree = MakeTree(scratch / "via-link-system", Os::Linux);
+            tree.env.launcherSelf = scratch / "via-link-usr" / "bin" / "true";
+            LauncherRemoval removal = PlanLauncherRemoval(tree.env);
+            UN_EXPECT(!removal.ok && removal.paths.empty());
+            tree.env.launcherSelf = tree.self;
+            UN_EXPECT(PlanLauncherRemoval(tree.env).ok);
+        }
+        printf("Uninstall through a link: the plan and the run work on a folder reached by a link, a link into a system folder is refused\n");
+    }
+
     // ---- The folders of the layout before 0.3.1 ---------------------------------------------------------------------
 
     void OldFolderChecks(const fs::path& base)
@@ -642,6 +674,7 @@ int UninstallChecks(const fs::path& scratch)
     LayoutChecks();
     for (Os os : { Os::MacOS, Os::Windows, Os::Linux })
         PlanAndRunChecks(base, os);
+    SymlinkChecks(scratch);
     OldFolderChecks(base);
     RefusalChecks(base);
     LauncherChecks(base);

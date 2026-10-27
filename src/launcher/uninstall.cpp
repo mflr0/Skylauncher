@@ -11,6 +11,7 @@
 #include <cctype>
 #include <cstring>
 #include <fstream>
+#include <iterator>
 #include <optional>
 #if defined(_WIN32)
 #include <windows.h>
@@ -591,8 +592,12 @@ namespace uninstall
         {
             if (!fs::is_regular_file(self, error))
                 return refuse(Why::Unfit, "not a file");
-            // An AppImage lives where its owner put it, but never in a system folder.
-            const fs::path top = *std::next(self.lexically_normal().begin());
+            // An AppImage lives where its owner put it, but never in a system folder. Links are followed: a folder reached
+            // through /var that really is /private/var is not one, a link into /usr is.
+            const fs::path resolved = Resolved(self);
+            if (std::distance(resolved.begin(), resolved.end()) < 3)
+                return refuse(Why::Unfit, "a system folder");
+            const fs::path top = *std::next(resolved.begin());
             for (const char* system : { "usr", "bin", "sbin", "lib", "lib64", "etc", "var", "boot", "sys", "proc", "dev", "run", "snap" })
                 if (top == system)
                     return refuse(Why::Unfit, "a system folder");
