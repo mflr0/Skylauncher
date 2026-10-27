@@ -101,7 +101,7 @@ namespace LauncherTheme
     inline constexpr int BackdropArtW = 1024; // the painting's width as a texture (Giants' is 1600 px)
     // The sidebar's game rows: the logo's box on the left, the name and status beside it.
     inline constexpr float GameLogoW = 72, GameLogoH = 38, GameTextX = 98;
-    inline constexpr float VersionSize = 13; // "v0.4.2" beside the SKYLAUNCHER title
+    inline constexpr float VersionSize = 13; // "v0.4.3" beside the SKYLAUNCHER title
 
     // ImGui widget colours and shapes for the whole window.
     void Apply(ImGuiStyle& style);
