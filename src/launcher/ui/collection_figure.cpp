@@ -44,6 +44,8 @@ namespace launcher_ui
         {
             if (m_editing)
                 m_editing = false;
+            else if (!m_changeKeep.empty())
+                m_changeKeep.clear();
             else if (!m_confirm.empty())
                 m_confirm.clear();
             else
@@ -200,6 +202,8 @@ namespace launcher_ui
         rows.push_back({ Tr("Plays in"), games.empty() ? std::string(Tr("No game this launcher knows")) : count == int(collection::Catalogue::Get().Games().size()) ? std::string(Tr("every game")) : games });
         rows.push_back({ Tr("Toy"), Tf("{} · type {} · variant {:04X}", f.toy != nullptr ? f.toy->name : std::string(Tr("Unknown")), f.type, f.variant) });
         rows.push_back({ Tr("File"), f.file + (f.origin.empty() ? "" : " · " + f.origin) });
+        if (collection::Card card = CardOf(f); card.Swapper())
+            rows.push_back({ Tr("Bottom file"), (card.first == &f ? card.second : card.first)->file });
         size_t backups = Backups(f.path).size();
         rows.push_back({ Tr("Backups"), backups == 0 ? std::string(Tr("None yet")) : fmt::format("{}", backups) });
         FactRows("##details", rows);
@@ -228,8 +232,14 @@ namespace launcher_ui
             DrawEditStats(copy);
             return;
         }
+        if (!m_changeKeep.empty())
+        {
+            DrawChangeHalf(size);
+            return;
+        }
         Figure f = *found; // actions below reload the collection
         const std::string path = f.path;
+        const collection::Card card = CardOf(f); // f is the swapper's top, or a figure (also a half on its own)
         bool writable = Writable(f);
         ImDrawList* draw = ImGui::GetWindowDrawList();
 
@@ -238,6 +248,8 @@ namespace launcher_ui
         ImVec2 origin = ImGui::GetCursorScreenPos();
         draw->AddRectFilled(origin, ImVec2(origin.x + Picture, origin.y + Picture), Rgb(Field), RadiusLarge);
         DrawPicture(draw, f.toy, f.Kind(), f.variant, ImVec2(origin.x + 6, origin.y + 6), Picture - 12);
+        if (card.Swapper())
+            DrawBottom(draw, *card.second, ImVec2(origin.x + Picture - 76, origin.y + Picture - 76), 68);
         float badgeX = origin.x;
         auto badge = [&](const std::string& text, unsigned fill, unsigned ink) {
             ImGui::PushFont(nullptr, SmallSize - 1);
@@ -250,7 +262,9 @@ namespace launcher_ui
             badge(KindLabel(f.Kind()), collection::VariantKindRgb(f.Kind()), AccentInk);
         if (f.toy != nullptr && f.toy->element != collection::Element::None)
             badge(ElementName(f.toy->element), PanelRaised, Text);
-        if (f.toy != nullptr)
+        if (card.Swapper())
+            badge(Tr("Swapper"), PanelRaised, Text);
+        else if (f.toy != nullptr)
             badge(CategoryLabel(f.toy->category), PanelRaised, Text);
 
         // Right: name, where it is, the facts, Details.
@@ -260,9 +274,11 @@ namespace launcher_ui
         ImGui::PushTextWrapPos(right + textW);
         m_app.Title(Name(f).c_str(), HeadlineSize - 6, Text);
         std::string what = f.toy != nullptr ? f.variantInfo.name : Tf("Toy type {}", f.type);
+        if (card.Swapper())
+            what = Tf("Top: {} · bottom: {}", WithoutHalf(f.variantInfo.name), WithoutHalf(card.second->variantInfo.name));
         if (what != Name(f)) // the second line only when it says more (a nickname over the toy's name)
             ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", what.c_str());
-        if (f.lock.Busy())
+        if (card.Busy())
             ImGui::TextColored(ImColor(Rgb(Danger)), "%s", Tf("On the portal in {}: read-only", LiveGame(f)).c_str());
         else if (int seat = m_model.SeatOf(path); seat >= 0)
             ImGui::TextColored(ImColor(Rgb(Accent)), "%s", Tf("On {} at the next start of {}", SeatName(size_t(seat)), ShortGameName(m_model.gameId)).c_str());
@@ -270,6 +286,22 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 4));
         DrawFigureFacts(f, textW);
         ImGui::Dummy(ImVec2(0, 2));
+        // A swapper changes one half at a time ("Change the bottom": mixing stays possible); a half on its own looks for its partner.
+        if (f.IsSwapTop() || f.IsSwapBottom())
+        {
+            ImGui::Dummy(ImVec2(0, 4));
+            ImGui::BeginDisabled(!writable);
+            if (f.IsSwapTop() && m_app.PillButton(Tr("Change the bottom"), false, 210, true))
+                m_changeKeep = f.path;
+            if (f.IsSwapTop() && card.Swapper())
+                ImGui::SameLine(0, 8);
+            if (card.Swapper() && m_app.PillButton(Tr("Change the top"), false, 190, true))
+                m_changeKeep = card.second->path;
+            if (f.IsSwapBottom() && !card.Swapper() && m_app.PillButton(Tr("Change the top"), false, 190, true))
+                m_changeKeep = f.path;
+            ImGui::EndDisabled();
+            ImGui::Dummy(ImVec2(0, 4));
+        }
         ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(PanelRaised));
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Accent));
@@ -431,12 +463,13 @@ namespace launcher_ui
             CloseOverlay();
 
         // A figure held by a game: the lock can be broken when the game is really gone (a crash on another machine...).
-        if (f.lock.Busy() && m_confirm.empty())
+        if (card.Busy() && m_confirm.empty())
         {
             ImGui::SetCursorScreenPos(ImVec2(right, row - 52));
             if (m_app.HoldButton(Tr(strings::Release), 240, Tr(strings::ReleaseHint)))
             {
-                collection::BreakLock(path);
+                for (const Figure* half : card.Halves())
+                    collection::BreakLock(half->path);
                 Reload();
             }
         }
@@ -457,7 +490,7 @@ namespace launcher_ui
                 break;
             }
         std::string error;
-        if (!m_model.Delete(path, &error))
+        if (!m_model.DeleteCard(path, &error))
         {
             Toast(Tr("Couldn't delete it: ") + error);
             return;
@@ -467,6 +500,94 @@ namespace launcher_ui
         Toast(Tr("Moved to the trash"));
         m_generation++;
         CloseOverlay();
+    }
+
+    // "Change the bottom" / "Change the top": the card keeps `keep` and takes `replacement` as its other half. A card on a seat
+    // stays there: the seat is written again, so the next start puts the new half on the portal.
+    void CollectionPage::ChangeHalf(const Figure& keep, const Figure& replacement)
+    {
+        const Figure* oldTop = keep.IsSwapTop() ? &keep : CardOf(keep).first;
+        int seat = m_model.SeatOf(oldTop->path);
+        const std::string newTop = keep.IsSwapTop() ? keep.path : replacement.path;
+        std::string error;
+        if (!collection::ChangeHalf(keep.path, replacement.path, &error))
+        {
+            Toast(Tr("Couldn't change it: ") + error);
+            return;
+        }
+        Reload();
+        if (seat >= 0 && !m_model.seats[seat].empty())
+            m_model.SetSeat(size_t(seat), newTop);
+        if (const Figure* now = m_model.Find(keep.path))
+            m_figure = CardOf(*now).first->path;
+        m_changeKeep.clear();
+        Reload();
+        Toast(Tr("Changed"));
+    }
+
+    // The list of the other halves to take: one row each, the ones in use or on a seat left out; a half that belongs to another
+    // swapper says so (that swapper takes the old half in exchange).
+    void CollectionPage::DrawChangeHalf(ImVec2 size)
+    {
+        const Figure* keep = m_model.Find(m_changeKeep);
+        if (keep == nullptr || !(keep->IsSwapTop() || keep->IsSwapBottom()))
+        {
+            m_changeKeep.clear();
+            return;
+        }
+        const bool wantBottom = keep->IsSwapTop();
+        collection::Card keepCard = CardOf(*keep);
+        const Figure* current = keepCard.Swapper() ? (wantBottom ? keepCard.second : keepCard.first) : nullptr;
+        m_app.Title(wantBottom ? Tr("CHANGE THE BOTTOM") : Tr("CHANGE THE TOP"), HeadlineSize - 6, Text);
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{}: pick the new {}", Name(*keep), wantBottom ? Tr("bottom") : Tr("top")).c_str());
+        ImGui::Dummy(ImVec2(0, 8));
+
+        // The candidates: lone halves first.
+        std::vector<const Figure*> rows;
+        for (const Figure& half : m_model.figures)
+        {
+            if (!(wantBottom ? half.IsSwapBottom() : half.IsSwapTop()) || (current != nullptr && half.path == current->path))
+                continue;
+            collection::Card card = CardOf(half);
+            if (card.Busy() || m_model.SeatOf(card.first->path) >= 0 || collection::UntouchedStarter(half))
+                continue;
+            rows.push_back(&half);
+        }
+        std::stable_partition(rows.begin(), rows.end(), [&](const Figure* half) { return half->partner.empty(); });
+
+        ImGui::BeginChild("##changehalf", ImVec2(0, std::max(160.0f, ImGui::GetContentRegionAvail().y - 64)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        constexpr float Row = 54;
+        const Figure* chosen = nullptr;
+        for (const Figure* half : rows)
+        {
+            ImVec2 at = ImGui::GetCursorScreenPos();
+            ImGui::PushID(half->path.c_str());
+            if (ImGui::Selectable("##half", false, 0, ImVec2(0, Row)))
+                chosen = half;
+            ImGui::PopID();
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            DrawIcon(draw, half->toy, half->Kind(), ImVec2(at.x + 6, at.y + 3), Row - 6, false);
+            collection::Card card = CardOf(*half);
+            ImGui::PushFont(m_app.m_boldFont, TextSize - 1);
+            draw->AddText(ImVec2(at.x + Row + 10, at.y + 6), Rgb(Text), (half->label.empty() ? WithoutHalf(half->DisplayName()) : half->label).c_str());
+            ImGui::PopFont();
+            ImGui::PushFont(nullptr, SmallSize - 1);
+            std::string note = card.Swapper() ? Tf("Now with {}", WithoutHalf((half->IsSwapTop() ? card.second : card.first)->DisplayName())) : std::string(Tr("On its own"));
+            draw->AddText(ImVec2(at.x + Row + 10, at.y + 29), Rgb(TextDim), note.c_str());
+            ImGui::PopFont();
+        }
+        if (rows.empty())
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", wantBottom ? Tr("No other bottom to take.") : Tr("No other top to take."));
+        ImGui::EndChild();
+        if (chosen != nullptr)
+        {
+            Figure keepNow = *keep, replacement = *chosen; // the call reloads the collection
+            ChangeHalf(keepNow, replacement);
+            return;
+        }
+        ImGui::Dummy(ImVec2(0, 8));
+        if (m_app.PillButton(Tr("Cancel"), false, 140, true))
+            m_changeKeep.clear();
     }
 
     // The toy's upgrades by name (collection::Upgrades): the basic ones, the two paths side by side (the chosen one lit, the

@@ -135,7 +135,7 @@ Finding default.xex	Recherche de default.xex
 Fingerprinting default.xex (SHA-256)	Calcul de l'empreinte de default.xex (SHA-256)
 Finishing	Finalisation
 Folders	Dossiers
-For Skylauncher and both games.	Pour Skylauncher et les deux jeux.
+For Skylauncher and all games.	Pour Skylauncher et tous les jeux.
 Found	Détecté
 Found, not usable	Détecté, inutilisable
 Frame rate limit	Limite d'images par seconde
@@ -276,7 +276,7 @@ Saves	Sauvegardes
 Saves and data deleted	Sauvegardes et données supprimées
 Saves restored from {}	Sauvegardes restaurées : copie du {}
 For this game only.	Pour ce jeu seulement.
-Settings, saves, figures and builds, shared by both games.	Réglages, sauvegardes, figurines et jeux construits, communs aux deux jeux.
+Settings, saves, figures and builds, shared by all games.	Réglages, sauvegardes, figurines et jeux construits, communs à tous les jeux.
 Shortcut added to the Desktop	Raccourci ajouté au bureau
 Show details	Détails
 Show in folder	Afficher dans le dossier
@@ -679,3 +679,19 @@ Upgrades	Améliorations
 All	Tout
 Basic	De base
 {} gold	{} or
+Swapper	Swapper
+Bottom file	Fichier du bas
+Top: {} · bottom: {}	Haut : {} · bas : {}
+Change the bottom	Changer le bas
+Change the top	Changer le haut
+CHANGE THE BOTTOM	CHANGER LE BAS
+CHANGE THE TOP	CHANGER LE HAUT
+{}: pick the new {}	{} : choisis le nouveau {}
+bottom	bas
+top	haut
+Now with {}	Actuellement avec {}
+On its own	Seul
+No other bottom to take.	Pas d'autre bas à prendre.
+No other top to take.	Pas d'autre haut à prendre.
+Couldn't change it: 	Impossible de le changer : 
+Changed	Changé

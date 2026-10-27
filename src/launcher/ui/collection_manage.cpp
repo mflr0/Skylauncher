@@ -281,7 +281,8 @@ namespace launcher_ui
         constexpr const char* Shots[] = { "20-collection", "21-choose-player-1", "22-choose-magic-item", "23-filter-water", "24-figure-sheet",
             "25-figure-details", "26-figure-delete", "27-edit", "28-add-a-figure", "29-add-later-game", "30-manage-trash", "31-manage-backups",
             "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
-            "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet" };
+            "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet", "42-swapforce-portal", "43-swapper-sheet",
+            "44-change-the-bottom", "45-swapforce-choose-player-1" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -346,12 +347,19 @@ namespace launcher_ui
                 collection::Create(toy.type);
                 break;
             }
-        for (const collection::Toy& toy : collection::Catalogue::Get().Toys())
-            if (toy.game == "swap_force" && toy.category == collection::Category::SwapTop)
+        // Swap Force: two swappers (one played to level 7) and a bottom on its own, shown as cards of their own game.
+        {
+            collection::SwapperPaths doom = collection::CreateSwapper(2003, 1003), night = collection::CreateSwapper(2012, 1004);
+            Figure played;
+            if (!doom.top.empty() && collection::Read(doom.top, played))
             {
-                collection::Create(toy.type);
-                break;
+                played.stats.experience = 12500;
+                played.stats.gold = 3100;
+                collection::WriteStats(doom.top, played.stats);
             }
+            collection::Create(1007);
+            (void)night;
+        }
         // Level 15 and a hat (Giants' part of the figure): Giants shows 15, Spyro's Adventure 10.
         std::string eruptor = collection::Create(9);
         Figure high;
@@ -379,7 +387,7 @@ namespace launcher_ui
         (void)chop; (void)item; (void)pack; (void)sidekick; (void)dark;
         if (getenv("SSA_SAVE_DIR") != nullptr)
             if (const collection::Game* game = m_model.Game())
-                WriteSeats(SessionFile(*game), { gill, spyro, item, pack });
+                WriteSeats(*game, SessionFile(*game), { gill, spyro, item, pack });
         Reload();
     }
 
@@ -427,10 +435,10 @@ namespace launcher_ui
             break;
         case 9:
             m_overlay = Overlay::Add;
-            m_addGame = "swap_force";
+            m_addGame = "swapforce";
             m_addToy = 0xFFFF;
             for (const collection::Toy& toy : collection::Catalogue::Get().Toys())
-                if (toy.game == "swap_force" && toy.category == collection::Category::SwapTop)
+                if (toy.game == "swapforce" && toy.category == collection::Category::SwapTop)
                 {
                     m_addToy = toy.type;
                     break;
@@ -558,6 +566,29 @@ namespace launcher_ui
                     OpenFigure(figure.path);
                     break;
                 }
+            break;
+        }
+        case 22: // Swap Force: a swapper on player 1 (its two halves, one seat) and the shelf's swapper cards
+        case 23: // its sheet
+        case 24: // "Change the bottom"
+        case 25: // choosing for player 1: the swapper cards among the figures
+        {
+            SelectPortalGame("swapforce");
+            std::string doom;
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 2003)
+                    doom = figure.path;
+            if (step == 22)
+                TestSetSeats({ doom, "", "", "" });
+            else if (step == 25)
+                Choose(0);
+            else
+            {
+                OpenFigure(doom);
+                if (step == 24)
+                    if (const Figure* top = m_model.Find(doom))
+                        m_changeKeep = top->path;
+            }
             break;
         }
         default: break;

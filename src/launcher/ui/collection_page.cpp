@@ -269,7 +269,7 @@ namespace launcher_ui
                 std::vector<std::string> seats = MoveLauncherSettings(*game, collection::LegacyFolder(),
                     SplitList(SettingGet(m_app.m_config, "collection", "favourites")), SplitList(SettingGet(m_app.m_config, "portal", "place")));
                 if (!seats.empty())
-                    WriteSeats(SessionFile(*game), seats);
+                    WriteSeats(*game, SessionFile(*game), seats);
             }
             m_app.Set("collection", "moved", "1");
             // The seats are the session file now: a [portal] place would override it at the game's start.
@@ -309,9 +309,39 @@ namespace launcher_ui
         m_sections = m_model.Shelf(filter, m_list, &m_hiddenStarters);
     }
 
+    std::string WithoutHalf(std::string name)
+    {
+        for (const char* suffix : { " (top)", " (bottom)" })
+        {
+            std::string tail = suffix;
+            if (name.size() > tail.size() && name.compare(name.size() - tail.size(), tail.size(), tail) == 0)
+                return name.substr(0, name.size() - tail.size());
+        }
+        return name;
+    }
+
+    collection::Card CollectionPage::CardOf(const Figure& figure) const
+    {
+        if (!figure.partner.empty())
+            for (const Figure& other : m_model.figures)
+                if (other.file == figure.partner)
+                    return figure.IsSwapBottom() ? collection::Card{ &other, &figure } : collection::Card{ &figure, &other };
+        return { &figure, nullptr };
+    }
+
+    // The bottom half of a swapper, small over the corner of the card's picture.
+    void CollectionPage::DrawBottom(ImDrawList* draw, const Figure& bottom, ImVec2 at, float size)
+    {
+        draw->AddRectFilled(ImVec2(at.x - 2, at.y - 2), ImVec2(at.x + size + 2, at.y + size + 2), Rgb(Panel), Radius);
+        DrawIcon(draw, bottom.toy, bottom.Kind(), at, size, false);
+        draw->AddRect(ImVec2(at.x - 2, at.y - 2), ImVec2(at.x + size + 2, at.y + size + 2), Rgb(BorderBright), Radius);
+    }
+
     // The game's words: the player's name for it, else the toy's name with the nickname the game shows.
     std::string CollectionPage::Name(const Figure& figure) const
     {
+        if (collection::Card card = CardOf(figure); card.Swapper())
+            return collection::CardName(card);
         if (!figure.label.empty())
             return figure.label;
         if (figure.toy == nullptr)
@@ -326,9 +356,10 @@ namespace launcher_ui
     // has it on its portal (the tooltip and the sheet say which).
     std::string CollectionPage::Detail(const Figure& figure) const
     {
-        if (figure.lock.Busy())
+        collection::Card card = CardOf(figure);
+        if (card.Busy())
             return Tr("Playing now");
-        return collection::LevelText(figure, m_model.gameId, French());
+        return card.Swapper() ? collection::CardLevelText(card, m_model.gameId, French()) : collection::LevelText(figure, m_model.gameId, French());
     }
 
     std::string CollectionPage::SeatName(size_t seat) const
@@ -384,12 +415,16 @@ namespace launcher_ui
 
     std::string CollectionPage::LiveGame(const Figure& figure) const
     {
-        return figure.lock.Busy() ? ShortGameName(figure.lock.game) : std::string();
+        collection::Card card = CardOf(figure);
+        for (const Figure* half : card.Halves())
+            if (half->lock.Busy())
+                return ShortGameName(half->lock.game);
+        return {};
     }
 
     bool CollectionPage::Writable(const Figure& figure) const
     {
-        return !figure.lock.Busy();
+        return !Busy(figure);
     }
 
     // ---- Actions --------------------------------------------------------------------------------------------------
@@ -397,6 +432,11 @@ namespace launcher_ui
     void CollectionPage::OpenFigure(const std::string& path)
     {
         m_figure = path;
+        m_changeKeep.clear();
+        // A swapper's sheet is its top's.
+        if (const Figure* figure = m_model.Find(path); figure != nullptr && figure->IsSwapBottom())
+            if (collection::Card card = CardOf(*figure); card.Swapper())
+                m_figure = card.first->path;
         m_overlay = Overlay::Figure;
         m_editing = false;
         m_confirm.clear();
@@ -434,7 +474,7 @@ namespace launcher_ui
             Toast(Tf("{} is not for {}", Name(*figure), ShortGameName(m_model.gameId)));
         else if (!SeatAccepts(game->seats[seat], *figure))
             Toast(Tf("{} doesn't go on {}", Name(*figure), SeatName(seat)));
-        else if (figure->lock.Busy())
+        else if (Busy(*figure))
             Toast(Tf("{} is in use by {}", Name(*figure), LiveGame(*figure)));
         else if (m_model.SetSeat(seat, path))
         {
@@ -740,13 +780,15 @@ namespace launcher_ui
             if (occupied && figure != nullptr)
             {
                 DrawIcon(draw, figure->toy, figure->Kind(), icon, Icon, false);
+                if (collection::Card card = CardOf(*figure); card.Swapper())
+                    DrawBottom(draw, *card.second, ImVec2(icon.x + Icon - 22, icon.y + Icon - 22), 22);
                 ImGui::PushFont(m_app.m_boldFont, TextSize - 1);
                 draw->AddText(ImVec2(tx, at.y + 30), Rgb(Text), fit(Name(*figure), TextSize - 1, m_app.m_boldFont).c_str());
                 ImGui::PopFont();
                 if (std::string detail = Detail(*figure); !detail.empty())
                 {
                     ImGui::PushFont(nullptr, SmallSize - 1);
-                    draw->AddText(ImVec2(tx, at.y + 52), Rgb(figure->lock.Busy() ? Ok : TextDim), fit(detail, SmallSize - 1).c_str());
+                    draw->AddText(ImVec2(tx, at.y + 52), Rgb(Busy(*figure) ? Ok : TextDim), fit(detail, SmallSize - 1).c_str());
                     ImGui::PopFont();
                 }
             }
@@ -766,7 +808,7 @@ namespace launcher_ui
                 draw->AddText(ImVec2(tx, at.y + 52), Rgb(TextDim), choosing ? Tr("Pick one below") : editable ? Tr("Choose") : "");
                 ImGui::PopFont();
             }
-            if (occupied && editable && !(figure != nullptr && figure->lock.Busy()))
+            if (occupied && editable && !(figure != nullptr && Busy(*figure)))
             {
                 ImVec2 cross(end.x - 18, at.y + 18);
                 m_crossAt[i] = cross;
@@ -934,6 +976,9 @@ namespace launcher_ui
         draw->AddRect(at, end, Rgb(seat >= 0 ? Accent : selected || hovered ? BorderBright : Border), Radius, 0, seat >= 0 || selected ? 2.0f : 1.0f);
         float icon = width - 28;
         DrawIcon(draw, figure.toy, figure.Kind(), ImVec2(at.x + 14, at.y + 10), icon, false);
+        const bool busy = Busy(figure);
+        if (collection::Card card = CardOf(figure); card.Swapper())
+            DrawBottom(draw, *card.second, ImVec2(at.x + 14 + icon - icon * 0.38f, at.y + 10 + icon - icon * 0.38f), icon * 0.38f);
 
         ImGui::PushFont(m_app.m_boldFont, SmallSize + 1);
         std::string name = Name(figure);
@@ -946,7 +991,7 @@ namespace launcher_ui
         {
             ImGui::PushFont(nullptr, SmallSize - 1);
             ImVec2 detailSize = ImGui::CalcTextSize(detail.c_str());
-            draw->AddText(ImVec2(at.x + std::max(6.0f, (width - detailSize.x) / 2), at.y + icon + 31), Rgb(figure.lock.Busy() ? Ok : TextDim), detail.c_str());
+            draw->AddText(ImVec2(at.x + std::max(6.0f, (width - detailSize.x) / 2), at.y + icon + 31), Rgb(busy ? Ok : TextDim), detail.c_str());
             ImGui::PopFont();
         }
 
@@ -967,7 +1012,7 @@ namespace launcher_ui
         if (hovered)
         {
             std::string tip = Name(figure);
-            if (figure.lock.Busy())
+            if (busy)
                 tip += "\n" + Tf("On the portal in {}: read-only", LiveGame(figure));
             else if (dim)
                 tip += "\n" + Tf("Not for {}", ShortGameName(m_model.gameId));

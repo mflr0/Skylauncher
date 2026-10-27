@@ -21,8 +21,12 @@ namespace launcher_ui
     // it fits there, else to the first free seat that takes it, as the game's Toy Box does. Paths of the old figure
     // folder lead to their copies in the collection.
     std::vector<std::string> ReadSeats(const collection::Game& game, const std::string& file);
-    // Seat i in slot i. False if the file cannot be written.
-    bool WriteSeats(const std::string& file, const std::vector<std::string>& seats);
+    // Seat i in slot i; Swap Force's six slots: player 1 on 0 and 1, player 2 on 2 and 3, the item on 4, the adventure pack on
+    // 5, a swapper's bottom (the top's partner) in the slot after its top. False if the file cannot be written.
+    bool WriteSeats(const collection::Game& game, const std::string& file, const std::vector<std::string>& seats);
+    // The portal slot a seat starts at, and the seat of a slot, for the game.
+    int SeatFirstSlot(const collection::Game& game, size_t seat);
+    int SlotSeat(const collection::Game& game, int slot);
 
     // "Spyro's Adventure" for "ssa": the game's name without the series' prefix; the id itself if unknown.
     std::string ShortGameName(const std::string& game);
@@ -79,6 +83,8 @@ namespace launcher_ui
         // Moves the figure to the trash (collection::Delete), takes it off its seat and reloads. False, with the reason,
         // when the trash refuses it: then nothing has changed.
         bool Delete(const std::string& path, std::string* error);
+        // A swapper's card: both halves go to the trash.
+        bool DeleteCard(const std::string& path, std::string* error);
         std::vector<std::string> OnPortal() const; // the seated paths
         // The figures the page shows, into `shown`, cut by collection::Group's shelf for Game(): every figure once,
         // favourites first, then what the game took (newest first), then by element; unknown toys and the toys the game

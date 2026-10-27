@@ -9,6 +9,20 @@ namespace launcher_ui
     using collection::Category;
     using collection::Toy;
 
+    namespace
+    {
+        // A swapper is added whole: the catalogue lists its tops only, named without the "(top)", and creating one makes both halves.
+        bool IsSwapper(const Toy& toy) { return toy.category == Category::SwapTop; }
+
+        // A swapper's plain version is its "Standard": its own entry in the list would say the same twice.
+        bool PlainDuplicate(const Toy& toy, const collection::Variant& variant) { return IsSwapper(toy) && variant.kind == collection::VariantKind::Base; }
+
+        size_t CountVersions(const Toy& toy)
+        {
+            return size_t(std::count_if(toy.variants.begin(), toy.variants.end(), [&](const collection::Variant& v) { return !PlainDuplicate(toy, v); }));
+        }
+    }
+
     void CollectionPage::DrawAdd(ImVec2 size)
     {
         const collection::Catalogue& catalogue = collection::Catalogue::Get();
@@ -53,11 +67,13 @@ namespace launcher_ui
             if (search.empty())
                 return 0;
             for (size_t i = 0; i < toy.variants.size(); i++)
-                if (Lower(toy.variants[i].name).find(search) != std::string::npos)
+                if (!PlainDuplicate(toy, toy.variants[i]) && Lower(toy.variants[i].name).find(search) != std::string::npos)
                     return int(i) + 1;
             return 0;
         };
         auto matches = [&](const Toy& toy) {
+            if (toy.category == Category::SwapBottom)
+                return false; // the bottom comes with its top
             if (m_addCategory >= 0 && int(toy.category) != m_addCategory)
                 return false;
             return search.empty() || Lower(toy.name).find(search) != std::string::npos || firstMatchingVersion(toy) > 0;
@@ -116,7 +132,7 @@ namespace launcher_ui
                     draw->AddRect(at, ImVec2(at.x + Cell, at.y + Cell + 38), Rgb(Accent), Radius, 0, 2.5f);
                 DrawIcon(draw, &toy, collection::VariantKind::Base, ImVec2(at.x + 16, at.y + 6), Cell - 32, false);
                 ImGui::PushFont(nullptr, SmallSize);
-                std::string name = LauncherMiddleEllipsis(toy.name, 14);
+                std::string name = LauncherMiddleEllipsis(IsSwapper(toy) ? WithoutHalf(toy.name) : toy.name, 14);
                 ImVec2 nameSize = ImGui::CalcTextSize(name.c_str());
                 draw->AddText(ImVec2(at.x + (Cell - nameSize.x) / 2, at.y + Cell - 18), Rgb(Text), name.c_str());
                 int count = owned(toy.type, -1, {});
@@ -124,9 +140,9 @@ namespace launcher_ui
                 ImVec2 noteSize = ImGui::CalcTextSize(note.c_str());
                 draw->AddText(ImVec2(at.x + (Cell - noteSize.x) / 2, at.y + Cell), Rgb(pass == 1 ? TextDim : Ok), note.c_str());
                 ImGui::PopFont();
-                if (!toy.variants.empty()) // it has versions: a small badge, the count
+                if (CountVersions(toy) > 0) // it has versions: a small badge, the count
                 {
-                    std::string more = "+" + std::to_string(toy.variants.size());
+                    std::string more = "+" + std::to_string(CountVersions(toy));
                     ImGui::PushFont(nullptr, SmallSize - 1);
                     float moreW = ImGui::CalcTextSize(more.c_str()).x + 12;
                     ImGui::PopFont();
@@ -144,8 +160,9 @@ namespace launcher_ui
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Pick a figure."));
         else
         {
-            m_app.BoldText(chosen->name.c_str(), Text);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ElementName(chosen->element).c_str(), CategoryLabel(chosen->category).c_str());
+            m_app.BoldText((IsSwapper(*chosen) ? WithoutHalf(chosen->name) : chosen->name).c_str(), Text);
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ElementName(chosen->element).c_str(),
+                (IsSwapper(*chosen) ? std::string(Tr("Swapper")) : CategoryLabel(chosen->category)).c_str());
             ImGui::Dummy(ImVec2(0, 4));
             std::vector<std::pair<std::string, collection::VariantKind>> versions{ { chosen->edition != collection::VariantKind::Base ? chosen->name : std::string(Tr("Standard")),
                 chosen->edition } };
@@ -155,6 +172,8 @@ namespace launcher_ui
             m_app.BoldText(Tr("Versions"), TextSecondary);
             for (size_t i = 0; i < versions.size(); i++)
             {
+                if (i > 0 && PlainDuplicate(*chosen, chosen->variants[i - 1]))
+                    continue;
                 int count = i == 0 ? owned(chosen->type, 0, {})
                     : chosen->variants[i - 1].sameTag ? owned(chosen->type, -1, chosen->variants[i - 1].name) : owned(chosen->type, chosen->variants[i - 1].id, {});
                 // A row: the version's picture (the toy's own when it has none), its name, its kind and how many are owned.
@@ -166,7 +185,7 @@ namespace launcher_ui
                 DrawPicture(draw, chosen, versions[i].second, i == 0 ? uint16_t(0) : chosen->variants[i - 1].id, ImVec2(at.x + 4, at.y + 3), Row - 6);
                 float textX = at.x + Row + 6;
                 ImGui::PushFont(m_app.m_boldFont, SmallSize);
-                draw->AddText(ImVec2(textX, at.y + 5), Rgb(Text), LauncherMiddleEllipsis(versions[i].first, 26).c_str());
+                draw->AddText(ImVec2(textX, at.y + 5), Rgb(Text), LauncherMiddleEllipsis(IsSwapper(*chosen) ? WithoutHalf(versions[i].first) : versions[i].first, 26).c_str());
                 ImGui::PopFont();
                 ImGui::PushFont(nullptr, SmallSize - 1);
                 std::string kind = versions[i].second == collection::VariantKind::Base ? std::string() : KindLabel(versions[i].second);
@@ -183,6 +202,8 @@ namespace launcher_ui
         if (chosen != nullptr)
         {
             std::string versionName = m_addVersion > 0 ? chosen->variants[std::min<size_t>(m_addVersion - 1, chosen->variants.size() - 1)].name : std::string(chosen->name);
+            if (IsSwapper(*chosen))
+                versionName = WithoutHalf(versionName);
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 10));
             ImGui::SetNextItemWidth(220);
             ImGui::InputTextWithHint("##addlabel", Tr("Name (optional)"), m_addLabel, sizeof(m_addLabel));
@@ -191,7 +212,19 @@ namespace launcher_ui
             if (m_app.PillButton(Tf("Create {}", LauncherMiddleEllipsis(versionName, 20)).c_str(), true, 300, true))
             {
                 const collection::Variant* variant = m_addVersion > 0 ? &chosen->variants[m_addVersion - 1] : nullptr;
-                std::string path = collection::Create(chosen->type, variant != nullptr && !variant->sameTag ? variant->id : 0);
+                std::string path;
+                if (IsSwapper(*chosen))
+                {
+                    // Both halves, linked: the bottom of the same version when it has one.
+                    uint16_t bottomType = collection::MatchingHalf(chosen->type), bottomVariant = 0;
+                    if (const Toy* bottom = collection::Catalogue::Get().Find(bottomType); bottom != nullptr && variant != nullptr && !variant->sameTag)
+                        for (const collection::Variant& candidate : bottom->variants)
+                            if (candidate.id == variant->id)
+                                bottomVariant = candidate.id;
+                    path = collection::CreateSwapper(chosen->type, bottomType, variant != nullptr && !variant->sameTag ? variant->id : 0, bottomVariant).top;
+                }
+                else
+                    path = collection::Create(chosen->type, variant != nullptr && !variant->sameTag ? variant->id : 0);
                 if (path.empty())
                     Toast(Tr("Couldn't create the figure"));
                 else

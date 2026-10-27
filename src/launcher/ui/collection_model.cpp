@@ -1,4 +1,5 @@
 #include "launcher/ui/collection_model.h"
+#include "launcher/launcher.h"
 #include "shared/dir_list.h"
 #include "shared/collection/datadir.h"
 #include "shared/collection/json.h"
@@ -8,6 +9,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fmt/format.h>
+#include <map>
 
 namespace launcher_ui
 {
@@ -15,13 +17,31 @@ namespace launcher_ui
 
     std::string SessionFile(const collection::Game& game)
     {
-        if (game.runtime.empty())
+        if (FindGame(game.id) == nullptr) // no runtime of ours yet
             return {};
         if (const char* saves = getenv("SSA_SAVE_DIR"))
             return std::string(saves) + "/portal.txt";
         // The game's folder in the data root, as host/portal.cpp asks for it.
         std::filesystem::path folder = datadir::Game(game.id);
         return folder.empty() ? std::string() : datadir::Text(folder / "portal.txt");
+    }
+
+    // Swap Force's portal has six slots: a player's swapper takes two (player 1 slots 0 and 1, player 2 slots 2 and 3), the
+    // magic item the fifth, the adventure pack the sixth. Every other game: one slot per seat, in order.
+    static bool TwoSlotSeats(const collection::Game& game) { return game.id == "swapforce"; }
+
+    int SeatFirstSlot(const collection::Game& game, size_t seat)
+    {
+        if (!TwoSlotSeats(game))
+            return int(seat);
+        return seat < 2 ? int(seat) * 2 : int(seat) + 2;
+    }
+
+    int SlotSeat(const collection::Game& game, int slot)
+    {
+        if (!TwoSlotSeats(game))
+            return slot;
+        return slot < 4 ? slot / 2 : slot - 2;
     }
 
     bool SeatAccepts(const collection::Seat& seat, const collection::Figure& figure)
@@ -55,6 +75,21 @@ namespace launcher_ui
             if (collection::Read(p.path, p.figure))
                 placed.push_back(std::move(p));
         }
+        // A swapper is one seat: its bottom (the top's partner, when the top is placed too) is not a seat of its own.
+        for (size_t i = 0; i < placed.size();)
+        {
+            const collection::Figure& half = placed[i].figure;
+            bool follows = false;
+            if (half.IsSwapBottom() && !half.partner.empty())
+                for (const Placed& other : placed)
+                    follows = follows || (other.figure.IsSwapTop() && other.figure.file == half.partner);
+            if (follows)
+                placed.erase(placed.begin() + i);
+            else
+                i++;
+        }
+        for (Placed& p : placed)
+            p.slot = SlotSeat(game, p.slot);
         std::vector<bool> done(placed.size());
         for (size_t i = 0; i < placed.size(); i++)
         {
@@ -81,14 +116,22 @@ namespace launcher_ui
         return seats;
     }
 
-    bool WriteSeats(const std::string& file, const std::vector<std::string>& seats)
+    bool WriteSeats(const collection::Game& game, const std::string& file, const std::vector<std::string>& seats)
     {
         if (file.empty())
             return false;
         std::string text;
         for (size_t i = 0; i < seats.size(); i++)
-            if (!seats[i].empty())
-                text += fmt::format("{} {}\n", i, seats[i]);
+        {
+            if (seats[i].empty())
+                continue;
+            int slot = SeatFirstSlot(game, i);
+            text += fmt::format("{} {}\n", slot, seats[i]);
+            // A swapper's bottom goes in the slot after its top.
+            collection::Figure top;
+            if (TwoSlotSeats(game) && i < 2 && collection::Read(seats[i], top) && top.IsSwapTop() && !top.partner.empty())
+                text += fmt::format("{} {}\n", slot + 1, collection::PathOf(top.partner));
+        }
         std::error_code error;
         fs::create_directories(fs::path(file).parent_path(), error);
         return SDL_SaveFile(file.c_str(), text.data(), text.size());
@@ -264,7 +307,7 @@ namespace launcher_ui
                 if (other == path)
                     other.clear();
         seats[seat] = path;
-        if (!WriteSeats(SessionFile(*Game()), seats))
+        if (!WriteSeats(*Game(), SessionFile(*Game()), seats))
             return false;
         m_signature = Signature();
         return true;
@@ -288,6 +331,16 @@ namespace launcher_ui
         return true;
     }
 
+    bool CollectionModel::DeleteCard(const std::string& path, std::string* error)
+    {
+        const collection::Figure* figure = Find(path);
+        std::string other = figure != nullptr && !figure->partner.empty() ? collection::PathOf(figure->partner) : std::string();
+        if (!Delete(path, error))
+            return false;
+        // Deleting the first half cut the link; the other half goes too, and its seat.
+        return other.empty() || Find(other) == nullptr || Delete(other, error);
+    }
+
     std::vector<collection::Section> CollectionModel::Shelf(const ShelfFilter& filter, std::vector<collection::Figure>& shown, int* hidden) const
     {
         const collection::Game* game = Game();
@@ -301,10 +354,14 @@ namespace launcher_ui
         shown.clear();
         if (hidden != nullptr)
             *hidden = 0;
-        for (const collection::Figure& figure : figures)
+        // A swapper is one card: a half the filters let through brings the other half with it.
+        std::vector<char> passes(figures.size(), 0), hiddenStarter(figures.size(), 0);
+        for (size_t i = 0; i < figures.size(); i++)
         {
+            const collection::Figure& figure = figures[i];
             if (std::find(seated.begin(), seated.end(), figure.path) == seated.end() && collection::UntouchedStarter(figure))
             {
+                hiddenStarter[i] = 1;
                 if (hidden != nullptr)
                     (*hidden)++; // the game made it on its own: not the player's (Manage > Tidy)
                 continue;
@@ -327,7 +384,20 @@ namespace launcher_ui
                 if (lower(words).find(text) == std::string::npos)
                     continue;
             }
-            shown.push_back(figure);
+            passes[i] = 1;
+        }
+        std::map<std::string, size_t> byFile;
+        for (size_t i = 0; i < figures.size(); i++)
+            if (!figures[i].partner.empty())
+                byFile[figures[i].file] = i;
+        for (size_t i = 0; i < figures.size(); i++)
+        {
+            bool partnerPasses = false;
+            if (!figures[i].partner.empty())
+                if (auto other = byFile.find(figures[i].partner); other != byFile.end())
+                    partnerPasses = passes[other->second] != 0;
+            if (!hiddenStarter[i] && (passes[i] || partnerPasses))
+                shown.push_back(figures[i]);
         }
         return collection::Group(shown, collection::GroupBy::Smart, collection::OrderBy::Recent, gameId);
     }

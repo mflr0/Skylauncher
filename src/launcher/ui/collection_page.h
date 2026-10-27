@@ -28,6 +28,8 @@ namespace launcher_ui
     bool French();                                              // the launcher shows French (the library's own French texts)
     unsigned ElementInk(collection::Element element); // 0xRRGGBB
     std::string Lower(std::string text);
+    // "Doom Stone" for "Doom Stone (top)" or "(bottom)": a swapper's halves are named after it.
+    std::string WithoutHalf(std::string name);
 
     // A figure's picture: the disc's portrait, or a generated icon (the page writes the initials over those).
     struct FigureIconTexture
@@ -86,6 +88,8 @@ namespace launcher_ui
         void DrawFigureFacts(const collection::Figure& figure, float width);
         void DrawDetails(const collection::Figure& figure);
         void DrawEditStats(const collection::Figure& figure);
+        void DrawChangeHalf(ImVec2 size);
+        void ChangeHalf(const collection::Figure& keep, const collection::Figure& replacement);
         void DrawUpgradeEditor(const collection::Figure& figure);
         void OpenEdit(const collection::Figure& figure);
         void DeleteFigure(const std::string& path);
@@ -102,6 +106,10 @@ namespace launcher_ui
         // `box` at `at` and centred; the drawn icon when there is none.
         void DrawPicture(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, uint16_t variant, ImVec2 at, float box);
         const FigureIconTexture& Icon(const collection::Toy* toy, collection::VariantKind kind, bool large);
+        // A swapper (Swap Force) is one card: the top stands for it, the bottom is drawn small at its corner.
+        collection::Card CardOf(const collection::Figure& figure) const;
+        bool Busy(const collection::Figure& figure) const { return CardOf(figure).Busy(); }
+        void DrawBottom(ImDrawList* draw, const collection::Figure& bottom, ImVec2 at, float size);
         void CloseOverlay();
         void Toast(const std::string& text, bool error = false);
 
@@ -157,6 +165,7 @@ namespace launcher_ui
         Overlay m_overlay = Overlay::None;
         std::string m_figure;           // the figure sheet's dump
         bool m_details = false;         // the sheet's Details are open
+        std::string m_changeKeep;       // "Change the bottom/top": the half the card keeps while the other is chosen
         bool m_editing = false;
         figures::FigureStats m_edit;
         figures::FigureStats m_editBase; // as read when Edit stats opened: Save writes back only what changed since
