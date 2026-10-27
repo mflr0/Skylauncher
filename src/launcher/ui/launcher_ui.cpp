@@ -44,7 +44,7 @@ namespace launcher_ui
             constexpr const char* PlayWith = N_("PLAY WITH");
             constexpr const char* DiscGone = N_("The disc image isn't there. Choose it again.");
             constexpr const char* LauncherLanguageHint = N_("Skylauncher's own language. \"Same as the game\" follows its text language.");
-            constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds, shared by both games.");
+            constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds, shared by all games.");
             constexpr const char* GameSettings = N_("Game settings");
             constexpr const char* ResetKeys = N_("Reset to defaults");
             constexpr const char* ResetKeysHint = N_("Hold to reset every key.");
@@ -1955,7 +1955,7 @@ namespace launcher_ui
         Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("For Skylauncher and both games."));
+        ImGui::TextUnformatted(Tr("For Skylauncher and all games."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
@@ -3159,7 +3159,7 @@ std::span<const LauncherGameEntry> LauncherGameCatalog()
     static const LauncherGameEntry catalog[] = {
         { "ssa", "Spyro's Adventure", "Spyro's Adventure", 0x6BBAFF, true },
         { "giants", "Giants", "Giants", 0xFFC65C, true },
-        { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, false },
+        { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, true },
         { "trapteam", "Trap Team", "Trap Team", 0x6DF0B4, false },
         { "superchargers", "SuperChargers", "SuperChargers", 0xFF8A5C, false },
         { "racing", "SuperChargers Racing", "SuperChargers Racing", 0xE85D75, false },

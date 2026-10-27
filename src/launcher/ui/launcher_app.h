@@ -84,6 +84,8 @@ namespace launcher_ui
     inline constexpr Choice GiantsLanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
         { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" }, { "sv", "Svenska" },
         { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
+    // Swap Force's disc has English and French.
+    inline constexpr Choice SwapForceLanguageChoices[] = { { "en", "English" }, { "fr", "Français" } };
     inline constexpr Choice GiantsVoiceChoices[] = { { "", N_("Same as text") }, { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" },
         { "es", "Español" }, { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" },
         { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };

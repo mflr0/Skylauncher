@@ -324,7 +324,7 @@ LauncherArguments ParseLauncherArguments(int argc, const char* const* argv)
 const char* LauncherUsage()
 {
     return "Skylauncher [--game <id>] [--play]\n\n"
-           "  --game <id>  open on that game's page: ssa (Spyro's Adventure) or giants (Giants)\n"
+           "  --game <id>  open on that game's page: ssa (Spyro's Adventure), giants (Giants) or swapforce (Swap Force)\n"
            "  --play       start the game as soon as its disc is checked (what a desktop shortcut runs)\n"
            "  --help       show this";
 }

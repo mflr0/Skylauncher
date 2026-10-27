@@ -17,11 +17,19 @@ namespace
         { "USA, Europe", 0x415608DA, 0x52FFE94B, 0x00000002, "12d1e29e4f07fbc559bc1a4988dd6bf346c3d16e30cbf862e2683e862f9fc09e" },
     };
 
+    const GameRelease SwapForceReleases[] =
+    {
+        // Redump "Skylanders - Swap Force (USA, Australia) (En,Fr)", XGD3, 8738846720 bytes.
+        // SHA-256 of its default.xex (18563072 bytes), computed from the player's image.
+        { "USA, Australia", 0x415608E9, 0x22F1FB91, 0x00000021, "5d9a3bc3c2d85ed59684a9c5f94daf6bffcfdfedcef7650a866737edbf3f4ac3" },
+    };
+
     // `runtime` is the executable the player kit builds for the game (its config/<id>/game.txt).
     const GameInfo Games[] =
     {
         { "ssa", "Skylanders: Spyro's Adventure", SpyrosAdventureReleases, "SSARecomp" },
         { "giants", "Skylanders: Giants", GiantsReleases, "SGRecomp" },
+        { "swapforce", "Skylanders: Swap Force", SwapForceReleases, "SSFRecomp" },
     };
 }
 

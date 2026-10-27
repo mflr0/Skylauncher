@@ -72,7 +72,7 @@ int main(int argc, char** argv)
     // window to it in place; the game that was shown when PLAY was pressed is the one that runs.
     const GameInfo* game = arguments.game.empty() ? FindGame(config["launcher"]["game"]) : FindGame(arguments.game);
     if (!arguments.game.empty() && game == nullptr)
-        fprintf(stderr, "launcher: no game called \"%s\" (ssa or giants)\n", arguments.game.c_str());
+        fprintf(stderr, "launcher: no game called \"%s\" (ssa, giants or swapforce)\n", arguments.game.c_str());
     if (game == nullptr)
         game = FindGame(config["launcher"]["game"]);
     if (game == nullptr)

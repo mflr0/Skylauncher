@@ -22,7 +22,7 @@ struct InstallKit
     std::filesystem::path ssabuild; // the kit's SSABuild executable
     std::string release;            // "version=" in kit.txt: the release it came from, "" when it has none
     std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
-    std::vector<std::string> games; // "games=" in kit.txt: what the kit builds ("ssa", "giants"); a kit before 0.5.0 has none: SSA only
+    std::vector<std::string> games; // "games=" in kit.txt: what the kit builds ("ssa", "giants", "swapforce"); a kit before 0.5.0 has none: SSA only
     std::string tag;                // the release it was downloaded from (its kit/<tag>/ folder), "" for any other kit
     bool chosen = false;            // SKYLAUNCHER_KIT or "[launcher] kit=": the player's own, never replaced by the launcher
 
@@ -53,7 +53,7 @@ std::optional<InstallKit> FindInstallKit(const LauncherConfig& config, std::stri
 // `overrideOnly` keeps only SKYLAUNCHER_RUNTIME, which wins over an installed game.
 std::string FindRuntime(const GameInfo& game, const LauncherConfig& config, bool overrideOnly = false);
 
-// The game the launcher is showing ("ssa", "giants": GameInfo::id). Set by main() before a game's window opens; the
+// The game the launcher is showing ("ssa", "giants", "swapforce": GameInfo::id). Set by main() before a game's window opens; the
 // functions below that take no game (GameInstallFolder, the log folders) answer for it. "ssa" until set.
 void SetActiveGame(std::string_view id);
 std::string_view ActiveGame();

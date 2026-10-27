@@ -21,6 +21,8 @@ namespace LauncherTheme
             return SpyrosAdventureStyle;
         if (game != nullptr && strcmp(game, "giants") == 0)
             return GiantsStyle;
+        if (game != nullptr && strcmp(game, "swapforce") == 0)
+            return SwapForceStyle;
         return Launcher;
     }
 }
