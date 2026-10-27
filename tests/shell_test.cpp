@@ -230,6 +230,14 @@ namespace
             SDL_Delay(20);
     }
 
+    void ParseGamesManifestChecks()
+    {
+        std::vector<GameUpdate> games;
+        SHELL_EXPECT(ParseGamesManifest(R"({"games":[{"id":"ssa","version":"0.9.0","kit":"v1","notes":"a"},{"id":"","version":"1.0.0"},{"id":"g","version":"x"}]})", games));
+        SHELL_EXPECT(games.size() == 1 && games[0].id == "ssa" && games[0].version == "0.9.0" && games[0].kit == "v1" && games[0].notes == "a");
+        SHELL_EXPECT(!ParseGamesManifest("not json", games) && !ParseGamesManifest("{}", games));
+    }
+
     void UpdaterChecks(const std::filesystem::path& scratch)
     {
         // Versions.
@@ -307,11 +315,10 @@ namespace
         SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r1" / "latest.json").c_str(), true);
         UpdateManager manager;
         UpdateManager::Settings settings;
-        settings.kitInstalled = "1.0.0";
         manager.Check(settings);
         WaitFor(manager);
         UpdateManager::State state = manager.Snapshot();
-        SHELL_EXPECT(state.checked && state.launcherNewer && state.launcher.tag == "v99.0.0" && !state.kitNewer && state.phase == UpdateManager::Phase::Idle);
+        SHELL_EXPECT(state.checked && state.launcherNewer && state.launcher.tag == "v99.0.0" && state.games.empty() && state.phase == UpdateManager::Phase::Idle);
         MakeRelease(updates / "r4", "v0.0.1", { { "Skylauncher.exe", "x" } }, {});
         SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r4" / "latest.json").c_str(), true);
         manager.Check(settings);
@@ -322,25 +329,28 @@ namespace
         WaitFor(manager);
         SHELL_EXPECT(!manager.Snapshot().checked && !manager.Snapshot().checkError.empty());
 
-        // Kit update: a release with the kit asset, a newer tag than the installed kit.
-        std::string kitZip = MakeZip(updates / "kitasset" / KitAssetName(), { { "SSABuild", "kit v2" }, { "SSABuild.exe", "kit v2" }, { "kit.txt", "version=2.0.0\nbuild=b2\n" } });
-        MakeRelease(updates / "r5", "v2.0.0", { { KitAssetName(), kitZip } }, {});
+        // Game updates: a release whose games.json lists each game's version (here Giants alone is ahead of what is built);
+        // read like the other assets (SHA256SUMS), refused if its hash is wrong, absent: no game updates and no complaint.
+        ParseGamesManifestChecks();
+        std::string manifest = R"({"games":[{"id":"ssa","version":"0.9.0","kit":"v2.0.0","notes":""},{"id":"giants","version":"0.8.2","kit":"v2.0.0","notes":"Fixes a thing."},{"id":"x","version":"?"}]})";
+        MakeRelease(updates / "r5", "v2.0.0", { { GamesManifestName, manifest }, { "Skylauncher.exe", "x" } }, {});
         SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r5" / "latest.json").c_str(), true);
         settings.kitRepo = "someone/kit";
-        settings.kitFolder = updates / "kitdest" / "ssa-kit";
-        WriteBytes(settings.kitFolder / "SSABuild", "kit v1");
         manager.Check(settings);
-        WaitFor(manager);
-        SHELL_EXPECT(manager.Snapshot().kitNewer && manager.Snapshot().kit.tag == "v2.0.0");
-        manager.UpdateKit();
         WaitFor(manager);
         state = manager.Snapshot();
-        SHELL_EXPECT(state.phase == UpdateManager::Phase::Done && !state.kitNewer && ReadBytes(settings.kitFolder / "SSABuild") == "kit v2");
-        SHELL_EXPECT(ReadBytes(settings.kitFolder / "kit.txt").find("build=b2") != std::string::npos);
-        settings.kitInstalled = "v2.0.0";
+        SHELL_EXPECT(state.checked && state.games.size() == 2 && state.games[1].id == "giants" && state.games[1].version == "0.8.2" &&
+            state.games[1].kit == "v2.0.0" && state.games[1].notes == "Fixes a thing.");
+        MakeRelease(updates / "r5b", "v2.0.0", { { GamesManifestName, manifest } }, { { GamesManifestName, std::string(64, 'c') } });
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r5b" / "latest.json").c_str(), true);
         manager.Check(settings);
         WaitFor(manager);
-        SHELL_EXPECT(!manager.Snapshot().kitNewer);
+        SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a wrong hash: no updates offered
+        MakeRelease(updates / "r5c", "v2.0.0", { { "Skylauncher.exe", "x" } }, {});
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_UPDATE_URL", FileUrl(updates / "r5c" / "latest.json").c_str(), true);
+        manager.Check(settings);
+        WaitFor(manager);
+        SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a release without the manifest
         // The kit download INSTALL starts with: the release of this launcher's tag, else the latest, verified, then found.
         auto setEnv = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
@@ -609,9 +619,10 @@ namespace
 
 // The kit of a fake release for SkylauncherTest's launcher checks (tests/launcher_test.cpp): `kitFolder`'s files in a zip, as the kit
 // asset of a release for each of `tags`, the last one the latest; `<tag>.json` is the release of that tag, as the launcher asks for
-// its own. `folder` is what SKYLAUNCHER_UPDATE_URL points into. Where `zip` exists the Unix modes are kept (so the kit's SSABuild
+// its own; `gamesJson` (when not empty) is the release's games.json. `folder` is what SKYLAUNCHER_UPDATE_URL points into. Where `zip` exists the Unix modes are kept (so the kit's SSABuild
 // runs once unpacked).
-void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder)
+void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder,
+    const std::string& gamesJson)
 {
     std::filesystem::create_directories(folder);
     std::filesystem::path zip = folder / KitAssetName();
@@ -636,7 +647,10 @@ void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::
     std::string bytes = ReadBytes(zip);
     for (const std::string& tag : tags)
     {
-        MakeRelease(folder, tag, { { KitAssetName(), bytes } }, {});
+        std::map<std::string, std::string> assets{ { KitAssetName(), bytes } };
+        if (!gamesJson.empty())
+            assets[GamesManifestName] = gamesJson;
+        MakeRelease(folder, tag, assets, {});
         std::filesystem::copy_file(folder / "latest.json", folder / (tag + ".json"), std::filesystem::copy_options::overwrite_existing);
     }
 }

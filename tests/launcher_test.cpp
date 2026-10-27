@@ -765,7 +765,8 @@ void EditChecks()
 }
 
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
-void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder); // tests/shell_test.cpp
+void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder,
+    const std::string& gamesJson = {}); // tests/shell_test.cpp
 int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
 int I18nChecks(); // tests/i18n_test.cpp
 int CopyChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso); // tests/copy_test.cpp
@@ -845,26 +846,37 @@ static void KitFlowChecks(const std::filesystem::path& scratch, const std::strin
     fs::remove_all(scratch / "kitflow");
     fs::create_directories(newKit.parent_path());
     fs::copy(SKYLAUNCHER_FAKE_KIT, newKit, fs::copy_options::recursive);
-    std::ofstream(newKit / "kit.txt") << "version=0.5.0\nbuild=kit-new\ngames=ssa,giants\n";
     SemVer next = ParseSemVer(LauncherVersion());
     std::string nextTag = "v" + std::to_string(next.major) + "." + std::to_string(next.minor) + "." + std::to_string(next.patch + 1);
+    std::string nextVersion = nextTag.substr(1);
+    std::ofstream(newKit / "kit.txt") << "version=0.5.0\nbuild=kit-new\ngames=ssa,giants\ngame_version.ssa=0.9.0\ngame_version.giants=0.8.0\n";
     MakeKitRelease(scratch / "kitflow" / "release", { "v" + LauncherVersion(), nextTag }, newKit);
+    // A release that bumps Giants only: its kit says Giants 0.8.1, its games.json too, and Spyro's Adventure stays at 0.9.0.
+    fs::path newerKit = scratch / "kitflow" / "kit-newer";
+    fs::copy(SKYLAUNCHER_FAKE_KIT, newerKit, fs::copy_options::recursive);
+    std::ofstream(newerKit / "kit.txt") << "version=" << nextVersion << "\nbuild=kit-new\ngames=ssa,giants\ngame_version.ssa=0.9.0\ngame_version.giants=0.8.1\n";
+    MakeKitRelease(scratch / "kitflow" / "release-updates", { nextTag }, newerKit,
+        R"({"games":[{"id":"ssa","version":"0.9.0","kit":")" + nextTag + R"(","notes":""},{"id":"giants","version":"0.8.1","kit":")" + nextTag +
+            R"(","notes":"Fixes a crash in the Toy Box."}]})");
 
     struct Case { const char* mode; const char* kitText; };
     const Case cases[] = {
         { "old", "version=0.3.1\nbuild=old\n" },                       // a kit from before this launcher: SSA only
         { "giants", "version=9.0.0\nbuild=old\ngames=ssa\n" },         // recent enough, but it cannot build Giants
-        { "start", "version=0.3.1\nbuild=old\n" },
+        // The kit at hand is the launcher's own release, with Spyro's Adventure 0.9.0 and Giants 0.8.0: both games are built from it.
+        { "updates", nullptr },
+        { "offline", nullptr },
     };
     for (const Case& test : cases)
     {
-        if (std::string_view(test.mode) == "giants" && giantsIso.empty())
+        if ((std::string_view(test.mode) == "giants" || std::string_view(test.mode) == "updates") && giantsIso.empty())
             continue;
         fs::path root = scratch / "kitflow" / test.mode;
         fs::create_directories(root / "shots");
         fs::create_directories(root / "base");
         fs::copy(SKYLAUNCHER_FAKE_KIT, root / "base" / "ssa-kit-test", fs::copy_options::recursive);
-        std::ofstream(root / "base" / "ssa-kit-test" / "kit.txt") << test.kitText;
+        std::ofstream(root / "base" / "ssa-kit-test" / "kit.txt") << (test.kitText != nullptr ? std::string(test.kitText)
+            : "version=" + LauncherVersion() + "\nbuild=at-hand\ngames=ssa,giants\ngame_version.ssa=0.9.0\ngame_version.giants=0.8.0\n");
         set("SDL_VIDEO_DRIVER", "offscreen");
         set("SDL_AUDIO_DRIVER", "dummy");
         set("SKYLANDERS_DATA", (root / "data").string());
@@ -872,7 +884,8 @@ static void KitFlowChecks(const std::filesystem::path& scratch, const std::strin
         set("SSA_COLLECTION", (root / "collection").string());
         set("SKYLAUNCHER_NO_UPDATE_CHECK", "1");
         set("SKYLAUNCHER_BASE_PATH", (root / "base").string());
-        set("SKYLAUNCHER_UPDATE_URL", "file://" + (scratch / "kitflow" / "release" / "latest.json").string());
+        bool updates = std::string_view(test.mode) == "updates", offline = std::string_view(test.mode) == "offline";
+        set("SKYLAUNCHER_UPDATE_URL", "file://" + (scratch / "kitflow" / (updates ? "release-updates" : offline ? "no-release" : "release") / "latest.json").string());
         set("FAKE_SSABUILD_DELAY", "0.01");
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_KIT");
@@ -933,8 +946,10 @@ int main(int argc, char** argv)
         fprintf(stderr, "usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]\n");
         return 2;
     }
-    // The text the windows are checked against is English, whatever language the computer is in.
-    SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LANGUAGE", "en", true);
+    // The text the windows are checked against is English, whatever language the computer is in (SKYLAUNCHER_TEST_LANGUAGE=fr
+    // only takes screenshots in another language: the text checks then fail).
+    const char* testLanguage = std::getenv("SKYLAUNCHER_TEST_LANGUAGE");
+    SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKYLAUNCHER_LANGUAGE", testLanguage != nullptr && *testLanguage != 0 ? testLanguage : "en", true);
     std::filesystem::path iso = argv[1];
     std::filesystem::path scratch = std::filesystem::path(argv[2]) / "launcher_test";
     std::filesystem::remove_all(scratch);
