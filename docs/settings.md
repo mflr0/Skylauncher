@@ -14,14 +14,15 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `launcher` | `reduce_motion` | `auto`, `0`, `1` | The logo's fall on the game page (`docs/launcher_ui.md`): `auto` follows the system (macOS Reduce motion, Windows animation effects), `1` never animates, `0` always does | n/a |
 | `launcher` | `runtime` | path | The game runtime to start, if not next to the launcher | n/a |
 | `launcher` | `kit` | folder | The player kit that installs the game, if not next to the launcher (`docs/install.md`) | n/a |
-| `update` | `auto_check` | `0`, `1` | Look for a new Skylauncher once a day at start (default 1; `docs/updates.md`) | n/a |
+| `update` | `auto_check` | `0`, `1` | Look for a new Skylauncher and for game updates at every start (default 1; `docs/updates.md`) | n/a |
 | `update` | `last_check` | epoch seconds | When the last check ran | n/a |
 | `update` | `repo` | `owner/name` | Where Skylauncher's releases are (default `mflr0/Skylauncher`) | n/a |
-| `update` | `kit_repo` | `owner/name` | Where the player kit's releases are; empty: no kit updates | n/a |
-| `update` | `kit_tag` | text | The release of the installed kit, written after a kit update | n/a |
-| `update` | `kit_fetched` | release tag | The launcher release whose kit was fetched at start or by INSTALL: not asked again for it (docs/updates.md) | n/a |
+| `update` | `kit_repo` | `owner/name` | Where the player kit's releases and `games.json` are; empty: no game updates | n/a |
+| `update` | `kit_tag` | text | The release of the installed kit, written after a kit download | n/a |
+| `update` | `kit_fetched` | release tag | The release whose kit INSTALL or UPDATE fetched: not asked again for it (docs/updates.md) | n/a |
 | `install.<sha256>` | `runtime` | path | The game the launcher built for the disc whose `default.xex` has this SHA-256 | n/a |
-| `install.<sha256>` | `kit` | text | The kit version it was built with; another kit offers "Update the game" | n/a |
+| `install.<sha256>` | `kit` | text | The kit version it was built with | n/a |
+| `install.<sha256>` | `version` | `0.8.2` | The game's version when it was built (from the kit's `kit.txt`); UPDATE is offered when the release's `games.json` has a higher one | n/a |
 | `install.<sha256>` | `state`, `pid` | `running`, `failed`; process id | An install that runs or stopped: shown again after a restart | n/a |
 | `ssa` | `iso` | path | The verified disc image | yes |
 | `ssa` | `language` | `en` `fr` `de` `es` `it` `nl` `sv` `no` `da` `fi` | Text language | yes |

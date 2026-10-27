@@ -92,7 +92,7 @@ Portal of Power. Then click **Test the portal**.
 - Everything is in one "Skylanders" folder: `%APPDATA%\Skylanders\` on Windows, `~/Library/Application Support/Skylanders/`
   on Mac, `~/.local/share/Skylanders/` on Linux. The logs are in its `logs/` and `SSA/` folders.
 - If the game stops with an error, a window offers Copy log and Report.
-- Updates are offered at start, at most once a day. Every download is checked against the release's SHA-256.
+- Updates (Skylauncher's and each game's) are looked for at every start; an offline start says nothing. Every download is checked against the release's SHA-256.
 
 ## Build from source
 

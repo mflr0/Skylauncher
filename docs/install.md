@@ -36,7 +36,7 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
      `install.log` ("Installation interrupted", **Resume**; Resume waits for an SSABuild that is still running).
 4. `@done <path>` and exit code 0: the path is saved for that disc and PLAY appears. On Windows SDL cannot report the
    exit code of a process started without a console window, so there `@done` alone means success.
-5. When the kit changes (another `build=` in its `kit.txt`), the Play page offers **Update the game**; the game's settings
+5. When the release publishes a newer version of the game than the one built (`games.json`, `docs/updates.md`), the Play page's button is **UPDATE**, with a small link **Play without updating** under it; the game's settings
    (Settings button on its Play page) > Game has **Reinstall** (held a second), **Remove game** and
    **Game files**. SSABuild is incremental, so a reinstall is quick when little changed.
 
@@ -127,7 +127,7 @@ in `logs/migration.log`. The full table and rules: SSARecomp's `docs/settings.md
 from 0.3.1 on leave `layout.txt` in the game folder. When PLAY starts a game under `SSA/` without it, the launcher points
 it at the new places through variables that build already reads: `SSA_LAUNCHER_INI` (the root's `launcher.ini`),
 `SSA_SAVE_DIR` (`SSA/saves`; that build also keeps `pipelines.bin` and `portal.txt` there), `SSA_LOG` and
-`SSA_PORTRAITS`. A `launcher-cache` it makes again in the old folder is dropped at the next start. "Update the game"
+`SSA_PORTRAITS`. A `launcher-cache` it makes again in the old folder is dropped at the next start. UPDATE
 rebuilds it with the new kit and ends this.
 
 ### Delete data, uninstall

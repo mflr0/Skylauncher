@@ -116,8 +116,7 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 | State | Sidebar and Home line | Dot | Main button |
 |---|---|---|---|
 | never shown this session | Open | blue | CHOOSE DISC |
-| the kit being downloaded | `Downloading tools 42 %` | blue | INSTALLING... (off) |
-| the kit renewed at start or after an update (a verified disc) | `Downloading tools 42 %` | blue | INSTALL (off), or PLAY |
+| the kit being downloaded (the first step of an install or an update) | `Downloading tools 42 %` | blue | INSTALLING... (off) |
 | installing; its last step | `Installing 42 %`; `Finishing 97 %` | blue | INSTALLING... (off) |
 | updating a build; its last step | `Updating 42 %`; `Finishing 97 %` | blue | UPDATING... (off) |
 | the disc being checked | Checking your disc | blue | CHECKING... (off) |
@@ -127,12 +126,18 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 | another game's disc | Wrong disc | red | CHOOSE DISC |
 | this game, a release no build exists for | Unknown release | red | CHOOSE DISC |
 | a folder, not an Xbox 360 game, damaged | Not a game disc | red | CHOOSE DISC |
-| the last install failed (no build); the last update failed (a build) | Install failed; Update failed | red | INSTALL; PLAY |
+| the last install failed (no build); the last update failed (a build) | Install failed; Update failed | red | INSTALL; UPDATE (or PLAY) |
 | the install was interrupted | Interrupted | blue | INSTALL, or PLAY if built |
 | the copied game data is damaged, and no disc image to fall back on | Game data damaged | red | CHOOSE DISC |
 | a verified disc, no build yet | Ready to install | blue | INSTALL |
-| the kit moved on since the build | Update available | blue | PLAY |
+| the release has a newer version of the game than the one built (`games.json`), not set aside with "Play without updating" | Update available | blue | UPDATE |
 | verified disc and built (or an own runtime) | Ready to play | green | PLAY |
+
+**UPDATE** (`docs/updates.md`): the page says the version built and the one on offer ("Update 0.8.0 to 0.8.1: no download, up to
+about 15 min.", the release's notes for the game under it) and the main button reads UPDATE; one click fetches the kit if it is
+needed, rebuilds the game (SSABuild is incremental) and PLAY is back. Under the button a small link, **Play without updating**,
+plays what is built (offline, in a hurry): it sets the offer aside until the launcher is closed. The game's version ("Giants 0.8.2")
+is the first line of the disc's lines on the page. No tools are ever downloaded without a click on INSTALL or UPDATE.
 
 "Ready to play" needs both the build and a verified source: the disc image, **or the copied game data** ("Game data" below).
 With no source or a refused one the game says what it needs, even if it was built (the game reads the disc image while it runs). The Play page's disc line says more
