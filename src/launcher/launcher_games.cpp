@@ -22,6 +22,8 @@ namespace
         // Redump "Skylanders - Swap Force (USA, Australia) (En,Fr)", XGD3, 8738846720 bytes.
         // SHA-256 of its default.xex (18563072 bytes), computed from the player's image.
         { "USA, Australia", 0x415608E9, 0x22F1FB91, 0x00000021, "5d9a3bc3c2d85ed59684a9c5f94daf6bffcfdfedcef7650a866737edbf3f4ac3" },
+        // Redump "Skylanders - Swap Force (Europe) (Es,It)", XGD3, 8738846720 bytes: the same game code, another XEX header.
+        { "Europe", 0x415608E9, 0x74FDDE06, 0x0000001C, "3db455f6ee17e8cb3a4d58873d96583d9160396d360a0130e5eb88adad8a5518" },
     };
 
     // `runtime` is the executable the player kit builds for the game (its config/<id>/game.txt).
