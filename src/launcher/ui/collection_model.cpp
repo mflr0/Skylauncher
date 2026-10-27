@@ -1,4 +1,5 @@
 #include "launcher/ui/collection_model.h"
+#include "shared/dir_list.h"
 #include "shared/collection/datadir.h"
 #include "shared/collection/json.h"
 #include <SDL3/SDL.h>
@@ -203,7 +204,7 @@ namespace launcher_ui
         // whether each lock's process still runs: a game that quits leaves its locks behind (docs/collection.md).
         std::string signature;
         std::error_code error;
-        for (const fs::directory_entry& entry : fs::directory_iterator(collection::Folder(), error))
+        for (const fs::directory_entry& entry : ListDirectory(collection::Folder(), error))
         {
             if (!entry.is_regular_file(error))
                 continue;

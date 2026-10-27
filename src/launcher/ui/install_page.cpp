@@ -177,11 +177,19 @@ namespace launcher_ui
     {
         if (m_kitRefresh.Running() || AnyInstalling())
             return;
-        std::optional<InstallKit> kit = FindInstallKit(m_config);
-        if (!kit || !KitOlderThanLauncher(*kit, tag) || SettingGet(m_config, "update", "kit_fetched") == tag)
-            return;
-        m_kitRefresh.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), tag, DownloadedKitsFolder());
-        m_kitRefreshTag = tag;
+        try
+        {
+            std::optional<InstallKit> kit = FindInstallKit(m_config);
+            if (!kit || !KitOlderThanLauncher(*kit, tag) || SettingGet(m_config, "update", "kit_fetched") == tag)
+                return;
+            m_kitRefresh.Start(SettingGet(m_config, "update", "kit_repo", "mflr0/Skylauncher"), tag, DownloadedKitsFolder());
+            m_kitRefreshTag = tag;
+        }
+        catch (const std::filesystem::filesystem_error& e)
+        {
+            // A folder the system refuses to list must not stop the launcher: carry on without refreshing the kit.
+            SDL_Log("Kit refresh skipped: %s", e.what());
+        }
     }
 
     void App::PollKitRefresh()
