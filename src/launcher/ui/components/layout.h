@@ -28,6 +28,7 @@ namespace ui
         bool selected = false;
         bool disabled = false;
         float width = -1;
+        float leading = 0; // room kept at the left, after the padding, for a picture the caller draws there (a figure's)
     };
     bool ListRow(const char* title, const ListRowOptions& options = {});
 
@@ -57,7 +58,9 @@ namespace ui
         ModalKind kind = ModalKind::Normal);
 
     // ---- Menu: a popover under the item that opens it, with its rows. ----
-    void OpenMenu(const char* id); // after the item that opens it: the menu opens under that item
+    // After the item that opens it: the menu opens under that item, its left edge on the item's (`alignRight`: its right edge
+    // on the item's, for an opener at the window's right).
+    void OpenMenu(const char* id, bool alignRight = false);
     bool BeginMenu(const char* id);
     struct MenuItemOptions
     {

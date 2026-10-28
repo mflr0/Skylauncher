@@ -44,7 +44,7 @@ namespace ui
         if (options.selected)
             draw->AddRectFilled(min, ImVec2(min.x + stroke::Selection + 2, max.y), Col(color::Selected), radius::Control, ImDrawFlags_RoundCornersLeft);
 
-        float x = min.x + space::S, right = max.x - space::S;
+        float x = min.x + space::S + options.leading, right = max.x - space::S;
         const float mid = std::round((min.y + max.y) / 2);
         if (options.icon != Icon::None)
         {
@@ -270,15 +270,16 @@ namespace ui
 
     namespace
     {
-        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59; // "MENX", "MENY": where a menu opens, by its id
+        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59, AnchorR = 0x4D454E5A; // "MENX", "MENY", "MENZ": where a menu opens, by its id
         constexpr float IconSlot = space::L; // a menu row's room for its icon or check, kept when it has none (the labels align)
     }
 
-    void OpenMenu(const char* id)
+    void OpenMenu(const char* id, bool alignRight)
     {
         ImGuiStorage* storage = ImGui::GetStateStorage();
         const ImGuiID key = ImGui::GetID(id);
-        storage->SetFloat(key ^ AnchorX, ImGui::GetItemRectMin().x);
+        storage->SetFloat(key ^ AnchorR, alignRight ? 1.0f : 0.0f);
+        storage->SetFloat(key ^ AnchorX, alignRight ? ImGui::GetItemRectMax().x : ImGui::GetItemRectMin().x);
         storage->SetFloat(key ^ AnchorY, ImGui::GetItemRectMax().y + space::XS);
         ImGui::OpenPopup(id);
     }
@@ -288,7 +289,8 @@ namespace ui
         ImGuiStorage* storage = ImGui::GetStateStorage();
         const ImGuiID key = ImGui::GetID(id);
         if (ImGui::IsPopupOpen(id))
-            ImGui::SetNextWindowPos(ImVec2(storage->GetFloat(key ^ AnchorX), storage->GetFloat(key ^ AnchorY)), ImGuiCond_Appearing);
+            ImGui::SetNextWindowPos(ImVec2(storage->GetFloat(key ^ AnchorX), storage->GetFloat(key ^ AnchorY)), ImGuiCond_Appearing,
+                ImVec2(storage->GetFloat(key ^ AnchorR), 0));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(space::XS, space::XS));
         ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, radius::Control);
         ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, elevation::Raised.border);
