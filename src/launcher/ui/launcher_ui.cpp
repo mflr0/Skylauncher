@@ -460,6 +460,27 @@ namespace launcher_ui
 
     // Every opened game's jobs go on while another is shown: each is polled with its own slot (and its game's folders)
     // in place, then the shown one comes back.
+    void App::CheckQueuedDiscs()
+    {
+        // One check at a time: the next starts when no disc is being read (the shown game's first).
+        if (m_discQueue.empty() || AnyVerifying())
+            return;
+        const GameInfo* game = FindGame(m_discQueue.front());
+        m_discQueue.erase(m_discQueue.begin());
+        if (game == nullptr)
+            return;
+        GameSlot& slot = SlotFor(*game);
+        if (slot.started)
+            return;
+        GameSlot* shown = m_s;
+        m_s = &slot;
+        SetActiveGame(game->id);
+        slot.started = true;
+        StartGameDisc();
+        m_s = shown;
+        SetActiveGame(m_s->game.id);
+    }
+
     void App::PollSlots()
     {
         GameSlot* shown = m_s;
@@ -521,6 +542,9 @@ namespace launcher_ui
         {
             m_s->started = true;
             StartGameDisc();
+            for (const LauncherGameEntry& entry : LauncherGameCatalog())
+                if (entry.enabled && FindGame(entry.id) != nullptr && std::string_view(entry.id) != m_s->game.id)
+                    m_discQueue.push_back(entry.id);
         }
         if (m_shots.empty() && LauncherEnv("SKY_LAUNCHER_NO_UPDATE_CHECK") == nullptr)
         {
@@ -539,6 +563,7 @@ namespace launcher_ui
             while (SDL_PollEvent(&event))
                 HandleEvent(event);
             PollSlots();
+            CheckQueuedDiscs();
             PollUpdateAll();
             PollUpdates();
             AutoPlay();

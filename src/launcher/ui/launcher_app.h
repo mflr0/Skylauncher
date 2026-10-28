@@ -465,6 +465,10 @@ namespace launcher_ui
         void PollSlots();
         bool AnyInstalling() const;
         bool AnyVerifying() const;
+        // At start-up, the other games' discs are checked too, one after the other in the background (each as its first
+        // visit would), so every game shows its real state and art at once.
+        std::vector<std::string> m_discQueue;
+        void CheckQueuedDiscs();
         void StartVerify(const std::string& path);
         void StartGameDisc(); // the remembered disc image, or the game's copy when it is complete (game_data_page.cpp)
         void FinishVerify();
