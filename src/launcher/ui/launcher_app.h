@@ -465,6 +465,7 @@ namespace launcher_ui
         void SetDevice(const std::string& value);
         void Screenshot(const char* name);
         void TestScript();
+        void TestScreensScript(uint64_t now);
         void TestInstallScript(uint64_t now);
         void TestUpdateScript(uint64_t now);
         void TestNavScript(uint64_t now);
@@ -544,6 +545,7 @@ namespace launcher_ui
         bool m_uninstalled = false;    // done: the window only shows the result and quits
         bool m_testUninstall = false;  // SKY_LAUNCHER_TEST_UNINSTALL: the uninstall screens
         bool m_testKeys = false;       // SKY_LAUNCHER_TEST_KEYS: each game's Keyboard tab, one shot each
+        int m_testScreens = 0;         // SKY_LAUNCHER_TEST_SCREENS: Home, the game page and its Keyboard tab; 1 with the mouse, 2 with a pad
         bool m_testLogo = false;       // SKY_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
         uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)

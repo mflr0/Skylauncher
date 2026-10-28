@@ -383,6 +383,8 @@ namespace launcher_ui
             m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
             m_testLogo = LauncherEnv("SKY_LAUNCHER_TEST_LOGO") != nullptr;
             m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
+            if (const char* screens = LauncherEnv("SKY_LAUNCHER_TEST_SCREENS"))
+                m_testScreens = std::string_view(screens) == "pad" ? 2 : 1;
             m_testGallery = LauncherEnv("SKY_LAUNCHER_TEST_GALLERY") != nullptr;
         }
         RefreshGamepads();
@@ -2188,14 +2190,14 @@ namespace launcher_ui
         frameIo.DisplayFramebufferScale = ImVec2(frameIo.DisplayFramebufferScale.x * m_uiScale, frameIo.DisplayFramebufferScale.y * m_uiScale);
         if (SDL_GetMouseFocus() == nullptr && !m_testSeatX) // the backend's outside-the-window position is in unscaled window units
             frameIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-        if (m_testNav || m_testSeatX)
+        if (m_testNav || m_testSeatX || m_testScreens == 2)
             frameIo.BackendFlags |= ImGuiBackendFlags_HasGamepad; // the test's pad keys count with no pad plugged in
         ImGui::NewFrame();
         // The components' context: the time, the focus ring in the shown game's colour on its pages, the pad family in use.
         ui::NewFrame(SDL_GetTicks());
         ui::Ctx().accent = m_page == Page::Play || m_page == Page::GameSettings ? StyleOf(m_s->game.id).glow : Accent;
         ui::Ctx().reduceMotion = ReduceMotion();
-        if (m_gamepads.empty() && !m_testNav && !CollectionPage::TestPad())
+        if (m_gamepads.empty() && !m_testNav && m_testScreens != 2 && !CollectionPage::TestPad())
             ui::Ctx().glyphs = ui::Glyphs::Keyboard;
         else
         {
@@ -2276,7 +2278,7 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || !m_testKit.empty())
+            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testScreens != 0 || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
                 Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
@@ -3068,6 +3070,55 @@ namespace launcher_ui
     }
 
     // Screens of the screenshot test, each captured once it has settled.
+    // The three model screens (docs/polish_audit.md): Home, the game page and its Keyboard tab, as a player finds them: Spyro's
+    // Adventure's disc (SKY_LAUNCHER_TEST_DROP) verified and its game built (by hand: the runtime is not run), Giants opened
+    // with no disc, Swap Force not opened yet. With a pad (SKY_LAUNCHER_TEST_SCREENS=pad) the focus is on each page's first
+    // stop, its ring shown; with the mouse, no ring. SKY_LAUNCHER_LANGUAGE and SKY_LAUNCHER_TEST_SIZE set the rest;
+    // SKY_LAUNCHER_TEST_SCALE=2 draws them at twice the density (a Retina screen's), the same layout.
+    void App::TestScreensScript(uint64_t now)
+    {
+        const bool pad = m_testScreens == 2;
+        auto shoot = [&](const char* name, Page page, uint64_t wait) {
+            m_page = page;
+            m_gameTab = GameTab::Keyboard;
+            m_focusTo = FocusTo::Page;
+            m_focusShow = pad;
+            ImGui::SetNavCursorVisible(pad);
+            m_testShot = fmt::format("screen-{}", name);
+            m_testAt = now + wait;
+        };
+        GameSlot& ssa = SlotFor(*FindGame("ssa"));
+        switch (m_testStep)
+        {
+        case 0:
+            if (const char* scale = LauncherEnv("SKY_LAUNCHER_TEST_SCALE"); scale != nullptr && std::atof(scale) > 0)
+            {
+                int w = int(WindowW), h = int(WindowH);
+                if (const char* size = LauncherEnv("SKY_LAUNCHER_TEST_SIZE"))
+                    std::sscanf(size, "%dx%d", &w, &h);
+                m_testUiScale = m_uiScale = float(std::atof(scale));
+                SDL_SetWindowSize(m_window, int(float(w) * m_uiScale), int(float(h) * m_uiScale));
+            }
+            SelectGame(*FindGame("giants"));
+            SelectGame(*FindGame("ssa"));
+            if (ssa.disc == DiscState::None && !m_testDrop.empty())
+                StartVerify(m_testDrop);
+            m_page = Page::Play;
+            m_testStep = 1;
+            return;
+        case 1:
+            if (ssa.disc == DiscState::Verifying)
+                return;
+            ssa.installed.runtime = "test-built";
+            ssa.installed.gameVersion = "99.0.0";
+            shoot("home", Page::Home, 600);
+            break;
+        case 2: shoot("game", Page::Play, 2200); break; // the logo has fallen
+        case 3: shoot("keys", Page::GameSettings, 600); break;
+        default: m_running = false; break;
+        }
+    }
+
     void App::TestScript()
     {
         if (m_shots.empty() || m_testAt != 0)
@@ -3086,6 +3137,11 @@ namespace launcher_ui
         if (m_testUninstall)
         {
             TestUninstallScript(now);
+            return;
+        }
+        if (m_testScreens != 0)
+        {
+            TestScreensScript(now);
             return;
         }
         if (m_testKeys)
