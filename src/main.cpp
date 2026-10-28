@@ -6,6 +6,7 @@
 #include "shared/collection/datadir.h"
 #include "launcher/game_run.h"
 #include "launcher/launcher.h"
+#include "launcher/problem_report.h"
 #include "launcher/shortcut.h"
 #include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
@@ -28,12 +29,13 @@ namespace
         return out;
     }
 
-    // "The game stopped unexpectedly": Copy log (the dialog stays), Report (opens a GitHub issue, the log is on the
-    // clipboard), Close.
-    void ShowGameStopped(const GameInfo& game, int exitCode)
+    // "The game stopped unexpectedly": Report (writes the same report file as Settings > Support, shows it in the file manager and
+    // opens a GitHub issue to attach it to), Copy log (the dialog stays), Close.
+    void ShowGameStopped(const GameInfo& game, int exitCode, const std::string& configPath, const LauncherConfig& config,
+        const std::string& iso)
     {
         SDL_InitSubSystem(SDL_INIT_VIDEO);
-        std::string message = Tf("{} stopped unexpectedly (exit code {}).\n\nPress Copy log, then Report.", game.name, exitCode);
+        std::string message = Tf("{} stopped unexpectedly (exit code {}).\n\nPress Report to save a report file with the log and where the game stopped.", game.name, exitCode);
         const SDL_MessageBoxButtonData buttons[] = { { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 2, Tr("Report") }, { 0, 1, Tr("Copy log") },
             { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, Tr("Close") } };
         SDL_MessageBoxData box{ SDL_MESSAGEBOX_ERROR, nullptr, Tr("The game stopped unexpectedly"), message.c_str(), 3, buttons, nullptr };
@@ -42,14 +44,17 @@ namespace
             int pressed = 0;
             if (!SDL_ShowMessageBox(&box, &pressed) || pressed == 0)
                 return;
-            SDL_SetClipboardText(GameLogText().c_str());
-            if (pressed == 2)
+            if (pressed == 1)
             {
-                std::string title = fmt::format("The game stopped unexpectedly (exit code {})", exitCode);
-                std::string body = "What I was doing:\n\n\nThe log is in my clipboard, I paste it below:\n\n```\n\n```\n";
-                SDL_OpenURL(("https://github.com/mflr0/Skylauncher/issues/new?title=" + UrlEncode(title) + "&body=" + UrlEncode(body)).c_str());
-                return;
+                SDL_SetClipboardText(GameLogText().c_str());
+                continue;
             }
+            SavedReport saved = SaveProblemReport(configPath, config, game.id, iso);
+            std::string title = fmt::format("The game stopped unexpectedly (exit code {})", exitCode);
+            std::string body = "What I was doing:\n\n\n" + (saved.file.empty() ? std::string("The report file could not be saved; the log is below.\n")
+                : "The report file is " + saved.file.filename().string() + " (on my Desktop or in the logs folder); I attach it here:\n\n");
+            SDL_OpenURL(("https://github.com/mflr0/Skylauncher/issues/new?title=" + UrlEncode(title) + "&body=" + UrlEncode(body)).c_str());
+            return;
         }
     }
 }
@@ -163,19 +168,14 @@ int main(int argc, char** argv)
     // The launcher stays until the game ends: it keeps the game's output in skylauncher-game.log, and says so if the game
     // stops with an error (docs/support.md).
     GameRunResult run = RunGame(runtime, chosen);
-    // What the game changed in [video] (its own Settings menu) is this game's again; the other game keeps its own.
-    {
-        LauncherConfig after = LoadLauncherConfig(configPath);
-        StoreGameVideo(after, game->id);
-        SaveLauncherConfig(configPath, after);
-    }
+    // The game's own menu (F3) writes [<game>.video] and [<game>.audio] itself, and they win over [video]: nothing is copied back.
     if (!run.started)
     {
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, run.error.c_str(), nullptr);
         return 1;
     }
     if (run.exitCode != 0)
-        ShowGameStopped(*game, run.exitCode);
+        ShowGameStopped(*game, run.exitCode, configPath, LoadLauncherConfig(configPath), chosen);
     SDL_Quit();
     return 0;
 }

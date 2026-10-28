@@ -174,6 +174,7 @@ target_sources(ArkeyanLauncherCore PRIVATE
     src/launcher/ui/game_settings_page.cpp
     src/launcher/ui/game_data_page.cpp
     src/launcher/report.cpp
+    src/launcher/problem_report.cpp
     src/launcher/updater.cpp
     src/shared/mini_json.cpp
     src/launcher/ui/install_page.cpp

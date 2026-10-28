@@ -1,6 +1,7 @@
 // Support in Settings: the game's logs (Copy game log, Open logs folder), "Report a problem" (one text file with the
 // logs and the player's versions, shown before anything is saved or copied; nothing is uploaded) and "Test the portal"
 // (docs/support.md).
+#include "launcher/problem_report.h"
 #include "launcher/report.h"
 #include "launcher/ui/launcher_app.h"
 #include "launcher/game_names.h"
@@ -62,20 +63,9 @@ namespace launcher_ui
     // One text file with the last logs, the settings and the versions; it is shown before it can be saved or copied.
     void App::OpenProblemReport()
     {
-        launcher_report::Sources sources;
-        sources.runtimeFolder = RuntimeLogFolder();
-        sources.logFolder = GameLogFolder();
-        sources.settingsFile = std::filesystem::path(std::u8string(m_configPath.begin(), m_configPath.end()));
-        sources.iso = m_s->discPath;
-        std::string kit = m_s->installed.kitVersion;
-        if (kit.empty())
-            if (std::optional<InstallKit> found = FindInstallKit(m_config))
-                kit = found->version;
-        sources.versions = launcher_report::ReadVersions(LauncherVersion(), kit, sources.runtimeFolder);
-        launcher_report::Identity identity = launcher_report::CurrentIdentity(sources.iso);
-        sources.userName = identity.userName;
-        sources.computerName = identity.computerName;
-        sources.homeFolder = identity.homeFolder;
+        launcher_report::Sources sources = CurrentReportSources(m_configPath, m_config, m_s->game.id, m_s->discPath);
+        if (!m_s->installed.kitVersion.empty())
+            sources.versions.kit = m_s->installed.kitVersion;
         m_reportText = launcher_report::BuildReport(sources);
         m_reportOpen = true;
     }
@@ -110,11 +100,21 @@ namespace launcher_ui
         ImGui::PopTextWrapPos();
         ImGui::PopFont();
         ui::EndCard();
-        // Save as... is the action (the dialog takes over, so the report closes); Copy stays at the left of the same row.
+        // Save to Desktop is the action (the same file the game's F3 menu writes: on the Desktop, else in the logs folder);
+        // Save as... and Copy stay at the left of the same row.
         const float rowY = ImGui::GetCursorPosY() + ui::space::XS;
-        ui::ModalResult result = ui::ModalActions(&m_reportOpen, Tr("Save as..."), Tr("Close"));
+        ui::ModalResult result = ui::ModalActions(&m_reportOpen, Tr("Save to Desktop"), Tr("Close"));
         const float afterY = ImGui::GetCursorPosY();
         ImGui::SetCursorPos(ImVec2(ui::space::L, rowY));
+        if (ui::Button(Tr("Save as...")))
+        {
+            std::filesystem::path folder = GameLogFolder();
+            std::string name = launcher_report::FileName();
+            std::string start = (folder / name).string();
+            static const SDL_DialogFileFilter Filters[] = { { "Text file", "txt" } };
+            SDL_ShowSaveFileDialog(SaveReport, new std::string(m_reportText), m_window, Filters, 1, start.c_str());
+        }
+        ImGui::SameLine(0, ui::space::S);
         if (ui::Button(Tr("Copy")))
         {
             SDL_SetClipboardText(m_reportText.c_str());
@@ -124,11 +124,11 @@ namespace launcher_ui
         ImGui::Dummy(ImVec2(0, 0)); // the cursor went back and forth: an item ends it
         if (result == ui::ModalResult::Confirm)
         {
-            std::filesystem::path folder = GameLogFolder();
-            std::string name = launcher_report::FileName();
-            std::string start = (folder / name).string();
-            static const SDL_DialogFileFilter Filters[] = { { "Text file", "txt" } };
-            SDL_ShowSaveFileDialog(SaveReport, new std::string(m_reportText), m_window, Filters, 1, start.c_str());
+            SavedReport saved = SaveProblemReportText(m_reportText);
+            if (saved.file.empty())
+                Toast(Tr("Couldn't save the report"), ui::ToastKind::Error);
+            else
+                Toast(Tf("Report saved: {}", saved.file.filename().string()), ui::ToastKind::Success);
         }
         ui::EndModal();
     }

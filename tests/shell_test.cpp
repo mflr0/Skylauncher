@@ -471,13 +471,13 @@ namespace
 
         // The three home folders, with both separator spellings on Windows.
         SHELL_EXPECT(launcher_report::Redact("/Users/alice/Library/Application Support/Skylanders", identity) ==
-            "<home>/Library/Application Support/Skylanders");
-        SHELL_EXPECT(launcher_report::Redact("/home/alice/.local/share/Skylanders", identity) == "<home>/.local/share/Skylanders");
+            "~/Library/Application Support/Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("/home/alice/.local/share/Skylanders", identity) == "~/.local/share/Skylanders");
         SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData\\Roaming\\Skylanders", identity) ==
-            "<home>\\AppData\\Roaming\\Skylanders");
+            "~\\AppData\\Roaming\\Skylanders");
         SHELL_EXPECT(launcher_report::Redact("C:/Users/alice/AppData/Roaming/Skylanders", identity) ==
-            "<home>/AppData/Roaming/Skylanders");
-        SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData", identity) == "<home>\\AppData");
+            "~/AppData/Roaming/Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData", identity) == "~\\AppData");
         // Another account is not touched, and neither is a longer name that starts with ours.
         SHELL_EXPECT(launcher_report::Redact("/Users/alicia/x C:\\Users\\alice2\\x", identity) ==
             "/Users/alicia/x C:\\Users\\alice2\\x");
@@ -503,7 +503,7 @@ namespace
         // Nothing else changes: a text without the identity is returned as it is, byte for byte.
         std::string plain = "line one\r\n\tspaced  two\n[]{}%$#@! caf\xC3\xA9\n";
         SHELL_EXPECT(launcher_report::Redact(plain, identity) == plain);
-        SHELL_EXPECT(launcher_report::Redact("before /Users/alice after", identity) == "before <home> after");
+        SHELL_EXPECT(launcher_report::Redact("before /Users/alice after", identity) == "before ~ after");
         SHELL_EXPECT(launcher_report::Redact("", identity).empty());
 
         // The whole report: every file, the versions and the GPU line, all redacted.
@@ -513,9 +513,11 @@ namespace
         std::filesystem::create_directories(data / "logs");
         WriteBytes(data / "launcher.ini", "[video]\nvsync=1\n[ssa]\niso=/Users/alice/Documents/SSA.iso\n");
         WriteBytes(game / "SSARecomp.log", "[log] /Users/alice/Library/Application Support/Skylanders/SSA/SSARecomp.log\n"
-            "[version] SSARecomp 1.0.0, build abc123\n[system] macOS 15\n"
+            "[version] SSARecomp 1.0.0, build abc123\n[system] macOS 15\n[system] CPU Test CPU 3000\n"
             "[gpu] adapter Apple M2: vendor 106B, integrated, unified memory, 8192 MB of video memory, driver n/a\n");
-        WriteBytes(game / "SSARecomp.prev.log", "previous run\n");
+        WriteBytes(game / "SSARecomp.prev.log", "previous run\n\nFault (signal 11 segv) at host address 0x0\n"
+            "[crash] where: guest thread 7, lr 0x8262D6D4, ctr 0x82850DA8, r1 0x700B7D30, r3 0x40070600, r31 0x82BB0000\n"
+            "[crash] guest function: sub_822A95C0, called from sub_8262D690\n");
         WriteBytes(game / "install.log", "@done /Users/alice/Applications/SSARecomp\n");
         WriteBytes(game / "install.prev.log", "previous install\n");
         WriteBytes(game / "install-logs" / "compile.txt", "compiled on Alices-MacBook-Pro.local\n");
@@ -544,10 +546,27 @@ namespace
         SHELL_EXPECT(report.find("===== install.prev.log =====") != std::string::npos);
         SHELL_EXPECT(report.find("===== install-logs/compile.txt =====") != std::string::npos);
         SHELL_EXPECT(report.find("previous run") != std::string::npos && report.find("previous install") != std::string::npos);
+        // Where the game stopped: the last fault block of the log, from this run's log or else the previous run's, quoted once under
+        // its own heading and named in the header; the CPU line comes from the log.
+        SHELL_EXPECT(report.find("CPU: Test CPU 3000\n") != std::string::npos);
+        SHELL_EXPECT(report.find("Last crash: yes (the previous run), see below\n") != std::string::npos);
+        SHELL_EXPECT(report.find("===== last crash (the previous run) =====\nFault (signal 11 segv)") != std::string::npos);
+        SHELL_EXPECT(report.find("[crash] guest function: sub_822A95C0, called from sub_8262D690") != std::string::npos);
+        SHELL_EXPECT(launcher_report::CrashDetails("no fault here\n").empty());
+        SHELL_EXPECT(launcher_report::CrashDetails("Fault (a)\nold\nFault (b)\nnew\n") == "Fault (b)\nnew\n");
         SHELL_EXPECT(report.find("alice") == std::string::npos && report.find("Alices-MacBook-Pro") == std::string::npos);
-        SHELL_EXPECT(report.find("<home>") != std::string::npos && report.find("<iso folder>/SSA.iso") != std::string::npos);
+        SHELL_EXPECT(report.find("~") != std::string::npos && report.find("<iso folder>/SSA.iso") != std::string::npos);
         SHELL_EXPECT(launcher_report::FileName().starts_with("ArkeyanLauncher-report-") &&
             launcher_report::FileName().ends_with(".txt"));
+        // The file the Support page and the crash dialog write: the first folder that takes it, else the next.
+        {
+            std::filesystem::path blocked = scratch / "reportblocked";
+            WriteBytes(blocked, "a file where a folder is needed");
+            std::filesystem::path desktop = scratch / "reportdesktop";
+            std::filesystem::path saved = launcher_report::SaveToFirstFolder("text", "r.txt", { blocked / "Desktop", desktop });
+            SHELL_EXPECT(saved == desktop / "r.txt" && std::filesystem::exists(saved));
+            SHELL_EXPECT(launcher_report::SaveToFirstFolder("text", "r.txt", { blocked / "Desktop" }).empty());
+        }
         printf("Report: the three home folders, names in text, computer and ISO folder redacted; nothing else changed\n");
     }
 }

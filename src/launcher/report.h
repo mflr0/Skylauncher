@@ -4,6 +4,7 @@
 // of the player's own details before it is shown, saved or copied. Nothing is uploaded.
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace launcher_report
 {
@@ -17,7 +18,7 @@ namespace launcher_report
     };
 
     // Replaces the home paths (/Users/<name>, C:\Users\<name>, C:/Users/<name>, /home/<name>), the disc image's folder,
-    // the account name and the computer name with <home>, <iso folder>, <user> and <computer>. Everything else is kept
+    // the account name and the computer name with ~, <iso folder>, <user> and <computer>. Everything else is kept
     // byte for byte. Case-insensitive (Windows paths), whole names only for the account and the computer.
     std::string Redact(const std::string& text, const Identity& identity);
 
@@ -31,6 +32,7 @@ namespace launcher_report
         std::string gameBuild; // the [version] line of the last game log, without its tag
         std::string os;
         std::string gpu;       // the [gpu] adapter line of the last game log
+        std::string cpu;       // the [system] CPU line of the last game log
     };
 
     // The version numbers, the OS and the GPU as the game itself logged them.
@@ -47,8 +49,17 @@ namespace launcher_report
         std::string userName, computerName, homeFolder; // for the redaction
     };
 
-    // The whole report, already redacted.
+    // The fault block of a game log: from its last "Fault (" line to the end (the runtime's "[crash]" lines: the guest thread,
+    // lr and ctr, the guest function, the host stack). Empty when the log has none.
+    std::string CrashDetails(const std::string& log);
+
+    // The whole report, already redacted: the header, the last crash (this run's log, else the previous run's), then the files.
+    // The game's own "Report a problem" (F3 menu) writes the same sections.
     std::string BuildReport(const Sources& sources);
+
+    // Writes `text` as `name` in the first of `folders` that takes it (the Desktop, then the logs folder). Returns the file, or an
+    // empty path when none did.
+    std::filesystem::path SaveToFirstFolder(const std::string& text, const std::string& name, const std::vector<std::filesystem::path>& folders);
 
     // "ArkeyanLauncher-report-<yyyymmdd-hhmmss>.txt".
     std::string FileName();
