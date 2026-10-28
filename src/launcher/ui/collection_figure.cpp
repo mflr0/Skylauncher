@@ -10,6 +10,7 @@
 #include <ctime>
 #include <fmt/format.h>
 #include <imgui_internal.h> // the key owners, the popup stack
+#include <utility>
 
 namespace launcher_ui
 {
@@ -44,7 +45,10 @@ namespace launcher_ui
     void CollectionPage::DrawOverlay()
     {
         if (m_overlay == Overlay::None)
+        {
+            m_sheetShown.clear();
             return;
+        }
         // B / Escape go back one step: out of Edit or "Change the bottom", then out of the dialog (which closes itself). A menu
         // or a question open (a deeper popup), or a field being typed in, answers it first.
         const bool deeper = ImGui::GetCurrentContext()->OpenPopupStack.Size > 1;
@@ -74,6 +78,15 @@ namespace launcher_ui
             break;
         case Overlay::Add: title = Tr("Add a figure"); break;
         default: title = Tr("Manage"); break;
+        }
+        // Each figure, and each of its views (the sheet, Edit, Change the bottom), opens at the top: the dialog and its scrolling
+        // body are the same windows for all of them and would keep the last one's place.
+        const std::string sheet = m_overlay == Overlay::Figure ? m_figure + (m_editing ? "|edit|" : "|sheet|") + m_changeKeep : std::string();
+        if (sheet != m_sheetShown)
+        {
+            m_sheetShown = sheet;
+            m_sheetTop = true;
+            ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
         }
         bool open = true;
         if (!ui::BeginModal("##overlay", title.c_str(), &open, ui::ModalSize::Large))
@@ -625,6 +638,8 @@ namespace launcher_ui
         }
         std::stable_partition(rows.begin(), rows.end(), [&](const Figure* half) { return half->partner.empty(); });
 
+        if (std::exchange(m_sheetTop, false))
+            ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
         ui::BeginRoomyChild("##changehalf", ImVec2(0, OverlayBody(3 * ui::height::Main, 2 * ui::height::Main, 6 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         constexpr float Art = ui::height::Large - 2 * ui::space::XXS;
@@ -737,6 +752,8 @@ namespace launcher_ui
         bool stats = collection::HasProgress(f) && f.state != figures::AreaState::Damaged;
         ui::Text(ui::TextStyle::Body, (f.variantInfo.name != Name(f) ? Name(f) + " · " + f.variantInfo.name : Name(f)).c_str(), ui::color::InkSoft);
         // The fields scroll above the Save row (the upgrades list makes the sheet taller than a small window).
+        if (std::exchange(m_sheetTop, false))
+            ImGui::SetNextWindowScroll(ImVec2(0.0f, 0.0f));
         ui::BeginRoomyChild("##editbody", ImVec2(0, OverlayBody(4 * ui::height::Main, 3 * ui::height::Main, 8 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         if (ui::BeginSettings("##edit"))

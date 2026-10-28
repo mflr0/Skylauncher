@@ -425,6 +425,8 @@ namespace launcher_ui
         m_overlay = Overlay::Figure;
         m_editing = false;
         m_confirm.clear();
+        m_details = false;
+        m_sheetShown.clear(); // it opens at the top, even right after another sheet
     }
 
     void CollectionPage::Choose(int seat)

@@ -190,6 +190,8 @@ namespace launcher_ui
         bool m_details = false;         // the sheet's Details are open
         std::string m_changeKeep;       // "Change the bottom/top": the half the card keeps while the other is chosen
         bool m_editing = false;
+        std::string m_sheetShown;       // the figure and the view (sheet, Edit, Change...) drawn last: another one opens at the top
+        bool m_sheetTop = false;        // a new one is shown: its scrolling body starts at the top too
         figures::FigureStats m_edit;
         figures::FigureStats m_editBase; // as read when Edit stats opened: Save writes back only what changed since
         char m_nickname[64] = {};        // 16 characters of up to 3 bytes, and the terminator
