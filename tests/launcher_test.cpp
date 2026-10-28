@@ -1308,7 +1308,7 @@ int main(int argc, char** argv)
     LauncherConfig videoBack = LoadLauncherConfig(settings.string());
     EXPECT(videoBack["video"]["aspect"] == "16:9" && videoBack["video"]["texture_packs"] == "0" && videoBack["video"]["texture_dump"] == "1");
 
-    std::filesystem::remove_all(scratch);
+    if (skyenv::Get("SKY_LAUNCHER_TEST_KEEP") == nullptr) std::filesystem::remove_all(scratch);
     printf(g_failures == 0 ? "All launcher checks passed\n" : "%d launcher check(s) failed\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

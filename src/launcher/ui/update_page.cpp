@@ -288,7 +288,7 @@ namespace launcher_ui
         ImGui::TextUnformatted(Tr("Check at startup"));
         ImGui::PushFont(nullptr, SmallSize);
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", Tr("Only asks github.com for the latest version. Nothing else is sent."));
+        ImGui::TextWrapped("%s", Tr("Only contacts github.com."));
         ImGui::PopStyleColor();
         ImGui::PopFont();
     }
@@ -298,7 +298,7 @@ namespace launcher_ui
         Title("Arkeyan Launcher", HeadlineSize);
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Version {}, {}", LauncherVersion(), PlatformName()).c_str());
         ImGui::Dummy(ImVec2(0, 6));
-        ImGui::TextWrapped("%s", Tr("A launcher for the native PC ports of Skylanders. It has no game code or art: all of it comes from your own disc."));
+        ImGui::TextWrapped("%s", Tr("A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc."));
 
         ImGui::Dummy(ImVec2(0, 14));
         Title(Tr("Credits"), TitleSize, Text);

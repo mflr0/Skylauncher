@@ -391,6 +391,11 @@ namespace launcher_ui
         // The keyboard and pad focus around the last item, for the widgets drawn over an InvisibleButton; `gap` < 0 draws
         // it inside (rows that touch the window's edges).
         void FocusRing(float rounding, float gap = 4, ImDrawFlags flags = 0);
+        // A page's centred column (the cursor is at its left): it reaches a few points past each side and over the page's
+        // bottom padding, so the clip rect neither shaves the borders at its edges nor cuts the scrolling content short of the window.
+        float m_columnBelow = 0;
+        void BeginPageColumn(const char* id, float width);
+        void EndPageColumn();
         bool Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
         bool BeginSettingsTable(const char* id);

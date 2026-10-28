@@ -234,7 +234,7 @@ namespace launcher_ui
     void CollectionPage::DrawUnknown()
     {
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Toys missing from the catalogue. Name one to show it."));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Not in the catalogue. Name one to show it."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         bool any = false;
@@ -275,7 +275,7 @@ namespace launcher_ui
     {
         RefreshDisk();
         ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Blank figures made by old game versions. Tidy moves them to the trash."));
+        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Blank figures from old versions. Tidy trashes them."));
         ImGui::PopTextWrapPos();
         ImGui::Dummy(ImVec2(0, 8));
         ImGui::BeginDisabled(m_starters == 0);

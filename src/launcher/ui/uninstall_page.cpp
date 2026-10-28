@@ -69,11 +69,14 @@ namespace launcher_ui
         if (PillButton(Tr("Uninstall everything..."), false, 300))
             OpenUninstall();
         ImGui::EndDisabled();
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", busy ? Tr("Wait for the game to finish.") : Tr("Removes the games, their files and Arkeyan Launcher."));
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
+        if (busy)
+        {
+            ImGui::PushFont(nullptr, SmallSize);
+            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
+            ImGui::TextWrapped("%s", Tr("Wait for the game to finish."));
+            ImGui::PopStyleColor();
+            ImGui::PopFont();
+        }
     }
 
     // The dry run: nothing is touched.

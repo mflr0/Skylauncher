@@ -19,8 +19,8 @@ namespace
         { "a", N_("1st Power / Accept"), "A", SDLK_SPACE }, { "x", N_("2nd Power"), "X", SDLK_C },
         { "y", N_("Use / Talk"), "Y", SDLK_V }, { "b", N_("Special Power / Back"), "B", SDLK_X },
         { "back", N_("Skylander Info"), "Back", SDLK_BACKSPACE }, { "start", N_("Pause"), "Start", SDLK_RETURN },
-        { "right_up", N_("Shake / Insert / Swing up"), N_("R stick"), SDLK_I }, { "right_down", N_("Shake / Insert / Swing down"), N_("R stick"), SDLK_K },
-        { "right_left", N_("Shake / Insert / Swing left"), N_("R stick"), SDLK_J }, { "right_right", N_("Shake / Insert / Swing right"), N_("R stick"), SDLK_L },
+        { "right_up", N_("Shake / Insert / Swing"), N_("R stick up"), SDLK_I }, { "right_down", N_("Same"), N_("R stick down"), SDLK_K },
+        { "right_left", N_("Same"), N_("R stick left"), SDLK_J }, { "right_right", N_("Same"), N_("R stick right"), SDLK_L },
     };
     constexpr GameKey Giants[] = {
         MOVE_ROWS,
