@@ -162,10 +162,10 @@ namespace launcher_ui
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
         if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingFixedFit))
         {
-            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 200);
-            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 96);
-            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 200);
-            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 96);
+            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 184);
+            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 112);
+            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 184);
+            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 112);
             for (size_t i = 0; i < keys.size(); i++)
             {
                 const GameKey& action = keys[i];
@@ -173,14 +173,14 @@ namespace launcher_ui
                     ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(fmt::format("{} ({})", Tr(action.label), action.pad).c_str());
+                ImGui::TextWrapped("%s", fmt::format("{} ({})", Tr(action.label), Tr(action.pad)).c_str()); // a long French name takes two lines
                 ImGui::TableNextColumn();
-                const std::string key = GameKeyName(m_config, game, action);
+                const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
                 const bool duplicate = GameKeyConflict(m_config, game, action);
                 ImGui::PushID(action.action);
                 ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Accent : Field));
                 ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? AccentInk : duplicate ? Danger : Text));
-                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(90, 32)))
+                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(106, 32)))
                     m_capturing = &action;
                 ImGui::PopStyleColor(2);
                 if (duplicate && ImGui::IsItemHovered())

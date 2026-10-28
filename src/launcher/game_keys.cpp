@@ -9,35 +9,38 @@ namespace
         "left_left", "left_right", "right_up", "right_down", "right_left", "right_right", "dpad_up", "dpad_down", "dpad_left", "dpad_right" };
 
     // The defaults, shared by the games: the pad's buttons sit on the same keys in each (A Space, X C, Y V, B X).
-    // Names: SSA from the PC key list on its disc ("1st Power/Accept", "Special Power/Back"...), Giants and Swap Force
-    // from the controls screens of their disc (docs/settings.md, "Where the names come from").
+    // Names and buttons: each game's own controls screen, read in the running game (docs/settings.md, "Where the names come from").
     #define MOVE_ROWS \
-        { "left_up", N_("Move up"), "L stick", SDLK_W }, { "left_down", N_("Move down"), "L stick", SDLK_S }, \
-        { "left_left", N_("Move left"), "L stick", SDLK_A }, { "left_right", N_("Move right"), "L stick", SDLK_D }
-    #define CAMERA_ROWS \
-        { "right_up", N_("Camera up"), "R stick", SDLK_I }, { "right_down", N_("Camera down"), "R stick", SDLK_K }, \
-        { "right_left", N_("Camera left"), "R stick", SDLK_J }, { "right_right", N_("Camera right"), "R stick", SDLK_L }
+        { "left_up", N_("Move up"), N_("L stick"), SDLK_W }, { "left_down", N_("Move down"), N_("L stick"), SDLK_S }, \
+        { "left_left", N_("Move left"), N_("L stick"), SDLK_A }, { "left_right", N_("Move right"), N_("L stick"), SDLK_D }
 
     constexpr GameKey Ssa[] = {
         MOVE_ROWS,
-        { "a", N_("1st Power / Accept"), "A", SDLK_SPACE }, { "b", N_("2nd Power / Back"), "B", SDLK_X },
-        { "x", N_("Use / Talk"), "X", SDLK_C }, { "y", N_("Special Power"), "Y", SDLK_V },
+        { "a", N_("1st Power / Accept"), "A", SDLK_SPACE }, { "x", N_("2nd Power"), "X", SDLK_C },
+        { "y", N_("Use / Talk"), "Y", SDLK_V }, { "b", N_("Special Power / Back"), "B", SDLK_X },
         { "back", N_("Skylander Info"), "Back", SDLK_BACKSPACE }, { "start", N_("Pause"), "Start", SDLK_RETURN },
-        CAMERA_ROWS,
+        { "right_up", N_("Shake / Insert / Swing up"), N_("R stick"), SDLK_I }, { "right_down", N_("Shake / Insert / Swing down"), N_("R stick"), SDLK_K },
+        { "right_left", N_("Shake / Insert / Swing left"), N_("R stick"), SDLK_J }, { "right_right", N_("Shake / Insert / Swing right"), N_("R stick"), SDLK_L },
     };
     constexpr GameKey Giants[] = {
         MOVE_ROWS,
-        { "a", N_("Action / Accept"), "A", SDLK_SPACE }, { "x", N_("Attack 1"), "X", SDLK_C },
-        { "y", N_("Attack 2"), "Y", SDLK_V }, { "b", N_("Attack 3 / Back"), "B", SDLK_X },
+        { "a", N_("Attack 1 / Accept"), "A", SDLK_SPACE }, { "x", N_("Attack 2"), "X", SDLK_C },
+        { "y", N_("Action"), "Y", SDLK_V }, { "b", N_("Attack 3 / Back"), "B", SDLK_X },
         { "back", N_("Skylander Info"), "Back", SDLK_BACKSPACE }, { "start", N_("Pause"), "Start", SDLK_RETURN },
     };
     constexpr GameKey SwapForce[] = {
         MOVE_ROWS,
         { "a", N_("Jump"), "A", SDLK_SPACE }, { "x", N_("Attack 1"), "X", SDLK_C },
-        { "y", N_("Attack 2"), "Y", SDLK_V }, { "b", N_("Attack 3"), "B", SDLK_X },
+        { "b", N_("Attack 2"), "B", SDLK_X }, { "y", N_("Attack 3"), "Y", SDLK_V },
+        { "rb", N_("Attack 2"), "RB", SDLK_E }, { "lb", N_("Attack 3"), "LB", SDLK_Q },
+        { "lt", N_("Interact"), "LT", SDLK_1 }, { "rt", N_("Interact"), "RT", SDLK_3 },
         { "back", N_("Skylanders Stats"), "Back", SDLK_BACKSPACE }, { "start", N_("Pause"), "Start", SDLK_RETURN },
-        CAMERA_ROWS,
     };
+
+    // The SDL names of the keys the launcher words in the player's language (the others, letters and digits, are the same everywhere).
+    constexpr std::array<const char*, 16> KeyNames = { N_("Space"), N_("Return"), N_("Backspace"), N_("Escape"), N_("Up"), N_("Down"),
+        N_("Left"), N_("Right"), N_("Left Shift"), N_("Right Shift"), N_("Left Ctrl"), N_("Right Ctrl"), N_("Left Alt"), N_("Right Alt"),
+        N_("Caps Lock"), N_("Delete") };
 
     std::string KeyLine(const char* action) { return std::string("key_") + action; }
 
@@ -79,6 +82,14 @@ std::string GameKeyName(const LauncherConfig& config, std::string_view gameId, c
     if (const std::string* value = Find(config, GameInputSection(gameId), KeyLine(key.action)))
         return *value;
     return SDL_GetKeyName(key.fallback);
+}
+
+std::string KeyDisplayName(const std::string& sdlName)
+{
+    for (const char* name : KeyNames)
+        if (sdlName == name)
+            return i18n::Tr(name);
+    return sdlName;
 }
 
 bool GameKeyConflict(const LauncherConfig& config, std::string_view gameId, const GameKey& key)

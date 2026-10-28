@@ -41,10 +41,6 @@ COLLECTION	COLLECTION
 COMING LATER	BIENTÔT
 CONTROLLER	MANETTE
 Caches cleared	Caches vidés
-Camera down	Caméra bas
-Camera left	Caméra gauche
-Camera right	Caméra droite
-Camera up	Caméra haut
 Can't read the disc	Disque illisible
 Cancel	Annuler
 Carry on copying	Reprendre la copie
@@ -731,11 +727,9 @@ Kept: Xbox signing keys	Gardé : clés de signature Xbox
 
 # Keyboard tab of a game: the names are the game's own, as the disc words them (docs/settings.md, "Where the names come from")
 1st Power / Accept	1er pouvoir / Accepter
-2nd Power / Back	2e pouvoir / Retour
 Use / Talk	Utiliser / Parler
-Special Power	Pouvoir spécial
 Skylander Info	Infos du Skylander
-Action / Accept	Action / Accepter
+Attack 1 / Accept	Attaque 1 / Accepter
 Attack 1	Attaque 1
 Attack 2	Attaque 2
 Attack 3	Attaque 3
@@ -744,3 +738,28 @@ Jump	Sauter
 Skylanders Stats	Stats Skylanders
 Pause	Pause
 Hold to reset every key of this game.	Maintenez pour réinitialiser toutes les touches de ce jeu.
+2nd Power	2e pouvoir
+Special Power / Back	Pouvoir spécial / Retour
+Action	Action
+Interact	Interagir
+Shake / Insert / Swing up	Agiter / Insérer / Balancer haut
+Shake / Insert / Swing down	Agiter / Insérer / Balancer bas
+Shake / Insert / Swing left	Agiter / Insérer / Balancer gauche
+Shake / Insert / Swing right	Agiter / Insérer / Balancer droite
+L stick	stick gauche
+R stick	stick droit
+Space	Espace
+Return	Entrée
+Backspace	Retour arrière
+Escape	Échap
+Up	Flèche haut
+Down	Flèche bas
+Left	Flèche gauche
+Right	Flèche droite
+Left Shift	Maj gauche
+Right Shift	Maj droite
+Left Ctrl	Ctrl gauche
+Right Ctrl	Ctrl droite
+Left Alt	Alt gauche
+Right Alt	Alt droite
+Caps Lock	Verr. maj

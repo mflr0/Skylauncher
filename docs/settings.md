@@ -91,29 +91,37 @@ The runtime reads one `[input]` section (`key_<action>=<SDL key name>`), but the
 - Two rows of one game on the same key are marked (a conflict is only possible inside a game).
 
 Keyboard actions the runtime knows: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`,
-`left_left`, `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (camera), `dpad_up`, `dpad_down`,
+`left_left`, `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (right stick: Spyro's Adventure's Shake / Insert / Swing), `dpad_up`, `dpad_down`,
 `dpad_left`, `dpad_right`. Defaults (all three games): A Space, B X, X C, Y V, Start Return, Back Backspace, W S A D for the
 left stick, I K J L for the right stick, the arrow keys for the D-pad.
 
 ### What each game's Keyboard tab lists (`src/launcher/game_keys.cpp`)
 
-A row names what the key does **in that game, in the game's own words**, with the pad button in brackets ("Attack 1 (X)").
-Only the actions the game uses have a row; the other actions keep whatever the copy was seeded with (the runtime's default
-otherwise). The names are English; the French is the disc's own wording (`resources/lang/fr.txt`); the other launcher
-languages show English until translated. The sources are each game's disc, read once by hand; nothing from it is in the
-repository (the names are short words, written in the table).
+A row names what the key does **in that game, in the game's own words**, with the pad button in brackets ("Attack 1 (X)";
+the sticks in the player's language: "(stick gauche)"). Only the actions the game uses have a row; the other actions keep
+whatever the copy was seeded with (the runtime's default otherwise). The names are English; the French is the disc's own
+wording (`resources/lang/fr.txt`); the other launcher languages show English until translated. A key's name is shown in the
+player's language where the launcher has one ("Espace", "Entrée", "Retour arrière", "Échap", "Flèche haut"); the stored value
+stays SDL's English name. The sources are each game's disc, read in the running game; nothing from it is in the repository (the
+names are short words, written in the table).
 
-| Game | Rows (pad button) | Where the names come from |
+Verified [V] (2026-10-28) by running each game (keyboard device, `SKY_PRESS`, an emulated portal with a figure) and reading its
+own Controls screen (pause menu: Options > Controls in Spyro's Adventure and Swap Force, Settings > Controls in Giants), in
+English and, for Spyro's Adventure, French. The Back button was pressed in play in all three.
+
+| Game | Rows (pad button) | Proof |
 | --- | --- | --- |
-| Spyro's Adventure | Move up, down, left, right (L stick); **1st Power / Accept** (A), **2nd Power / Back** (B), **Use / Talk** (X), **Special Power** (Y), **Skylander Info** (Back), **Pause** (Start); Camera up, down, left, right (R stick) | The key-binding screen in `text/<lang>/global.lxb`: "1st Power/Accept", "2nd Power", "Use/Talk", "Special Power/Back", "Skylander Info", "Pause" (French "1er pouvoir/Accepter", "2e pouvoir", "Utiliser/Parler", "Pouvoir spécial/Retour", "Infos du Skylander"). Which button each is: the console legend that Giants' options screen also carries ("1st Power/Accept", "2nd Power/Back", "Use/Talk", "Special Power"). Camera: the tutorial's "Move right stick" |
-| Giants | Move up, down, left, right (L stick); **Action / Accept** (A), **Attack 1** (X), **Attack 2** (Y), **Attack 3 / Back** (B), **Skylander Info** (Back), **Pause** (Start) | The controls screen of `misc/UI_Options.bld` (the controller diagram's labels "Attack 1", "Attack 2", "Attack 3", "Action", "Skylander Info", "Pause", "Move"; French "Attaque 1", "Attaque 2", "Attaque 3", "Action", "Infos Skylander", "Pause", "Déplacement"); "Accept" and "Back" from the legend in the same file. The tutorial's "[ to use your primary attack" and "Use [ and ] to defeat monsters" agree. No camera rows: the screen shows no right stick |
-| Swap Force | Move up, down, left, right (L stick); **Jump** (A), **Attack 1** (X), **Attack 2** (Y), **Attack 3** (B), **Skylanders Stats** (Back), **Pause** (Start); Camera up, down, left, right (R stick) | `archives/controller_schemexenon.pak`, the Xbox 360 controls screen (assets `A_Jump`, `X_Attack`, `Y_Attack`, `B_Attack`, `Start_Pause`, `Skylanders_Stats`; labels "Attack 1", "Attack 2", "Attack 3", "Interact", "Jump", "Move", "Skylanders Stats", "Pause"; French "Attaque 1", "Attaque 2", "Attaque 3", "Interagir", "Sauter", "Bouger", "Stats Skylanders") |
+| Spyro's Adventure | Move up, down, left, right (L stick); **1st Power / Accept** (A), **2nd Power** (X), **Use / Talk** (Y), **Special Power / Back** (B), **Skylander Info** (Back), **Pause** (Start); **Shake / Insert / Swing** up, down, left, right (R stick) | The Controls screen: A "1st Power/Accept", X "2nd Power", Y "Use/Talk", B "Special Power/Back", Back "Skylander Info", Start "Pause", left stick "Move Character/Menu Navigation", D-pad "Menu Navigation", right stick "Shake/Insert/Swing" (French "1er pouvoir/Accepter", "2e pouvoir", "Utiliser/Parler", "Pouvoir spécial/Retour", "Infos du Skylander", "Agiter/Insérer/Balancer"). Back in play opens the "Skylander Info" screen. **No camera**: the screen has no camera label |
+| Giants | Move up, down, left, right (L stick); **Attack 1 / Accept** (A), **Attack 2** (X), **Action** (Y), **Attack 3 / Back** (B), **Skylander Info** (Back), **Pause** (Start) | The Controls screen (Settings > Controls): A "Attack 1", X "Attack 2", Y "Action", B "Attack 3", Back "Skylander Info", Start "Pause", left stick "Move"; "Accept" and "Back" from the menus' legend (A "Accept", B "Back"). Back in play opens "Skylander Info" (Stats, Hats, Upgrades, Quests, Manage). No right stick on the screen: no camera rows |
+| Swap Force | Move up, down, left, right (L stick); **Jump** (A), **Attack 1** (X), **Attack 2** (B), **Attack 3** (Y), **Attack 2** (RB), **Attack 3** (LB), **Interact** (LT), **Interact** (RT), **Skylanders Stats** (Back), **Pause** (Start) | The Controls screen (Options > Controls): A "Jump", X "Attack 1", B "Attack 2", Y "Attack 3", the right shoulder "Attack 2", the left shoulder "Attack 3", both triggers "Interact", Back "Skylanders Stats", Start "Pause", left stick "Move" (French "Sauter", "Attaque 1/2/3", "Interagir", "Stats Skylanders"). Back in play opens the Skylander screen (Stats, Hats, Upgrades, Quests). The pause legend shows B as "Back" and Y as "Leaderboard". No right stick on the screen: no camera rows |
 
-**Not settled [?]**: the screens give the names, and the asset names say which of A, B, X, Y are attacks, but nothing was
-read from a running game for: which of Attack 2 and Attack 3 sits on Y and on B (Giants, Swap Force); which button is
-"Interact" in Swap Force (it has no row for now); whether "Skylander Info" and "Skylanders Stats" are the Back button; the
-camera rows of Spyro's Adventure and Swap Force. Each is one line of `game_keys.cpp`. Giants' French "Infos Skylander" and
-Spyro's Adventure's "Infos du Skylander" share one English key ("Skylander Info"): the launcher shows the second.
+**Not settled [?]**: the Controls screens are the proof for every row, and the Back button was pressed in play; the other
+buttons were not seen doing their action. In particular: the shoulders and triggers of Swap Force (`SKY_PRESS` has no `lb`,
+`rb`, `lt`, `rt`, so they could not be pressed; the diagram is the proof); the direction each way of Spyro's Adventure's right
+stick ("Shake/Insert/Swing") takes (`SKY_PRESS` has no right stick); and whether Swap Force or Giants moves a camera with the
+right stick at all (their screens show none, so there are no rows; the seeded keys stay in `[input]`). Giants' French "Infos
+Skylander" and Spyro's Adventure's "Infos du Skylander" share one English key ("Skylander Info"): the launcher shows the second.
+On the French pad names, the Back button reads "Retour" (the Xbox 360 French name), as the action "Retour" of the B button.
 
 ## Figures
 

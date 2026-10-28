@@ -14,7 +14,7 @@ struct GameKey
 {
     const char* action; // the runtime's name: key_<action> in [input]
     const char* label;  // English, as the game words it (translated where it is shown)
-    const char* pad;    // the pad button the key stands for (shown in brackets, not translated)
+    const char* pad;    // the pad button the key stands for (shown in brackets; the sticks are translated, N_)
     SDL_Keycode fallback; // the game's default key
 };
 
@@ -26,6 +26,8 @@ std::string GameInputSection(std::string_view gameId); // "giants.input"
 
 // The key's name now: the game's copy, else its default.
 std::string GameKeyName(const LauncherConfig& config, std::string_view gameId, const GameKey& key);
+// A key's name as the player reads it ("Espace"); the stored value stays SDL's English name.
+std::string KeyDisplayName(const std::string& sdlName);
 // True when another row of the same game has the same key.
 bool GameKeyConflict(const LauncherConfig& config, std::string_view gameId, const GameKey& key);
 // Back to the game's defaults: its copy loses every key it had.

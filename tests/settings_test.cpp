@@ -4,6 +4,7 @@
 #include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/game_keys.h"
+#include "launcher/i18n.h"
 #include "launcher/game_settings.h"
 #include "launcher/launcher.h"
 #include "launcher/shortcut.h"
@@ -126,11 +127,13 @@ namespace
     void KeyChecks()
     {
         // Each game lists the actions it uses, named as it names them; a button it ignores has no row.
-        SETTINGS_EXPECT(HasRow("ssa", "a", "1st Power / Accept") && HasRow("ssa", "y", "Special Power") && HasRow("ssa", "start", "Pause"));
-        SETTINGS_EXPECT(HasRow("giants", "x", "Attack 1") && HasRow("giants", "a", "Action / Accept") && HasRow("giants", "b", "Attack 3 / Back"));
-        SETTINGS_EXPECT(HasRow("swapforce", "a", "Jump") && HasRow("swapforce", "back", "Skylanders Stats"));
-        SETTINGS_EXPECT(!HasRow("giants", "right_up", "Camera up") && HasRow("swapforce", "right_up", "Camera up"));
-        SETTINGS_EXPECT(GameKeys("giants").size() == 10 && GameKeys("ssa").size() == 14 && GameKeys("nothing").empty());
+        SETTINGS_EXPECT(HasRow("ssa", "a", "1st Power / Accept") && HasRow("ssa", "x", "2nd Power") && HasRow("ssa", "y", "Use / Talk"));
+        SETTINGS_EXPECT(HasRow("ssa", "b", "Special Power / Back") && HasRow("ssa", "start", "Pause") && HasRow("ssa", "right_up", "Shake / Insert / Swing up"));
+        SETTINGS_EXPECT(HasRow("giants", "a", "Attack 1 / Accept") && HasRow("giants", "x", "Attack 2") && HasRow("giants", "y", "Action"));
+        SETTINGS_EXPECT(HasRow("giants", "b", "Attack 3 / Back") && !HasRow("giants", "right_up", "Shake / Insert / Swing up"));
+        SETTINGS_EXPECT(HasRow("swapforce", "a", "Jump") && HasRow("swapforce", "x", "Attack 1") && HasRow("swapforce", "back", "Skylanders Stats"));
+        SETTINGS_EXPECT(HasRow("swapforce", "b", "Attack 2") && HasRow("swapforce", "y", "Attack 3") && HasRow("swapforce", "lt", "Interact"));
+        SETTINGS_EXPECT(GameKeys("giants").size() == 10 && GameKeys("ssa").size() == 14 && GameKeys("swapforce").size() == 14 && GameKeys("nothing").empty());
         for (const char* game : { "ssa", "giants", "swapforce" })
             for (const GameKey& key : GameKeys(game))
             {
@@ -140,6 +143,13 @@ namespace
                 SETTINGS_EXPECT(known && key.pad != nullptr && *key.pad != 0);
             }
 
+        // A key name is shown in the player's language; the stored value stays SDL's English name.
+        i18n::SetLanguage("fr");
+        SETTINGS_EXPECT(KeyDisplayName("Space") == "Espace" && KeyDisplayName("Backspace") == "Retour arrière" && KeyDisplayName("W") == "W");
+        SETTINGS_EXPECT(std::string(i18n::Tr("L stick")) == "stick gauche" && std::string(i18n::Tr("R stick")) == "stick droit");
+        i18n::SetLanguage("en");
+        SETTINGS_EXPECT(KeyDisplayName("Space") == "Space");
+
         // Seeded once from the player's [input] keys; the other keys of [input] are not copied; the device stays.
         LauncherConfig config;
         config["input"] = { { "device", "keyboard" }, { "key_x", "F" }, { "key_dpad_up", "T" }, { "glyphs", "keyboard" } };
@@ -147,7 +157,7 @@ namespace
         SeedGameInput(config, "giants");
         SETTINGS_EXPECT(config["ssa.input"]["key_x"] == "F" && config["giants.input"]["key_dpad_up"] == "T");
         SETTINGS_EXPECT(config["ssa.input"].count("device") == 0 && config["ssa.input"].count("glyphs") == 0);
-        SETTINGS_EXPECT(GameKeyName(config, "ssa", GameKeys("ssa")[6]) == "F"); // ssa's X row
+        SETTINGS_EXPECT(GameKeyName(config, "ssa", GameKeys("ssa")[5]) == "F"); // ssa's X row
         config["input"]["key_x"] = "G"; // later changes of [input] (a game was played) never seed a game again
         SeedGameInput(config, "ssa");
         SETTINGS_EXPECT(config["ssa.input"]["key_x"] == "F");
