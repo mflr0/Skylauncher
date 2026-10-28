@@ -195,6 +195,57 @@ namespace ui
         return clicked && !options.disabled;
     }
 
+    namespace
+    {
+        constexpr float KeyDepth = 3; // a key cap's side, under its face
+
+        const char* KeyShown(const char* key, const KeyButtonOptions& options) { return options.capturing ? "..." : key; }
+        bool KeyWarns(const KeyButtonOptions& options) { return options.conflict && !options.capturing; }
+    }
+
+    float KeyButtonWidth(const char* key, const KeyButtonOptions& options)
+    {
+        const char* shown = KeyShown(key, options);
+        const float text = TextSize(TextStyle::Body, shown, nullptr, true).x;
+        return std::max(height::Normal, std::ceil(text + (KeyWarns(options) ? icon::Small + space::XXS : 0) + 2 * space::S));
+    }
+
+    bool KeyButton(const char* id, const char* key, const KeyButtonOptions& options)
+    {
+        const char* shown = KeyShown(key, options);
+        const float w = KeyButtonWidth(key, options), h = height::Normal;
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const bool clicked = Hit(id, ImVec2(w, h));
+        const State state = ItemState();
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        // The face sits on its side (KeyDepth under it) and goes down onto it while pressed.
+        const float down = state.pressed ? KeyDepth - 1 : 0;
+        const ImVec2 min(at.x, at.y + down), max(at.x + w, at.y + h + down - KeyDepth);
+        draw->AddRectFilled(ImVec2(at.x, at.y + KeyDepth), ImVec2(at.x + w, at.y + h), Col(0x000000, 0.35f), radius::Control);
+        const unsigned fill = options.capturing ? color::AccentFill : state.pressed ? color::RaisedPressed : state.hovered ? color::RaisedHover : color::Raised;
+        draw->AddRectFilled(min, max, Col(fill), radius::Control);
+        const bool warns = KeyWarns(options);
+        if (warns || !options.capturing)
+            draw->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), Col(warns ? color::Warning : color::Edge),
+                radius::Control, 0, warns ? stroke::Edge : stroke::Hairline);
+        // [warning] name, centred on the face, the capitals on its middle.
+        PushText(TextStyle::Body, true);
+        const float textW = ImGui::CalcTextSize(shown).x, contentW = textW + (warns ? icon::Small + space::XXS : 0);
+        float x = std::round((min.x + max.x - contentW) / 2);
+        const float mid = std::round((min.y + max.y) / 2);
+        if (warns)
+        {
+            DrawIcon(draw, Icon::Warning, ImVec2(x + icon::Small / 2, mid), icon::Small, Col(color::Warning));
+            x += icon::Small + space::XXS;
+        }
+        DrawText(draw, ImVec2(x, std::round(mid - CapMiddle(TextStyle::Body, true))), Col(options.capturing ? color::OnAccent : color::Ink), shown);
+        PopText();
+        FocusRingIf(state, radius::Control);
+        if (options.tooltip != nullptr && WantsTooltip(state))
+            Bubble(options.tooltip, at, ImVec2(at.x + w, at.y + h));
+        return clicked;
+    }
+
     bool IconButton(const char* id, Icon icon, const char* tooltip, const IconButtonOptions& options)
     {
         const float h = HeightOf(options.size);

@@ -762,6 +762,8 @@ Same	Idem
 Action	Action
 Interact	Interagir
 L stick	stick gauche
+R stick	stick droit
+Movement	Déplacement
 R stick up	stick droit haut
 R stick down	stick droit bas
 R stick left	stick droit gauche

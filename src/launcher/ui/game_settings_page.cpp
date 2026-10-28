@@ -151,7 +151,8 @@ namespace launcher_ui
         }
     }
 
-    // The keys of this game: one row per action the game uses, named as the game names it, the pad button beside it.
+    // The keys of this game, as key caps: the movement (the left stick) as a cross of four keys, the right stick's as another
+    // when the game uses it, then one row per other action, named as the game names it, the pad's button after the name.
     // [<game>.input] holds them; PLAY puts them in [input] (game_keys.h).
     void App::DrawGameKeyboard()
     {
@@ -159,47 +160,104 @@ namespace launcher_ui
         const std::string section = GameInputSection(game);
         const std::span<const GameKey> keys = GameKeys(game);
         const PadFamily family = PadFamilyNow();
-        ui::SectionHeader(Tr("Keyboard"), m_capturing != nullptr ? Tf("Press a key for \"{}\" (Escape cancels)", Tr(m_capturing->label)).c_str()
-                                                                  : Tr("Click a key to change it."), false);
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(ui::space::S, ui::space::XS));
-        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
+        auto find = [&](std::string_view action) -> const GameKey* {
+            for (const GameKey& key : keys)
+                if (action == key.action)
+                    return &key;
+            return nullptr;
+        };
+        // What the key is for, in words: the right stick's directions are named by the stick (their rows say "Same").
+        auto purpose = [&](const GameKey& action) {
+            return std::string_view(action.action).starts_with("right_") ? PadButtonName(action, family) : std::string(Tr(action.label));
+        };
+        auto keyCap = [&](const GameKey& action) {
+            const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
+            const std::string tip = purpose(action);
+            ui::KeyButtonOptions options;
+            options.capturing = m_capturing == &action;
+            options.conflict = GameKeyConflict(m_config, game, action);
+            options.tooltip = options.conflict ? Tr("This key is used by another action") : tip.c_str();
+            ImGui::PushID(action.action);
+            if (ui::KeyButton("##key", key.c_str(), options))
+                m_capturing = &action;
+            ImGui::PopID();
+        };
+        auto capWidth = [&](const GameKey* action) {
+            ui::KeyButtonOptions options;
+            options.capturing = m_capturing == action;
+            options.conflict = GameKeyConflict(m_config, game, *action);
+            return ui::KeyButtonWidth(KeyDisplayName(GameKeyName(m_config, game, *action)).c_str(), options);
+        };
+
+        // What to do, or what is awaited.
+        ui::Text(ui::TextStyle::Body, m_capturing != nullptr ? Tf("Press a key for \"{}\" (Escape cancels)", purpose(*m_capturing)).c_str()
+                                                              : Tr("Click a key to change it."), m_capturing != nullptr ? ui::color::Ink : ui::color::Dim);
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+
+        // The crosses, side by side: a title (the action, the stick after it), then up over down, left and right beside it.
+        struct Cross
         {
-            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthStretch, 3);
-            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthStretch, 2);
-            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthStretch, 3);
-            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthStretch, 2);
-            for (size_t i = 0; i < keys.size(); i++)
-            {
-                const GameKey& action = keys[i];
-                if (i % 2 == 0)
-                    ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                // The pad's button as the pad in use prints it (A on a 360 pad, Cross on a PS5, B on a Switch); words translated.
-                // Beside the name when it fits, else under it.
-                const std::string name = Tr(action.label), pad = PadButtonName(action, family);
-                const float room = ImGui::GetContentRegionAvail().x;
-                const bool oneLine = ui::TextSize(ui::TextStyle::Body, name.c_str()).x + ui::space::XS + ui::TextSize(ui::TextStyle::Caption, pad.c_str()).x + 2 * ui::space::S <= room;
-                ImGui::AlignTextToFramePadding();
-                ui::Text(ui::TextStyle::Body, name.c_str(), ui::color::Ink, oneLine ? -1 : 0);
-                if (oneLine)
-                    ImGui::SameLine(0, ui::space::XS);
-                ui::Text(ui::TextStyle::Caption, ("(" + pad + ")").c_str(), ui::color::Dim, -1);
-                ImGui::TableNextColumn();
-                const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
-                const bool duplicate = GameKeyConflict(m_config, game, action);
-                ImGui::PushID(action.action);
-                ui::ButtonOptions options;
-                options.kind = m_capturing == &action ? ui::ButtonKind::Primary : ui::ButtonKind::Secondary;
-                options.icon = duplicate ? ui::Icon::Warning : ui::Icon::None;
-                options.width = -1;
-                options.tooltip = duplicate ? Tr("This key is used by another action") : nullptr;
-                if (ui::Button(m_capturing == &action ? "..." : key.c_str(), options))
-                    m_capturing = &action;
-                ImGui::PopID();
-            }
-            ImGui::EndTable();
+            std::string title, note;
+            const GameKey *up, *left, *down, *right;
+        };
+        std::vector<Cross> crosses;
+        if (const GameKey* up = find("left_up"); up != nullptr && find("left_down") && find("left_left") && find("left_right"))
+            crosses.push_back({ Tr("Movement"), "(" + PadButtonName(*up, family) + ")", up, find("left_left"), find("left_down"), find("left_right") });
+        if (const GameKey* up = find("right_up"); up != nullptr && find("right_down") && find("right_left") && find("right_right"))
+            crosses.push_back({ Tr(up->label), "(" + std::string(Tr("R stick")) + ")", up, find("right_left"), find("right_down"), find("right_right") });
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const float columnW = ImGui::GetContentRegionAvail().x / 2;
+        const float crossH = ui::type::Body + ui::space::S + 2 * ui::height::Normal + ui::space::XS;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        for (size_t i = 0; i < crosses.size(); i++)
+        {
+            const Cross& cross = crosses[i];
+            const float x = origin.x + float(i) * columnW;
+            ui::PushText(ui::TextStyle::Body, true);
+            ui::DrawText(draw, ImVec2(x, origin.y), ui::Col(ui::color::Ink), cross.title.c_str());
+            const float titleEnd = x + ImGui::CalcTextSize(cross.title.c_str()).x;
+            ui::PopText();
+            ui::PushText(ui::TextStyle::Caption);
+            ui::DrawText(draw, ImVec2(titleEnd + ui::space::XS, origin.y + ui::Baseline(ui::TextStyle::Body, true) - ui::Baseline(ui::TextStyle::Caption)),
+                ui::Col(ui::color::Dim), cross.note.c_str());
+            ui::PopText();
+            const float wL = capWidth(cross.left), wD = capWidth(cross.down), wR = capWidth(cross.right), wU = capWidth(cross.up);
+            const float top = origin.y + ui::type::Body + ui::space::S, below = top + ui::height::Normal + ui::space::XS;
+            // The keys' row starts on the title's edge; the top key over the middle one.
+            const float middle = x + wL + ui::space::XS + wD / 2;
+            ImGui::SetCursorScreenPos(ImVec2(std::round(middle - wU / 2), top));
+            keyCap(*cross.up);
+            ImGui::SetCursorScreenPos(ImVec2(x, below));
+            keyCap(*cross.left);
+            ImGui::SetCursorScreenPos(ImVec2(x + wL + ui::space::XS, below));
+            keyCap(*cross.down);
+            ImGui::SetCursorScreenPos(ImVec2(x + wL + wD + 2 * ui::space::XS, below));
+            keyCap(*cross.right);
         }
-        ImGui::PopStyleVar();
+        if (!crosses.empty())
+        {
+            // A hairline (M below the keys) parts them from the list, like the list's rows from each other.
+            const float line = origin.y + crossH + ui::space::M;
+            draw->AddLine(ImVec2(origin.x, line + 0.5f), ImVec2(origin.x + ImGui::GetContentRegionAvail().x, line + 0.5f),
+                ui::Col(ui::color::Hairline, 110.0f / 255), ui::stroke::Hairline);
+            ImGui::SetCursorScreenPos(ImVec2(origin.x, line + ui::stroke::Hairline));
+        }
+
+        // The other actions: a settings row each, the key right-aligned in the control column.
+        if (ui::BeginSettings("##keys"))
+        {
+            for (const GameKey& action : keys)
+            {
+                const std::string_view name = action.action;
+                if (name.starts_with("left_") || name.starts_with("right_"))
+                    continue;
+                const std::string pad = "(" + PadButtonName(action, family) + ")";
+                ui::SettingRow(Tr(action.label), nullptr, pad.c_str());
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - capWidth(&action));
+                keyCap(action);
+            }
+            ui::EndSettings();
+        }
         ImGui::Dummy(ImVec2(0, ui::space::XS));
         ui::ButtonOptions reset;
         reset.kind = ui::ButtonKind::Danger;

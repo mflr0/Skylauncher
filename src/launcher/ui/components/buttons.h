@@ -59,6 +59,18 @@ namespace ui
     };
     bool IconButton(const char* id, Icon icon, const char* tooltip, const IconButtonOptions& options = {});
 
+    // A key bound to an action, drawn as a key cap: height::Normal high, at least as wide, as wide as its name needs.
+    // Pressed, it waits for the new key (`capturing`: the accent and "..."); `conflict`: another action has the same key
+    // (a warning icon and edge; the tooltip says so).
+    struct KeyButtonOptions
+    {
+        bool capturing = false;
+        bool conflict = false;
+        const char* tooltip = nullptr;
+    };
+    bool KeyButton(const char* id, const char* key, const KeyButtonOptions& options = {});
+    float KeyButtonWidth(const char* key, const KeyButtonOptions& options = {});
+
     // The game page's big split button: the main action (PLAY, INSTALL, UPDATE, CHOOSE DISC) in the game's colours, and the
     // game's settings in a gear segment on its right. height::MainWidth + height::MainGear by height::Main, at the cursor.
     struct MainActionOptions
