@@ -229,6 +229,7 @@ endif()
 # Checks against the player's own disc image: ArkeyanLauncherTest <game disc .iso> <scratch dir> [<damaged copy>...]
 add_executable(ArkeyanLauncherTest EXCLUDE_FROM_ALL tests/launcher_test.cpp)
 target_link_libraries(ArkeyanLauncherTest PRIVATE ArkeyanLauncherCore)
+target_include_directories(ArkeyanLauncherTest PRIVATE lib/stb)
 # A stand-in for the kit's SkyBuild, in <build>/fake-kit: the install screens and ArkeyanLauncherTest run against it.
 add_executable(FakeSkyBuild EXCLUDE_FROM_ALL tests/fake_skybuild.c)
 set_target_properties(FakeSkyBuild PROPERTIES OUTPUT_NAME SkyBuild RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fake-kit)

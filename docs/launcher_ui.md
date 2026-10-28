@@ -261,7 +261,7 @@ Game settings > Game > Desktop shortcut > **Create** (enabled once the disc is v
 that game on the Desktop. It starts Arkeyan Launcher as `ArkeyanLauncher --game <id> --play`: the window opens on that game's page, checks the
 disc, and starts the game as soon as it is ready. If it can't (no disc, a failed check, the game not built yet) the window stays
 open and says why, so the shortcut never leaves the player with nothing. Made again, it replaces the old one.
-The icon is the game's title icon decoded from the player's disc (`GameSlot::meta.iconPng`, memory only until the player asks).
+The icon is the built game's own, `game_icon.png` in its folder (the disc's title logo fitted in a transparent 512 px square, made by the kit's SkyBuild); a game built before that has none, and the shortcut falls back to the title icon decoded from the player's disc (`GameSlot::meta.iconPng`, memory only until the player asks). On Windows a 512 px PNG is halved to 256 px for the `.ico` (an entry is at most 256, `FitIcoPng`).
 
 | System | File on the Desktop | Icon |
 | --- | --- | --- |

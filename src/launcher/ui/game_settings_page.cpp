@@ -5,6 +5,8 @@
 #include "launcher/shortcut.h"
 #include "shared/collection/datadir.h"
 #include <fmt/format.h>
+#include <fstream>
+#include <iterator>
 
 namespace launcher_ui
 {
@@ -346,9 +348,14 @@ namespace launcher_ui
         spec.gameId = m_s->game.id;
         spec.gameName = m_s->game.name;
         spec.launcher = SelfExecutable();
-        spec.iconPng = m_s->meta.iconPng;
-        spec.folder = DesktopFolder();
+        // The built game's own icon (game_icon.png in its folder: the disc's logo, made by SkyBuild), else the disc's title icon.
         spec.iconFolder = GameInstallFolder({});
+        spec.iconFolder = GameInstallFolder({});
+        if (std::ifstream file(spec.iconFolder / "game_icon.png", std::ios::binary); file)
+            spec.iconPng.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+        if (spec.iconPng.empty())
+            spec.iconPng = m_s->meta.iconPng;
+        spec.folder = DesktopFolder();
         ShortcutResult result = CreateDesktopShortcut(spec);
         Toast(result.ok ? Tr("Shortcut added to the Desktop") : result.error, !result.ok);
     }
