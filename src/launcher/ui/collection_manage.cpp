@@ -132,18 +132,19 @@ namespace launcher_ui
             ui::EmptyState(ui::Icon::Trash, Tr("The trash is empty."));
             return;
         }
-        if (!ui::BeginSettings("##trash"))
+        ui::ButtonOptions forGood;
+        forGood.kind = ui::ButtonKind::Danger;
+        forGood.hold = true;
+        forGood.tooltip = Tr(strings::DeleteForGoodHint);
+        const float buttons = ui::ButtonWidth(Tr("Put back")) + ui::space::XS + ui::ButtonWidth(Tr(strings::DeleteForGood), forGood);
+        if (!ui::BeginSettings("##trash", buttons)) // the two buttons on one line, in every language
             return;
         for (size_t i = 0; i < trash.size(); i++)
         {
             const collection::TrashEntry& entry = trash[i];
             ImGui::PushID(entry.id.c_str());
             ui::SettingRow(names[i].c_str(), Tf("{} · {}", When(entry.deleted), entry.reason == "tidy" ? Tr("tidied") : Tr("deleted")).c_str());
-            ui::ButtonOptions forGood;
-            forGood.kind = ui::ButtonKind::Danger;
-            forGood.hold = true;
-            forGood.tooltip = Tr(strings::DeleteForGoodHint);
-            ui::AlignRight(ui::ButtonWidth(Tr("Put back")) + ui::space::XS + ui::ButtonWidth(Tr(strings::DeleteForGood), forGood));
+            ui::AlignRight(buttons);
             if (ui::Button(Tr("Put back")))
             {
                 const bool failed = collection::Undelete(entry.id).empty();

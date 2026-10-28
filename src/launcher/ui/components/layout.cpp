@@ -141,7 +141,7 @@ namespace ui
 
     // ---- Settings rows ---------------------------------------------------------------------------------------------
 
-    bool BeginSettings(const char* id)
+    bool BeginSettings(const char* id, float controlWidth)
     {
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(space::XXS, space::S));
         ImGui::PushStyleColor(ImGuiCol_TableBorderLight, LauncherTheme::Rgb(color::Hairline, 110));
@@ -153,7 +153,7 @@ namespace ui
             return false;
         }
         ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("control", ImGuiTableColumnFlags_WidthFixed, height::SettingControl);
+        ImGui::TableSetupColumn("control", ImGuiTableColumnFlags_WidthFixed, std::max(controlWidth, float(height::SettingControl)));
         return true;
     }
 
@@ -321,8 +321,13 @@ namespace ui
         Text(TextStyle::Title, title, color::Ink, -1);
         ImGui::PopTextWrapPos();
         const float below = ImGui::GetCursorPosY();
-        ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - space::L - cross, top - (cross - type::Title) / 2));
-        if (IconButton("##close", Icon::Cross, Tr("Close")))
+        // On the title's capitals; the pointer's only (B and Escape close a dialog): the keyboard's and the pad's first stop is
+        // the dialog's content or its action, never the cross.
+        ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - space::L - cross, std::round(top + CapMiddle(TextStyle::Title) - cross / 2)));
+        ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
+        const bool closed = IconButton("##close", Icon::Cross, Tr("Close"));
+        ImGui::PopItemFlag();
+        if (closed)
         {
             *open = false;
             ImGui::CloseCurrentPopup();

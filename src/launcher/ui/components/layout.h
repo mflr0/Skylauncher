@@ -48,7 +48,7 @@ namespace ui
     // column on the right (height::SettingControl wide), rows at least height::Large high with a hairline between them.
     // Between BeginSettings (false: draw nothing) and EndSettings, one SettingRow per setting, then its control; the label is
     // drawn once the control is, centred on it (`note`: a small word after the label, on its baseline: a pad's button). ----
-    bool BeginSettings(const char* id);
+    bool BeginSettings(const char* id, float controlWidth = height::SettingControl); // wider for a row of buttons that needs it
     void SettingRow(const char* label, const char* hint = nullptr, const char* note = nullptr);
     void EndSettings();
     // Moves the cursor so that a control (or a group) `width` wide ends at the available room's right edge: a settings row's
