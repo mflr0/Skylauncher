@@ -350,7 +350,6 @@ namespace launcher_ui
         spec.launcher = SelfExecutable();
         // The built game's own icon (game_icon.png in its folder: the disc's logo, made by SkyBuild), else the disc's title icon.
         spec.iconFolder = GameInstallFolder({});
-        spec.iconFolder = GameInstallFolder({});
         if (std::ifstream file(spec.iconFolder / "game_icon.png", std::ios::binary); file)
             spec.iconPng.assign(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         if (spec.iconPng.empty())
