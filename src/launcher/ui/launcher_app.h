@@ -6,6 +6,7 @@
 #include "assets/launcher_assets.h"
 #include "launcher/game_copy.h"
 #include "launcher/game_install.h"
+#include "launcher/game_progress.h"
 #include "launcher/game_keys.h"
 #include "launcher/game_run.h"
 #include "launcher/game_settings.h"
@@ -168,7 +169,7 @@ namespace launcher_ui
     // Home is the menu (the SKYLAUNCHER title opens it), Play is the game art and the main button, Collection is the
     // figures (its sidebar row), the gear opens the launcher's Settings, and the game's Settings button (on its Play
     // page) opens that game's own settings.
-    enum class Page { Home, Play, Collection, Settings, GameSettings };
+    enum class Page { Home, Play, Collection, Settings, GameSettings, Achievements };
     enum class SettingsTab { Controls, Launcher, Support, About };
     enum class GameTab { Video, Keyboard, Controller, Language, Disc, Saves, Game };
     enum class DiscState { None, Verifying, Ready, Failed };
@@ -307,6 +308,10 @@ namespace launcher_ui
         void DrawSupport();      // support_page.cpp: logs and the problem report
         // A game's own settings (game_settings_page.cpp), opened from the Settings button on its Play page.
         void DrawGameSettings();
+        // A game's achievements and play time (achievements_page.cpp), opened from its Play page.
+        void DrawAchievements();
+        void RefreshProgress(bool force = false);
+        const ArtTexture* AchievementIcon(const std::filesystem::path& image);
         void DrawGameVideo();
         void DrawGameKeyboard();
         void DrawGameLanguage();
@@ -565,7 +570,7 @@ namespace launcher_ui
         bool m_testKeys = false;       // SKY_LAUNCHER_TEST_KEYS: each game's Keyboard tab, one shot each
         int m_testScreens = 0;         // SKY_LAUNCHER_TEST_SCREENS: Home, the game page and its Keyboard tab; 1 with the mouse, 2 with a pad
         bool m_testPad = false;        // SKY_LAUNCHER_TEST_PAD: each game's Controller tab, and Swap Force's Game tab
-
+        bool m_testAchievements = false; // SKY_LAUNCHER_TEST_ACHIEVEMENTS: the shown game's page with its play time, then its achievements
         bool m_testLogo = false;       // SKY_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
         uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)
@@ -575,6 +580,11 @@ namespace launcher_ui
         const GameSlot* m_logoDropSlot = nullptr;
         bool m_logoDropHad = false; // the logo was there (it may arrive after the page, once the disc is read)
         Page m_lastPage = Page::Home;
+        GameProgress m_progress;           // the shown game's achievements and play time (RefreshProgress)
+        const GameSlot* m_progressSlot = nullptr;
+        std::string m_progressLanguage;
+        uint64_t m_progressAt = 0;
+        std::map<std::string, ArtTexture> m_achievementIcons; // by file
         std::map<std::string, ArtTexture> m_cachedArt; // CachedArt's, by "<game> <role> <width>"
 
         ui::Toasts m_toasts; // newest last; drawn at the bottom right, upwards

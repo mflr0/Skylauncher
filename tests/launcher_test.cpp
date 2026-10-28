@@ -3,6 +3,7 @@
 #include "launcher/portal_status.h"
 #include "launcher/env.h"
 #include "launcher/game_install.h"
+#include "launcher/game_progress.h"
 #include "launcher/launcher.h"
 #include "launcher/updater.h"
 #include "assets/launcher_assets.h"
@@ -17,6 +18,7 @@
 #include "shared/vfs.h"
 #include <algorithm>
 #include <chrono>
+#include <ctime>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -968,6 +970,45 @@ static void SeatXChecks(const std::filesystem::path& scratch)
     printf("Seat X: %d of 12 tries emptied their seat\n", emptied);
 }
 
+// The achievements and the play time as the game page shows them (game_progress.h): rows from a list and the unlocks, the hidden
+// ones, the texts of the play time line. No disc: the disc's list is checked with each game's pictures below.
+int AchievementChecks()
+{
+    int before = g_failures;
+    achievements::List list;
+    list.items.resize(3);
+    list.items[0].id = 1; list.items[0].name = "First"; list.items[0].unlockedDescription = "Did it"; list.items[0].lockedDescription = "Do it";
+    list.items[0].gamerscore = 10;
+    list.items[1].id = 2; list.items[1].name = "Secret name"; list.items[1].unlockedDescription = "It was this"; list.items[1].lockedDescription = "???";
+    list.items[1].gamerscore = 20; list.items[1].hidden = true;
+    list.items[2].id = 3; list.items[2].name = "Third"; list.items[2].unlockedDescription = "Did the third"; list.items[2].gamerscore = 30; // no locked text
+    GameProgress locked = BuildProgress(list, {}, {});
+    EXPECT(locked.hasList && locked.rows.size() == 3 && locked.unlocked == 0 && locked.gamerscore == 0 && locked.totalGamerscore == 60);
+    EXPECT(locked.rows[0].name == "First" && locked.rows[0].description == "Do it");
+    EXPECT(locked.rows[1].name == "Hidden achievement" && locked.rows[1].description == "???"); // shown as the game shows it
+    EXPECT(locked.rows[2].description == "Did the third");                                     // nothing else to show
+    GameProgress done = BuildProgress(list, { { 2, 5000 }, { 3, 6000 }, { 99, 7000 } }, {});
+    EXPECT(done.unlocked == 2 && done.gamerscore == 50 && done.rows[1].unlocked && done.rows[1].time == 5000);
+    EXPECT(done.rows[1].name == "Secret name" && done.rows[1].description == "It was this" && !done.rows[0].unlocked);
+    EXPECT(!BuildProgress({}, {}, {}).hasList);
+
+    std::tm noon{};
+    noon.tm_year = 126; noon.tm_mon = 9; noon.tm_mday = 28; noon.tm_hour = 12; noon.tm_isdst = -1; // 2026-10-28 12:00 local
+    int64_t now = int64_t(std::mktime(&noon));
+    EXPECT(FormatPlayTime(0) == "less than a minute" && FormatPlayTime(59) == "less than a minute" && FormatPlayTime(60) == "1 min");
+    EXPECT(FormatPlayTime(34 * 60 + 59) == "34 min" && FormatPlayTime(3600) == "1 h 00" && FormatPlayTime(12 * 3600 + 34 * 60) == "12 h 34");
+    EXPECT(FormatLastPlayed(now - 3600, now) == "today" && FormatLastPlayed(now - 86400, now) == "yesterday");
+    EXPECT(FormatLastPlayed(now - 3 * 86400, now) == "3 days ago" && FormatLastPlayed(now - 40 * 86400, now) == "2026-09-18");
+    EXPECT(FormatDate(now) == "2026-10-28");
+    EXPECT(PlayTimeLine({}, now).empty());
+    EXPECT(PlayTimeLine({ 12 * 3600 + 34 * 60, now - 60, 3 }, now) == "Play time: 12 h 34 \xC2\xB7 Last played: today");
+    i18n::SetLanguage("fr");
+    EXPECT(PlayTimeLine({ 90, now - 86400, 1 }, now) == "Temps de jeu\xC2\xA0: 1 min \xC2\xB7 Derni\xC3\xA8re partie\xC2\xA0: hier");
+    i18n::SetLanguage("en");
+    printf("Achievements and play time: rows, hidden ones and the play time line checked\n");
+    return g_failures - before;
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 3)
@@ -1023,6 +1064,7 @@ int main(int argc, char** argv)
     g_failures += UninstallChecks(scratch);
     g_failures += I18nChecks();
     g_failures += TextFitChecks();
+    g_failures += AchievementChecks();
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };
@@ -1076,7 +1118,7 @@ int main(int argc, char** argv)
     }
 
     // The game's pictures (shared/art/game_art.h), into a scratch data folder: logo, background, title icon, portraits.
-    auto artChecks = [&](const char* id, const std::string& image, int minimumPortraits) {
+    auto artChecks = [&](const char* id, const std::string& image, int minimumPortraits, size_t achievementCount) {
         DiscFileSystem gameDisc;
         EXPECT(gameDisc.Open(image.c_str()));
         TitleMetadata meta = ReadTitleMetadata(gameDisc.ReadAll("default.xex"));
@@ -1092,6 +1134,37 @@ int main(int argc, char** argv)
         EXPECT(provider.Get(LauncherAssets::Role::Logo).valid && provider.Get(LauncherAssets::Role::HeroBackground).valid);
         EXPECT(provider.Get(LauncherAssets::Role::TitleIcon).valid && LauncherAssets::Cached(id, LauncherAssets::Role::Logo).valid);
         EXPECT(found.portraits >= minimumPortraits);
+        // The achievements the disc check caches (game_progress.h), then what the game recorded: its own data folder, not SKY_SAVE_DIR.
+        {
+            const char* saveDir = getenv("SKY_SAVE_DIR");
+            std::string savedSaveDir = saveDir != nullptr ? saveDir : "";
+            SDL_unsetenv_unsafe("SKY_SAVE_DIR");
+            std::filesystem::path cache = AchievementCacheFolder(id);
+            std::vector<uint8_t> xex = gameDisc.ReadAll("default.xex");
+            EXPECT(!cache.empty() && !achievements::CacheIsCurrent(cache, "k") && achievements::WriteCache(cache, "k", xex) && achievements::CacheIsCurrent(cache, "k"));
+            GameProgress fresh = ReadGameProgress(id, "en");
+            size_t pictures = std::count_if(fresh.rows.begin(), fresh.rows.end(), [](const AchievementRow& row) { return !row.image.empty(); });
+            printf("  %s: %zu achievements, gamerscore %u, %zu pictures\n", id, fresh.rows.size(), fresh.totalGamerscore, pictures);
+            EXPECT(fresh.hasList && fresh.rows.size() == achievementCount && fresh.totalGamerscore == 1000 && fresh.unlocked == 0 && pictures == achievementCount);
+            EXPECT(fresh.play.totalSeconds == 0 && PlayTimeLine(fresh.play, 0).empty());
+            if (fresh.rows.size() >= 3)
+            {
+                std::filesystem::path folder = progress::Folder(id);
+                EXPECT(progress::WriteUnlock(folder, fresh.rows[0].id, 1000) && progress::WriteUnlock(folder, fresh.rows[2].id, 2000));
+                EXPECT(progress::WritePlayTime(folder, { 3700, 5000, 2 }));
+                GameProgress played = ReadGameProgress(id, "en");
+                EXPECT(played.unlocked == 2 && played.rows[0].unlocked && played.rows[0].time == 1000 && !played.rows[1].unlocked && played.rows[2].unlocked);
+                EXPECT(played.gamerscore == fresh.rows[0].gamerscore + fresh.rows[2].gamerscore && played.play.totalSeconds == 3700 && played.play.sessions == 2);
+                EXPECT(played.rows[0].description == fresh.rows[0].description || !played.rows[0].description.empty());
+                GameProgress french = ReadGameProgress(id, "fr");
+                size_t differ = 0;
+                for (size_t i = 0; i < french.rows.size() && i < played.rows.size(); i++)
+                    differ += french.rows[i].name != played.rows[i].name;
+                EXPECT(french.rows.size() == achievementCount && french.unlocked == 2 && differ > 0);
+            }
+            if (!savedSaveDir.empty())
+                SDL_setenv_unsafe("SKY_SAVE_DIR", savedSaveDir.c_str(), 1);
+        }
         if (std::string_view(id) == "swapforce")
             return;
         // The upgrades' names, read with the pictures (shared/collection/upgrades.h): Spyro's list from the disc.
@@ -1103,10 +1176,10 @@ int main(int argc, char** argv)
     printf("Disc pictures:\n");
     std::string dataBefore = getenv("SKYLANDERS_DATA") != nullptr ? getenv("SKYLANDERS_DATA") : "";
     SDL_setenv_unsafe("SKYLANDERS_DATA", (scratch / "art-data").string().c_str(), 1);
-    artChecks("ssa", iso.string(), 70);
+    artChecks("ssa", iso.string(), 70, 38);
     if (const char* giantsIso = skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
     {
-        artChecks("giants", giantsIso, 123);
+        artChecks("giants", giantsIso, 123, 45);
         // The rule for a toy: the shown game's picture, else the other game's (Jet-Vac has none on Spyro's Adventure).
         const collection::Toy* eruptor = collection::Catalogue::Get().Find(9);
         const collection::Toy* jetVac = collection::Catalogue::Get().Find(100);
@@ -1121,7 +1194,7 @@ int main(int argc, char** argv)
     }
     if (const char* swapIso = skyenv::Get("SKY_LAUNCHER_TEST_SWAPFORCE_ISO"); swapIso != nullptr)
     {
-        artChecks("swapforce", swapIso, 150);
+        artChecks("swapforce", swapIso, 150, 39);
         // A toy's portrait comes from the shown game's disc; Swap Force's own toys have one only here.
         const collection::Toy* doomTop = collection::Catalogue::Get().Find(2003);
         EXPECT(doomTop != nullptr && !collection::PortraitPath("swapforce", *doomTop).empty());

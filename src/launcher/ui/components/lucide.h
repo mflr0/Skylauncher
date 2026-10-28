@@ -36,4 +36,5 @@ namespace ui::lucide
     constexpr unsigned Circle = 0xE076; // circle
     constexpr unsigned Square = 0xE167; // square
     constexpr unsigned Triangle = 0xE192; // triangle
+    constexpr unsigned Trophy = 0xE373; // trophy
 }

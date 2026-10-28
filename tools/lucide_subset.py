@@ -19,7 +19,7 @@ ICONS = [
     "check", "x", "plus", "minus", "chevron-down", "chevron-up", "chevron-left", "chevron-right", "arrow-up", "arrow-down",
     "search", "settings", "info", "triangle-alert", "circle-x", "download", "trash-2", "folder", "disc-3", "play", "timer",
     "ellipsis", "star", "circle-check", "circle-arrow-down", "circle-pause", "circle-dashed", "loader-circle", "gamepad-2",
-    "circle", "square", "triangle",
+    "circle", "square", "triangle", "trophy",
 ]
 
 

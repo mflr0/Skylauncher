@@ -654,6 +654,35 @@ space, so nothing moves when the line changes. "Playing" is never shown: PLAY cl
 `FAKE_SSABUILD_HOLD` keeps the build at 100 %) shoots and checks the line through an install and an update at 0, 50 and 100 %,
 with the other game shown meanwhile, then a failed build: `ArkeyanLauncherTest` runs it (`SidebarChecks`).
 
+## Achievements and play time
+
+The games have Xbox 360 achievements; the launcher lists them per game and shows how long the game was played. Nothing is shipped: the list is
+read from the player's own disc.
+
+- **The list.** The disc check (`VerifyJob`) reads the title's XDBF in `default.xex` and caches it in `<Game>/launcher-cache/achievements/`:
+  `list.tsv` (each achievement's id, gamerscore, picture id and hidden flag, and its name, unlocked text and locked text in en, fr, de, es, it,
+  pt) and one `<picture id>.png` each. The cache holds the `default.xex`'s SHA-256: it is rewritten only when the disc's `default.xex`
+  changes (older launchers' caches have no list: the next disc check makes it). Code: `src/shared/collection/achievements.{h,cpp}` (also
+  the runtime's reader: `tools/sync_skylauncher.sh`); counts per disc are in SSARecomp's `docs/runtime/xbox360/xam.md` (SSA 38, Giants 45,
+  Swap Force 39, 1000 G each). "Clear caches" removes it; the next disc check makes it again.
+- **What was unlocked and the play time** are written by the game runtime, not the launcher (`achievements.txt`, `playtime.txt`:
+  `docs/settings.md`, "Progress files"). `src/launcher/game_progress.{h,cpp}` joins them with the cached list in the launcher's language (English
+  where a language has no text) and formats the play time line. The page reads them again every 1.5 s, so a game running beside the launcher shows
+  its new unlocks.
+- **The game page** (Play) shows under the disc's lines "Play time: 12 h 34 · Last played: today" (`Last played`: today, yesterday, "3 days ago",
+  then the date); nothing for a game never played. An **Achievements 6/38** button, under "Change disc...", opens the page once the list is cached.
+- **The Achievements page** (`ui/achievements_page.cpp`; `Page::Achievements`, which the sidebar and Back treat like the game's settings: B or Back
+  returns to the game page): the game's name, the totals ("6 of 38 unlocked · 180 of 1000 G"), the play time, a bar, then one row per
+  achievement in the game's order: its picture, name, description, gamerscore, and for an unlocked one the date (accent colour, full picture).
+  A locked one is greyed and shows the game's own text for it (the locked description, else the unlocked one); a hidden one still locked shows
+  "Hidden achievement" and the game's locked text, as the game shows it (none of the three discs has one: `BuildProgress` is checked on
+  made-up data). Rows take the keyboard and pad focus, which scrolls the list.
+- **Screenshots**: `SKY_LAUNCHER_TEST_ACHIEVEMENTS=1` (with `SKY_LAUNCHER_SHOTS`, `SKY_LAUNCHER_TEST_DROP=<disc>`, a scratch `SKYLANDERS_DATA`, `--game <id>`,
+  `SKY_LAUNCHER_LANGUAGE=en|fr`) verifies the disc, writes six unlocks and 12 h 34 of play in the scratch folder, and shoots
+  `achievements-1-game`, `achievements-2-list` and `achievements-3-end`.
+- **Tests**: `ArkeyanLauncherTest` (`AchievementChecks`: rows, hidden ones, the play time texts in English and French; per game's disc in the
+  "Disc pictures" part: the cache, the counts, the unlocks and the play time read back, French names differ).
+
 ## Game data (copy the disc's files, no disc image afterwards)
 Game settings > Disc has two sections: **Disc image** (choose, change, remove, show in folder) and **Game data**, which copies the
 disc's files (about the image's size, 8 GB) into `<data>/<Game>/gamedata/` so the disc image is no longer needed. The default is

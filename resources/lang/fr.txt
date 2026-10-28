@@ -270,7 +270,7 @@ Report a problem	Signaler un problème
 You see the report before saving it; nothing is sent.	Vous voyez le rapport avant de l'enregistrer ; rien n'est envoyé.
 Report copied	Rapport copié
 Report saved	Rapport enregistré
-Report saved: {}	Rapport enregistré : {}
+Report saved: {}	Rapport enregistré : {}
 Save to Desktop	Enregistrer sur le Bureau
 FPS counter	Compteur d'images
 A small frame rate readout in the game (F3 in the game turns it on too).	Un petit compteur d'images par seconde dans le jeu (F3 dans le jeu l'active aussi).
@@ -840,3 +840,15 @@ Difficulty	Difficulté
 Nightmare from the start	Cauchemar dès le début
 Offered before you beat the game. Your save is not changed.	Proposé avant d'avoir fini le jeu. Votre sauvegarde n'est pas modifiée.
 
+# Achievements and play time (the game page, Achievements)
+Achievements	Succès
+Achievements {}/{}	Succès {}/{}
+Hidden achievement	Succès caché
+The list comes from your disc: it appears once the game's disc image is checked.	La liste vient de votre disque : elle apparaît une fois l'image disque du jeu vérifiée.
+{} of {} unlocked · {} of {} G	{} sur {} débloqués · {} sur {} G
+Play time: {}	Temps de jeu : {}
+Last played: {}	Dernière partie : {}
+less than a minute	moins d'une minute
+today	aujourd'hui
+yesterday	hier
+{} days ago	il y a {} jours

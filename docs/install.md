@@ -101,7 +101,7 @@ The launcher, the game and SkyBuild keep everything under one root per OS, chose
 | `kit/<release tag>/` | the kits the launcher downloaded |
 | `toolchains/` | the compiler SkyBuild downloads (Windows) |
 | `logs/` | `skylauncher-game.log` (+ `.prev.log`) and `migration.log` |
-| `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `saves-backup/`, `pipelines.bin`, `portal.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Giants has its own folder, `Giants/`, with the same layout (`SGRecomp.app` / `SGRecomp.exe`). |
+| `SSA/` | the built game (`SSARecomp.app` / `SSARecomp.exe`, `install.log` + `install.prev.log`, `install-logs/`), and its data: `saves/`, `saves-backup/`, `pipelines.bin`, `portal.txt`, `achievements.txt`, `playtime.txt`, `figures/`, `portraits/`, `launcher-cache/`, `SSARecomp.log` (+ `.prev.log`). Giants has its own folder, `Giants/`, with the same layout (`SGRecomp.app` / `SGRecomp.exe`). |
 
 **Environment variables.** The launcher reads `SKY_LAUNCHER_<X>` (its own: `SKY_LAUNCHER_DATA`, `SKY_LAUNCHER_INI`, `SKY_LAUNCHER_KIT`...)
 and `SKY_<X>` (shared with the games and SkyBuild: `SKY_COLLECTION`, `SKY_SAVE_DIR`, `SKY_SETTINGS`...), then the names of earlier
@@ -146,8 +146,8 @@ Restore uses) and **disabled while the game installs**. The sizes shown next to 
 | Button | Goes | Stays |
 | --- | --- | --- |
 | **Clear caches** (plain button) | `pipelines.bin` (shader cache), `launcher-cache/` (the disc's art), `portraits/`, the game's `*.log` | everything else: the saves too |
-| **Delete saves and data** (held a second) | the saves (`saves/`, or `SKY_SAVE_DIR`), `saves-backup/`, `portal.txt` (the seats of the next session), and the caches above | the built game, the disc image, the settings in `launcher.ini`, `textures/`, `figures/`, the shared figure collection |
-| **Remove game** (held a second) | the built game (`SSARecomp.app` or `.exe`, its libraries and shaders), `install.log` and `install-logs/`, `pipelines.bin`, the game's logs; and `[install.<sha256>]` in `launcher.ini`, so the Play page offers INSTALL again | the saves and their backups, `portal.txt`, `textures/`, `figures/`, `launcher-cache/`, `portraits/`, the disc image, the settings |
+| **Delete saves and data** (held a second) | the saves (`saves/`, or `SKY_SAVE_DIR`), `saves-backup/`, `portal.txt` (the seats of the next session), `achievements.txt` and `playtime.txt` (the unlocked achievements and the play time: they go with the saves), and the caches above | the built game, the disc image, the settings in `launcher.ini`, `textures/`, `figures/`, the shared figure collection |
+| **Remove game** (held a second) | the built game (`SSARecomp.app` or `.exe`, its libraries and shaders), `install.log` and `install-logs/`, `pipelines.bin`, the game's logs; and `[install.<sha256>]` in `launcher.ini`, so the Play page offers INSTALL again | the saves and their backups, `portal.txt`, `achievements.txt`, `playtime.txt`, `textures/`, `figures/`, `launcher-cache/`, `portraits/`, the disc image, the settings |
 | **Reinstall** (held a second) | nothing is deleted: SkyBuild builds again (incremental) | all of it |
 
 After an uninstall the disc is still known, so INSTALL builds the game again and the saves are where they were. To remove
@@ -215,8 +215,8 @@ macOS together with `SKY_LAUNCHER_UNINSTALL_TRASH`).
 After a **successful** install: `ssabuild-work/` (2-3 GB) is deleted and its `logs/` kept as `install-logs/` (an update
 therefore rebuilds everything); the kits in `kit/` older than the one that built the game are deleted; a compiler archive
 (`toolchains/*.zip`) whose extracted copy is ready is deleted. Each log keeps one previous run (`.prev.log`). The art
-cache `<Game>/launcher-cache` holds three pictures (logo, background, title icon; `docs/launcher_ui.md`, "Disc art") and
-needs no trimming; the per-title folders of older launchers in it are removed at the next disc check.
+cache `<Game>/launcher-cache` holds three pictures (logo, background, title icon; `docs/launcher_ui.md`, "Disc art") and the
+achievements' list with their pictures (`achievements/`, "Achievements and play time") and needs no trimming; the per-title folders of older launchers in it are removed at the next disc check.
 
 ## Linux
 

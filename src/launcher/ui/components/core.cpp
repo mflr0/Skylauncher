@@ -313,6 +313,7 @@ namespace ui
             case Icon::Circle: return lucide::Circle;
             case Icon::Square: return lucide::Square;
             case Icon::Triangle: return lucide::Triangle;
+            case Icon::Trophy: return lucide::Trophy;
             }
             return 0;
         }

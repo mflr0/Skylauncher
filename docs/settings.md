@@ -186,3 +186,17 @@ changed.
 
 When it starts the game, the launcher also passes `portal` and the languages through the environment variables in
 brackets above, which the runtime already reads.
+
+## Progress files (written by the game, read by the launcher)
+
+Not settings: two small text files in the game's folder (`<root>/SSA`, `<root>/Giants`, `<root>/SwapForce`; `SKY_SAVE_DIR` in test runs), kept
+by the game runtime and shown on the game page (`docs/launcher_ui.md`, "Achievements and play time"):
+
+| File | Lines | Meaning |
+| --- | --- | --- |
+| `achievements.txt` | `<id> <unix time>` | An achievement the game unlocked, with the time; the first time of an id stays. The ids are the disc's (SSA 1 to 38, Giants 200 to 244, Swap Force 7 and 26 to 64) |
+| `playtime.txt` | `total=<seconds>`, `last_end=<unix time>`, `sessions=<count>` | The game's play time, written when it starts, every minute and at exit (so a game started from its own icon or a shortcut counts too); `last_end` is the end of the last session, moving while it runs |
+
+Both go with the saves: "Delete saves and data" removes them, "Remove game" keeps them. The achievements' list itself (names, descriptions,
+gamerscore, pictures) is not here: it is read from the player's disc at the disc check and cached in `<Game>/launcher-cache/achievements/`.
+
