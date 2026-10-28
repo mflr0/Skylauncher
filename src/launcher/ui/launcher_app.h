@@ -127,8 +127,6 @@ namespace launcher_ui
 
     // ---- Drawing --------------------------------------------------------------------------------------------------
 
-    // `passes` extra copies, each BoldOffset further right: 1 is bold, more is heavier.
-    void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes = 1);
 
     // ---- Disc verification on a worker thread ---------------------------------------------------------------------
 
@@ -285,9 +283,6 @@ namespace launcher_ui
         SlotLine SlotStatus(GameSlot* slot);
         float PlayBandH() const; // the game page's band under the art: the main action, and the pad legend when a pad is in use
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
-        // The width of a PillButton: `width`, or wider when the label (a translation may be longer) needs it; `chevron` != 0
-        // makes room for the drawn chevron.
-        float PillWidth(const char* label, float width, bool bold = false, int chevron = 0);
 
     private:
         bool Init();
@@ -400,37 +395,15 @@ namespace launcher_ui
         void ForgetCachedArt(const char* game); // its disc was read again
         bool ReduceMotion() const;
 
-        // Widgets in the launcher's style. Each is now a thin wrapper over a component (components/components.h), kept so the
-        // screens build while they move to the components (docs/launcher_ui.md, "Migration map").
-        bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
-        bool PillButton(const char* label, bool primary = false, float width = 0, bool bold = false, unsigned fill = PanelRaised,
-            unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive, int chevron = 0);
-        // A chevron drawn with two lines (no font glyph): down when `dir` > 0, up when < 0; `size` is its width.
-        static void DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir);
-        // Draws the label of the last item (a button whose own text was made transparent) with a chevron after it.
-        void DrawLabelChevron(const char* label, unsigned color, int dir, bool bold);
-        void BoldText(const char* text, unsigned color);
-        // Acts once held for a second (HoldConfirm); `hint` is its tooltip, which says so. Red: for what deletes or overwrites.
-        bool HoldButton(const char* label, float width, const char* hint);
-        void ProgressBar(float fraction, ImVec2 size); // a rounded bar, the fill drawn with the cap of the track
-        // The keyboard and pad focus around the last item, for the widgets drawn over an InvisibleButton; `gap` < 0 draws
-        // it inside (rows that touch the window's edges).
-        void FocusRing(float rounding, float gap = 4, ImDrawFlags flags = 0);
         // A page's centred column (the cursor is at its left): it reaches a few points past each side and over the page's
         // bottom padding, so the clip rect neither shaves the borders at its edges nor cuts the scrolling content short of the window.
         float m_columnBelow = 0;
         void BeginPageColumn(const char* id, float width, bool alwaysScrollbar = false);
-        // The combo and its list rows as the launcher draws them: the chevron inside the rounded box (no arrow cell), rows with
-        // the rounded highlight.
-        bool BeginCombo(const char* id, const char* preview);
-        bool Option(const char* label, bool selected = false, ImGuiSelectableFlags flags = 0, ImVec2 size = ImVec2(0, 0));
         void EndPageColumn();
-        bool Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width = -1);
         // A settings row's select: the choices' labels, the value in [section] key; the control column's width.
         bool SettingSelect(const char* id, const char* section, const char* key, std::span<const Choice> choices, int fallback);
         void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
         void EndCard();
-        void Title(const char* text, float size = TitleSize, unsigned color = Accent);
 
         // Installing the game (the band's INSTALL button, the progress card in place of the logo).
         void RefreshInstall();
@@ -641,22 +614,4 @@ namespace launcher_ui
         return changed;
     }
 
-    inline bool App::Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width)
-    {
-        const size_t N = choices.size();
-        int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
-        bool changed = false;
-        ImGui::SetNextItemWidth(width);
-        if (BeginCombo(label, Tr(choices[index].label)))
-        {
-            for (size_t i = 0; i < N; i++)
-                if (Option(Tr(choices[i].label), int(i) == index))
-                {
-                    Set(section, key, choices[i].value);
-                    changed = true;
-                }
-            ImGui::EndCombo();
-        }
-        return changed;
-    }
 }

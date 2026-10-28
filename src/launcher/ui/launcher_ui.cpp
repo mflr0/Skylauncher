@@ -35,7 +35,6 @@
 
 namespace launcher_ui
 {
-    ImFont* g_boldFont = nullptr; // Outfit SemiBold, for AddBoldText (set by App::LoadFonts)
 
     namespace
     {
@@ -298,7 +297,7 @@ namespace launcher_ui
         config.OversampleH = config.OversampleV = 1;
         config.PixelSnapH = true;
         m_textFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[0].data(), int(m_fontData[0].size()), TextSize, &config);
-        g_boldFont = m_boldFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[2].data(), int(m_fontData[2].size()), TextSize, &config);
+        m_boldFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[2].data(), int(m_fontData[2].size()), TextSize, &config);
         m_titleFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[1].data(), int(m_fontData[1].size()), TitleSize, &config);
         m_monoFont = io.Fonts->AddFontDefaultVector(); // logs: Dear ImGui's own monospace font
         // The icons (Lucide, ui::DrawIcon): always the built-in subset.
@@ -934,134 +933,6 @@ namespace launcher_ui
 
     // ---- Widgets -------------------------------------------------------------------------------------------------
 
-    // Bold is Outfit SemiBold at the current size; `passes` extra copies BoldOffset apart make it heavier still.
-    void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes)
-    {
-        ImGui::PushFont(g_boldFont, ImGui::GetFontSize());
-        for (int i = 0; i < passes; i++)
-            draw->AddText(ImVec2(at.x + BoldOffset * i, at.y), color, text);
-        ImGui::PopFont();
-    }
-
-    void App::BoldText(const char* text, unsigned color)
-    {
-        ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        ImVec2 size = ImGui::CalcTextSize(text);
-        ImGui::PopFont();
-        AddBoldText(ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos(), Rgb(color), text);
-        ImGui::Dummy(size);
-    }
-
-    void App::Title(const char* text, float size, unsigned color)
-    {
-        ImGui::PushFont(m_titleFont, size);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(color));
-        ImGui::TextUnformatted(text);
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
-    }
-
-    bool App::BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled)
-    {
-        (void)color, (void)dark, (void)ink; // no screen draws one any more: the main action is ui::MainAction
-        ui::ButtonOptions options;
-        options.kind = ui::ButtonKind::Primary;
-        options.size = ui::Size::Large;
-        options.width = size.x;
-        options.disabled = !enabled;
-        return ui::Button(label, options);
-    }
-
-    namespace
-    {
-        ui::ButtonOptions PillOptions(bool primary, float width, unsigned fill, int chevron)
-        {
-            ui::ButtonOptions options;
-            options.kind = primary ? ui::ButtonKind::Primary : ui::ButtonKind::Secondary;
-            options.width = width;
-            options.overArt = fill == BottomBarRaised; // the band's greys: on the game's art and the band
-            options.trailing = chevron > 0 ? ui::Icon::ChevronDown : chevron < 0 ? ui::Icon::ChevronUp : ui::Icon::None;
-            return options;
-        }
-    }
-
-    bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive, int chevron)
-    {
-        (void)bold, (void)fillHover, (void)fillActive; // every button's label is SemiBold; the fills are the kind's
-        return ui::Button(label, PillOptions(primary, width, fill, chevron));
-    }
-
-    float App::PillWidth(const char* label, float width, bool bold, int chevron)
-    {
-        (void)bold;
-        return ui::ButtonWidth(label, PillOptions(false, width, PanelRaised, chevron));
-    }
-
-    void App::DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir)
-    {
-        float half = size / 2, rise = size / 4 * (dir > 0 ? 1 : -1);
-        ImVec2 points[3] = { ImVec2(centre.x - half, centre.y - rise), ImVec2(centre.x, centre.y + rise), ImVec2(centre.x + half, centre.y - rise) };
-        draw->AddPolyline(points, 3, Rgb(color), ImDrawFlags_None, std::max(1.5f, size / 6));
-    }
-
-    void App::DrawLabelChevron(const char* label, unsigned color, int dir, bool bold)
-    {
-        if (bold)
-            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        const char* end = std::strstr(label, "##");
-        ImVec2 text = ImGui::CalcTextSize(label, end);
-        float size = ImGui::GetFontSize() * 0.6f, gap = ImGui::GetFontSize() * 0.4f;
-        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        float left = (min.x + max.x - (text.x + gap + size)) / 2, middle = (min.y + max.y) / 2;
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddText(ImVec2(left, middle - text.y / 2), Rgb(color), label, end);
-        DrawChevron(draw, ImVec2(left + text.x + gap + size / 2, middle), size, color, dir);
-        if (bold)
-            ImGui::PopFont();
-    }
-
-    void App::FocusRing(float rounding, float gap, ImDrawFlags flags)
-    {
-        if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
-            return;
-        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        if (gap < 0) // inside the item (rows that touch the window's edges): the ring `-gap` points in
-        {
-            float in = -gap + ui::focus::Offset + ui::focus::Width;
-            min = ImVec2(min.x + in, min.y + in);
-            max = ImVec2(max.x - in, max.y - in);
-        }
-        ui::FocusRing(min, max, rounding, flags);
-    }
-
-    bool App::BeginCombo(const char* id, const char* preview)
-    {
-        ImDrawList* draw = ImGui::GetWindowDrawList(); // the box's window, not the list's
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        const float width = ImGui::CalcItemWidth(), height = ImGui::GetFrameHeight();
-        const bool open = ImGui::BeginCombo(id, preview, ImGuiComboFlags_NoArrowButton);
-        DrawChevron(draw, ImVec2(at.x + width - 18, at.y + height / 2), 10, TextSecondary, open ? -1 : 1);
-        return open;
-    }
-
-    bool App::Option(const char* label, bool selected, ImGuiSelectableFlags flags, ImVec2 size)
-    {
-        // ImGui's highlight is square: it is left out, and drawn with rounded corners under the row's text.
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->ChannelsSplit(2);
-        draw->ChannelsSetCurrent(1);
-        ImGui::PushStyleColor(ImGuiCol_Header, 0);
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
-        const bool pressed = ImGui::Selectable(label, selected, flags, size);
-        ImGui::PopStyleColor(3);
-        draw->ChannelsSetCurrent(0);
-        if (selected || ImGui::IsItemHovered())
-            draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), Rgb(FieldActive), RadiusSmall);
-        draw->ChannelsMerge();
-        return pressed;
-    }
-
     void App::BeginPageColumn(const char* id, float width, bool alwaysScrollbar)
     {
         constexpr float Bleed = 4;
@@ -1080,19 +951,6 @@ namespace launcher_ui
     {
         ImGui::Dummy(ImVec2(0, m_columnBelow));
         ImGui::EndChild();
-    }
-
-    void App::ProgressBar(float fraction, ImVec2 size) { ui::ProgressBar(fraction, size.x); }
-
-    bool App::HoldButton(const char* label, float width, const char* hint)
-    {
-        ui::Ctx().testHeld = m_testHoldAt != 0 ? m_un.holdId : 0; // the screenshot test holds the uninstall button down
-        ui::ButtonOptions options;
-        options.kind = ui::ButtonKind::Danger;
-        options.width = width;
-        options.hold = true;
-        options.tooltip = hint;
-        return ui::Button(label, options);
     }
 
     void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)
@@ -2236,13 +2094,6 @@ namespace launcher_ui
 
     constexpr float ToastWidth = 420; // the longest line of a message before it wraps
 
-    void App::Toast(std::string text, bool error)
-    {
-        // A failure ("Couldn't ...", in any language: the collection's English toasts still say it so) is an error.
-        error = error || i18n::StartsLike(text, "Couldn't");
-        Toast(std::move(text), error ? ui::ToastKind::Error : ui::ToastKind::Info);
-    }
-
     void App::Toast(std::string text, ui::ToastKind kind) { m_toasts.Push(std::move(text), kind); }
 
     void App::DrawToast()
@@ -2874,9 +2725,9 @@ namespace launcher_ui
                 a.verify.done = true;
                 m_page = Page::Play;
                 Toast(Tr("Game installed: press PLAY"), ui::ToastKind::Success);
-                Toast(Tr("Log copied"));
-                Toast(Tr("Couldn't save the settings"), true);
-                Toast(Tf("Saves restored from {}", "2026-10-26 09:30"));
+                Toast(Tr("Log copied"), ui::ToastKind::Success);
+                Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
+                Toast(Tf("Saves restored from {}", "2026-10-26 09:30"), ui::ToastKind::Success);
                 shoot("toasts-stacked", 400);
                 break;
             }
