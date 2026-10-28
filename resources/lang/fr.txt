@@ -812,7 +812,7 @@ Sidebar	Barre latérale
 
 # Controller tab of a game: what each pad button does, and the rumble (docs/settings.md, "Per-game pad")
 Choose what each button does.	Choisissez ce que fait chaque bouton.
-Its own job	Son rôle habituel
+Default	Par défaut
 Nothing	Rien
 Rumble	Vibrations
 Player 1	Joueur 1

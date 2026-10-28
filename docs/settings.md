@@ -117,7 +117,7 @@ The runtime reads one `[input]` section (`key_<action>=<SDL key name>`), but the
 The game's settings page has a **Controller** tab beside Keyboard (`src/launcher/game_keys.{h,cpp}`, `ui/game_settings_page.cpp`): each of
 the pad's 16 buttons (A B X Y, LB RB LT RT, Start, Back, the two stick clicks, the D-pad's four directions), named as the pad in
 use prints it (the same family as the Keyboard tab's brackets: Cross on a PS5, B on a Switch for the 360's A), has a list that says
-**whose job it does**: its own (the default), another button's (shown with the game's word for that job: "B (Attack 3 / Back)"),
+**whose job it does**: its own ("Default", "Par défaut"), another button's (shown with the game's word for that job: "B (Attack 3 / Back)"),
 or Nothing. Below, the **Rumble** of Player 1 and Player 2: Off, Low, Normal, Strong.
 
 - Stored in the game's own section, next to its keys: `[<game>.input] pad_<button>=<button>|none` and `rumble_p1` / `rumble_p2`. The

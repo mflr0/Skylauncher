@@ -307,12 +307,12 @@ namespace launcher_ui
                 const std::string name = PadButtonLabel(button, family);
                 ui::SettingRow(name.c_str(), nullptr, note.empty() ? nullptr : note.c_str());
                 const int target = PadTarget(m_config, game, button);
-                const std::string preview = target == button ? std::string(Tr("Its own job")) : target < 0 ? std::string(Tr("Nothing")) : describe(target);
+                const std::string preview = target == button ? std::string(Tr("Default")) : target < 0 ? std::string(Tr("Nothing")) : describe(target);
                 ImGui::PushID(button);
                 if (ui::BeginSelect("##job", preview.c_str()))
                 {
                     int chosen = -2;
-                    if (ui::SelectOption(Tr("Its own job"), target == button))
+                    if (ui::SelectOption(Tr("Default"), target == button))
                         chosen = button;
                     for (int other = 0; other < PadButtonTotal; other++)
                         if (other != button && ui::SelectOption((describe(other) + "##" + std::to_string(other)).c_str(), target == other))
