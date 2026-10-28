@@ -979,11 +979,14 @@ static void NavChecks(const std::filesystem::path& scratch, const std::string& i
     std::filesystem::path root = scratch / "nav";
     std::filesystem::create_directories(root / "shots");
     std::filesystem::create_directories(root / "home");
+    std::string quoted; // the disc's path in single quotes: its own quotes ("Spyro's Adventure") closed and escaped
+    for (char c : iso)
+        quoted += c == '\'' ? std::string("'\\''") : std::string(1, c);
     std::string command = "env -u SKY_MIGRATE_FROM -u SKY_FIGURES -u SKY_SETTINGS -u SSA_MIGRATE_FROM -u SSA_FIGURES -u SSA_SETTINGS SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy HOME='" + (root / "home").string() +
         "' SKYLANDERS_DATA='" + (root / "data").string() + "' SKY_LAUNCHER_DATA='" + (root / "launcher").string() +
         "' SKY_COLLECTION='" + (root / "collection").string() + "' SKY_SAVE_DIR='" + (root / "saves").string() +
         "' SKY_LAUNCHER_INI='" + (root / "x.ini").string() + "' SKY_LAUNCHER_NO_UPDATE_CHECK=1 SKY_LAUNCHER_SHOTS='" + (root / "shots").string() +
-        "' SKY_LAUNCHER_TEST_DROP='" + iso + "' SKY_LAUNCHER_TEST_NAV=1 '" + SKYLAUNCHER_TEST_EXE + "' > '" + (root / "out.txt").string() + "' 2>&1";
+        "' SKY_LAUNCHER_TEST_DROP='" + quoted + "' SKY_LAUNCHER_TEST_NAV=1 '" + SKYLAUNCHER_TEST_EXE + "' > '" + (root / "out.txt").string() + "' 2>&1";
     EXPECT(std::system(command.c_str()) == 0);
     std::ifstream in(root / "out.txt");
     std::string line;
