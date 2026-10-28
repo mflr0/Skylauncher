@@ -10,6 +10,7 @@
 #include "launcher/launcher.h"
 #include "launcher/shortcut.h"
 #include "launcher/ui/launcher_app.h"
+#include "shared/collection/datadir.h"
 #include "shared/collection/save_backup.h"
 #include <SDL3/SDL.h>
 #include <stb_image_write.h>
@@ -113,6 +114,14 @@ namespace
         LauncherConfig back = LoadLauncherConfig(scratch.string());
         SETTINGS_EXPECT(back["giants.video"]["fps_limit"] == "30" && back["ssa.video"]["resolution_scale"] == "3");
         fs::remove(scratch);
+        // A first start: the data folder does not exist yet (a fresh Windows PC), and its path has accents.
+        fs::path fresh = fs::temp_directory_path() / "skylauncher-fresh-test" / u8"Données élève";
+        fs::remove_all(fresh.parent_path());
+        std::string freshIni = datadir::Text(fresh / "launcher.ini");
+        SETTINGS_EXPECT(SaveLauncherConfig(freshIni, config));
+        SETTINGS_EXPECT(LoadLauncherConfig(freshIni)["giants.video"]["fps_limit"] == "30");
+        SETTINGS_EXPECT(!fs::exists(fresh / "launcher.ini.tmp"));
+        fs::remove_all(fresh.parent_path());
 
         // The whole way of the two options a player turns on in a game's page (Video): the page writes the game's copy,
         // PLAY puts it into [video] on disk, which is what the game reads, and the game's end keeps it.

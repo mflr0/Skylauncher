@@ -53,9 +53,9 @@ namespace launcher_ui
         std::string normal = path;
         std::replace(normal.begin(), normal.end(), '\\', '/');
         std::error_code error;
-        fs::path file(normal);
-        if (file.has_filename() && fs::equivalent(file.parent_path(), fs::path(collection::Folder()), error) && !error)
-            return collection::PathOf(file.filename().string());
+        const fs::path file = datadir::FromText(normal); // UTF-8, as the folder below (accents in a Windows user name)
+        if (file.has_filename() && fs::equivalent(file.parent_path(), datadir::FromText(collection::Folder()), error) && !error)
+            return collection::PathOf(datadir::Text(file.filename()));
         return path;
     }
 
@@ -168,19 +168,23 @@ namespace launcher_ui
             if (TwoSlotSeats(game) && i < 2 && collection::Read(seats[i], top) && top.IsSwapTop() && !top.partner.empty())
                 text += fmt::format("{} {}\n", slot + 1, collection::PathOf(top.partner));
         }
+        // UTF-8 paths (a user name with accents on Windows): FromText, never a narrow std::string, for std::filesystem.
+        const fs::path target = datadir::FromText(file), temporary = datadir::FromText(file + ".tmp");
         std::error_code error;
-        fs::create_directories(fs::path(file).parent_path(), error);
+        fs::create_directories(target.parent_path(), error);
         // Written beside, then renamed over: a crash leaves the old seats or the new ones, never half a file.
-        std::string temporary = file + ".tmp";
-        if (!SDL_SaveFile(temporary.c_str(), text.data(), text.size()))
+        if (!SDL_SaveFile((file + ".tmp").c_str(), text.data(), text.size()))
             return false;
-        fs::rename(temporary, file, error);
-        if (error)
+        // An antivirus scanning the new file (Windows) can hold it for a moment: a few tries before giving up.
+        for (int attempt = 0; attempt < 5; attempt++)
         {
-            fs::remove(temporary, error);
-            return false;
+            fs::rename(temporary, target, error);
+            if (!error)
+                return true;
+            SDL_Delay(20);
         }
-        return true;
+        fs::remove(temporary, error);
+        return false;
     }
 
     std::string ShortGameName(const std::string& game)

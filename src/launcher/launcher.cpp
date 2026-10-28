@@ -397,18 +397,23 @@ bool SaveLauncherConfig(const std::string& path, const LauncherConfig& config)
         for (const auto& [key, value] : values)
             text += key + "=" + value + "\n";
     }
-    // Beside, then renamed over: launcher.ini also holds the install records, a half-written file would lose them.
-    std::string temporary = path + ".tmp";
-    if (!SDL_SaveFile(temporary.c_str(), text.data(), text.size()))
-        return false;
+    // Beside, then renamed over: launcher.ini also holds the install records, a half-written file would lose them. The
+    // paths are UTF-8 (a user name with accents on Windows): FromText, never a narrow std::string, for std::filesystem.
+    const std::filesystem::path target = datadir::FromText(path), temporary = datadir::FromText(path + ".tmp");
     std::error_code error;
-    std::filesystem::rename(temporary, path, error);
-    if (error)
-    {
-        std::filesystem::remove(temporary, error);
+    std::filesystem::create_directories(target.parent_path(), error); // a first start: the data folder may not exist yet
+    if (!SDL_SaveFile((path + ".tmp").c_str(), text.data(), text.size()))
         return false;
+    // An antivirus scanning the new file (Windows) can hold it for a moment: a few tries before giving up.
+    for (int attempt = 0; attempt < 5; attempt++)
+    {
+        std::filesystem::rename(temporary, target, error);
+        if (!error)
+            return true;
+        SDL_Delay(20);
     }
-    return true;
+    std::filesystem::remove(temporary, error);
+    return false;
 }
 
 namespace
