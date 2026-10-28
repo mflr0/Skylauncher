@@ -122,8 +122,6 @@ namespace launcher_ui
 
     // ---- Drawing --------------------------------------------------------------------------------------------------
 
-    void DrawGear(ImDrawList* draw, ImVec2 center, float radius, ImU32 ink, ImU32 hole);
-    void DrawGamepad(ImDrawList* draw, ImVec2 center, float width, ImU32 ink, ImU32 hole);
     // `passes` extra copies, each BoldOffset further right: 1 is bold, more is heavier.
     void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes = 1);
 
@@ -176,6 +174,8 @@ namespace launcher_ui
         Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame, DataDamaged,
         DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready
     };
+    // The shape and colour that say a game's state: never the colour alone (the sidebar, Home's cards, the page).
+    ui::Status StatusOf(SlotState state);
     // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
     enum class FocusTo { None, Sidebar, Page };
 
@@ -276,6 +276,7 @@ namespace launcher_ui
             bool buttonEnabled = true; // and whether it can be pressed
         };
         SlotLine SlotStatus(GameSlot* slot);
+        float PlayBandH() const; // the game page's band under the art: the main action, and the pad legend when a pad is in use
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
         // The width of a PillButton: `width`, or wider when the label (a translation may be longer) needs it; `chevron` != 0
         // makes room for the drawn chevron.
@@ -363,11 +364,14 @@ namespace launcher_ui
             const char* label;
             bool enabled = true;
             float progress = -1; // 0..1 while busy (checking the disc, installing); < 0 otherwise
+            bool indeterminate = false; // busy with no known end: a sweep in place of the percentage
         };
         enum class MainActionHit { None, Main, Settings };
         MainActionHit DrawMainAction(ImVec2 at, const MainAction& action);
         // A logo inside `size` at `at` (centred, aspect kept), with a soft shadow; `alpha` 0..1.
         void DrawLogo(ImDrawList* draw, const ArtTexture& logo, ImVec2 at, ImVec2 size, float alpha = 1, bool shadow = true);
+        // A game's mark in a sidebar row: its logo once its disc was read, else its initial on its colour.
+        void DrawGameMark(ImDrawList* draw, const LauncherGameEntry& entry, ImVec2 at, ImVec2 size);
         // The logo's arrival on the game page: 0 when it starts falling, 1 once landed (always 1 with reduced motion).
         float LogoDrop();
         // The game page's logo inside `size` at `at`, falling in on arrival (LogoDrop), with its shadow.
