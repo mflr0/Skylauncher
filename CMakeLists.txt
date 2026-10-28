@@ -122,6 +122,13 @@ add_library(ArkeyanLauncherCore STATIC
     src/launcher/ui/collection_manage.cpp
     src/launcher/ui/collection_model.cpp
     src/launcher/ui/game_look.cpp
+    src/launcher/ui/components/core.cpp
+    src/launcher/ui/components/buttons.cpp
+    src/launcher/ui/components/inputs.cpp
+    src/launcher/ui/components/layout.cpp
+    src/launcher/ui/components/feedback.cpp
+    src/launcher/ui/components/format.cpp
+    src/launcher/ui/gallery.cpp
     src/assets/launcher_assets.cpp
     src/shared/figures/figure_catalog.cpp
     src/shared/figures/figure_crypto.cpp

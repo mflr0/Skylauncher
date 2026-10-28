@@ -9,7 +9,7 @@
 #include "shared/collection/datadir.h"
 #include "shared/embedded_fonts.h"
 #include "assets/launcher_assets.h"
-#include "launcher/theme/launcher_theme.h"
+#include "launcher/ui/theme/launcher_theme.h"
 #include "shared/vfs.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -296,6 +296,7 @@ namespace launcher_ui
         g_boldFont = m_boldFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[2].data(), int(m_fontData[2].size()), TextSize, &config);
         m_titleFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[1].data(), int(m_fontData[1].size()), TitleSize, &config);
         m_monoFont = io.Fonts->AddFontDefaultVector(); // logs: Dear ImGui's own monospace font
+        ui::Ctx().fonts = { m_textFont, m_boldFont, m_titleFont, m_monoFont }; // the components' text styles
         return m_textFont != nullptr && m_boldFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr;
     }
 
@@ -380,6 +381,7 @@ namespace launcher_ui
             m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
             m_testLogo = LauncherEnv("SKY_LAUNCHER_TEST_LOGO") != nullptr;
             m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
+            m_testGallery = LauncherEnv("SKY_LAUNCHER_TEST_GALLERY") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -545,17 +547,17 @@ namespace launcher_ui
             m_busyFrames--;
             return 0;
         }
-        // Something moves: a check, an install's spinner, an update's bar, a held button, a text cursor, a drag.
-        if (AnyVerifying() || AnyInstalling() || m_updates.Busy() || ImGui::IsAnyItemActive())
+        // Something moves: a check, an install's spinner, an update's bar, a held button, a text cursor, a drag, a component's
+        // own motion (a spinner, a sliding toggle).
+        if (AnyVerifying() || AnyInstalling() || m_updates.Busy() || ImGui::IsAnyItemActive() || ui::Ctx().animating)
             return 0;
         if (m_page == Page::Play && m_logoDropAt != 0 && SDL_GetTicks() < m_logoDropAt + uint64_t(LogoDropMs) + 20) // the logo is falling
             return 0;
         constexpr int Idle = 500;
         int wait = Idle;
         uint64_t now = SDL_GetTicks();
-        for (const ToastItem& item : m_toasts)
-            if (item.until > now) // wake to take it down
-                wait = std::min<int>(wait, int(item.until - now) + 1);
+        if (int toast = m_toasts.NextWakeMs(now); toast >= 0) // wake to take it down
+            wait = std::min(wait, toast);
         // The night sky's stars twinkle, at 30 fps, while the window is seen.
         bool seen = !(SDL_GetWindowFlags(m_window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_OCCLUDED | SDL_WINDOW_HIDDEN));
         if (seen && m_page == Page::Play && CachedArt(m_s->game.id, LauncherAssets::Role::HeroBackground, BackdropArtW) == nullptr)
@@ -950,57 +952,38 @@ namespace launcher_ui
 
     bool App::BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled)
     {
-        ImVec2 position = ImGui::GetCursorScreenPos();
-        ImGui::BeginDisabled(!enabled);
-        bool pressed = ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
-        bool hovered = ImGui::IsItemHovered(), held = ImGui::IsItemActive();
-        ImGui::EndDisabled();
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        float lift = held ? 2.0f : 0.0f;
-        unsigned alpha = enabled ? 255 : 90;
-        if (hovered && enabled)
-            draw->AddRectFilled(ImVec2(position.x - 4, position.y - 4), ImVec2(position.x + size.x + 4, position.y + size.y + 4), Rgb(color, 60), Radius + 4);
-        draw->AddRectFilled(ImVec2(position.x, position.y + 6), ImVec2(position.x + size.x, position.y + size.y), Rgb(dark, alpha), Radius);
-        draw->AddRectFilled(ImVec2(position.x, position.y + lift), ImVec2(position.x + size.x, position.y + size.y - 6 + lift), Rgb(color, alpha), Radius);
-        draw->AddRectFilled(ImVec2(position.x + 8, position.y + 6 + lift), ImVec2(position.x + size.x - 8, position.y + size.y * 0.42f + lift), IM_COL32(255, 255, 255, enabled ? 40 : 15), Radius - 4);
-        ImGui::PushFont(m_titleFont, size.y * 0.42f);
-        const char* labelEnd = std::strstr(label, "##"); // "##id" alone draws no text
-        ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
-        draw->AddText(ImVec2(position.x + (size.x - text.x) / 2, position.y + (size.y - 6 - text.y) / 2 + lift), Rgb(ink, alpha), label, labelEnd);
-        ImGui::PopFont();
-        FocusRing(Radius);
-        return pressed && enabled;
+        (void)color, (void)dark, (void)ink; // no screen draws one any more: the main action is ui::MainAction
+        ui::ButtonOptions options;
+        options.kind = ui::ButtonKind::Primary;
+        options.size = ui::Size::Large;
+        options.width = size.x;
+        options.disabled = !enabled;
+        return ui::Button(label, options);
+    }
+
+    namespace
+    {
+        ui::ButtonOptions PillOptions(bool primary, float width, unsigned fill, int chevron)
+        {
+            ui::ButtonOptions options;
+            options.kind = primary ? ui::ButtonKind::Primary : ui::ButtonKind::Secondary;
+            options.width = width;
+            options.overArt = fill == BottomBarRaised; // the band's greys: on the game's art and the band
+            options.trailing = chevron > 0 ? ui::Icon::ChevronDown : chevron < 0 ? ui::Icon::ChevronUp : ui::Icon::None;
+            return options;
+        }
     }
 
     bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive, int chevron)
     {
-        unsigned ink = primary ? AccentInk : Text;
-        ImGui::PushStyleColor(ImGuiCol_Button, Rgb(primary ? Accent : fill));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? AccentHover : fillHover));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? AccentDark : fillActive));
-        ImGui::PushStyleColor(ImGuiCol_Text, chevron != 0 ? IM_COL32(0, 0, 0, 0) : Rgb(ink));
-        ImGui::PushStyleColor(ImGuiCol_Border, primary ? ImVec4(0, 0, 0, 0) : ImGui::GetStyleColorVec4(ImGuiCol_Border)); // the grey frame shows as a dark ring round the light fill
-        if (bold)
-            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        bool pressed = ImGui::Button(label, ImVec2(PillWidth(label, width, bold, chevron), 40));
-        if (bold)
-            ImGui::PopFont();
-        ImGui::PopStyleColor(5);
-        if (chevron != 0)
-            DrawLabelChevron(label, ink, chevron, bold);
-        return pressed;
+        (void)bold, (void)fillHover, (void)fillActive; // every button's label is SemiBold; the fills are the kind's
+        return ui::Button(label, PillOptions(primary, width, fill, chevron));
     }
 
     float App::PillWidth(const char* label, float width, bool bold, int chevron)
     {
-        if (bold)
-            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        float need = ImGui::CalcTextSize(label, nullptr, true).x + 2 * ImGui::GetStyle().FramePadding.x + 16;
-        if (chevron != 0)
-            need += ImGui::GetFontSize() * 0.9f;
-        if (bold)
-            ImGui::PopFont();
-        return std::max(width, std::ceil(need));
+        (void)bold;
+        return ui::ButtonWidth(label, PillOptions(false, width, PanelRaised, chevron));
     }
 
     void App::DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir)
@@ -1026,30 +1009,20 @@ namespace launcher_ui
             ImGui::PopFont();
     }
 
-    bool App::Toggle(const char* id, bool* value)
-    {
-        ImVec2 position = ImGui::GetCursorScreenPos();
-        ImVec2 size(54, 30);
-        bool pressed = ImGui::InvisibleButton(id, size, ImGuiButtonFlags_EnableNav);
-        if (pressed)
-            *value = !*value;
-        bool hovered = ImGui::IsItemHovered();
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? (hovered ? AccentHover : Accent) : hovered ? FieldHover : Field), size.y / 2);
-        draw->AddRect(position, ImVec2(position.x + size.x, position.y + size.y), Rgb(*value ? AccentDark : hovered ? BorderBright : Border), size.y / 2, 2.0f);
-        float knob = *value ? position.x + size.x - size.y / 2 : position.x + size.y / 2;
-        draw->AddCircleFilled(ImVec2(knob, position.y + size.y / 2), size.y / 2 - 5, Rgb(*value ? AccentInk : TextSecondary));
-        FocusRing(size.y / 2);
-        return pressed;
-    }
+    bool App::Toggle(const char* id, bool* value) { return ui::Toggle(id, value); }
 
     void App::FocusRing(float rounding, float gap, ImDrawFlags flags)
     {
         if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
             return;
         ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        ImGui::GetWindowDrawList()->AddRect(ImVec2(min.x - gap, min.y - gap), ImVec2(max.x + gap, max.y + gap), Rgb(Accent),
-            std::max(0.0f, rounding + gap), flags, 2.0f);
+        if (gap < 0) // inside the item (rows that touch the window's edges): the ring `-gap` points in
+        {
+            float in = -gap + ui::focus::Offset + ui::focus::Width;
+            min = ImVec2(min.x + in, min.y + in);
+            max = ImVec2(max.x - in, max.y - in);
+        }
+        ui::FocusRing(min, max, rounding, flags);
     }
 
     bool App::BeginCombo(const char* id, const char* preview)
@@ -1082,35 +1055,10 @@ namespace launcher_ui
 
     bool App::LevelSlider(const char* id, int* value, int min, int max, float width)
     {
-        const float height = ImGui::GetFrameHeight(), knob = 11, track = 8;
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        ImGui::InvisibleButton(id, ImVec2(width, height), ImGuiButtonFlags_EnableNav);
-        bool changed = false;
-        const float left = at.x + knob + 2, right = at.x + width - knob - 2;
-        if (ImGui::IsItemActive())
-        {
-            int next = min + int(std::lround(std::clamp((ImGui::GetIO().MousePos.x - left) / (right - left), 0.0f, 1.0f) * float(max - min)));
-            changed = next != *value;
-            *value = next;
-        }
-        else if (ImGui::IsItemFocused())
-        {
-            int step = (ImGui::IsKeyPressed(ImGuiKey_RightArrow) ? 1 : 0) - (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) ? 1 : 0);
-            if (step != 0)
-            {
-                *value = std::clamp(*value + step, min, max);
-                changed = true;
-            }
-        }
-        const float t = max > min ? float(*value - min) / float(max - min) : 0.0f, x = left + (right - left) * t, mid = at.y + height / 2;
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        const bool hovered = ImGui::IsItemHovered();
-        draw->AddRectFilled(ImVec2(at.x, mid - track / 2), ImVec2(at.x + width, mid + track / 2), Rgb(Field), track / 2);
-        draw->AddRect(ImVec2(at.x, mid - track / 2), ImVec2(at.x + width, mid + track / 2), Rgb(Border), track / 2);
-        draw->AddRectFilled(ImVec2(at.x, mid - track / 2), ImVec2(x, mid + track / 2), Rgb(Accent), track / 2);
-        draw->AddCircleFilled(ImVec2(x, mid), knob, Rgb(hovered || ImGui::IsItemActive() ? AccentHover : Accent), 24);
-        FocusRing(height / 2);
-        return changed;
+        ui::SliderOptions options;
+        options.width = width;
+        options.showValue = false;
+        return ui::Slider(id, value, min, max, options);
     }
 
     void App::BeginPageColumn(const char* id, float width, bool alwaysScrollbar)
@@ -1133,108 +1081,34 @@ namespace launcher_ui
         ImGui::EndChild();
     }
 
-    void App::ProgressBar(float fraction, ImVec2 size)
-    {
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        ImGui::Dummy(size);
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        float round = size.y / 2;
-        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), ImGui::GetColorU32(Rgb(TextDim, 90)), round); // a light track: the end of the bar shows on the dark art
-        if (fraction > 0) // a whole cap at both ends, even when nearly empty
-            draw->AddRectFilled(at, ImVec2(at.x + std::max(size.x * std::min(fraction, 1.0f), size.y), at.y + size.y), ImGui::GetColorU32(ImGuiCol_PlotHistogram), round);
-    }
+    void App::ProgressBar(float fraction, ImVec2 size) { ui::ProgressBar(fraction, size.x); }
 
     bool App::HoldButton(const char* label, float width, const char* hint)
     {
-        ImVec2 at = ImGui::GetCursorScreenPos(), size(PillWidth(label, width, true), 40);
-        ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
-        // Held: pressed and, for the mouse, still under the pointer (leaving cancels). Space, Enter and the pad's A hold it too.
-        bool mouse = ImGui::IsMouseDown(ImGuiMouseButton_Left);
-        bool hovered = ImGui::IsItemHovered(), active = ImGui::IsItemActive();
-        bool held = active && (!mouse || hovered);
-        bool inputDown = mouse || ImGui::IsKeyDown(ImGuiKey_Space) || ImGui::IsKeyDown(ImGuiKey_Enter) ||
-            ImGui::IsKeyDown(ImGuiKey_KeypadEnter) || ImGui::IsKeyDown(ImGuiKey_GamepadFaceDown);
-        bool done = false;
-        if (m_testHoldAt != 0 && m_un.holdId != 0 && ImGui::GetItemID() == m_un.holdId) // the screenshot test holds it down
-            held = inputDown = true;
-        float fill = m_hold.Update(ImGui::GetItemID(), held, inputDown, SDL_GetTicks(), done);
-
-        // Colours through GetColorU32: they fade with the rest under BeginDisabled.
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        float rounding = ImGui::GetStyle().FrameRounding;
-        ImVec2 end(at.x + size.x, at.y + size.y);
-        draw->AddRectFilled(at, end, ImGui::GetColorU32(Rgb(Danger, held ? 150 : hovered ? 110 : 70)), rounding);
-        if (fill > 0) // rounded at the leading end like the button (at least two radii wide, so the cap is whole)
-            draw->AddRectFilled(at, ImVec2(at.x + std::max(size.x * fill, 2 * rounding), end.y), ImGui::GetColorU32(Rgb(Danger, 200)), rounding);
-        const char* labelEnd = std::strstr(label, "##"); // "Delete##trash" shows "Delete"
-        ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
-        draw->AddText(ImVec2(at.x + (size.x - text.x) / 2, at.y + (size.y - text.y) / 2), ImGui::GetColorU32(Rgb(Text)), label, labelEnd);
-        ImGui::PopFont();
-        FocusRing(rounding);
-        if (hovered && hint != nullptr)
-            ImGui::SetTooltip("%s", hint);
-        return done;
+        ui::Ctx().testHeld = m_testHoldAt != 0 ? m_un.holdId : 0; // the screenshot test holds the uninstall button down
+        ui::ButtonOptions options;
+        options.kind = ui::ButtonKind::Danger;
+        options.width = width;
+        options.hold = true;
+        options.tooltip = hint;
+        return ui::Button(label, options);
     }
 
-    void App::SettingRow(const char* label, const char* hint)
-    {
-        ImGui::TableNextRow(ImGuiTableRowFlags_None, 62);
-        ImGui::TableSetColumnIndex(0);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 3));
-        ImGui::TextUnformatted(label);
-        if (hint != nullptr)
-        {
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-            ImGui::TextWrapped("%s", hint);
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
-        }
-        ImGui::PopStyleVar();
-        ImGui::TableSetColumnIndex(1);
-    }
+    void App::SettingRow(const char* label, const char* hint) { ui::SettingRow(label, hint); }
 
-    bool App::BeginSettingsTable(const char* id)
-    {
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4, 14));
-        ImGui::PushStyleColor(ImGuiCol_TableBorderLight, Rgb(Border, 110));
-        bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp);
-        if (open)
-        {
-            ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthFixed, 320);
-        }
-        else
-        {
-            ImGui::PopStyleColor();
-            ImGui::PopStyleVar();
-        }
-        return open;
-    }
+    bool App::BeginSettingsTable(const char* id) { return ui::BeginSettings(id); }
 
-    void App::EndSettingsTable()
-    {
-        ImGui::EndTable();
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-    }
+    void App::EndSettingsTable() { ui::EndSettings(); }
 
     void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)
     {
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Panel, 235));
-        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusLarge);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
-        ImGui::BeginChild(id, size, ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_NavFlattened | flags);
-        ImGui::SetScrollX(0.0f);
+        ui::CardOptions options;
+        options.panel = true; // the settings pages' big cards
+        options.flags = flags;
+        ui::BeginCard(id, size, options);
     }
 
-    void App::EndCard()
-    {
-        ImGui::EndChild();
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor();
-    }
+    void App::EndCard() { ui::EndCard(); }
 
     // ---- Screens -------------------------------------------------------------------------------------------------
 
@@ -1578,6 +1452,15 @@ namespace launcher_ui
         float cardW = (width - CardGap * float(playable.size() - 1)) / float(std::max<size_t>(playable.size(), 1));
         float cardH = std::min(cardW * 0.6f, size.y - origin.y - 300);
         ImVec2 row = ImGui::GetCursorScreenPos();
+        // Every card says the game's full name, all at one size: the largest at which the longest fits (never cut, never
+        // the short name on one card and the full name on another). A card without the disc's logo shows the short name in
+        // its place, like a logo's big word, at one size too.
+        float nameSize = SidebarTextSize, logoNameSize = TitleSize + 6;
+        for (const LauncherGameEntry* entry : playable)
+        {
+            nameSize = std::min(nameSize, ui::FitSize(m_boldFont, SidebarTextSize, GameName(entry->id), cardW - 40));
+            logoNameSize = std::min(logoNameSize, ui::FitSize(m_titleFont, TitleSize + 6, GameName(entry->id, GameNameForm::Short), cardW * 0.84f));
+        }
         for (size_t i = 0; i < playable.size(); i++)
         {
             const LauncherGameEntry& entry = *playable[i];
@@ -1619,17 +1502,11 @@ namespace launcher_ui
                 DrawLogo(draw, *logo, ImVec2(at.x + cardW * 0.12f, at.y + cardH * 0.08f), ImVec2(cardW * 0.76f, cardH * 0.56f));
             else
             {
-                // The name in the title font, smaller when it would not fit the card's width with a margin.
-                float titleSize = TitleSize + 6;
-                ImGui::PushFont(m_titleFont, titleSize);
-                ImVec2 text = ImGui::CalcTextSize(entry.name);
-                if (text.x > cardW * 0.84f)
-                {
-                    ImGui::PopFont();
-                    ImGui::PushFont(m_titleFont, titleSize * cardW * 0.84f / text.x);
-                    text = ImGui::CalcTextSize(entry.name);
-                }
-                draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, at.y + cardH * 0.36f - text.y / 2), Rgb(Text), entry.name);
+                // The short name in the title font, at the row's size.
+                const char* word = GameName(entry.id, GameNameForm::Short);
+                ImGui::PushFont(m_titleFont, logoNameSize);
+                ImVec2 text = ImGui::CalcTextSize(word);
+                draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, at.y + cardH * 0.36f - text.y / 2), Rgb(Text), word);
                 ImGui::PopFont();
             }
             GameSlot* slot = nullptr;
@@ -1637,18 +1514,9 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             SlotLine line = SlotStatus(slot);
-            // The full name; on a narrow card the short one (without "Skylanders: "), smaller if it still does not fit
-            // between the card's 20 px margins. Never cut.
-            const char* name = FindGame(entry.id) != nullptr ? FindGame(entry.id)->name : entry.name;
-            ImGui::PushFont(m_boldFont, SidebarTextSize);
-            if (ImGui::CalcTextSize(name).x > cardW - 40)
-                name = entry.name;
-            if (float nameW = ImGui::CalcTextSize(name).x; nameW > cardW - 40)
-            {
-                ImGui::PopFont();
-                ImGui::PushFont(m_boldFont, SidebarTextSize * (cardW - 40) / nameW);
-            }
-            draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), name);
+            // The full name, at the row's size (between the card's 20 px margins).
+            ImGui::PushFont(m_boldFont, nameSize);
+            draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), GameName(entry.id));
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SmallSize);
             draw->AddCircleFilled(ImVec2(at.x + 24, end.y - 22), 4, Rgb(line.dot));
@@ -2038,53 +1906,24 @@ namespace launcher_ui
     // LB / RB change tab, as in the console launchers.
     bool App::DrawTabBar(const char* const* labels, int count, int* current)
     {
-        bool changed = false;
-        if (!ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) && !ImGui::IsAnyItemActive())
-        {
-            int step = ImGui::IsKeyPressed(ImGuiKey_GamepadL1, false) ? -1 : ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false) ? 1 : 0;
-            if (step != 0 && std::clamp(*current + step, 0, count - 1) != *current)
-            {
-                *current = std::clamp(*current + step, 0, count - 1);
-                changed = true;
-                RequestFocus(FocusTo::Page); // the ring follows to the new tab
-            }
-        }
-        ImGui::PushFont(nullptr, SidebarTextSize);
+        std::vector<const char*> shown;
         for (int i = 0; i < count; i++)
-        {
-            const char* label = Tr(labels[i]);
-            bool active = *current == i;
-            ImVec2 at = ImGui::GetCursorScreenPos(), text = ImGui::CalcTextSize(label);
-            ImVec2 size(text.x + BoldOffset, text.y + 10 + TabUnderlineH);
-            if (ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav))
-            {
-                changed = changed || *current != i;
-                *current = i;
-            }
-            bool hovered = ImGui::IsItemHovered();
-            FocusRing(RadiusSmall, 6);
-            if (active)
-                TakeFocus(FocusTo::Page);
-            ImDrawList* draw = ImGui::GetWindowDrawList();
-            unsigned color = active || hovered ? Text : TextDim;
-            if (active)
-            {
-                AddBoldText(draw, at, Rgb(color), label);
-                draw->AddRectFilled(ImVec2(at.x, at.y + size.y - TabUnderlineH), ImVec2(at.x + size.x, at.y + size.y), Rgb(AccentDark));
-            }
-            else
-                draw->AddText(at, Rgb(color), label);
-            ImGui::SameLine(0, TabGap);
-        }
-        ImGui::PopFont();
-        ImGui::NewLine();
+            shown.push_back(Tr(labels[i]));
+        ui::TabsOptions options;
+        options.focusSelected = m_focusTo == FocusTo::Page;
+        options.showFocus = m_focusShow;
+        if (options.focusSelected)
+            m_focusTo = FocusTo::None;
+        ui::TabChange change = ui::Tabs("##tabs", shown, current, options);
+        if (change == ui::TabChange::Bumper)
+            RequestFocus(FocusTo::Page); // the ring follows to the new tab
         ImGui::Dummy(ImVec2(0, 4));
-        if (changed)
+        if (change != ui::TabChange::None)
         {
             m_capturing = nullptr;
             m_s->saveBackupsLoaded = m_s->dataSizesLoaded = false; // the saves and the folders may have changed since the tab was open
         }
-        return changed;
+        return change != ui::TabChange::None;
     }
 
     // The launcher's settings, apart from any game's: the controller (all games read the same), the launcher
@@ -2264,75 +2103,24 @@ namespace launcher_ui
         m_focusTo = FocusTo::None;
     }
 
-    constexpr float ToastWidth = 420, ToastMargin = 20; // the stack's text width and its distance from the window's top and right
-    constexpr size_t MaxToasts = 4;
+    constexpr float ToastWidth = 420; // the longest line of a message before it wraps
 
     void App::Toast(std::string text, bool error)
     {
-        // Long enough to read: 2.5 s, and more for a long message, up to 6 s. A failure ("Couldn't ...", in any language) stays
-        // 12 s: long enough to read without a mouse (a pad cannot reach the cross), and the cross closes it sooner.
+        // A failure ("Couldn't ...", in any language: the collection's English toasts still say it so) is an error.
         error = error || i18n::StartsLike(text, "Couldn't");
-        uint64_t readMs = std::clamp<uint64_t>(2500 + 45 * (text.size() > 40 ? text.size() - 40 : 0), 2500, 6000);
-        uint64_t until = SDL_GetTicks() + (error ? std::max<uint64_t>(readMs, 12000) : readMs);
-        for (ToastItem& item : m_toasts)
-            if (item.text == text) // the same words again: the one already shown, kept longer
-            {
-                item.until = until;
-                item.error = item.error || error;
-                return;
-            }
-        m_toasts.push_back({ std::move(text), until, error });
-        if (m_toasts.size() > MaxToasts)
-            m_toasts.erase(m_toasts.begin());
+        Toast(std::move(text), error ? ui::ToastKind::Error : ui::ToastKind::Info);
     }
+
+    void App::Toast(std::string text, ui::ToastKind kind) { m_toasts.Push(std::move(text), kind); }
 
     void App::DrawToast()
     {
-        uint64_t now = SDL_GetTicks();
-        std::erase_if(m_toasts, [&](const ToastItem& item) { return now > item.until; });
-        if (m_toasts.empty())
-            return;
-        // Bottom right, stacked upwards, newest at the bottom, above the game page's band and Home's buttons so no control is
-        // covered; each at most 420 points wide (a long one wraps). Errors have a cross; a click on any message closes it.
-        ImVec2 size = ImGui::GetIO().DisplaySize;
-        float wrap = std::min(ToastWidth, size.x - SidebarW - 2 * Pad - 80);
-        ImDrawList* draw = ImGui::GetForegroundDrawList();
-        float bottom = size.y - ToastMargin - (m_page == Page::Play || m_page == Page::Home ? BottomBarH : 0.0f);
-        int closed = -1;
-        for (size_t i = m_toasts.size(); i-- > 0;)
-        {
-            const ToastItem& item = m_toasts[i];
-            const bool error = item.error;
-            ImVec2 text = ImGui::CalcTextSize(item.text.c_str(), nullptr, false, wrap);
-            float width = text.x + 40 + (error ? 28 : 0);
-            // Whole points, so the 2-point ring covers whole pixels at 1x and 2x.
-            ImVec2 position(std::round(size.x - ToastMargin - width), std::round(bottom - text.y - 24)), end(size.x - ToastMargin, std::round(bottom));
-            // A window of its own, so a click closes the message and does not reach what is under it.
-            ImGui::SetNextWindowPos(position);
-            ImGui::SetNextWindowSize(ImVec2(end.x - position.x, end.y - position.y));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-            ImGui::Begin(fmt::format("##toast{}", i).c_str(), nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground |
-                ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollbar);
-            if (ImGui::InvisibleButton("##close", ImVec2(end.x - position.x, end.y - position.y)))
-                closed = int(i);
-            bool hovered = ImGui::IsItemHovered();
-            ImGui::End();
-            ImGui::PopStyleVar(2);
-            draw->AddRectFilled(position, end, Rgb(PanelRaised, 245), Radius);
-            // AddRect puts the line's centre half a point in: a 2-point ring then runs between whole points only from 1 point in.
-            draw->AddRect(ImVec2(position.x + 0.5f, position.y + 0.5f), ImVec2(end.x - 0.5f, end.y - 0.5f), Rgb(error ? Danger : Accent, 200), Radius - 1, 0, 2.0f);
-            draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(position.x + 20, position.y + 12), Rgb(Text), item.text.c_str(), nullptr, wrap);
-            if (error) // a cross
-            {
-                ImVec2 centre(end.x - 22, position.y + 24);
-                draw->AddLine(ImVec2(centre.x - 5, centre.y - 5), ImVec2(centre.x + 5, centre.y + 5), Rgb(hovered ? Text : TextDim), 2.0f);
-                draw->AddLine(ImVec2(centre.x - 5, centre.y + 5), ImVec2(centre.x + 5, centre.y - 5), Rgb(hovered ? Text : TextDim), 2.0f);
-            }
-            bottom = position.y - 8;
-        }
-        if (closed >= 0)
-            m_toasts.erase(m_toasts.begin() + closed);
+        // Above the game page's band and Home's buttons, so no control is covered; a message closed with the keyboard or the
+        // pad gives the focus back to the page.
+        float wrap = std::min(ToastWidth, ImGui::GetIO().DisplaySize.x - SidebarW - 2 * Pad - 80);
+        if (m_toasts.Draw(m_page == Page::Play || m_page == Page::Home ? BottomBarH : 0.0f, wrap))
+            RequestFocus(FocusTo::Page);
     }
 
     // Quitting during an install: keep installing (the default, B / Escape) or quit.
@@ -2392,6 +2180,36 @@ namespace launcher_ui
         if (m_testNav || m_testSeatX)
             frameIo.BackendFlags |= ImGuiBackendFlags_HasGamepad; // the test's pad keys count with no pad plugged in
         ImGui::NewFrame();
+        // The components' context: the time, the focus ring in the shown game's colour on its pages, the pad family in use.
+        ui::NewFrame(SDL_GetTicks());
+        ui::Ctx().accent = m_page == Page::Play || m_page == Page::GameSettings ? StyleOf(m_s->game.id).glow : Accent;
+        ui::Ctx().reduceMotion = ReduceMotion();
+        if (m_gamepads.empty() && !m_testNav)
+            ui::Ctx().glyphs = ui::Glyphs::Keyboard;
+        else
+        {
+            PadFamily family = PadFamilyNow();
+            ui::Ctx().glyphs = family == PadFamily::PlayStation || family == PadFamily::PlayStation3 ? ui::Glyphs::PlayStation
+                : family == PadFamily::Nintendo ? ui::Glyphs::Nintendo : ui::Glyphs::Xbox;
+        }
+        if (m_testGallery)
+        {
+            DrawGallery();
+            ImGui::Render();
+            ImGuiIO& galleryIo = ImGui::GetIO();
+            SDL_SetRenderScale(m_renderer, galleryIo.DisplayFramebufferScale.x, galleryIo.DisplayFramebufferScale.y);
+            SDL_SetRenderDrawColor(m_renderer, 30, 30, 36, 255);
+            SDL_RenderClear(m_renderer);
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+            if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
+            {
+                Screenshot(m_testShot.c_str());
+                m_testAt = 0;
+                m_testStep++;
+            }
+            SDL_RenderPresent(m_renderer);
+            return;
+        }
         if (!m_backTaken && (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false)))
             Back();
         DrawBackdrop();
@@ -2424,7 +2242,7 @@ namespace launcher_ui
         DrawToast();
         // Who answers B / Escape next frame: an open menu or dialog, a field being edited, the collection's search or View.
         m_backTaken = ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) || ImGui::IsAnyItemActive() ||
-            m_reportOpen || m_whatsNewOpen || m_quitPrompt || (m_page == Page::Collection && m_s->collection->TakesBack());
+            m_toasts.HasFocus() || m_reportOpen || m_whatsNewOpen || m_quitPrompt || (m_page == Page::Collection && m_s->collection->TakesBack());
         m_focusTo = FocusTo::None; // a request no page answered (its item wasn't drawn) is dropped
 
         ImGui::Render();
@@ -2599,7 +2417,7 @@ namespace launcher_ui
             }
         };
         auto shoot = [&](const char* name, uint64_t wait = 500) {
-            m_toasts.clear(); // the install's "Game installed" would sit on the banner
+            m_toasts.Clear(); // the install's "Game installed" would sit on the banner
             m_testShot = fmt::format("{:02}-{}", m_testStep, name);
             m_testAt = now + wait;
         };
@@ -2710,7 +2528,7 @@ namespace launcher_ui
         case 21:
             if (m_updates.Busy() || m_updateWasBusy)
                 return;
-            expect(!m_updates.Snapshot().checked && m_gameUpdates.empty() && BannerHeight() == 0 && m_toasts.empty(), "offline: nothing is said");
+            expect(!m_updates.Snapshot().checked && m_gameUpdates.empty() && BannerHeight() == 0 && m_toasts.Items().empty(), "offline: nothing is said");
             expect(!UpdateAvailable(a) && !std::filesystem::exists(DownloadedKitsFolder()), "and nothing is offered or downloaded");
             shoot("offline");
             break;
@@ -2885,7 +2703,7 @@ namespace launcher_ui
                 expect(m_drawn["home:ssa"] == StateCases[Cases - 1].text, "Home's card says the same");
                 a.verify.done = true;
                 m_page = Page::Play;
-                Toast(Tr("Game installed: press PLAY"));
+                Toast(Tr("Game installed: press PLAY"), ui::ToastKind::Success);
                 Toast(Tr("Log copied"));
                 Toast(Tr("Couldn't save the settings"), true);
                 Toast(Tf("Saves restored from {}", "2026-10-26 09:30"));
@@ -2894,15 +2712,15 @@ namespace launcher_ui
             }
             if (m_testStep == Toasts + 1)
             {
-                expect(m_toasts.size() == 4 && m_toasts[2].error, "four messages, one an error");
+                expect(m_toasts.Items().size() == 4 && m_toasts.Items()[2].kind == ui::ToastKind::Error, "four messages, one an error");
                 m_testAt = now + 3500; // the others have gone by themselves
                 m_testShot = fmt::format("{:02}-toasts-error-kept", m_testStep);
                 break;
             }
             if (m_testStep == Toasts + 2)
             {
-                expect(m_toasts.size() == 1 && m_toasts[0].error, "only the error is left (it stays 12 s)");
-                m_toasts.clear();
+                expect(m_toasts.Items().size() == 1 && m_toasts.Items()[0].kind == ui::ToastKind::Error, "only the error is left (it stays until closed)");
+                m_toasts.Clear();
             }
             SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
             m_running = false;
@@ -3294,6 +3112,11 @@ namespace launcher_ui
             TestButtonsScript(now);
             return;
         }
+        if (m_testGallery)
+        {
+            TestGalleryScript(now);
+            return;
+        }
         if (m_testNav)
         {
             TestNavScript(now);
@@ -3461,6 +3284,7 @@ void LauncherTheme::Apply(ImGuiStyle& style)
     style.ChildBorderSize = 1.5f;
     style.FrameBorderSize = 1;
     style.FontSizeBase = TextSize;
+    style.DisabledAlpha = ui::DisabledAlpha; // the one disabled look: everything at this alpha
     ImVec4* colors = style.Colors;
     auto color = [](unsigned rgb, float alpha = 1.0f) {
         return ImVec4(((rgb >> 16) & 0xFF) / 255.0f, ((rgb >> 8) & 0xFF) / 255.0f, (rgb & 0xFF) / 255.0f, alpha);
@@ -3493,14 +3317,15 @@ void LauncherTheme::Apply(ImGuiStyle& style)
 
 std::span<const LauncherGameEntry> LauncherGameCatalog()
 {
+    // The names are game_names.h's (the short one: the sidebar's rows).
     static const LauncherGameEntry catalog[] = {
-        { "ssa", "Spyro's Adventure", "Spyro's Adventure", 0x6BBAFF, true },
-        { "giants", "Giants", "Giants", 0xFFC65C, true },
-        { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, true },
-        { "trapteam", "Trap Team", "Trap Team", 0x6DF0B4, false },
-        { "superchargers", "SuperChargers", "SuperChargers", 0xFF8A5C, false },
-        { "racing", "SuperChargers Racing", "SuperChargers Racing", 0xE85D75, false },
-        { "imaginators", "Imaginators", "Imaginators", 0xB49BFF, false },
+        { "ssa", GameName("ssa", GameNameForm::Short), 0x6BBAFF, true },
+        { "giants", GameName("giants", GameNameForm::Short), 0xFFC65C, true },
+        { "swapforce", GameName("swapforce", GameNameForm::Short), 0xFF55A8, true },
+        { "trapteam", GameName("trapteam", GameNameForm::Short), 0x6DF0B4, false },
+        { "superchargers", GameName("superchargers", GameNameForm::Short), 0xFF8A5C, false },
+        { "racing", GameName("racing", GameNameForm::Short), 0xE85D75, false },
+        { "imaginators", GameName("imaginators", GameNameForm::Short), 0xB49BFF, false },
     };
     return catalog;
 }
@@ -3533,14 +3358,7 @@ bool LauncherFullscreen(const LauncherConfig& config)
 
 std::string LauncherFormatSize(uint64_t bytes)
 {
-    constexpr double KB = 1024, MB = KB * 1024, GB = MB * 1024;
-    if (bytes >= uint64_t(GB))
-        return Tf("{:.1f} GB", double(bytes) / GB);
-    if (bytes >= uint64_t(MB))
-        return Tf("{:.0f} MB", double(bytes) / MB);
-    if (bytes >= uint64_t(KB))
-        return Tf("{:.0f} KB", double(bytes) / KB);
-    return Tf("{} bytes", bytes);
+    return ui::FormatSize(bytes); // the one size format (components/format.h)
 }
 
 std::string LauncherMiddleEllipsis(std::string_view text, size_t max)

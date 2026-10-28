@@ -15,9 +15,9 @@
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/portal_status.h"
 #include "launcher/uninstall.h"
-#include "launcher/theme/launcher_theme.h"
+#include "launcher/ui/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
-#include "launcher/ui/hold_confirm.h"
+#include "launcher/ui/components/components.h"
 #include "shared/collection/save_backup.h"
 #include <SDL3/SDL.h>
 #include <atomic>
@@ -196,8 +196,7 @@ namespace launcher_ui
     // Loads a PNG; `crop`: to its opaque bounds; `maxWidth` > 0: averaged down to at most that many pixels wide. Empty if
     // the file can't be read.
     ArtTexture LoadArt(SDL_Renderer* renderer, const std::string& path, bool crop, int maxWidth = 0);
-    // A rounded rectangle filled with a vertical gradient, alpha included (`flags`: which corners are rounded).
-    void GradientRect(ImDrawList* draw, ImVec2 min, ImVec2 max, ImU32 top, ImU32 bottom, float rounding, ImDrawFlags flags = 0);
+    using ui::GradientRect; // a rounded rectangle filled with a vertical gradient (components/core.h)
     // Whether the system asks for less motion (macOS: Reduce motion; Windows: animations off). [launcher] reduce_motion
     // = 1 / 0 overrides it.
     bool SystemReducesMotion();
@@ -342,6 +341,9 @@ namespace launcher_ui
         void DrawProblemReport();
         void DrawToast();
         void DrawQuitPrompt();
+        // SKY_LAUNCHER_TEST_GALLERY (gallery.cpp): every component in every state, page by page, in place of the window's pages.
+        void DrawGallery();
+        void TestGalleryScript(uint64_t now);
 
         // Pages and focus. The sidebar and the page are separate windows, which the D-pad doesn't cross: B / Escape
         // moves the focus to the sidebar (or leaves Settings and Collection), A on a row moves it into the page.
@@ -376,7 +378,8 @@ namespace launcher_ui
         void ForgetCachedArt(const char* game); // its disc was read again
         bool ReduceMotion() const;
 
-        // Widgets in the launcher's style.
+        // Widgets in the launcher's style. Each is now a thin wrapper over a component (components/components.h), kept so the
+        // screens build while they move to the components (docs/launcher_ui.md, "Migration map").
         bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
         bool PillButton(const char* label, bool primary = false, float width = 0, bool bold = false, unsigned fill = PanelRaised,
             unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive, int chevron = 0);
@@ -448,6 +451,7 @@ namespace launcher_ui
         bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
         void Toast(std::string text, bool error = false); // an error stays until it is closed; the rest go by themselves
+        void Toast(std::string text, ui::ToastKind kind);
         void RefreshGamepads();
         PadFamily PadFamilyNow() const; // whose button names the Keyboard tab shows (game_keys.h)
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
@@ -520,8 +524,6 @@ namespace launcher_ui
         std::vector<std::unique_ptr<GameSlot>> m_slots;
         GameSlot* m_s = nullptr;
 
-        HoldConfirm m_hold;
-
         enum class UninstallStage { Closed, List, Result };
         struct UninstallState
         {
@@ -548,13 +550,7 @@ namespace launcher_ui
         Page m_lastPage = Page::Home;
         std::map<std::string, ArtTexture> m_cachedArt; // CachedArt's, by "<game> <role> <width>"
 
-        struct ToastItem
-        {
-            std::string text;
-            uint64_t until; // when it goes
-            bool error = false; // a failure: red ring and a cross, kept longer
-        };
-        std::vector<ToastItem> m_toasts; // newest last; drawn from the top right, down
+        ui::Toasts m_toasts; // newest last; drawn at the bottom right, upwards
         std::vector<ImVec4> m_stars; // x, y (0..1), radius, phase
 
         // Screenshot test (SKY_LAUNCHER_SHOTS, SKY_LAUNCHER_TEST_DROP): drives the screens without a player.
@@ -578,6 +574,8 @@ namespace launcher_ui
         bool m_testControllers = false; // open the controller menu (its screenshot)
         bool m_testButtons = false;     // SKY_LAUNCHER_TEST_BUTTONS: the action button's states, both games
         bool m_testButtonsOff = false;  // its "disabled" shot: the main button drawn disabled
+        bool m_testGallery = false;     // SKY_LAUNCHER_TEST_GALLERY: the component gallery (gallery.cpp)
+        int m_galleryPage = 0;          // the gallery's page shown
         std::string m_testShot;         // the next shot's name, for scripts that name their own
         float m_testUiScale = 0;        // > 0: the UI scale, whatever the display (the button test)
         ImVec2 m_testMainAt, m_testGearAt; // the action button's two halves' centres, last drawn (where the script points)

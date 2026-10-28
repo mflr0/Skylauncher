@@ -133,6 +133,8 @@ namespace
     void CheckNoRawText(const std::vector<fs::path>& files)
     {
         static const char* const Calls[] = { "PillButton(", "Title(", "BoldText(", "Toast(", "Chip(", "HoldButton(", "SettingRow(",
+            "ui::Button(", "ui::Pill(", "ui::Chip(", "ui::Badge(", "ui::StatusPill(", "ui::Toggle(", "ui::Checkbox(", "ui::Radio(",
+            "ui::ListRow(", "ui::SectionHeader(", "ui::MenuItem(", "ui::Tooltip(",
             "ImGui::Button(", "ImGui::TextUnformatted(", "ImGui::Selectable(", "ImGui::BeginCombo(", "ImGui::TextWrapped(", "ImGui::SetTooltip(",
             "ImGui::Text(" };
         for (const fs::path& file : files)
@@ -229,6 +231,11 @@ namespace
                     Fail(name + ": missing: " + key.substr(0, 80));
                 continue;
             }
+            // French: a no-break space before : ? ! % (the file's own rule), never a plain space.
+            if (catalog.code == "fr")
+                for (const char* mark : { " :", " ?", " !", " %" })
+                    if (it->second.find(mark) != std::string::npos)
+                        Fail(name + ": a plain space before '" + std::string(mark + 1) + "' (use a no-break space): " + it->second.substr(0, 60));
             bool englishValid, translatedValid;
             std::map<int, std::string> english = Placeholders(key, englishValid), translated = Placeholders(it->second, translatedValid);
             if (!translatedValid || english != translated)

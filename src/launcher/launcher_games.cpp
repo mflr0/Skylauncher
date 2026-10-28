@@ -1,3 +1,4 @@
+#include "launcher/game_names.h"
 #include "launcher/launcher.h"
 
 // Hashes identify the player's own default.xex; they are not game content.
@@ -29,9 +30,9 @@ namespace
     // `runtime` is the executable the player kit builds for the game (its config/<id>/game.txt).
     const GameInfo Games[] =
     {
-        { "ssa", "Skylanders: Spyro's Adventure", SpyrosAdventureReleases, "SSARecomp" },
-        { "giants", "Skylanders: Giants", GiantsReleases, "SGRecomp" },
-        { "swapforce", "Skylanders: Swap Force", SwapForceReleases, "SSFRecomp" },
+        { "ssa", GameName("ssa"), SpyrosAdventureReleases, "SSARecomp" },
+        { "giants", GameName("giants"), GiantsReleases, "SGRecomp" },
+        { "swapforce", GameName("swapforce"), SwapForceReleases, "SSFRecomp" },
     };
 }
 

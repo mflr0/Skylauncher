@@ -4,6 +4,26 @@
 @code fr
 @name Français
 
+# Components (ui/components): the hold hint, numbers ("." is the decimal mark, "," the thousands separator), dates.
+Hold to confirm	Maintenez pour confirmer
+{}%	{} %
+.	,
+,	 
+{0} {1} {2}	{0} {1} {2}
+Today {}	Aujourd'hui {}
+Yesterday {}	Hier {}
+Jan	janv.
+Feb	févr.
+Mar	mars
+Apr	avr.
+May	mai
+Jun	juin
+Jul	juil.
+Aug	août
+Sep	sept.
+Oct	oct.
+Nov	nov.
+Dec	déc.
 \n\nAllow access in System Settings > Privacy & Security > Files and Folders.	\n\nAutorisez l'accès dans Réglages Système > Confidentialité et sécurité > Fichiers et dossiers.
 \n- {} (media ID {:08X}, version {})	\n- {} (ID du média {:08X}, version {})
 Can't read the disc image ({}).{}	Impossible de lire l'image disque ({}).{}
@@ -17,7 +37,7 @@ Not an Xbox 360 disc image, or the file is incomplete.	Ce n'est pas une image di
 60 (experimental)	60 (expérimental)
 Only contacts github.com.	Contacte seulement github.com.
 Couldn't write to the game folder.	Impossible d'écrire dans le dossier du jeu.
-A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc.	Un launcher pour les portages PC natifs de Skylanders. Aucun code ni image du jeu : tout vient de votre disque.
+A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc.	Un launcher pour les portages PC natifs de Skylanders. Aucun code ni image du jeu : tout vient de votre disque.
 About	À propos
 Adding the movie shaders	Ajout des shaders des vidéos
 Advanced	Avancé
@@ -248,7 +268,7 @@ Restore	Restaurer
 Resume	Reprendre
 Retry	Réessayer
 SETTINGS	RÉGLAGES
-{} can't be verified, so it wasn't installed	{} ne peut pas être vérifié : rien n'a été installé
+{} can't be verified, so it wasn't installed	{} ne peut pas être vérifié : rien n'a été installé
 Save as...	Enregistrer sous...
 Save backups	Copies de secours des sauvegardes
 Saved gamepad (not connected)	Manette enregistrée (non connectée)
@@ -388,9 +408,9 @@ just now	à l'instant
 less than a minute left	moins d'une minute restante
 no answer	aucune réponse
 nothing yet	0 octet
-{:.0f} KB	{:.0f} Ko
-{:.0f} MB	{:.0f} Mo
-{:.1f} GB	{:.1f} Go
+{} KB	{} Ko
+{} MB	{} Mo
+{} GB	{} Go
 {} Xbox, PlayStation and Switch pads work.	{} Les manettes Xbox, PlayStation et Switch fonctionnent.
 {} already plays from its copied game data	{} fonctionne déjà avec ses données copiées
 {} bytes	{} octets
@@ -445,16 +465,16 @@ Choose another	En choisir une autre
 Chrome	Chrome
 Clear search and filters	Effacer recherche et filtres
 Click a seat, then a figure	Cliquez sur une place, puis sur une figurine
-Click: sheet · drag to a seat	Clic : fiche · glisser vers une place
-Click: put it on {}	Clic : la mettre sur {}
+Click: sheet · drag to a seat	Clic : fiche · glisser vers une place
+Click: put it on {}	Clic : la mettre sur {}
 Couldn't back it up	Sauvegarde impossible
 Couldn't create the figure	Création de la figurine impossible
-Couldn't delete it: 	Suppression impossible : 
-Couldn't duplicate it: 	Duplication impossible : 
+Couldn't delete it: 	Suppression impossible : 
+Couldn't duplicate it: 	Duplication impossible : 
 Couldn't put it back	Remise en place impossible
-Couldn't reset it: 	Réinitialisation impossible : 
-Couldn't restore it: 	Restauration impossible : 
-Couldn't save it: 	Enregistrement impossible : 
+Couldn't reset it: 	Réinitialisation impossible : 
+Couldn't restore it: 	Restauration impossible : 
+Couldn't save it: 	Enregistrement impossible : 
 Couldn't save the name	Nom non enregistré
 Couldn't write the seats for the next start	Écriture des places pour le prochain lancement impossible
 Create {}	Créer {}
@@ -470,7 +490,7 @@ Details	Détails
 Drop figure files or a folder on the window.	Déposez des fichiers de figurines ou un dossier sur la fenêtre.
 Duplicate	Dupliquer
 More actions	Plus d'actions
-Duplicated: 	Dupliquée : 
+Duplicated: 	Dupliquée : 
 EDIT	MODIFIER
 Earth	Terre
 Edit	Modifier
@@ -533,15 +553,15 @@ Metallic	Métallisé
 Minis and sidekicks	Minis et acolytes
 Missing figure	Figurine absente
 Move {} to the trash	Mettre {} à la corbeille
-Move {} to the trash?	Mettre {} à la corbeille ?
+Move {} to the trash?	Mettre {} à la corbeille ?
 Moved to the trash	Mise à la corbeille
 My Skylanders is empty	Mes Skylanders est vide
 Name (optional)	Nom (facultatif)
-Name (empty: the toy's name)	Nom (vide : celui du jouet)
+Name (empty: the toy's name)	Nom (vide : celui du jouet)
 Name this toy	Nommer ce jouet
-Named: shown at the next start	Nommé : affiché au prochain lancement
+Named: shown at the next start	Nommé : affiché au prochain lancement
 Never	Jamais
-New: never played.	Neuve : jamais jouée.
+New: never played.	Neuve : jamais jouée.
 Nickname	Surnom
 Nickname (16 max)	Surnom (16 max)
 No element	Aucun élément
@@ -555,7 +575,7 @@ Nothing for this seat yet	Rien pour cette place pour l'instant
 ON THE PORTAL NOW	SUR LE PORTAIL MAINTENANT
 Blank figures from old versions. Tidy trashes them.	Figurines vierges d'anciennes versions. Ranger les met à la corbeille.
 On	Sur
-On the portal in {}: read-only	Sur le portail dans {} : lecture seule
+On the portal in {}: read-only	Sur le portail dans {} : lecture seule
 On {} at the next start of {}	Sur {} au prochain lancement de {}
 Open its sheet	Ouvrir sa fiche
 Other	Autre
@@ -566,13 +586,13 @@ Player {}	Joueur {}
 Playing now	En jeu
 Plays in	Joue dans
 Put back	Remettre
-Put back the copy from {}?	Remettre la copie du {} ?
-Put back: 	Remise : 
+Put back the copy from {}?	Remettre la copie du {} ?
+Put back: 	Remise : 
 Put it on {}	La mettre sur {}
 Put on the portal	Mettre sur le portail
 Reset to new	Remise à neuf
 Reset to new...	Remettre à neuf...
-Reset {} to new? Level, gold and upgrades are lost.	Remettre {} à neuf ? Niveau, or et améliorations seront perdus.
+Reset {} to new? Level, gold and upgrades are lost.	Remettre {} à neuf ? Niveau, or et améliorations seront perdus.
 Restore a backup	Restaurer une copie de secours
 Save	Enregistrer
 Saved	Enregistré
@@ -589,7 +609,7 @@ Swap Force bottoms	Swap Force (bas)
 Swap Force tops	Swap Force (haut)
 Take it off	La retirer
 Tech	Tech
-The game is running: use its Toy Box	Le jeu tourne : utilisez son Coffre à jouets
+The game is running: use its Toy Box	Le jeu tourne : utilisez son Coffre à jouets
 The game isn't installed yet	Le jeu n'est pas encore installé
 The trash is empty.	La corbeille est vide.
 Not available for this game yet	Pas encore disponible pour ce jeu
@@ -644,11 +664,11 @@ Not available for {} yet	Pas encore disponible pour {}
 {} h {:02} min	{} h {:02} min
 {} is in use by {}	{} est utilisée par {}
 {} is not for {}	{} n'est pas pour {}
-{} is running: use its Toy Box	{} tourne : utilisez son Coffre à jouets
+{} is running: use its Toy Box	{} tourne : utilisez son Coffre à jouets
 {} keep no level or gold.	{} n'ont ni niveau ni or.
 {} min	{} min
 {} · type {} · variant {:04X}	{} · type {} · variante {:04X}
-{}: {} taken off	{} : {} retirée
+{}: {} taken off	{} : {} retirée
 Name, element, game, level…	Nom, élément, jeu, niveau…
 Filters	Filtres
 Sort by	Trier par
@@ -663,19 +683,19 @@ Basic	De base
 {} gold	{} or
 Swapper	Swapper
 Bottom file	Fichier du bas
-Top: {} · Bottom: {}	Haut : {} · Bas : {}
+Top: {} · Bottom: {}	Haut : {} · Bas : {}
 Change the bottom	Changer le bas
 Change the top	Changer le haut
 CHANGE THE BOTTOM	CHANGER LE BAS
 CHANGE THE TOP	CHANGER LE HAUT
-{}: pick the new {}	{} : choisis le nouveau {}
+{}: pick the new {}	{} : choisis le nouveau {}
 bottom	bas
 top	haut
 Now with {}	Actuellement avec {}
 On its own	Seul
 No other bottom to take.	Pas d'autre bas à prendre.
 No other top to take.	Pas d'autre haut à prendre.
-Couldn't change it: 	Impossible de le changer : 
+Couldn't change it: 	Impossible de le changer : 
 Changed	Changé
 UPDATE	MISE À JOUR
 Play without updating	Jouer sans mettre à jour
@@ -772,5 +792,5 @@ Works in {}	Fonctionne dans {}
 In {}	Dans {}
 plays as {}	joue comme {}
 On the wheel	Sur la roue
-On the wheel: {}	Sur la roue : {}
-The wheel is full: take a figure off it first	La roue est pleine : retirez d’abord une figurine
+On the wheel: {}	Sur la roue : {}
+The wheel is full: take a figure off it first	La roue est pleine : retirez d’abord une figurine
