@@ -46,7 +46,7 @@ namespace launcher_ui
         BeginPageColumn("##gamesettingscolumn", width);
 
         Title(m_s->game.name, HeadlineSize, Text);
-        ImGui::SameLine(width - PillWidth(Tr("Back"), 120) - 30);
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - PillWidth(Tr("Back"), 120)); // the column's right edge, scrollbar or not
         if (PillButton(Tr("Back"), false, 120))
             GoTo(Page::Play);
         ImGui::Dummy(ImVec2(0, 4));

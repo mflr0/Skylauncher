@@ -603,7 +603,11 @@ namespace launcher_ui
         DrawHeader(width);
         DrawSeats(width);
         DrawBar();
-        ImGui::BeginChild("##shelf", ImVec2(0, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        // The shelf reaches 4 points past each side too (its padding keeps the content where it was), for the banner's borders.
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() - 4);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 0));
+        ImGui::BeginChild("##shelf", ImVec2(ImGui::GetContentRegionAvail().x + 8, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoBackground);
+        ImGui::PopStyleVar();
         ImGui::SetScrollX(0.0f);
         DrawList();
         ImGui::EndChild();
@@ -792,7 +796,9 @@ namespace launcher_ui
             // The seat's name leaves room for the X; the figure's name and level run under it, to the edge.
             float tx = icon.x + Icon + 12, tw = end.x - tx - 10;
             ImGui::PushFont(nullptr, SmallSize - 1);
-            draw->AddText(ImVec2(tx, at.y + 11), Rgb(choosing ? Accent : TextDim), SeatName(i).c_str());
+            const float nameW = tw - (occupied && editable ? 26.0f : 0.0f); // not under the X
+            draw->AddText(ImVec2(tx, at.y + 11), Rgb(choosing ? Accent : TextDim),
+                FitText(SeatName(i), nameW, [](const std::string& s) { return ImGui::CalcTextSize(s.c_str()).x; }).c_str());
             ImGui::PopFont();
             auto fit = [&](const std::string& text, float size, ImFont* font = nullptr) {
                 ImGui::PushFont(font, size);

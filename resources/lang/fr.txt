@@ -32,7 +32,6 @@ Higher scales need a dedicated graphics card.	Les échelles élevées demandent 
 Auto shows more on wide windows; 16:9 adds bars.	Auto montre plus sur les fenêtres larges ; 16:9 ajoute des bandes.
 Auto: a real portal if plugged in, else virtual	Auto : un vrai portail s'il est branché, sinon virtuel
 Automatic	Automatique
-Automatic (gamepad first)	Automatique (manette d'abord)
 Back	Retour
 Built for this disc.	Construit pour ce disque.
 Button glyphs	Icônes des boutons
@@ -524,7 +523,7 @@ LightCore	LightCore
 MANAGE	GÉRER
 Magic	Magie
 Magic Items	Objets magiques
-Magic item	Objet magique
+Magic item	Objet
 Manage	Gérer
 Mark as not in use	Marquer comme non utilisée
 Metallic	Métallisé
@@ -559,7 +558,7 @@ Open its sheet	Ouvrir sa fiche
 Other	Autre
 PORTAL AT THE NEXT START	PORTAIL AU PROCHAIN LANCEMENT
 Pick a figure below	Choisissez une figurine ci-dessous
-Pick one below	Choisissez-en une ci-dessous
+Pick one below	Voir ci-dessous
 Player {}	Joueur {}
 Playing now	En jeu
 Plays in	Joue dans

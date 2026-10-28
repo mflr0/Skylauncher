@@ -827,7 +827,7 @@ namespace launcher_ui
     // The device the game listens to: "auto", "keyboard" or "gamepad:<SDL GUID>" ([input] device= and gamepad=).
     std::vector<std::pair<std::string, std::string>> App::DeviceOptions() const
     {
-        std::vector<std::pair<std::string, std::string>> options = { { "auto", Tr("Automatic (gamepad first)") }, { "keyboard", Tr("Keyboard") } };
+        std::vector<std::pair<std::string, std::string>> options = { { "auto", Tr("Automatic") }, { "keyboard", Tr("Keyboard") } };
         for (SDL_JoystickID id : m_gamepads)
         {
             char text[64];
@@ -850,7 +850,7 @@ namespace launcher_ui
         for (const auto& [value, label] : DeviceOptions())
             if (value == current)
                 return label;
-        return current.starts_with("gamepad:") ? Tr("Saved gamepad (not connected)") : Tr("Automatic (gamepad first)");
+        return current.starts_with("gamepad:") ? Tr("Saved gamepad (not connected)") : Tr("Automatic");
     }
 
     void App::SetDevice(const std::string& value)
@@ -1823,10 +1823,8 @@ namespace launcher_ui
         {
             constexpr float RowH = 38, Dot = 6, DotX = 12 + Dot, LabelX = DotX + Dot + 12;
             std::vector<std::pair<std::string, std::string>> options = DeviceOptions();
-            float labelsW = ImGui::CalcTextSize(Tr(strings::PlayWith)).x;
-            for (const auto& [value, name] : options)
-                labelsW = std::max(labelsW, ImGui::CalcTextSize(name.c_str()).x);
-            float rowW = std::max(ControllerW - 12, LabelX + labelsW + 16);
+            // As wide as the picker, never wider: a long name is cut to the row.
+            const float rowW = ControllerW - 12, labelW = rowW - LabelX - 12;
             ImGui::PushFont(nullptr, SmallSize);
             ImGui::SetCursorPosX(ImGui::GetCursorPosX() + LabelX);
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr(strings::PlayWith));
@@ -1838,14 +1836,24 @@ namespace launcher_ui
                 bool current = value == device;
                 ImVec2 at = ImGui::GetCursorScreenPos();
                 ImGui::PushID(value.c_str());
+                // The highlight is drawn here, with the popup's corners, not as the Selectable's square one.
+                ImGui::PushStyleColor(ImGuiCol_Header, 0);
+                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+                ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
                 if (ImGui::Selectable("##device", current, 0, ImVec2(rowW, RowH)))
                     SetDevice(value);
+                ImGui::PopStyleColor(3);
+                if (current || ImGui::IsItemHovered())
+                    popup->AddRectFilled(at, ImVec2(at.x + rowW, at.y + RowH), Rgb(FieldActive, 255), RadiusSmall);
                 ImGui::PopID();
                 float mid = at.y + RowH / 2;
                 popup->AddCircle(ImVec2(at.x + DotX, mid), Dot, Rgb(current ? Accent : TextDim), 16, 2.0f);
                 if (current)
                     popup->AddCircleFilled(ImVec2(at.x + DotX, mid), Dot - 3, Rgb(Accent), 12);
-                popup->AddText(ImVec2(at.x + LabelX, mid - ImGui::GetTextLineHeight() / 2), Rgb(Text), name.c_str());
+                const std::string shown = FitText(name, labelW, [](const std::string& s) { return ImGui::CalcTextSize(s.c_str()).x; });
+                popup->AddText(ImVec2(at.x + LabelX, mid - ImGui::GetTextLineHeight() / 2), Rgb(Text), shown.c_str());
+                if (shown != name && ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", name.c_str());
             }
             ImGui::EndPopup();
         }
@@ -2023,7 +2031,26 @@ namespace launcher_ui
         DrawUpdates();
         ImGui::Dummy(ImVec2(0, 16));
         Title(Tr("Data folder"), TitleSize, Text);
-        ImGui::TextWrapped("%s", datadir::Text(LauncherDataFolder()).c_str());
+        {
+            // The path breaks after a separator, never in the middle of a name.
+            const std::string path = datadir::Text(LauncherDataFolder());
+            const float room = ImGui::GetContentRegionAvail().x;
+            std::string line;
+            for (size_t from = 0; from < path.size();)
+            {
+                size_t to = path.find_first_of("/\\", from);
+                to = to == std::string::npos ? path.size() : to + 1;
+                const std::string part = path.substr(from, to - from);
+                if (!line.empty() && ImGui::CalcTextSize((line + part).c_str()).x > room)
+                {
+                    ImGui::TextUnformatted(line.c_str());
+                    line.clear();
+                }
+                line += part;
+                from = to;
+            }
+            ImGui::TextUnformatted(line.c_str());
+        }
         if (PillButton(Tr("Show in folder"), false, 260))
         {
             std::error_code error;
@@ -2164,20 +2191,20 @@ namespace launcher_ui
         std::erase_if(m_toasts, [&](const ToastItem& item) { return item.until != 0 && now > item.until; });
         if (m_toasts.empty())
             return;
-        // Top right, stacked downwards, newest at the bottom; each at most 420 points wide (a long one wraps). Errors have a
-        // cross; a click on any message closes it.
+        // Bottom right, stacked upwards, newest at the bottom, above the game page's band and Home's buttons so no control is
+        // covered; each at most 420 points wide (a long one wraps). Errors have a cross; a click on any message closes it.
         ImVec2 size = ImGui::GetIO().DisplaySize;
         float wrap = std::min(ToastWidth, size.x - SidebarW - 2 * Pad - 80);
         ImDrawList* draw = ImGui::GetForegroundDrawList();
-        float y = ToastMargin;
+        float bottom = size.y - ToastMargin - (m_page == Page::Play || m_page == Page::Home ? BottomBarH : 0.0f);
         int closed = -1;
-        for (size_t i = 0; i < m_toasts.size(); i++)
+        for (size_t i = m_toasts.size(); i-- > 0;)
         {
             const ToastItem& item = m_toasts[i];
             bool error = item.until == 0;
             ImVec2 text = ImGui::CalcTextSize(item.text.c_str(), nullptr, false, wrap);
             float width = text.x + 40 + (error ? 28 : 0);
-            ImVec2 position(size.x - ToastMargin - width, y), end(size.x - ToastMargin, y + text.y + 24);
+            ImVec2 position(size.x - ToastMargin - width, bottom - text.y - 24), end(size.x - ToastMargin, bottom);
             // A window of its own, so a click closes the message and does not reach what is under it.
             ImGui::SetNextWindowPos(position);
             ImGui::SetNextWindowSize(ImVec2(end.x - position.x, end.y - position.y));
@@ -2199,7 +2226,7 @@ namespace launcher_ui
                 draw->AddLine(ImVec2(centre.x - 5, centre.y - 5), ImVec2(centre.x + 5, centre.y + 5), Rgb(hovered ? Text : TextDim), 2.0f);
                 draw->AddLine(ImVec2(centre.x - 5, centre.y + 5), ImVec2(centre.x + 5, centre.y - 5), Rgb(hovered ? Text : TextDim), 2.0f);
             }
-            y = end.y + 8;
+            bottom = position.y - 8;
         }
         if (closed >= 0)
             m_toasts.erase(m_toasts.begin() + closed);
