@@ -1094,48 +1094,11 @@ namespace launcher_ui
         return ui::Button(label, options);
     }
 
-    void App::SettingRow(const char* label, const char* hint)
-    {
-        ImGui::TableNextRow(ImGuiTableRowFlags_None, 62);
-        ImGui::TableSetColumnIndex(0);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 3));
-        ImGui::TextUnformatted(label);
-        if (hint != nullptr)
-        {
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-            ImGui::TextWrapped("%s", hint);
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
-        }
-        ImGui::PopStyleVar();
-        ImGui::TableSetColumnIndex(1);
-    }
+    void App::SettingRow(const char* label, const char* hint) { ui::SettingRow(label, hint); }
 
-    bool App::BeginSettingsTable(const char* id)
-    {
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4, 14));
-        ImGui::PushStyleColor(ImGuiCol_TableBorderLight, Rgb(Border, 110));
-        bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp);
-        if (open)
-        {
-            ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthFixed, 320);
-        }
-        else
-        {
-            ImGui::PopStyleColor();
-            ImGui::PopStyleVar();
-        }
-        return open;
-    }
+    bool App::BeginSettingsTable(const char* id) { return ui::BeginSettings(id); }
 
-    void App::EndSettingsTable()
-    {
-        ImGui::EndTable();
-        ImGui::PopStyleColor();
-        ImGui::PopStyleVar();
-    }
+    void App::EndSettingsTable() { ui::EndSettings(); }
 
     void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)
     {
@@ -2740,7 +2703,7 @@ namespace launcher_ui
                 expect(m_drawn["home:ssa"] == StateCases[Cases - 1].text, "Home's card says the same");
                 a.verify.done = true;
                 m_page = Page::Play;
-                Toast(Tr("Game installed: press PLAY"));
+                Toast(Tr("Game installed: press PLAY"), ui::ToastKind::Success);
                 Toast(Tr("Log copied"));
                 Toast(Tr("Couldn't save the settings"), true);
                 Toast(Tf("Saves restored from {}", "2026-10-26 09:30"));

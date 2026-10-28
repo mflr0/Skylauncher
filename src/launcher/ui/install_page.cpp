@@ -288,7 +288,7 @@ namespace launcher_ui
                 version = pending->version;
             RecordInstalledGame(m_config, m_s->installSha, progress.runtime, m_s->installKitVersion, version);
             SetInstallState(m_s->installSha, nullptr);
-            Toast(Tr("Game installed: press PLAY"));
+            Toast(Tr("Game installed: press PLAY"), ui::ToastKind::Success);
             m_s->installView = false;
             RefreshInstall();
         }

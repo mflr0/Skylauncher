@@ -48,6 +48,7 @@ namespace ui
         inline constexpr float Main = 64;   // the main action (PLAY, INSTALL, UPDATE)
         inline constexpr float MainWidth = 300, MainGear = 64; // its main half's width and its settings segment's
         inline constexpr float Mark = 22;   // a checkbox's box, a radio's circle, a slider's knob
+        inline constexpr float SettingControl = 320; // a settings row's control column: one width for its select, toggle or button
     }
 
     // ---- Lines. ----

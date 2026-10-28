@@ -31,6 +31,13 @@ namespace ui
     };
     bool ListRow(const char* title, const ListRowOptions& options = {});
 
+    // ---- Settings rows: the one settings idiom. The label (and a one-line hint under it) on the left, the control in a
+    // column on the right (height::SettingControl wide), rows at least height::Large high with a hairline between them.
+    // Between BeginSettings (false: draw nothing) and EndSettings, one SettingRow per setting, then its control. ----
+    bool BeginSettings(const char* id);
+    void SettingRow(const char* label, const char* hint = nullptr);
+    void EndSettings();
+
     // ---- SectionHeader: a section's title in a card or a page, a divider above it unless it is the first. ----
     void SectionHeader(const char* title, const char* subtitle = nullptr, bool divider = true);
 

@@ -5,7 +5,7 @@
 @name Français
 
 # Components (ui/components): the hold hint, numbers ("." is the decimal mark, "," the thousands separator), dates.
-Hold to confirm	Maintenir pour confirmer
+Hold to confirm	Maintenez pour confirmer
 {}%	{} %
 .	,
 ,	 

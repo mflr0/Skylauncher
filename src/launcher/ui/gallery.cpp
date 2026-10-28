@@ -326,6 +326,18 @@ namespace launcher_ui
                 }
             }
             grid.End(6);
+            Caption("Settings rows: the label and its hint left, the control in its column");
+            static bool fullscreen = true;
+            if (ui::BeginSettings("##settings"))
+            {
+                ui::SettingRow(Tr("Fullscreen"));
+                ui::Toggle("##fullscreen", &fullscreen);
+                ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 is experimental."));
+                ui::SelectOptions select;
+                if (ui::BeginSelect("##fps", Tr(FpsChoices[0].label), select))
+                    ui::EndSelect();
+                ui::EndSettings();
+            }
             break;
         }
         case 5: // Fields, cards, list rows, section headers

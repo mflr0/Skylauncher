@@ -88,6 +88,43 @@ namespace ui
         return pressed && !options.disabled;
     }
 
+    // ---- Settings rows ---------------------------------------------------------------------------------------------
+
+    bool BeginSettings(const char* id)
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(space::XXS, space::S));
+        ImGui::PushStyleColor(ImGuiCol_TableBorderLight, LauncherTheme::Rgb(color::Hairline, 110));
+        const bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp);
+        if (!open)
+        {
+            ImGui::PopStyleColor();
+            ImGui::PopStyleVar();
+            return false;
+        }
+        ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("control", ImGuiTableColumnFlags_WidthFixed, height::SettingControl);
+        return true;
+    }
+
+    void SettingRow(const char* label, const char* hint)
+    {
+        ImGui::TableNextRow(ImGuiTableRowFlags_None, height::Large);
+        ImGui::TableSetColumnIndex(0);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(space::XS, space::XXS - 1));
+        Text(TextStyle::Body, label, color::Ink);
+        if (hint != nullptr)
+            Text(TextStyle::Caption, hint, color::Dim);
+        ImGui::PopStyleVar();
+        ImGui::TableSetColumnIndex(1);
+    }
+
+    void EndSettings()
+    {
+        ImGui::EndTable();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
+    }
+
     // ---- SectionHeader ---------------------------------------------------------------------------------------------
 
     void SectionHeader(const char* title, const char* subtitle, bool divider)
