@@ -19,7 +19,15 @@ Apr	avr.
 May	mai
 Jun	juin
 Jul	juil.
+Add a figure	Ajouter une figurine
 Aug	août
+Check for updates	Rechercher les mises à jour
+Clear the figures	Retirer les figurines
+Game log	Journal du jeu
+Hold to clear the caches.	Maintenez pour vider les caches.
+Launcher settings	Réglages du launcher
+Logs folder	Dossier des journaux
+Open the Toy Box	Ouvrir la Toy Box
 Sep	sept.
 Oct	oct.
 Nov	nov.
@@ -27,6 +35,9 @@ Dec	déc.
 \n\nAllow access in System Settings > Privacy & Security > Files and Folders.	\n\nAutorisez l'accès dans Réglages Système > Confidentialité et sécurité > Fichiers et dossiers.
 \n- {} (media ID {:08X}, version {})	\n- {} (ID du média {:08X}, version {})
 Can't read the disc image ({}).{}	Impossible de lire l'image disque ({}).{}
+Test	Tester
+Texture pack folder	Dossier des packs de textures
+The copy failed	La copie a échoué
 The disc image isn't there. Choose it again.	L'image disque est introuvable. Choisissez-la à nouveau.
 That's a folder: choose the disc image (.iso).	C'est un dossier : choisissez l'image disque (.iso).
 Not an Xbox 360 disc image, or the file is incomplete.	Ce n'est pas une image disque Xbox 360, ou le fichier est incomplet.
@@ -135,7 +146,6 @@ Drop your disc image (.iso) here.	Déposez votre image disque (.iso) ici.
 Dump textures	Extraire les textures
 Stopping keeps the files already copied.	Arrêter garde les fichiers déjà copiés.
 Game art comes from your own disc.	Les images viennent de votre propre disque.
-F6 or Tab opens the Toy Box, F7 adds a figure, F8 clears them.	F6 ou Tab ouvre la Toy Box, F7 ajoute une figurine, F8 les retire.
 Finding default.xex	Recherche de default.xex
 Fingerprinting default.xex (SHA-256)	Calcul de l'empreinte de default.xex (SHA-256)
 Finishing	Finalisation
@@ -170,6 +180,8 @@ INSTALL	INSTALLER
 INSTALLATION INTERRUPTED	INSTALLATION INTERROMPUE
 INSTALLATION STOPPED	INSTALLATION ARRÊTÉE
 INSTALLING THE GAME	INSTALLATION DU JEU
+The test failed	Le test a échoué
+Toy Box keys	Touches de la Toy Box
 UPDATING THE GAME	MISE À JOUR DU JEU
 INSTALLING...	INSTALLATION...
 The install stops and can resume later.	L'installation s'arrête ; vous pourrez la reprendre.
@@ -183,7 +195,6 @@ Interrupted: {} of {} copied	Interrompue : {} sur {} copiés
 Keep installing	Continuer l'installation
 Keyboard	Clavier
 Keyboard bindings reset	Touches du clavier réinitialisées
-LAUNCHER SETTINGS	RÉGLAGES DU LAUNCHER
 LIBRARY	BIBLIOTHÈQUE
 Language	Langue
 Last checked {}	Dernière vérification : {}
@@ -232,6 +243,7 @@ Play {} with Arkeyan Launcher	Jouer à {} avec Arkeyan Launcher
 Plug in the portal, then test it.	Branchez le portail, puis testez-le.
 Portal	Portail
 Portal of Power	Portail des Pouvoirs
+Problem report	Rapport de problème
 Portal: not detected	Portail : non détecté
 Portal: {}	Portail : {}
 Preparing the compiler	Préparation du compilateur
@@ -268,6 +280,7 @@ Restore	Restaurer
 Resume	Reprendre
 Retry	Réessayer
 SETTINGS	RÉGLAGES
+{} accepts this portal.	{} accepte ce portail.
 {} can't be verified, so it wasn't installed	{} ne peut pas être vérifié : rien n'a été installé
 Save as...	Enregistrer sous...
 Save backups	Copies de secours des sauvegardes
@@ -288,9 +301,6 @@ Arkeyan Launcher on GitHub	Arkeyan Launcher sur GitHub
 Arkeyan Launcher closed during the install. Resume carries on.	Arkeyan Launcher a été fermé pendant l'installation. Reprendre continue.
 Arkeyan Launcher {} is installed. Restart to use it.	Arkeyan Launcher {} est installé. Redémarrez pour l'utiliser.
 Something went wrong while {}.	Un problème est survenu pendant l'étape « {} ».
-Spyro's Adventure accepts this portal.	Spyro's Adventure accepte ce portail.
-Spyro's Adventure rejects this portal: {}.	Spyro's Adventure refuse ce portail : {}.
-Spyro's Adventure warns about this portal: {}.	Spyro's Adventure signale un problème avec ce portail : {}.
 Starting the installer	Démarrage de l'installateur
 Step {} of {}	Étape {} sur {}
 Stop	Arrêter
@@ -404,24 +414,23 @@ about {} min left	environ {} min restantes
 another game (title ID {:08X})	un autre jeu (ID de titre {:08X})
 couldn't open the disc image	impossible d'ouvrir l'image disque
 curl couldn't start ({})	curl n'a pas pu démarrer ({})
-just now	à l'instant
 less than a minute left	moins d'une minute restante
 no answer	aucune réponse
 nothing yet	0 octet
+{} files	{} fichiers
 {} KB	{} Ko
 {} MB	{} Mo
 {} GB	{} Go
+{} rejects this portal: {}.	{} refuse ce portail : {}.
+{} warns about this portal: {}.	{} signale un problème avec ce portail : {}.
 {} Xbox, PlayStation and Switch pads work.	{} Les manettes Xbox, PlayStation et Switch fonctionnent.
 {} already plays from its copied game data	{} fonctionne déjà avec ses données copiées
 {} bytes	{} octets
 {} can't be used: {}	{} inutilisables : {}
-{} days ago	il y a {} jours
 {} elapsed	Temps écoulé : {}
 {} gamepads connected.	{} manettes connectées.
-{} h ago	il y a {} h
 {} has no {} for this computer	{} n'a pas de {} pour cet ordinateur
 {} is busy: try again when it is done	{} est occupé : réessayez quand il aura terminé
-{} min ago	il y a {} min
 {} of {}	{} sur {}
 {} of {} steps done	{} étapes sur {} terminées
 {} settings	Réglages de {}
