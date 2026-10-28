@@ -940,7 +940,7 @@ namespace launcher_ui
                     if (ImGui::Selectable(ElementName(element).c_str(), m_filter.element == int(element)))
                         m_filter.element = int(element);
             });
-            row(N_("Game"), "##game", m_filter.game.empty() ? Tr("All games") : ShortGameName(m_filter.game), [&] {
+            row(N_("Works in"), "##game", m_filter.game.empty() ? Tr("All games") : ShortGameName(m_filter.game), [&] {
                 if (ImGui::Selectable(Tr("All games"), m_filter.game.empty()))
                     m_filter.game.clear();
                 for (const collection::Game& g : collection::Catalogue::Get().Games())
@@ -985,7 +985,7 @@ namespace launcher_ui
         if (m_filter.element >= 0)
             tags.push_back({ ElementName(collection::Element(m_filter.element)), 0 });
         if (!m_filter.game.empty())
-            tags.push_back({ ShortGameName(m_filter.game), 1 });
+            tags.push_back({ Tf("Works in {}", ShortGameName(m_filter.game)), 1 });
         if (m_filter.category >= 0)
             tags.push_back({ CategoryLabel(Category(m_filter.category)), 2 });
         if (m_filter.sort != collection::Sort::Recent)

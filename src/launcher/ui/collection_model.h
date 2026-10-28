@@ -58,7 +58,7 @@ namespace launcher_ui
     struct ShelfFilter
     {
         int element = -1;      // a collection::Element
-        std::string game;      // the game a toy came with ("giants")
+        std::string game;      // the game that reads the toy ("giants": Works in)
         int category = -1;     // a collection::Category
         std::string text;      // the smart search (collection::SearchMatches): names, elements, games, types, versions, levels
         collection::Sort sort = collection::Sort::Recent;

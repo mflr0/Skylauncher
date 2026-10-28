@@ -742,3 +742,10 @@ Arkeyan Launcher can't remove itself from here: delete it by hand.	Arkeyan Launc
 {} couldn't be removed.	{} n'a pas pu être supprimé.
 Other files in the figures folder stay.	Les autres fichiers du dossier des figurines restent.
 Kept: Xbox signing keys	Gardé : clés de signature Xbox
+Works in	Fonctionne dans
+Works in {}	Fonctionne dans {}
+In {}	Dans {}
+plays as {}	joue comme {}
+On the wheel	Sur la roue
+On the wheel: {}	Sur la roue : {}
+The wheel is full: take a figure off it first	La roue est pleine : retirez d’abord une figurine

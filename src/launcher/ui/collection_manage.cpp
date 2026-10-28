@@ -297,7 +297,7 @@ namespace launcher_ui
             "25-figure-details", "26-figure-delete", "27-edit", "28-add-a-figure", "29-add-later-game", "30-manage-trash", "31-manage-backups",
             "32-live-portal", "33-after-delete", "34-giants-portal", "35-giants-figure", "36-giants-edit", "37-add-lightcore", "38-no-match",
             "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet", "42-swapforce-portal", "43-swapper-sheet",
-            "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-standard-version", "47-search-element", "48-search-level",
+            "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-versions", "47-search-element", "48-search-level",
             "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name", "53-all-swappers", "54-mixed-swapper-sheet",
             "55-add-swapper-versions" };
     }
@@ -618,7 +618,7 @@ namespace launcher_ui
             }
             break;
         }
-        case 26: // Add a figure, Giants: Flashwing's versions (Standard, then the others: its own entry is not a row)
+        case 26: // Add a figure, Giants: Flashwing's versions (the plain toy under its own name, then the versions Giants tells apart)
             m_overlay = Overlay::Add;
             m_addGame = "giants";
             m_addToy = 103;

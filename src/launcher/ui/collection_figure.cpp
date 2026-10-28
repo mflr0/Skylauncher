@@ -182,6 +182,20 @@ namespace launcher_ui
         // A never-played figure already says so above: no "Last played: Never" row for it.
         if (f.state != figures::AreaState::Blank)
             rows.push_back({ Tr("Last played"), f.lastGame.empty() ? std::string(Tr("Never")) : fmt::format("{} · {}", ShortGameName(f.lastGame), ShortDate(f.lastUsed)) });
+        // What the chosen game makes of it (a variant it does not tell apart plays as another), and the games whose wheel has it.
+        if (f.toy != nullptr)
+        {
+            collection::Catalogue::Reading reading = collection::Catalogue::Get().Read(m_model.gameId, f.toy, f.variant);
+            if (reading.works && !reading.exact && f.edition.empty() && f.variant != 0 && f.variantInfo.kind != collection::VariantKind::Base)
+                rows.push_back({ Tf("In {}", ShortGameName(m_model.gameId)),
+                    Tf("plays as {}", reading.seen != nullptr ? reading.seen->name : f.toy->name) });
+            std::string wheels;
+            for (const collection::Game& g : collection::Catalogue::Get().Games())
+                if (!g.runtime.empty() && collection::OnWheel(g.id, f.file))
+                    wheels += (wheels.empty() ? "" : ", ") + ShortGameName(g.id);
+            if (!wheels.empty())
+                rows.push_back({ Tr("On the wheel"), wheels });
+        }
         if (!rows.empty())
             FactRows("##facts", rows);
         ImGui::EndGroup();
@@ -437,6 +451,21 @@ namespace launcher_ui
         ImGui::SetNextWindowPos(ImVec2(moreAt.x, moreAt.y), ImGuiCond_Always, ImVec2(0, 1));
         if (ImGui::BeginPopup("##figuremenu"))
         {
+            // "On the wheel": the in-game quick swap wheel (hold Tab or View), per game that reads the figure.
+            for (const collection::Game& g : collection::Catalogue::Get().Games())
+            {
+                if (g.runtime.empty() || f.toy == nullptr || !collection::Catalogue::Get().Accepts(g.id, f.type) ||
+                    !(collection::HasProgress(f) || f.toy->category == collection::Category::CreationCrystal))
+                    continue;
+                bool on = collection::OnWheel(g.id, f.file);
+                if (ImGui::MenuItem(Tf("On the wheel: {}", ShortGameName(g.id)).c_str(), nullptr, on))
+                {
+                    if (!collection::SetOnWheel(g.id, f.file, !on))
+                        Toast(Tr("The wheel is full: take a figure off it first"));
+                    Reload();
+                }
+            }
+            ImGui::Separator();
             if (ImGui::MenuItem(Tr("Duplicate")))
             {
                 std::string error;
