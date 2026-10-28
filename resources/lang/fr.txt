@@ -744,7 +744,6 @@ R stick up	stick droit haut
 R stick down	stick droit bas
 R stick left	stick droit gauche
 R stick right	stick droit droite
-R stick	stick droit
 Cross	Croix
 Circle	Rond
 Square	Carré
