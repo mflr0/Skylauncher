@@ -3255,6 +3255,20 @@ namespace launcher_ui
             m_lastPage = Page::Home;
             m_testAt = now + uint64_t(LogoDropMs / 8);
             break;
+        case 16: // the launcher's Support and About tabs, and the problem report over Support
+            m_page = Page::Settings;
+            m_tab = SettingsTab::Support;
+            m_testAt = now + 400;
+            break;
+        case 17:
+            m_tab = SettingsTab::About;
+            m_testAt = now + 400;
+            break;
+        case 18:
+            m_tab = SettingsTab::Support;
+            OpenProblemReport();
+            m_testAt = now + 500;
+            break;
         default:
             m_running = false;
             break;
