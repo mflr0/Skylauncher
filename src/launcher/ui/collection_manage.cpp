@@ -139,6 +139,11 @@ namespace launcher_ui
             const collection::TrashEntry& entry = trash[i];
             ImGui::PushID(entry.id.c_str());
             ui::SettingRow(names[i].c_str(), Tf("{} · {}", When(entry.deleted), entry.reason == "tidy" ? Tr("tidied") : Tr("deleted")).c_str());
+            ui::ButtonOptions forGood;
+            forGood.kind = ui::ButtonKind::Danger;
+            forGood.hold = true;
+            forGood.tooltip = Tr(strings::DeleteForGoodHint);
+            ui::AlignRight(ui::ButtonWidth(Tr("Put back")) + ui::space::XS + ui::ButtonWidth(Tr(strings::DeleteForGood), forGood));
             if (ui::Button(Tr("Put back")))
             {
                 const bool failed = collection::Undelete(entry.id).empty();
@@ -146,10 +151,6 @@ namespace launcher_ui
                 Reload();
             }
             ImGui::SameLine(0, ui::space::XS);
-            ui::ButtonOptions forGood;
-            forGood.kind = ui::ButtonKind::Danger;
-            forGood.hold = true;
-            forGood.tooltip = Tr(strings::DeleteForGoodHint);
             if (ui::Button(Tr(strings::DeleteForGood), forGood))
             {
                 collection::DeleteForGood(entry.id);
@@ -181,6 +182,7 @@ namespace launcher_ui
             ImGui::PopID();
             if (!open)
                 continue;
+            ImGui::Indent(ui::space::S - ui::space::XXS); // the copies' labels on the rows' titles' edge
             if (ui::BeginSettings("##backups"))
             {
                 for (const BackupRow& backup : backups)
@@ -192,6 +194,7 @@ namespace launcher_ui
                     restore.hold = true;
                     restore.disabled = !Writable(figure);
                     restore.tooltip = Tr("Hold to put this copy back.");
+                    ui::AlignRight(ui::ButtonWidth(Tr("Restore"), restore) + ui::space::S - ui::space::XXS); // the rows' trailing edge
                     if (ui::Button(Tr("Restore"), restore))
                     {
                         std::string error;
@@ -203,6 +206,7 @@ namespace launcher_ui
                 }
                 ui::EndSettings();
             }
+            ImGui::Unindent(ui::space::S - ui::space::XXS);
         }
         if (!any)
             ui::EmptyState(ui::Icon::Info, Tr("No backups yet."));

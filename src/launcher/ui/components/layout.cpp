@@ -206,11 +206,12 @@ namespace ui
                 PopText();
             }
             float bottom = top + SizeOf(TextStyle::Body);
-            if (hint != nullptr)
+            if (hint != nullptr) // drawn, not an item: a table lowers a row's text items to its controls' text baseline
             {
-                ImGui::SetCursorScreenPos(ImVec2(at.x, bottom + space::XXS));
-                Text(TextStyle::Caption, hint, color::Dim, width);
-                bottom = ImGui::GetItemRectMax().y;
+                PushText(TextStyle::Caption);
+                draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(at.x, bottom + space::XXS), Col(color::Dim), hint, nullptr, width);
+                bottom += space::XXS + ImGui::CalcTextSize(hint, nullptr, false, width).y;
+                PopText();
             }
             ImGui::SetCursorScreenPos(at);
             ImGui::Dummy(ImVec2(0, std::max(0.0f, bottom - at.y))); // the row is as tall as the label needs
@@ -229,6 +230,11 @@ namespace ui
         if (lower > 0)
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + lower);
         g_row = { true, label, hint != nullptr ? hint : "", note != nullptr ? note : "", ImGui::GetCursorScreenPos().y };
+    }
+
+    void AlignRight(float width)
+    {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - width));
     }
 
     void EndSettings()

@@ -140,6 +140,8 @@ namespace launcher_ui
                 {
                     ImGui::TableNextRow();
                     ImGui::TableSetColumnIndex(0);
+                    // The name on the value's baseline (the value is Body, the name Caption).
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + ui::Baseline(ui::TextStyle::Body) - ui::Baseline(ui::TextStyle::Caption));
                     ui::Text(ui::TextStyle::Caption, name.c_str(), ui::color::Dim);
                     ImGui::TableSetColumnIndex(1);
                     ui::Text(ui::TextStyle::Body, value.c_str(), ui::color::Ink);

@@ -51,6 +51,9 @@ namespace ui
     bool BeginSettings(const char* id);
     void SettingRow(const char* label, const char* hint = nullptr, const char* note = nullptr);
     void EndSettings();
+    // Moves the cursor so that a control (or a group) `width` wide ends at the available room's right edge: a settings row's
+    // buttons end on the column's edge.
+    void AlignRight(float width);
 
     // ---- SectionHeader: a section's title in a card or a page, a divider above it unless it is the first. ----
     void SectionHeader(const char* title, const char* subtitle = nullptr, bool divider = true);
