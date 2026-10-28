@@ -23,12 +23,13 @@ language. The game's text and voice languages are a different thing: they are th
   stays in the language it was made in until it is made again.
 
 ## Which language is shown
-Settings > Launcher > Language: **Same as the game**, or one language of the list. Remembered in `[launcher] language`
-(`docs/settings.md`) and applied at once, with no restart.
-- **Same as the game** follows the text language of the game that is shown (Game settings > Language > Game text), when the
-  launcher has a file for it, else English. A game with no text language chosen counts as English.
-- **Not chosen yet** (the default): the system's language, the first of the system's preferred languages the launcher has,
-  else English.
+The launcher's language is its own: it never follows the game that is shown. Settings > Launcher > Language:
+**System default**, or one language of the list. Remembered in `[launcher] language` (`docs/settings.md`) and applied at once,
+with no restart.
+- **System default** (the default, and an empty setting): the system's language, the first of the system's preferred languages
+  the launcher has, else English.
+- **A language** is that language; a code that has no file in `resources/lang` shows English.
+- An old `game` (follow the shown game's text language) is read as `System default` and erased at the next save.
 - `SKY_LAUNCHER_LANGUAGE=<code>` forces a language (the tests and the screenshots use it).
 
 ## Adding a language

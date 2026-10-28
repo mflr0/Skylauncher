@@ -4,6 +4,7 @@
 #include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/game_settings.h"
+#include "launcher/i18n.h"
 #include "launcher/launcher.h"
 #include "launcher/shortcut.h"
 #include "launcher/ui/launcher_app.h"
@@ -472,6 +473,32 @@ namespace
         SETTINGS_EXPECT(config["swapforce"].count("disc_text_languages") == 0 && StoredDiscLanguages(config, "swapforce").text.empty());
         printf("Disc languages: stored, filtered, the default when the choice is not on the disc, the full list when unknown\n");
     }
+
+    // The launcher's own language: never the shown game's; an old "game" is the system's and goes at the next save.
+    void LauncherLanguageChecks()
+    {
+        using namespace launcher_ui;
+        const std::vector<std::string> system = { "ja", "fr", "en" };
+        fs::path file = fs::temp_directory_path() / "launcher-language-check.ini";
+        Write(file, "[launcher]\nlanguage=game\ngame=ssa\n[ssa]\nlanguage=fr\n[giants]\nlanguage=de\n");
+        LauncherConfig config = LoadLauncherConfig(file.string());
+        // An old "game" is the system's language (the first one the launcher has) and is not kept.
+        SETTINGS_EXPECT(config["launcher"].count("language") == 0);
+        SETTINGS_EXPECT(i18n::Resolve(SettingGet(config, "launcher", "language"), system) == "fr");
+        SETTINGS_EXPECT(SaveLauncherConfig(file.string(), config));
+        SETTINGS_EXPECT(LoadLauncherConfig(file.string())["launcher"].count("language") == 0); // gone at the next save
+        // Showing another game, with its own text language, leaves the launcher's language alone.
+        config["launcher"]["language"] = "en";
+        config["launcher"]["game"] = "giants";
+        SETTINGS_EXPECT(i18n::Resolve(SettingGet(config, "launcher", "language"), system) == "en");
+        config["launcher"]["game"] = "ssa";
+        SETTINGS_EXPECT(i18n::Resolve(SettingGet(config, "launcher", "language"), system) == "en");
+        // A chosen language is what the next file keeps.
+        SETTINGS_EXPECT(SaveLauncherConfig(file.string(), config));
+        SETTINGS_EXPECT(LoadLauncherConfig(file.string())["launcher"]["language"] == "en");
+        fs::remove(file);
+        printf("Launcher language: never the shown game's, an old game is the system's and goes at the next save\n");
+    }
 }
 
 int SettingsChecks(const fs::path& scratch)
@@ -483,5 +510,6 @@ int SettingsChecks(const fs::path& scratch)
     ShortcutChecks(scratch / "shortcut");
     DataChecks(scratch / "datachecks");
     DiscLanguageChecks();
+    LauncherLanguageChecks();
     return g_settingsFailures;
 }
