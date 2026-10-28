@@ -625,7 +625,7 @@ namespace launcher_ui
         }
         std::stable_partition(rows.begin(), rows.end(), [&](const Figure* half) { return half->partner.empty(); });
 
-        ImGui::BeginChild("##changehalf", ImVec2(0, OverlayBody(3 * ui::height::Main, 2 * ui::height::Main, 6 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ui::BeginRoomyChild("##changehalf", ImVec2(0, OverlayBody(3 * ui::height::Main, 2 * ui::height::Main, 6 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         constexpr float Art = ui::height::Large - 2 * ui::space::XXS;
         const Figure* chosen = nullptr;
@@ -645,7 +645,7 @@ namespace launcher_ui
         }
         if (rows.empty())
             ui::EmptyState(ui::Icon::Info, wantBottom ? Tr("No other bottom to take.") : Tr("No other top to take."));
-        ImGui::EndChild();
+        ui::EndRoomyChild();
         if (chosen != nullptr)
         {
             Figure keepNow = *keep, replacement = *chosen; // the call reloads the collection
@@ -737,7 +737,7 @@ namespace launcher_ui
         bool stats = collection::HasProgress(f) && f.state != figures::AreaState::Damaged;
         ui::Text(ui::TextStyle::Body, (f.variantInfo.name != Name(f) ? Name(f) + " · " + f.variantInfo.name : Name(f)).c_str(), ui::color::InkSoft);
         // The fields scroll above the Save row (the upgrades list makes the sheet taller than a small window).
-        ImGui::BeginChild("##editbody", ImVec2(0, OverlayBody(4 * ui::height::Main, 3 * ui::height::Main, 8 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ui::BeginRoomyChild("##editbody", ImVec2(0, OverlayBody(4 * ui::height::Main, 3 * ui::height::Main, 8 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         if (ui::BeginSettings("##edit"))
         {
@@ -796,7 +796,7 @@ namespace launcher_ui
         }
         if (stats)
             DrawUpgradeEditor(f);
-        ImGui::EndChild();
+        ui::EndRoomyChild();
         ImGui::Dummy(ImVec2(0, ui::space::XXS));
         const ui::ModalResult result = OverlayActions(Tr("Cancel"), Tr("Save"));
         if (result == ui::ModalResult::Cancel)

@@ -580,17 +580,13 @@ namespace launcher_ui
         DrawHeader(width);
         DrawSeats(width);
         DrawBar();
-        // The shelf reaches a few points past each side too (its padding keeps the content where it was), for the banner's borders.
+        // The shelf has room round its cards (their focus rings, the choose banner's border).
         const bool pad = ui::Ctx().glyphs != ui::Glyphs::Keyboard;
         const float legend = pad ? ui::height::Normal + ImGui::GetStyle().ItemSpacing.y : 0;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() - ui::space::XXS);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ui::space::XXS, ui::focus::Offset + ui::focus::Width)); // room for a card's focus ring
-        ImGui::BeginChild("##shelf", ImVec2(ImGui::GetContentRegionAvail().x + 2 * ui::space::XXS, -legend),
-            ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoBackground);
-        ImGui::PopStyleVar();
+        ui::BeginRoomyChild("##shelf", ImVec2(0, -legend), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         DrawList();
-        ImGui::EndChild();
+        ui::EndRoomyChild();
         // A figure dragged off a seat and dropped on the shelf leaves the seat.
         if (ImGui::BeginDragDropTarget())
         {

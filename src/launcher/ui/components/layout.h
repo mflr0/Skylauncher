@@ -19,6 +19,13 @@ namespace ui
     void BeginCard(const char* id, ImVec2 size, const CardOptions& options = {});
     void EndCard();
 
+    // ---- A scrolling area (a child window) with room round its content: its clip rect reaches `bleed` points past the
+    // content on every side and its padding puts the content back where the cursor was, so a focus ring, a hover box or a
+    // border at the content's edge is never cut. `size` is the content's: > 0 that size, <= 0 the room left less |size|
+    // (BeginChild's rule). The layout after it is a plain child's of that size (SameLine beside it, the next line under it). ----
+    void BeginRoomyChild(const char* id, ImVec2 size, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0, float bleed = focus::Reach);
+    void EndRoomyChild();
+
     // ---- ListRow: one row of a list, the whole row pressable. Its title, a subtitle under it (the row is then
     // height::Large), a trailing text, a chevron when it opens something; selected: the raised grey and the orange bar. ----
     struct ListRowOptions

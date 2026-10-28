@@ -508,7 +508,7 @@ namespace launcher_ui
         restore.disabled = running;
         restore.tooltip = Tr(strings::RestoreSavesHint);
         const float rowHeight = ui::height::Large + ui::space::XXS + ImGui::GetStyle().ItemSpacing.y; // a row and the gap after it
-        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(5 * rowHeight, rowHeight * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
+        ui::BeginRoomyChild("##savebackuplist", ImVec2(0, std::min(5 * rowHeight, rowHeight * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
         const float buttonWidth = ui::ButtonWidth(Tr(strings::RestoreSaves), restore);
         for (const savebackup::Entry& backup : m_s->saveBackups)
         {
@@ -529,7 +529,7 @@ namespace launcher_ui
             ImGui::Dummy(ImVec2(0, ui::space::XXS));
             ImGui::PopID();
         }
-        ImGui::EndChild();
+        ui::EndRoomyChild();
     }
 
     // ---- Game: shortcut, folders, reinstall, delete data, uninstall -----------------------------------------------------

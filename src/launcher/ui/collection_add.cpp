@@ -117,7 +117,7 @@ namespace launcher_ui
         const float listH = OverlayBody(4 * ui::height::Main + ui::height::Normal, 4 * ui::height::Main, 8 * ui::height::Main);
         const float gridW = ImGui::GetContentRegionAvail().x - PanelW - ui::space::S;
         const bool found = std::any_of(catalogue.Toys().begin(), catalogue.Toys().end(), matches);
-        ImGui::BeginChild("##addtoys", ImVec2(gridW, listH), ImGuiChildFlags_NavFlattened,
+        ui::BeginRoomyChild("##addtoys", ImVec2(gridW, listH), ImGuiChildFlags_NavFlattened,
             ImGuiWindowFlags_NoBackground | (found ? ImGuiWindowFlags_AlwaysVerticalScrollbar : 0));
         ImGui::SetScrollX(0.0f);
         constexpr float MinCell = ui::height::Main + ui::height::Normal, Gap = ui::space::S, Art = ui::height::Main + ui::space::XS;
@@ -195,11 +195,12 @@ namespace launcher_ui
             }
             ImGui::Dummy(ImVec2(0, ui::space::XS));
         }
-        ImGui::EndChild();
+        ui::EndRoomyChild();
 
-        // The versions of the chosen toy.
+        // The versions of the chosen toy, as tall as the grid with its room (the run of its scrollbar).
         ImGui::SameLine(0, ui::space::S);
-        ui::BeginCard("##addversions", ImVec2(PanelW, listH), { .padding = ui::space::XS });
+        ImGui::SetCursorPosY(ImGui::GetCursorPosY() - ui::focus::Reach);
+        ui::BeginCard("##addversions", ImVec2(PanelW, listH + 2 * ui::focus::Reach), { .padding = ui::space::XS });
         if (chosen == nullptr)
             ui::Text(ui::TextStyle::Body, Tr("Pick a figure."), ui::color::Dim);
         else

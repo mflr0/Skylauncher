@@ -4,6 +4,8 @@
 #include "launcher/ui/components/buttons.h"
 #include <algorithm>
 #include <cmath>
+#include <imgui_internal.h> // the parent's layout after a roomy child
+#include <vector>
 
 namespace ui
 {
@@ -26,6 +28,46 @@ namespace ui
         ImGui::EndChild();
         ImGui::PopStyleVar(3);
         ImGui::PopStyleColor(2);
+    }
+
+    // ---- Roomy child ---------------------------------------------------------------------------------------------------
+
+    namespace
+    {
+        struct Roomy
+        {
+            float bleed;
+            ImVec2 contentMin, contentMax; // where a plain child would have been (screen)
+            ImVec2 parentMax, parentIdeal; // the parent's content extent before it
+        };
+        std::vector<Roomy> g_roomy;
+    }
+
+    void BeginRoomyChild(const char* id, ImVec2 size, ImGuiChildFlags flags, ImGuiWindowFlags windowFlags, float bleed)
+    {
+        const ImVec2 at = ImGui::GetCursorScreenPos(), room = ImGui::GetContentRegionAvail();
+        const ImVec2 content(size.x > 0 ? size.x : std::max(1.0f, room.x + size.x), size.y > 0 ? size.y : std::max(1.0f, room.y + size.y));
+        const ImGuiWindow* parent = ImGui::GetCurrentWindow();
+        g_roomy.push_back({ bleed, at, ImVec2(at.x + content.x, at.y + content.y), parent->DC.CursorMaxPos, parent->DC.IdealMaxPos });
+        ImGui::SetCursorScreenPos(ImVec2(at.x - bleed, at.y - bleed));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(bleed, bleed));
+        ImGui::BeginChild(id, ImVec2(content.x + 2 * bleed, content.y + 2 * bleed), flags | ImGuiChildFlags_AlwaysUseWindowPadding, windowFlags);
+        ImGui::PopStyleVar();
+    }
+
+    void EndRoomyChild()
+    {
+        ImGui::EndChild();
+        const Roomy roomy = g_roomy.back();
+        g_roomy.pop_back();
+        // The parent lays out what follows as after a child of the content's size: SameLine beside the content, the next line
+        // under it, and the parent's content no larger for the room round it.
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        window->DC.CursorPosPrevLine = ImVec2(roomy.contentMax.x, roomy.contentMin.y);
+        window->DC.PrevLineSize.y = roomy.contentMax.y - roomy.contentMin.y;
+        window->DC.CursorPos.y -= roomy.bleed;
+        window->DC.CursorMaxPos = ImMax(roomy.parentMax, roomy.contentMax);
+        window->DC.IdealMaxPos = ImMax(roomy.parentIdeal, roomy.contentMax);
     }
 
     // ---- ListRow ---------------------------------------------------------------------------------------------------
@@ -145,7 +187,9 @@ namespace ui
     {
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(space::XXS, space::S));
         ImGui::PushStyleColor(ImGuiCol_TableBorderLight, LauncherTheme::Rgb(color::Hairline, 110));
-        const bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp);
+        // NoClip: a control at a column's edge keeps its whole focus ring (a column clips 4 points past its content, the ring
+        // reaches 6).
+        const bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoClip);
         if (!open)
         {
             ImGui::PopStyleColor();

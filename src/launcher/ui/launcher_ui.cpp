@@ -937,14 +937,12 @@ namespace launcher_ui
 
     void App::BeginPageColumn(const char* id, float width, bool alwaysScrollbar)
     {
-        constexpr float Bleed = 4;
-        float below = ImGui::GetStyle().WindowPadding.y;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() - Bleed);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Bleed, 0));
-        ImGui::BeginChild(id, ImVec2(width + 2 * Bleed, ImGui::GetContentRegionAvail().y + below),
-            ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding,
-            ImGuiWindowFlags_NoBackground | (alwaysScrollbar ? ImGuiWindowFlags_AlwaysVerticalScrollbar : 0));
-        ImGui::PopStyleVar();
+        // The column has room round its content (ui::BeginRoomyChild): a ring, or a button raised onto a title's capitals, at
+        // its edge is not cut. Its foot reaches over the page's bottom padding (to the window's edge).
+        constexpr float Bleed = ui::space::M;
+        const float below = ImGui::GetStyle().WindowPadding.y;
+        ui::BeginRoomyChild(id, ImVec2(width, ImGui::GetContentRegionAvail().y + below - Bleed), ImGuiChildFlags_NavFlattened,
+            ImGuiWindowFlags_NoBackground | (alwaysScrollbar ? ImGuiWindowFlags_AlwaysVerticalScrollbar : 0), Bleed);
         ImGui::SetScrollX(0.0f);
         m_columnBelow = below;
     }
@@ -952,7 +950,7 @@ namespace launcher_ui
     void App::EndPageColumn()
     {
         ImGui::Dummy(ImVec2(0, m_columnBelow));
-        ImGui::EndChild();
+        ui::EndRoomyChild();
     }
 
     void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)

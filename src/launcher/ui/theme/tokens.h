@@ -78,6 +78,7 @@ namespace ui
     {
         inline constexpr float Width = 3;  // points
         inline constexpr float Offset = 3; // the gap between the control and the ring
+        inline constexpr float Reach = Offset + Width; // how far the ring goes past its control: what a clip rect must leave
     }
 
     // ---- Colours by role (values from launcher_theme.h). ----

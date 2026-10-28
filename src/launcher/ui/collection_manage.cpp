@@ -109,7 +109,7 @@ namespace launcher_ui
             Tf("Tidy · {}", m_starters) };
         const char* labels[] = { tabs[0].c_str(), tabs[1].c_str(), tabs[2].c_str(), tabs[3].c_str(), tabs[4].c_str() };
         ui::Tabs("##managetabs", labels, &m_manageTab);
-        ImGui::BeginChild("##managebody", ImVec2(0, OverlayBody(3 * ui::height::Main, 3 * ui::height::Main, 6 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        ui::BeginRoomyChild("##managebody", ImVec2(0, OverlayBody(3 * ui::height::Main, 3 * ui::height::Main, 6 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         switch (m_manageTab)
         {
@@ -119,7 +119,7 @@ namespace launcher_ui
         case 3: DrawUnknown(); break;
         default: DrawTidy(); break;
         }
-        ImGui::EndChild();
+        ui::EndRoomyChild();
     }
 
     void CollectionPage::DrawTrash()
