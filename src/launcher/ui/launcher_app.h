@@ -328,6 +328,10 @@ namespace launcher_ui
         // The tabs of a settings page: words on one line, an accent line under the selected one; LB / RB change tab.
         // True when the tab changed (by a click or a bumper).
         bool DrawTabBar(const char* const* labels, int count, int* current);
+        // A settings page's head: the centred column, the title (Display) and, when `back`, the Back button at its right.
+        // EndSettingsPage closes the column.
+        void BeginSettingsPage(const char* id, const char* title, bool back);
+        void EndSettingsPage() { EndPageColumn(); }
         void DrawAbout();        // update_page.cpp: About
         void DrawUpdates();      // update_page.cpp: check for updates, and the automatic check; in Settings > Launcher
         void StartUpdateCheck(bool manual);
@@ -335,7 +339,8 @@ namespace launcher_ui
         float BannerHeight();
         void DrawUpdateBanner(float height);
         void DrawWhatsNew();
-        void DrawPortalTest();   // support_page.cpp
+        void DrawPortalTest();   // support_page.cpp: the "Test the portal" row, inside an open settings table
+        void DrawPortalResult(); // and what the test found, under the table
         void DrawLogs();
         void OpenProblemReport();
         void DrawProblemReport();
@@ -388,7 +393,6 @@ namespace launcher_ui
         // Draws the label of the last item (a button whose own text was made transparent) with a chevron after it.
         void DrawLabelChevron(const char* label, unsigned color, int dir, bool bold);
         void BoldText(const char* text, unsigned color);
-        bool Toggle(const char* id, bool* value);
         // Acts once held for a second (HoldConfirm); `hint` is its tooltip, which says so. Red: for what deletes or overwrites.
         bool HoldButton(const char* label, float width, const char* hint);
         void ProgressBar(float fraction, ImVec2 size); // a rounded bar, the fill drawn with the cap of the track
@@ -406,9 +410,8 @@ namespace launcher_ui
         bool LevelSlider(const char* id, int* value, int min, int max, float width);
         void EndPageColumn();
         bool Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width = -1);
-        void SettingRow(const char* label, const char* hint);
-        bool BeginSettingsTable(const char* id);
-        void EndSettingsTable();
+        // A settings row's select: the choices' labels, the value in [section] key; the control column's width.
+        bool SettingSelect(const char* id, const char* section, const char* key, std::span<const Choice> choices, int fallback);
         void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
         void EndCard();
         void Title(const char* text, float size = TitleSize, unsigned color = Accent);
@@ -582,6 +585,23 @@ namespace launcher_ui
         int m_testStep = 0;
         uint64_t m_testAt = 0;
     };
+
+    inline bool App::SettingSelect(const char* id, const char* section, const char* key, std::span<const Choice> choices, int fallback)
+    {
+        const int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
+        bool changed = false;
+        if (ui::BeginSelect(id, Tr(choices[size_t(index)].label)))
+        {
+            for (size_t i = 0; i < choices.size(); i++)
+                if (ui::SelectOption(Tr(choices[i].label), int(i) == index))
+                {
+                    Set(section, key, choices[i].value);
+                    changed = true;
+                }
+            ui::EndSelect();
+        }
+        return changed;
+    }
 
     inline bool App::Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width)
     {

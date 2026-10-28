@@ -52,6 +52,11 @@ namespace ui
     }
 
     // ---- Lines. ----
+    namespace width
+    {
+        inline constexpr float Page = 940; // a settings page's column: settings read badly stretched across a wide window
+    }
+
     namespace stroke
     {
         inline constexpr float Hairline = 1;  // card edges, dividers, a secondary button's edge

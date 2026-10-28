@@ -1009,8 +1009,6 @@ namespace launcher_ui
             ImGui::PopFont();
     }
 
-    bool App::Toggle(const char* id, bool* value) { return ui::Toggle(id, value); }
-
     void App::FocusRing(float rounding, float gap, ImDrawFlags flags)
     {
         if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
@@ -1093,12 +1091,6 @@ namespace launcher_ui
         options.tooltip = hint;
         return ui::Button(label, options);
     }
-
-    void App::SettingRow(const char* label, const char* hint) { ui::SettingRow(label, hint); }
-
-    bool App::BeginSettingsTable(const char* id) { return ui::BeginSettings(id); }
-
-    void App::EndSettingsTable() { ui::EndSettings(); }
 
     void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)
     {
@@ -1864,42 +1856,52 @@ namespace launcher_ui
 
     void App::DrawControls()
     {
-        std::string current = CurrentDevice();
-        Title(Tr("Controller"), TitleSize, Text);
-        ImGui::SetNextItemWidth(440);
-        if (BeginCombo("##device", DeviceLabel().c_str()))
+        const std::string current = CurrentDevice();
+        const size_t gamepads = m_gamepads.size();
+        const std::string connected = gamepads == 0 ? Tr(strings::NoGamepad) : gamepads == 1 ? Tr(strings::OneGamepad) : Tf(strings::Gamepads, gamepads);
+
+        if (ui::BeginSettings("##controller"))
         {
-            for (const auto& [value, label] : DeviceOptions())
-                if (Option(label.c_str(), value == current))
-                    SetDevice(value);
-            ImGui::EndCombo();
+            ui::SettingRow(Tr("Controller"), Tf("{} Xbox, PlayStation and Switch pads work.", connected).c_str());
+            if (ui::BeginSelect("##device", DeviceLabel().c_str()))
+            {
+                for (const auto& [value, label] : DeviceOptions())
+                    if (ui::SelectOption(label.c_str(), value == current))
+                        SetDevice(value);
+                ui::EndSelect();
+            }
+            ui::SettingRow(Tr("Button glyphs"), nullptr);
+            SettingSelect("##glyphs", "input", "glyphs", GlyphChoices, 0);
+            ui::EndSettings();
         }
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        size_t gamepads = m_gamepads.size();
-        std::string connected = gamepads == 0 ? Tr(strings::NoGamepad) : gamepads == 1 ? Tr(strings::OneGamepad) : Tf(strings::Gamepads, gamepads);
-        ImGui::Text("%s", Tf("{} Xbox, PlayStation and Switch pads work.", connected).c_str());
-        ImGui::PopStyleColor();
-        ImGui::Dummy(ImVec2(0, 12));
 
-        Title(Tr("Portal of Power"), TitleSize, Text);
-        Combo("##portal", "portal", "mode", PortalChoices, 0, 440);
-        bool autoOpen = ParseBool(SettingGet(m_config, "portal", "toybox_auto_open", "1"));
-        ImGui::Dummy(ImVec2(0, 10));
-        if (Toggle("##toyboxautoopen", &autoOpen))
-            Set("portal", "toybox_auto_open", autoOpen ? "1" : "0");
-        ImGui::SameLine(0, 14);
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(Tr("Auto-open Toy Box"));
-        DrawPortalTest();
-        ImGui::Dummy(ImVec2(0, 12));
+        ui::SectionHeader(Tr("Portal of Power"));
+        if (ui::BeginSettings("##portal"))
+        {
+            ui::SettingRow(Tr("Portal"), nullptr);
+            SettingSelect("##portal", "portal", "mode", PortalChoices, 0);
+            ui::SettingRow(Tr("Auto-open Toy Box"), nullptr);
+            bool autoOpen = ParseBool(SettingGet(m_config, "portal", "toybox_auto_open", "1"));
+            if (ui::Toggle("##toyboxautoopen", &autoOpen))
+                Set("portal", "toybox_auto_open", autoOpen ? "1" : "0");
+            DrawPortalTest();
+            ui::EndSettings();
+        }
+        DrawPortalResult();
 
-        Title(Tr("Button glyphs"), TitleSize, Text);
-        Combo("##glyphs", "input", "glyphs", GlyphChoices, 0, 440);
-        ImGui::Dummy(ImVec2(0, 12));
-
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("F6 or Tab opens the Toy Box, F7 adds a figure, F8 clears them."));
-        ImGui::PopStyleColor();
+        ui::SectionHeader(Tr("Toy Box keys"));
+        if (ui::BeginSettings("##toyboxkeys"))
+        {
+            ui::SettingRow(Tr("Open the Toy Box"), nullptr);
+            ui::KeyCap("F6");
+            ImGui::SameLine(0, ui::space::XS);
+            ui::KeyCap("Tab");
+            ui::SettingRow(Tr("Add a figure"), nullptr);
+            ui::KeyCap("F7");
+            ui::SettingRow(Tr("Clear the figures"), nullptr);
+            ui::KeyCap("F8");
+            ui::EndSettings();
+        }
     }
 
     // The tabs of a settings page: words on one line, an accent line under the selected one (like the sidebar's bar).
@@ -1917,7 +1919,7 @@ namespace launcher_ui
         ui::TabChange change = ui::Tabs("##tabs", shown, current, options);
         if (change == ui::TabChange::Bumper)
             RequestFocus(FocusTo::Page); // the ring follows to the new tab
-        ImGui::Dummy(ImVec2(0, 4));
+        ImGui::Dummy(ImVec2(0, ui::space::XXS));
         if (change != ui::TabChange::None)
         {
             m_capturing = nullptr;
@@ -1928,17 +1930,37 @@ namespace launcher_ui
 
     // The launcher's settings, apart from any game's: the controller (all games read the same), the launcher
     // itself, support and About. Each game has its own settings page (game_settings_page.cpp).
+    void App::BeginSettingsPage(const char* id, const char* title, bool back)
+    {
+        const float available = ImGui::GetContentRegionAvail().x;
+        const float width = std::min(available, ui::width::Page);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
+        BeginPageColumn(id, width, true); // the scrollbar is always there: the card is as wide on every tab
+        const float top = ImGui::GetCursorPosY();
+        ui::Text(ui::TextStyle::Display, title, ui::color::Ink, -1);
+        const float bottom = ImGui::GetCursorPosY();
+        if (back)
+        {
+            ui::ButtonOptions options;
+            options.kind = ui::ButtonKind::Ghost;
+            options.icon = ui::Icon::ChevronLeft;
+            ImGui::SetCursorPos(ImVec2(ImGui::GetContentRegionMax().x - ui::ButtonWidth(Tr("Back"), options), // the column's right edge, scrollbar or not
+                top + (bottom - top - ui::height::Normal) / 2));
+            if (ui::Button(Tr("Back"), options))
+                GoTo(Page::Play);
+            ImGui::SetCursorPosY(std::max(bottom, ImGui::GetCursorPosY()));
+        }
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+    }
+
+    // The launcher's settings, apart from any game's: the controller (all games read the same), the launcher
+    // itself, support and About. Each game has its own settings page (game_settings_page.cpp).
     void App::DrawSettings()
     {
         // A centred column: settings read badly when they stretch across a wide window.
-        float available = ImGui::GetContentRegionAvail().x;
-        float width = std::min(available, 940.0f);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        BeginPageColumn("##settingscolumn", width, true); // the scrollbar is always there: the card is as wide on every tab
+        BeginSettingsPage("##settingscolumn", Tr("Launcher settings"), false);
 
         static const char* const Tabs[] = { N_("Controls"), N_("Launcher"), N_("Support"), N_("About") };
-        Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);
-        ImGui::Dummy(ImVec2(0, 10));
         int tab = int(m_tab);
         DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
         m_tab = m_uninstalled ? SettingsTab::Launcher : SettingsTab(tab); // once uninstalled the window shows the result only
@@ -1953,7 +1975,7 @@ namespace launcher_ui
         EndCard();
         if (m_testUninstall && m_testScrollEnd)
             ImGui::SetScrollHereY(1.0f); // the screenshot test shows the bottom of the tab
-        EndPageColumn();
+        EndSettingsPage();
     }
 
     void App::DrawLauncherTab()
@@ -1964,11 +1986,9 @@ namespace launcher_ui
             return;
         }
         DrawLauncherLanguage();
-        ImGui::Dummy(ImVec2(0, 16));
-        Title(Tr("Updates"), TitleSize, Text);
+        ui::SectionHeader(Tr("Updates"));
         DrawUpdates();
-        ImGui::Dummy(ImVec2(0, 16));
-        Title(Tr("Data folder"), TitleSize, Text);
+        ui::SectionHeader(Tr("Data folder"), Tr(strings::DataFolderHint));
         {
             // The path breaks after a separator, never in the middle of a name.
             const std::string path = datadir::Text(LauncherDataFolder());
@@ -1979,28 +1999,24 @@ namespace launcher_ui
                 size_t to = path.find_first_of("/\\", from);
                 to = to == std::string::npos ? path.size() : to + 1;
                 const std::string part = path.substr(from, to - from);
-                if (!line.empty() && ImGui::CalcTextSize((line + part).c_str()).x > room)
+                if (!line.empty() && ui::TextSize(ui::TextStyle::Caption, (line + part).c_str()).x > room)
                 {
-                    ImGui::TextUnformatted(line.c_str());
+                    ui::Text(ui::TextStyle::Caption, line.c_str(), ui::color::Dim, -1);
                     line.clear();
                 }
                 line += part;
                 from = to;
             }
-            ImGui::TextUnformatted(line.c_str());
+            ui::Text(ui::TextStyle::Caption, line.c_str(), ui::color::Dim, -1);
         }
-        if (PillButton(Tr("Show in folder"), false, 260))
+        ui::ButtonOptions folder;
+        folder.icon = ui::Icon::Folder;
+        if (ui::Button(Tr("Show in folder"), folder))
         {
             std::error_code error;
             std::filesystem::create_directories(LauncherDataFolder(), error);
             OpenFolder(LauncherDataFolder());
         }
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", Tr(strings::DataFolderHint));
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
-        ImGui::Dummy(ImVec2(0, 16));
         DrawUninstallSection();
     }
 
@@ -2036,7 +2052,6 @@ namespace launcher_ui
 
     void App::DrawLauncherLanguage()
     {
-        Title(Tr("Language"), TitleSize, Text);
         const std::string setting = SettingGet(m_config, "launcher", "language");
         std::string shown = i18n::Current();
         for (const i18n::Language& language : i18n::Languages())
@@ -2044,24 +2059,23 @@ namespace launcher_ui
                 shown = language.name;
         if (setting.empty())
             shown = Tr("System default");
-        ImGui::SetNextItemWidth(440);
-        if (BeginCombo("##launcherlanguage", shown.c_str()))
+        if (!ui::BeginSettings("##launcherlanguage"))
+            return;
+        ui::SettingRow(Tr("Language"), Tr(strings::LauncherLanguageHint));
+        if (ui::BeginSelect("##launcherlanguage", shown.c_str()))
         {
-            if (Option(Tr("System default"), setting.empty()))
+            if (ui::SelectOption(Tr("System default"), setting.empty()))
                 Set("launcher", "language", "");
             for (const i18n::Language& language : i18n::Languages())
-                if (Option(language.name.c_str(), language.code == setting))
+                if (ui::SelectOption(language.name.c_str(), language.code == setting))
                     Set("launcher", "language", language.code);
-            ImGui::EndCombo();
+            ui::EndSelect();
         }
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextWrapped("%s", Tr(strings::LauncherLanguageHint));
-        ImGui::PopStyleColor();
+        ui::EndSettings();
     }
 
     void App::DrawSupport()
     {
-        Title(Tr("Support"), TitleSize, Text);
         DrawLogs();
     }
 
