@@ -102,10 +102,9 @@ namespace launcher_ui
         ui::EndCard();
         // Save to Desktop is the action (the same file the game's F3 menu writes: on the Desktop, else in the logs folder);
         // Save as... and Copy stay at the left of the same row.
-        const float rowY = ImGui::GetCursorPosY() + ui::space::XS;
         ui::ModalResult result = ui::ModalActions(&m_reportOpen, Tr("Save to Desktop"), Tr("Close"));
         const float afterY = ImGui::GetCursorPosY();
-        ImGui::SetCursorPos(ImVec2(ui::space::L, rowY));
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetCursorStartPos().x, ImGui::GetItemRectMin().y)); // on the actions' row
         if (ui::Button(Tr("Save as...")))
         {
             std::filesystem::path folder = GameLogFolder();

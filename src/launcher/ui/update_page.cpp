@@ -220,16 +220,71 @@ namespace launcher_ui
         bool open = true;
         if (ui::BeginModal("##whatsnew", Tf("What's new in {}", state.launcher.tag).c_str(), &open, ui::ModalSize::Large))
         {
-            ImGui::BeginChild("##notes", ImVec2(0, -(2 * ui::height::Normal + ui::space::L)), ImGuiChildFlags_None);
+            // The notes in an inset card as tall as the window allows (the title and the actions take the rest): the release's
+            // Markdown read simply, its headings as bold lines, its "- " items as bullets, the rest as written.
+            const float room = ImGui::GetIO().DisplaySize.y - 2 * ui::space::XL - 3 * ui::height::Large;
+            ui::BeginCard("##notes", ImVec2(0, std::clamp(room, 3.0f * ui::height::Large, 8.0f * ui::height::Large)), { .inset = true, .padding = ui::space::M });
             ImGui::SetScrollX(0.0f);
             std::string notes = Trimmed(StripHtmlComments(state.launcher.notes));
             if (notes.empty())
                 notes = Tr("No notes were published with this version.");
-            ui::Text(ui::TextStyle::Body, notes.c_str(), ui::color::Ink); // plain text: the release's Markdown as written
-            ImGui::EndChild();
-            if (ui::Button(Tr("Release page"), { .kind = ui::ButtonKind::Ghost, .disabled = state.launcher.pageUrl.empty() }))
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ui::space::XS, ui::space::XXS));
+            size_t start = 0;
+            bool first = true;
+            while (start <= notes.size())
+            {
+                size_t end = notes.find('\n', start);
+                if (end == std::string::npos)
+                    end = notes.size();
+                std::string line = Trimmed(notes.substr(start, end - start));
+                start = end + 1;
+                if (line.empty())
+                    continue;
+                if (line[0] == '#')
+                {
+                    line = Trimmed(line.substr(line.find_first_not_of('#')));
+                    if (!first)
+                        ImGui::Dummy(ImVec2(0, ui::space::XS));
+                    ui::PushText(ui::TextStyle::Body, true);
+                    ImGui::PushStyleColor(ImGuiCol_Text, ui::Col(ui::color::Ink));
+                    ImGui::PushTextWrapPos(0.0f);
+                    ImGui::TextUnformatted(line.c_str()); // never ui::Text: a "##" in the notes is text, not an ID
+                    ImGui::PopTextWrapPos();
+                    ImGui::PopStyleColor();
+                    ui::PopText();
+                }
+                else
+                {
+                    const bool bullet = line.size() > 2 && (line[0] == '-' || line[0] == '*') && line[1] == ' ';
+                    if (bullet)
+                    {
+                        line = Trimmed(line.substr(2));
+                        const ImVec2 at = ImGui::GetCursorScreenPos();
+                        ImGui::GetWindowDrawList()->AddCircleFilled(ImVec2(at.x + ui::space::XS / 2, at.y + ui::CapMiddle(ui::TextStyle::Body)), 2.0f,
+                            ui::Col(ui::color::InkSoft));
+                        ImGui::SetCursorScreenPos(ImVec2(at.x + ui::space::M, at.y));
+                    }
+                    ui::PushText(ui::TextStyle::Body);
+                    ImGui::PushStyleColor(ImGuiCol_Text, ui::Col(ui::color::InkSoft));
+                    ImGui::PushTextWrapPos(0.0f);
+                    ImGui::TextUnformatted(line.c_str());
+                    ImGui::PopTextWrapPos();
+                    ImGui::PopStyleColor();
+                    ui::PopText();
+                }
+                first = false;
+            }
+            ImGui::PopStyleVar();
+            ui::EndCard();
+            // Release page at the left of the actions' row.
+            const ui::ModalResult result = ui::ModalActions(&open, Tr("Update now"), Tr("Close"));
+            const float actionsY = ImGui::GetItemRectMin().y, afterY = ImGui::GetCursorPosY();
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + ImGui::GetCursorStartPos().x, actionsY));
+            if (ui::Button(Tr("Release page"), { .kind = ui::ButtonKind::Ghost, .icon = ui::Icon::External, .disabled = state.launcher.pageUrl.empty() }))
                 SDL_OpenURL(state.launcher.pageUrl.c_str());
-            switch (ui::ModalActions(&open, Tr("Update now"), Tr("Close")))
+            ImGui::SetCursorPosY(afterY);
+            ImGui::Dummy(ImVec2(0, 0));
+            switch (result)
             {
             case ui::ModalResult::Confirm:
                 m_updates.UpdateLauncher();

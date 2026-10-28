@@ -202,7 +202,9 @@ namespace ui
         ImGui::SetNextItemWidth(width);
         if (options.disabled)
             ImGui::BeginDisabled();
-        const bool open = ImGui::BeginCombo(id, preview, ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge);
+        // The value cut with "..." before the chevron, never under it.
+        const std::string shown = Ellipsize(preview, width - ImGui::GetStyle().FramePadding.x - space::XS - icon::Small - space::S);
+        const bool open = ImGui::BeginCombo(id, shown.c_str(), ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge);
         if (options.disabled)
             ImGui::EndDisabled();
         if (!open)

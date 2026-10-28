@@ -120,7 +120,7 @@ namespace ui
         Search, Gear, Info, Warning, Error, Download, Trash, Folder, Disc, Play, Hold, More, Star,
         Success, Update, Pause, Unknown, Loader, // a state: done, an update, stopped, not known yet; the spinner's
         Gamepad, Circle, Square, Triangle, // with Cross: PlayStation's face buttons
-        Trophy
+        Trophy, External // External: opens a web page
     };
     void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 centre, float size, ImU32 color);
     // The loader icon turning (an indeterminate wait); still when motion is reduced.

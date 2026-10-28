@@ -1670,8 +1670,11 @@ namespace launcher_ui
                 }
                 ui::StatusPill(ui::Status::Success, (m_s->fromCopy ? Tf("Game data copied: {}", LauncherFormatSize(m_s->discSize))
                                                                    : Tf("Disc verified: {}", LauncherFormatSize(m_s->discSize))).c_str());
-                if (achievements)
-                    ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + ui::height::Small + ImGui::GetStyle().ItemSpacing.y));
+                if (achievements) // the row ends under the button (an item ends a moved cursor)
+                {
+                    ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + ui::height::Small));
+                    ImGui::Dummy(ImVec2(0, 0));
+                }
                 if (!played.empty() && !m_s->installView)
                     ui::Text(ui::TextStyle::Body, played.c_str(), ui::color::InkSoft);
                 if (!m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
@@ -1801,12 +1804,8 @@ namespace launcher_ui
         }
 
         // The portal's state under the main button, in a word and a shape (above the band's foot, clear of the pad legend).
-        if (const std::string line = m_portal.Current().Line(); !line.empty())
-        {
-            ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY + PlayButtonH + ui::space::S)); // clear of the focus ring
-            ui::StatusPill(m_portal.Current().connected ? ui::Status::Success : ui::Status::Neutral, line.c_str());
-            ui::Tooltip(Tr(strings::PortalTip));
-        }
+        ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY + PlayButtonH + ui::space::S)); // clear of the focus ring
+        DrawPortalStatus();
 
         // The pad's buttons for this page, when a pad is in use.
         if (ui::Ctx().glyphs != ui::Glyphs::Keyboard)
@@ -1823,12 +1822,11 @@ namespace launcher_ui
 
     void App::DrawPortalStatus()
     {
-        std::string line = m_portal.Current().Line();
+        const std::string line = m_portal.Current().Line();
         if (line.empty())
             return;
-        ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", line.c_str());
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", Tr(strings::PortalTip));
+        ui::StatusPill(m_portal.Current().connected ? ui::Status::Success : ui::Status::Neutral, line.c_str());
+        ui::Tooltip(Tr(strings::PortalTip));
     }
 
     void App::DrawControls()
@@ -1922,7 +1920,7 @@ namespace launcher_ui
             options.kind = ui::ButtonKind::Ghost;
             options.icon = ui::Icon::ChevronLeft;
             ImGui::SetCursorPos(ImVec2(ImGui::GetContentRegionMax().x - ui::ButtonWidth(Tr("Back"), options), // the column's right edge, scrollbar or not
-                top + (bottom - top - ui::height::Normal) / 2));
+                std::round(top + ui::CapMiddle(ui::TextStyle::Display) - ui::height::Normal / 2))); // on the title's capitals
             if (ui::Button(Tr("Back"), options))
                 GoTo(Page::Play);
             ImGui::SetCursorPosY(std::max(bottom, ImGui::GetCursorPosY()));
@@ -2119,7 +2117,7 @@ namespace launcher_ui
         }
         // Keep installing is the default (the focus starts there, B / Escape keep installing); Quit is the danger.
         bool open = true;
-        const bool shown = ui::BeginModal("##quit", Tr(strings::QuitTitle), &open, ui::ModalSize::Small);
+        const bool shown = ui::BeginModal("##quit", Tr(strings::QuitTitle), &open, ui::ModalSize::Medium); // its title on one line in French too
         if (shown)
         {
             ui::Text(ui::TextStyle::Body, Tr(strings::QuitText), ui::color::InkSoft);

@@ -314,6 +314,7 @@ namespace ui
             case Icon::Square: return lucide::Square;
             case Icon::Triangle: return lucide::Triangle;
             case Icon::Trophy: return lucide::Trophy;
+            case Icon::External: return lucide::ExternalLink;
             }
             return 0;
         }

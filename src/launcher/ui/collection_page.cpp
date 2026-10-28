@@ -615,13 +615,11 @@ namespace launcher_ui
         const ImVec2 top = ImGui::GetCursorScreenPos();
         ui::Text(ui::TextStyle::Display, Tr("Collection"), ui::color::Ink, -1);
         const ImVec2 title = ImGui::GetItemRectSize();
-        // The real portal's state, beside the title.
+        // The real portal's state beside the title, centred on its capitals (a pill, as on the game page).
         if (!m_app.m_portal.Current().Line().empty())
         {
-            ui::PushText(ui::TextStyle::Caption);
-            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + ui::space::M, top.y + (title.y - ImGui::GetTextLineHeight()) / 2));
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + ui::space::M, std::round(top.y + ui::CapMiddle(ui::TextStyle::Display) - ui::PillHeight / 2)));
             m_app.DrawPortalStatus();
-            ui::PopText();
         }
 
         // Add a figure, and the rest of the collection's work under Manage.
@@ -631,8 +629,10 @@ namespace launcher_ui
         ui::ButtonOptions manage;
         manage.trailing = ui::Icon::ChevronDown;
         const float addWidth = ui::ButtonWidth(Tr("Add a figure"), add), manageWidth = ui::ButtonWidth(Tr("Manage"), manage);
-        const float row = std::max(title.y, ui::height::Normal);
-        ImGui::SetCursorScreenPos(ImVec2(top.x + width - addWidth - ui::space::S - manageWidth, top.y + (row - ui::height::Normal) / 2));
+        // On the title's line: the buttons' middle on its capitals' middle.
+        const float buttonsY = std::round(top.y + ui::CapMiddle(ui::TextStyle::Display) - ui::height::Normal / 2);
+        const float row = std::max(title.y, buttonsY + ui::height::Normal - top.y);
+        ImGui::SetCursorScreenPos(ImVec2(top.x + width - addWidth - ui::space::S - manageWidth, buttonsY));
         if (ui::Button(Tr("Add a figure"), add))
         {
             m_overlay = Overlay::Add;
