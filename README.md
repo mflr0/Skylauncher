@@ -43,6 +43,18 @@ game as far as you like and tell us in an issue what worked and what did not (Se
 
   Then unplug the portal and plug it in again.
 
+## Supported discs
+
+The launcher checks your disc's `default.xex`, so only these editions work (names as in the Redump database):
+
+| Game | Disc |
+|---|---|
+| Spyro's Adventure | Skylanders - Spyro's Adventure (USA, Europe) (En,Fr,De,Es,It,Nl,Sv,No,Da,Fi) |
+| Giants | Skylanders - Giants (USA, Europe) (En,Fr,De,Es,It,Nl,Pt,Sv,No,Da,Fi) |
+| Swap Force | Skylanders - Swap Force (USA, Australia) (En,Fr), or Skylanders - Swap Force (Europe) (Es,It) |
+
+Another edition is refused with a message. If you have one, tell us in an issue.
+
 ## Get started
 
 1. Download Arkeyan Launcher from the [Releases page](https://github.com/mflr0/Skylauncher/releases):
@@ -104,6 +116,8 @@ Portal of Power. Then click **Test the portal**.
 - **Frame rate:** 30 is the original. 60 is experimental.
 - The launcher and the games share one settings file, `launcher.ini`.
 - **Language:** the launcher is available in English and French (Settings, Launcher tab).
+- **Your saves are safe:** each save is written in one go, and the previous version is kept before it is replaced. To go
+  back to one, open the game's settings (the gear next to PLAY) > Saves > Restore.
 
 ## If something goes wrong
 
@@ -140,8 +154,11 @@ The developer docs are in `docs/`: `launcher_ui.md` covers the screens and theme
 
 The ports are made by static recompilation: the game's PowerPC code is translated to C++ and its shaders to Metal,
 Vulkan and Direct3D 12 shaders, on your computer, from your disc. A runtime written for these games replaces the Xbox 360
-(memory, threads, files, graphics, audio, controllers, the Portal of Power). This is an independent project: it is not a
-fork of other Skylanders recompilation projects, even where an executable shares a name with one of them.
+(memory, threads, files, graphics, audio, controllers, the Portal of Power).
+
+These ports are the author's own, written from scratch with XenonRecomp and XenosRecomp and a runtime made for these
+games. They are not a fork, do not use ReXGlue, and take no code from other Skylanders recompilation projects, even where
+an executable has the same name as one of theirs (SSARecomp).
 
 Every change is checked by automatic tests: each game is built from its disc, started and played for a few minutes by a
 script (frame rate, sound, the picture compared with a reference, saves, figures), and scripted tours load the games'
