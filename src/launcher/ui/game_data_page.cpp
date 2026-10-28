@@ -133,7 +133,7 @@ namespace launcher_ui
             const uint64_t total = m_s->copyJob.Total();
             ImGui::TextColored(ImColor(Rgb(Play)), "%s", total == 0 ? Tr("Copying...") :
                 Tf("Copying: {} of {}", LauncherFormatSize(m_s->copyJob.Bytes()), LauncherFormatSize(total)).c_str());
-            ImGui::ProgressBar(m_s->copyJob.Fraction(), ImVec2(420, 10), "");
+            ProgressBar(m_s->copyJob.Fraction(), ImVec2(420, 10));
             if (PillButton(Tr("Stop"), false, 160))
                 m_s->copyJob.Cancel();
             note(Tr("Stopping keeps the files already copied."));

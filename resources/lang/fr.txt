@@ -488,6 +488,9 @@ Exported {} figures to {}	{} figurines exportées vers {}
 Favourite	Favori
 Figure dumps (.sky, .bin, .dmp)	Dumps de figurines (.sky, .bin, .dmp)
 File	Fichier
+created	créée
+imported	importée
+portal	du portail
 Fire	Feu
 Flocked	Floqué
 For {}	Pour {}

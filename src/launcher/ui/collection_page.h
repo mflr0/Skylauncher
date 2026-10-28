@@ -26,6 +26,7 @@ namespace launcher_ui
     std::string KindLabel(collection::VariantKind kind);        // the version's name in the launcher's language
     bool French();                                              // the launcher shows French (the library's own French texts)
     unsigned ElementInk(collection::Element element); // 0xRRGGBB
+    unsigned KindInk(uint32_t rgb);                    // the badge text colour that reads on a version's colour
     std::string Lower(std::string text);
     // "Doom Stone" for "Doom Stone (top)" or "(bottom)": a swapper's halves are named after it.
     std::string WithoutHalf(std::string name);

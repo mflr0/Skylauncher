@@ -1133,6 +1133,17 @@ namespace launcher_ui
         ImGui::EndChild();
     }
 
+    void App::ProgressBar(float fraction, ImVec2 size)
+    {
+        ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::Dummy(size);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        float round = size.y / 2;
+        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), ImGui::GetColorU32(Rgb(TextDim, 90)), round); // a light track: the end of the bar shows on the dark art
+        if (fraction > 0) // a whole cap at both ends, even when nearly empty
+            draw->AddRectFilled(at, ImVec2(at.x + std::max(size.x * std::min(fraction, 1.0f), size.y), at.y + size.y), ImGui::GetColorU32(ImGuiCol_PlotHistogram), round);
+    }
+
     bool App::HoldButton(const char* label, float width, const char* hint)
     {
         ImVec2 at = ImGui::GetCursorScreenPos(), size(PillWidth(label, width, true), 40);
@@ -1153,8 +1164,8 @@ namespace launcher_ui
         float rounding = ImGui::GetStyle().FrameRounding;
         ImVec2 end(at.x + size.x, at.y + size.y);
         draw->AddRectFilled(at, end, ImGui::GetColorU32(Rgb(Danger, held ? 150 : hovered ? 110 : 70)), rounding);
-        if (fill > 0)
-            draw->AddRectFilled(at, ImVec2(at.x + size.x * fill, end.y), ImGui::GetColorU32(Rgb(Danger, 200)), rounding);
+        if (fill > 0) // rounded at the leading end like the button (at least two radii wide, so the cap is whole)
+            draw->AddRectFilled(at, ImVec2(at.x + std::max(size.x * fill, 2 * rounding), end.y), ImGui::GetColorU32(Rgb(Danger, 200)), rounding);
         const char* labelEnd = std::strstr(label, "##"); // "Delete##trash" shows "Delete"
         ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
         ImVec2 text = ImGui::CalcTextSize(label, labelEnd);
@@ -1755,7 +1766,7 @@ namespace launcher_ui
                 break;
             case DiscState::Verifying:
                 ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_s->verify.Stage().c_str());
-                ImGui::ProgressBar(m_s->verify.progress, ImVec2(360, 8), "");
+                ProgressBar(m_s->verify.progress, ImVec2(360, 8));
                 break;
             case DiscState::Ready:
                 ImGui::TextColored(ImColor(Rgb(Ready)), "%s", (m_s->fromCopy ? Tf("Game data copied: {}", LauncherFormatSize(m_s->discSize))
@@ -2292,7 +2303,8 @@ namespace launcher_ui
             bool error = item.until == 0;
             ImVec2 text = ImGui::CalcTextSize(item.text.c_str(), nullptr, false, wrap);
             float width = text.x + 40 + (error ? 28 : 0);
-            ImVec2 position(size.x - ToastMargin - width, bottom - text.y - 24), end(size.x - ToastMargin, bottom);
+            // Whole points, so the 2-point ring covers whole pixels at 1x and 2x.
+            ImVec2 position(std::round(size.x - ToastMargin - width), std::round(bottom - text.y - 24)), end(size.x - ToastMargin, std::round(bottom));
             // A window of its own, so a click closes the message and does not reach what is under it.
             ImGui::SetNextWindowPos(position);
             ImGui::SetNextWindowSize(ImVec2(end.x - position.x, end.y - position.y));
@@ -2306,7 +2318,8 @@ namespace launcher_ui
             ImGui::End();
             ImGui::PopStyleVar(2);
             draw->AddRectFilled(position, end, Rgb(PanelRaised, 245), Radius);
-            draw->AddRect(position, end, Rgb(error ? Danger : Accent, 200), Radius, 2.0f);
+            // AddRect puts the line's centre half a point in: a 2-point ring then runs between whole points only from 1 point in.
+            draw->AddRect(ImVec2(position.x + 0.5f, position.y + 0.5f), ImVec2(end.x - 0.5f, end.y - 0.5f), Rgb(error ? Danger : Accent, 200), Radius - 1, 0, 2.0f);
             draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(position.x + 20, position.y + 12), Rgb(Text), item.text.c_str(), nullptr, wrap);
             if (error) // a cross
             {
@@ -3431,6 +3444,7 @@ using namespace LauncherTheme;
 void LauncherTheme::Apply(ImGuiStyle& style)
 {
     style.WindowRounding = 0;
+    style.DisplaySafeAreaPadding = ImVec2(12, 12); // tooltips and popups keep a margin from the window's edges
     style.ChildRounding = RadiusLarge;
     style.FrameRounding = RadiusSmall;
     style.PopupRounding = RadiusSmall;

@@ -219,7 +219,15 @@ namespace launcher_ui
                 games += (games.empty() ? "" : ", ") + ShortGameName(game.id), count++;
         rows.push_back({ Tr("Plays in"), games.empty() ? std::string(Tr("No game this launcher knows")) : count == int(collection::Catalogue::Get().Games().size()) ? std::string(Tr("every game")) : games });
         rows.push_back({ Tr("Toy"), Tf("{} · type {} · variant {:04X}", f.toy != nullptr ? f.toy->name : std::string(Tr("Unknown")), f.type, f.variant) });
-        rows.push_back({ Tr("File"), f.file + (f.origin.empty() ? "" : " · " + f.origin) });
+        {
+            // How the file came to be: the collection stores a word (created, imported, portal), shown in the player's language.
+            static const char* const Origins[] = { N_("created"), N_("imported"), N_("portal") };
+            std::string origin = f.origin;
+            for (const char* known : Origins)
+                if (origin == known)
+                    origin = Tr(known);
+            rows.push_back({ Tr("File"), f.file + (origin.empty() ? "" : " · " + origin) });
+        }
         if (collection::Card card = CardOf(f); card.Swapper())
             rows.push_back({ Tr("Bottom file"), (card.first == &f ? card.second : card.first)->file });
         size_t backups = Backups(f.path).size();
@@ -280,7 +288,7 @@ namespace launcher_ui
             badgeX += w + 6;
         };
         if (f.Kind() != collection::VariantKind::Base)
-            badge(KindLabel(f.Kind()), collection::VariantKindRgb(f.Kind()), AccentInk);
+            badge(KindLabel(f.Kind()), collection::VariantKindRgb(f.Kind()), KindInk(collection::VariantKindRgb(f.Kind())));
         if (f.toy != nullptr && f.toy->element != collection::Element::None)
             badge(ElementName(f.toy->element), PanelRaised, Text);
         if (card.Swapper())
