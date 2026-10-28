@@ -1349,7 +1349,7 @@ namespace launcher_ui
         ImDrawList* draw = ImGui::GetWindowDrawList();
         float rowW = SidebarW;
 
-        // A row across the whole sidebar, like the Minecraft Launcher: lighter when hovered, a bar on the left when selected.
+        // A row across the whole sidebar: lighter when hovered, a bar on the left when selected.
         auto row = [&](const char* id, float height, bool selected, bool enabled, ImVec2& at) {
             at = ImVec2(0, ImGui::GetCursorScreenPos().y);
             ImGui::SetCursorScreenPos(at);

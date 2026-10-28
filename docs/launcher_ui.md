@@ -1,6 +1,6 @@
 # Launcher UI Guide
 
-The launcher is a Skylanders-flavoured take on the Minecraft Launcher. Keep the look modular so it
+The launcher has its own Skylanders look, designed by dorydev. Keep the look modular so it
 is easy to iterate without touching the game runtime.
 
 ## Structure
