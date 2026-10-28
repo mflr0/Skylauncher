@@ -159,6 +159,17 @@ namespace launcher_ui
         // Once the launcher's own release was fetched (or the nearest one there is), an older tag is the best there is.
         std::string tag = WantedKitTag(slot);
         bool fetched = SettingGet(m_config, "update", "kit_fetched") == tag;
+        // A kit at hand (even one fetched under the same tag) that builds an older version than the update offers would
+        // rebuild the same old game and offer the update again, forever: fetch the release's kit again instead.
+        if (const GameUpdate* pending = PendingUpdate(slot); pending != nullptr && !slot.kit->GameVersion(slot.game.id).empty())
+        {
+            SemVer kitBuilds = ParseSemVer(slot.kit->GameVersion(slot.game.id)), offered = ParseSemVer(pending->version);
+            // Once per release and version: if that release's own kit still builds the older one, do not download it
+            // again and again (the update then says what it can build).
+            const std::string once = tag + " " + slot.game.id + " " + pending->version;
+            if (kitBuilds.valid && offered.valid && CompareSemVer(kitBuilds, offered) < 0 && SettingGet(m_config, "update", "kit_refetched") != once)
+                return true;
+        }
         return !slot.kit->Builds(slot.game.id) || (KitOlderThanLauncher(*slot.kit, tag) && !fetched);
     }
 
@@ -182,7 +193,11 @@ namespace launcher_ui
         m_s->kitError.clear();
         m_page = Page::Play;
         if (KitNeedsFetch(*m_s))
+        {
+            if (const GameUpdate* pending = PendingUpdate(*m_s))
+                m_config["update"]["kit_refetched"] = WantedKitTag(*m_s) + " " + m_s->game.id + " " + pending->version;
             StartKitDownload();
+        }
         else
             StartInstaller();
     }
