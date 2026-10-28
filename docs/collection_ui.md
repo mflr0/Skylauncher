@@ -88,7 +88,7 @@ At the first visit to the page (`CollectionPage::Open`):
   slot *i* (`WriteSeats`) and reads it back (`ReadSeats`): a figure goes to its slot's seat when it fits, else to the
   first seat that takes it (as the Toy Box does). The seats are per game (`catalogue.json` `games[].seats`). Swap Force's
   portal has six slots (see "Swappers"): `SeatFirstSlot` and `SlotSeat` map the seats to them.
-- **Which games**: the selector next to "PORTAL AT THE NEXT START" lists the games that can start with prepared seats,
+- **Which games**: the select above the seats ("Next start: Spyro's Adventure", with a tooltip) lists the games that can start with prepared seats,
   those the launcher has a runtime for (`SessionFile` not empty): Spyro's Adventure, Giants (Player 1, Player 2, Item or
   adventure) and Swap Force (Player 1, Player 2, Magic item, Adventure). The page opens on the game chosen in the sidebar
   when it is one of them.
@@ -100,10 +100,11 @@ At the first visit to the page (`CollectionPage::Open`):
   where it is; `SKY_LAUNCHER_TEST_SEATX` checks all four seats by mouse, keyboard and pad), Delete or the pad's X on a
   focused tile (or Delete with the mouse over it), the tile's right-click menu ("Take it off", "Choose another", "Open its
   sheet"), or dragging the tile onto the shelf. A seat whose figure is gone shows "Missing figure" and can be emptied.
-- **A tile**: the seat's name (accent while choosing for it), the figure's picture, name and level for that game
-  ("Level 10 (15)"); empty: a `+`, "Empty", "Choose".
-- **Live**: figures a game holds (JSON lock of a live process) read "Playing now"; while the shown game runs the title is
-  "ON THE PORTAL NOW", the line says "Spyro's Adventure is running: change them in its Toy Box", the seats are
+- **A tile** (a card, `height::Main` high): the picture, then three lines: the seat's name (blue while choosing for it), the
+  figure's name, its level for that game ("Level 10 (15)"); empty: a `+`, "Empty", "Choose". The X is an `IconButton`
+  (`Icon::Cross`, tooltip "Take it off") at the corner.
+- **Live**: figures a game holds (JSON lock of a live process) read "Playing now"; while the shown game runs a status pill
+  "Spyro's Adventure is running: use its Toy Box" takes the place of the count above the seats, the seats are
   read-only and Edit, Reset, Delete are disabled for those figures (favourites and names stay editable). "Mark as not in
   use" (held) breaks a stale lock.
 - Refresh: every 1.5 s the model compares a signature of the folder (names, sizes, times of dumps, locks,
@@ -113,23 +114,27 @@ At the first visit to the page (`CollectionPage::Open`):
 
 ## The screens
 
-- **Header**: COLLECTION, "14 figures · 3 favourites", the portal status; `+ Add a figure` and `...` (Trash, Backups,
-  Import and export, Unknown toys, Tidy the starters: Manage on that tab; Show the collection folder).
+- **Header** (phase B, on the component library; `docs/launcher_ui.md`): the title "Collection" with the real portal's
+  state ("Portal: not detected") beside it, `+ Add a figure` (Primary) and **Manage** (a Secondary button with a chevron,
+  its menu right-aligned under it: Trash, Backups, Import and export, Unknown toys, Tidy the starters: Manage on that tab;
+  Show the collection folder). The line under it: "14 figures · 3 favourites" at the left, the game the seats are for at
+  the right, then the seats, then the bar: the shelf starts at about a third of a 720-point window.
 - **The seats** (above).
 - **The bar** (2026-10-27, the Toy Box's too, same words and order; `docs/runtime/host/toybox_ux.md` of the game's repo
-  holds the design): the **search field** first and wide ("Name, element, game, level..."), then one **Filters** button
-  ("Filters · 2" when two are on) opening a small panel of four drop-downs, **Element**, **Works in** (the toys a game
-  reads: Giants reads every Spyro's Adventure toy, Spyro's Adventure no Giants toy), **Type** (the types the collection has) and **Sort by** (Recent, Name, Level, Element, Game), and **Clear all**.
-  Under the bar, only when something is on, the **tags**: one per filter with an x ("Water x", "Sort: Level x"), **Clear
-  all**, and the count at the right ("12 figures", "1 figure"; French "12 figurines"). Nothing matches: "No figure
-  matches" and "Clear the search and the filters". The designer's look is untouched: the field, the pill button and the
-  popup are the launcher's own widgets; the tags are pills in her greys and blue.
+  holds the design): the **search field** first and wide ("Name, element, game, level..."), then the **order** (a Select,
+  "Sort: Recent": Recent, Name, Level, Element, Game; it is not a filter, so it is no chip and Clear all keeps it), then one
+  **Filters** button ("Filters · 2" when two are on) opening a small panel of three Selects, **Element**, **Works in** (the toys a game
+  reads: Giants reads every Spyro's Adventure toy, Spyro's Adventure no Giants toy) and **Type** (the types the collection has), and **Clear all**.
+  Under the bar, only when something is on, the **tags**: one filter Chip per filter (a check; a click turns it off), **Clear
+  all**, and the count at the right ("12 figures", "1 figure"; French "12 figurines"). Nothing matches: an EmptyState "No figure
+  matches" with "Clear search and filters"; an empty collection: an EmptyState with "Add a figure" and, under it, "Start with
+  Spyro, Gill Grunt, Trigger Happy".
 - **The smart search** (`collection::SearchMatches`, shared with the game): the words all have to match; a name
   (label, nickname, toy, version, file), an element ("fire", "feu"), a game ("giants", "swap force"), a type ("item",
   "objet", "adventure", "mini", "swapper"), a version ("legendary", "lightcore"), "level 10" / "niveau 10"; case and
   accents do not matter, English and French both always work, and one typo is tolerated in a word of 5 letters or more
   ("giatns"). A swapper is found by either half and stays one card.
-- **Sort**: Recent (the default: favourites first, then what the game took, then by element), Name, Level (highest
+- **Sort** (the Select of the bar): Recent (the default: favourites first, then what the game took, then by element), Name, Level (highest
   first), Element, Game. The other four ignore favourites. `ShelfFilter::sort`.
 - **The shelf** (`CollectionModel::Shelf`, `collection::Group` Smart for the portal's game): every figure once,
   favourites first, then the ones that game took (newest first), then by element; "Unknown toys" and "Not for
@@ -138,32 +143,36 @@ At the first visit to the page (`CollectionPage::Open`):
   "Gill Grunt (Splash)"), the level line for the portal's game, the star, the variant's name, P1/P2/"On" for the seats.
   The Toy Box draws the same card.
 - **The sheet** (a click on a card when no seat is being chosen, right click, X, F2): the picture with its element and
-  type; the name, the version, where it sits ("On Player 1 at the next start of Spyro's Adventure") or which game holds
-  it; "Level 10 (15)" with the bar to the next level, gold and play time, last played; **Details** (closed by default):
-  nickname, hero points, hat and upgrades, the games it plays in, toy type and variant, file and origin, backups.
-  **Three actions**: **Put on the portal** (a menu of the seats: "(replaces Bash)", disabled where it doesn't fit; Take
-  it off), **Edit**, **Favourite**; `...`: Duplicate, Back up now, Restore a backup (a submenu: date, level, gold),
-  Show in the folder, Reset to new..., Delete... (red: a bar over the actions asks to **Hold to reset / Hold to delete**,
-  1 s, backed up first; Delete goes to the trash). Close.
-- **Edit**: in two columns, the name in the lists (empty: the toy's name) and, for a figure that keeps them, the level in
+  type, in a Modal (Large, titled with the figure's name, the cross at the top right; B and Escape close it); the version,
+  where it sits (a status pill "On Player 1 at the next start of Spyro's Adventure") or which game holds it (a warning
+  pill); **three actions** in a row: **Put on the portal** (Secondary with a chevron; a menu of the seats: "(replaces
+  Bash)", a check on its own seat, disabled where it doesn't fit; Take it off), **Edit**, **Favourite** (a star), and a
+  "More actions" icon: On the wheel, Duplicate, Back up now, Restore a backup... (opens Manage > Backups on this figure),
+  Show in folder, then Reset to new... and Delete... (red menu rows: a danger dialog asks first, the focus on Cancel;
+  backed up first; Delete goes to the trash); "Level 10 (15)" with a ProgressBar to the next level, gold and play time,
+  last played (`ui::FormatWhen`); **Details** (a Ghost button with a chevron; open by default in a window 800 points high or
+  more): nickname, hero points, hat and upgrades, the games it plays in, toy type and variant, file and origin, backups.
+  A swapper adds "Change the bottom" / "Change the top"; a figure held by a game, the Danger hold button "Mark as not in use".
+- **Edit** (a view of the same Modal, titled "Edit", Cancel and Save bottom right; B goes back to the sheet): one column of
+  settings rows (`ui::BeginSettings`: label and hint left, the control right), the name in the lists (empty: the toy's name) and, for a figure that keeps them, the level in
   the portal's game (Spyro's Adventure 1-10 on its own part of the experience, so a figure Giants took to 15 keeps those
-  levels; Giants 1-15 on the first two parts of the experience; Swap Force 1-20, the game's own table), experience, Giants' **hat picker** (52 names), gold, hero points, the nickname the game shows.
+  levels; Giants 1-15 on the first two parts of the experience; Swap Force 1-20, the game's own table), experience, Giants' **hat picker** (52 names, a Select), gold, hero points (text fields that take digits), the nickname the game shows.
   Save re-reads the figure and writes only the fields changed (a game may have played it meanwhile); a name alone
   writes no stats (and makes no backup).
-- **Add a figure**: a game selector (the six games), search, a **Type** menu (as the bar's), one card per character,
-  "owned x2"; the toys the game reads first, then "Later games" labelled "needs Giants". A side panel lists the versions
+- **Add a figure** (a Modal, Large): a game Select (the six games), a SearchField, a **Type** Select (as the bar's), one card per
+  character with an "owned x2" Badge; the toys the game reads first, then "Later games" labelled "needs Giants" (a
+  SectionHeader each, with its count). A side Card lists the versions as ListRows (the picture in `leading`, "owned x2" as `trailing`)
   (the plain toy under its own name, then the variants the chosen game tells apart and the same-tag editions: a variant the game plays
   as the plain toy is not a row, `Catalogue::Read`); the plain toy makes the figure under the id the toy is sold with, and the
-  toy's own entry in the catalogue (its `base` kind) is never a second row; name (optional) and Create; "Put it on Player 1" afterwards. A toy with
+  toy's own entry in the catalogue (its `base` kind) is never a second row; the footer holds the optional name, "Put it on Player 1" after a Create, and Close then Create at the right (the dialog stays open after a Create, to make another). A toy with
   versions has a "+3" badge on its card; the panel is titled "Versions", each row with its picture (the toy's own when
   it has none) and its kind (an unknown kind from a newer `catalogue.json` shows as "Other"); the search also matches
   the versions' names ("polar" finds Whirlwind, with Polar Whirlwind chosen).
   The picture of the sheet and of each version row is `collection::BestPicturePath` (the variant's own artwork when the
   game has one; Giants: 99, about 1000x960), fitted into its box by `CollectionPage::DrawPicture`; the shelf's cards
   keep the round portraits. Shot `41-giants-variant-sheet` shows a Series 2 Eruptor.
-- **Chevrons** are drawn, never typed: `App::DrawChevron` / `DrawLabelChevron` (`PillButton`'s `chevron` argument) draw
-  two lines in the label's colour, down when closed and up when open (Details, Put on the portal, the Element / Game /
-  Type menus). The combo boxes use ImGui's own arrow.
+- **Chevrons** are drawn, never typed: a Button's `trailing` icon (`ui::Icon::ChevronDown` / `ChevronUp`: Details, Put on the
+  portal, Manage, Filters) and the Selects' own.
 - **Upgrades in Edit** (2026-10-26): `DrawUpgradeEditor`: the toy's upgrades by name (`collection::Upgrades`), the same
   columns, rules and words as the Toy Box (`collection::ToggleUpgrade`...), All / None, the focused one's description;
   the Edit fields scroll above the Save row. Save writes `upgrades` and Giants' Wow Pow (`wowPow`, the extra area's +0x06 bit 0, where Giants writes it when
@@ -172,9 +181,11 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Texts** (2026-10-26): one short sentence per help line, no path or file name in running text, no help when the
   label is clear, errors as what happened then what to do. The intro of Add a figure, the Edit sheet's backup note,
   the empty-state bodies and the portal selector's tooltip were removed; the rules are in `launcher_ui.md`, "Writing".
-- **Manage**: Trash (put back, delete for good (held); 30 days), Backups (per figure, restore), Import and export (files,
-  a folder, drop files or a folder on the window; export everything; show in folder), Unknown toys (name one:
-  `catalogue.json` of the collection, applied at the next start), Tidy (the starters).
+- **Manage** (a Modal with `ui::Tabs`; the counts in the tab names): Trash (a settings row per figure: its **name** (read
+  from the dump, not the file name), when and why, Put back and Delete for good (Danger, held); 30 days), Backups (a
+  ListRow per figure with its count, opening its copies: when, level and gold, Restore (Danger, held)), Import and export
+  (files, a folder, drop files or a folder on the window; export everything; show in folder), Unknown toys (name one:
+  `catalogue.json` of the collection, applied at the next start), Tidy (the starters; Danger, held).
 - **Pictures**: `collection::PortraitPath` (the shown game's disc, else the other's, else the toy's family picture from
   a disc: SSA's potion, compass and paw icons), else `figures::GenerateIcon` (a shape, the element's colour, the
   variant's badge, initials for characters, and the Toy Box's mark for items, packs and sidekicks:
@@ -183,11 +194,12 @@ At the first visit to the page (`CollectionPage::Open`):
   chooses (a seat: choose for it; a card: put it on the seat being chosen for, else its sheet), B goes back (closes the
   overlay one step, stops choosing, clears the search; then out of the page), X opens the sheet (on a seat: takes its
   figure off), Y the search (the bar's search, Filters and tags are on the way up from the shelf), LB/RB choose for the previous/next seat. Cards scrolled out of view aren't drawn; Manage and
-  the sheet read the trash and the backups once per change of the collection.
+  the sheet read the trash and the backups once per change of the collection. While a pad is in use a **PadLegend** closes the
+  page (A Select, X Figure sheet, Y Search, B Back), and a card's tooltip shows under the pointer only.
 
 ## Files
 
-`collection_page.{h,cpp}` (page, seats, bar, shelf), `collection_figure.cpp` (overlay, the sheet, Edit),
+`collection_page.{h,cpp}` (page, seats, bar, shelf), `collection_figure.cpp` (the overlay's Modal and its footer, the sheet, Edit),
 `collection_add.cpp`, `collection_manage.cpp` (Manage, test seed and screens), `collection_model.{h,cpp}` (no UI: seats,
 `ShelfFilter` and `Shelf`, signature polling, settings move, naming unknown toys). `launcher_app.h` only holds a
 `CollectionPage` and makes it a friend; `launcher_ui.cpp` calls `Draw`, `Drop`, `ClearIcons` and the test hooks.
@@ -204,13 +216,14 @@ At the first visit to the page (`CollectionPage::Open`):
   file still one seat, Change the bottom, Delete and Undelete of both halves, a lone half deleted alone). Seat X: 12 of 12. Everything runs in a scratch
   folder (`SKY_COLLECTION`, `SKY_SAVE_DIR`, `SKY_MIGRATE_FROM` set by the test).
 - Screenshots: `SKY_LAUNCHER_TEST_COLLECTION=1` with `SKY_LAUNCHER_SHOTS=<dir>` seeds a scratch `SKY_COLLECTION` (it
-  refuses without it) and writes `20-collection` to `52-sort-name`: the shelf, choosing for Player 1 and for the Magic
-  item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
+  refuses without it) and writes `20-collection` to `61-focus-seat`: the shelf, choosing for Player 1 and for the Magic
+  item, the Water filter, the sheet, its Details, the delete dialog, Edit, Add a figure (a later game), Manage (trash,
   backups), the live portal (`SKY_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
   its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on, Swap Force's portal with a
   swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (the plain toy, then the versions Giants tells apart, no
   second row with the toy's own name), then the smart search (an element, a level, a typo: `47-` to `49-`), the Filters panel
-  (`50-`), the tags with a count (`51-`) and a sort (`52-`). With `SKY_LAUNCHER_TEST_SWAPPERS=1` the collection also holds all
+  (`50-`), the tags with a count (`51-`) and a sort (`52-`), the menus open (`57-` Manage's, `58-` the sheet's, `59-` Put on the portal) and the
+  focus ring on a card and on a seat (`60-`, `61-`). `SKY_LAUNCHER_TEST_COLLECTION=pad` shows the page as a pad player sees it (the legend). With `SKY_LAUNCHER_TEST_SWAPPERS=1` the collection also holds all
   16 swappers matched and four mixed ones, and `53-all-swappers` (Swap Force's swapper cards; use `SKY_LAUNCHER_TEST_SIZE=1700x1500`
   to see them all), `54-mixed-swapper-sheet` and `55-add-swapper-versions` are written. Set `SKYLANDERS_DATA`
   to a folder holding the discs' cached pictures to see them (else the drawn icons).
@@ -240,12 +253,12 @@ What was wrong:
 Now: the index is written first and the move undone if it fails, so a refusal changes nothing and comes back as one
 toast with its reason. A hold button acts once per press. After a delete the page returns to the shelf, the focus on the
 next figure (`CollectionPage::DeleteFigure`, `CollectionModel::Delete`). Tested by `CollectionChecks` and screenshots
-`26-figure-delete` (the hold bar) and `33-after-delete`.
+`26-figure-delete` (the danger dialog) and `33-after-delete`.
 
 ## What a game makes of a figure; the wheel (2026-10-28)
 The collection keeps every figure; the library (`src/shared/collection/`, synced) tells what each game reads
 (`Catalogue::Read`, `VersionsFor`: the table is in the game's repo, `docs/runtime/host/collection.md` "What each game reads"). The sheet adds a
 row "In Giants: plays as Series 2 Eruptor" when the chosen game does not tell the figure's variant apart. The sheet's `...` menu has
-**On the wheel: <game>** for each game with a runtime that reads the figure (a toggle, `SetOnWheel`): the figure goes on the wheel of
+**On the wheel: <game>** (a checked row) for each game with a runtime that reads the figure (a toggle, `SetOnWheel`): the figure goes on the wheel of
 every player seat of that game (the in-game quick swap wheel, hold Tab or View) and a fact row lists the games. Stored in `collection.json`
 (`views.<game>.wheel`, `wheel_skipped`). The screenshot test's `46-` is now `46-add-versions`.

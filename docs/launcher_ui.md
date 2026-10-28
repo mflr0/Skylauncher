@@ -231,7 +231,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 | | |
 |---|---|
 | When | One row of a list or a menu-like page: a backup, a trashed figure, a setting that opens a page, a game. |
-| API | `bool ui::ListRow(title, ListRowOptions{subtitle, trailing, icon, chevron, selected, disabled, width})`; `Normal` high, `Large` with a subtitle; the whole row is pressable. |
+| API | `bool ui::ListRow(title, ListRowOptions{subtitle, trailing, icon, chevron, selected, disabled, width, leading})`; `Normal` high, `Large` with a subtitle; the whole row is pressable. `leading` keeps room at the left for a picture the caller draws there (a figure's). |
 | States | Hover, pressed, focus ring, disabled; selected: the raised grey and the orange bar (as the sidebar). Title and subtitle are cut with "..." before the trailing part. |
 
 ### Settings rows
@@ -259,7 +259,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 | | |
 |---|---|
 | When | A short list of actions under the item that opens it ("...", a figure's actions). |
-| API | `ui::OpenMenu(id)` after the opener; `if (ui::BeginMenu(id)) { ui::MenuItem(label, MenuItemOptions{icon, checked, danger, disabled}); ui::MenuSeparator(); ...; ui::EndMenu(); }` |
+| API | `ui::OpenMenu(id, alignRight = false)` after the opener (`alignRight`: the menu's right edge on the opener's, for one at the window's right); `if (ui::BeginMenu(id)) { ui::MenuItem(label, MenuItemOptions{icon, checked, danger, disabled}); ui::MenuSeparator(); ...; ui::EndMenu(); }` |
 | States | Rows `Small` high, hover / focus highlight, a check for a checked row, danger rows in `Danger`, disabled rows dim; a row closes the menu. |
 
 ### Tooltip
@@ -335,7 +335,7 @@ Phase B applies these on every screen it touches.
   ("28 Oct 2026", "28 oct. 2026"), times `ui::FormatTime` ("15:05", 24 hours), when something happened `ui::FormatWhen`
   ("Today 15:05", "Yesterday 15:05", else the date), the collection's ISO times `ui::ParseIsoUtc`. Local time, never "UTC" in the window.
 - **French punctuation**: a no-break space (U+00A0) before ":", "?", "!" and "%" and inside « »; the translation test fails on a
-  plain space there. The decimal mark is a comma, the thousands separator a narrow no-break space (the helpers).
+  plain space there. The decimal mark is a comma, the thousands separator a no-break space (the helpers; the font has no narrow one).
 - **Numbers and units**: digits, a space and the unit ("6 GB", "10 min", "30 FPS"); sizes rounded as `FormatSize` does;
   durations in minutes; a count with its noun has two strings, singular and plural.
 - **Hold buttons**: the label is the plain verb ("Delete", "Reset"); the hint ("Hold to confirm", or a sentence saying what
@@ -403,7 +403,13 @@ DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner an
   the action, not a setting); Uninstall everything a Danger `hold` Button.
 
 **3. The Collection, its sheets and dialogs** (`collection_page.cpp`, `collection_figure.cpp`, `collection_add.cpp`,
-`collection_manage.cpp`)
+`collection_manage.cpp`) - **done (phase B, 2026-10-28)**. What was decided: the portal's game is a Select "Next start: ..."
+(tooltip says what it is) on the count's line; Sort is a Select beside Filters (it is not a filter: no chip, Clear all keeps
+it) and Filters a Button opening a Menu with three Selects; the figure sheet, Add a figure and Manage are one `ui::Modal`
+(Large) whose title is the view's, Edit and "Change the bottom" being views of the sheet (B steps back); Reset and Delete ask
+in a danger `ConfirmDialog` (the hold is for the buttons in a list: Delete for good, Restore, Tidy, Mark as not in use); the
+sheet's "Restore a backup..." opens Manage > Backups on that figure (the Menu has no submenu); Edit is a settings list; the
+pad legend closes the page while a pad is in use. The list that follows is what was asked.
 - Header: "COLLECTION" Display, sentence case; "+ Add a figure" a Primary Button with `Icon::Plus` (the "+" leaves the
   string); "..." an IconButton (`Icon::More`, tooltip "Manage") or a Pill "Manage"; the portal's game dropdown (a 28-point
   pill) a Select with short names.
@@ -424,6 +430,8 @@ DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner an
   backups' chips a Select or ListRows; "Move {} to the trash" Danger, not Primary.
 
 **Inconsistencies seen, for phase B to fix**
+(Collection: every item that names it is done: casing, ellipsis, dates, hold wording, Primary, text sizes, raw colours, the
+shells, the toast kinds.)
 1. Casing: page titles written in capitals in the source ("LIBRARY", "COLLECTION", "LAUNCHER SETTINGS", "ADD A FIGURE",
    "EDIT", "MANAGE", "CHANGE THE BOTTOM", "CHANGE THE TOP") while section titles are sentence case; overline captions in
    capitals ("YOUR GAMES", "COMING LATER", "PORTAL AT THE NEXT START", "CONTROLLER", "DISC IMAGE:").
