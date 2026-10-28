@@ -66,9 +66,7 @@ Back	Retour
 Built for this disc.	Construit pour ce disque.
 Button glyphs	Icônes des boutons
 CHECKING...	VÉRIFICATION...
-COLLECTION	COLLECTION
 COMING LATER	BIENTÔT
-CONTROLLER	MANETTE
 Caches cleared	Caches vidés
 Can't read the disc	Disque illisible
 Cancel	Annuler
@@ -278,7 +276,6 @@ Restart now	Redémarrer maintenant
 Restore	Restaurer
 Resume	Reprendre
 Retry	Réessayer
-SETTINGS	RÉGLAGES
 {} accepts this portal.	{} accepte ce portail.
 {} can't be verified, so it wasn't installed	{} ne peut pas être vérifié : rien n'a été installé
 Save as...	Enregistrer sous...

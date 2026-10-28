@@ -1193,7 +1193,21 @@ namespace launcher_ui
         }
     }
 
-    // The game's logo (with "Skylanders" on it) once its disc has been read, else its initial on its colour; centred in the box.
+    ui::Icon IconOf(SlotState state)
+    {
+        using S = SlotState;
+        switch (state)
+        {
+        case S::NoDisc: return ui::Icon::Disc;
+        case S::ReadyToInstall: return ui::Icon::Download;
+        case S::UpdateAvailable: return ui::Icon::Update;
+        case S::Interrupted: return ui::Icon::Pause;
+        default: return ui::IconOf(StatusOf(state));
+        }
+    }
+
+    // The game's logo (with "Skylanders" on it) once its disc has been read, else its initial on its colour (at most
+    // height::Normal across); centred in the box.
     void App::DrawGameMark(ImDrawList* draw, const LauncherGameEntry& entry, ImVec2 at, ImVec2 size)
     {
         const ArtTexture* logo = entry.enabled ? CachedArt(entry.id, LauncherAssets::Role::Logo, int(size.x * 2.5f)) : nullptr;
@@ -1204,7 +1218,7 @@ namespace launcher_ui
             return;
         }
         const ImVec2 centre(at.x + size.x / 2, at.y + size.y / 2);
-        const float radius = size.y / 2;
+        const float radius = std::min(size.y, ui::height::Normal) / 2;
         draw->AddCircleFilled(centre, radius, ui::Col(entry.accent, entry.enabled ? 1.0f : 0.35f));
         ImGui::PushFont(ui::Ctx().fonts.title, radius);
         char letter[2] = { entry.name[0], 0 };
@@ -1226,38 +1240,42 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_NavCursor, 0); // the rows draw their own ring (FocusRing), not ImGui's as well
         ImDrawList* draw = ImGui::GetWindowDrawList();
 
-        // The title is the Home button; the launcher's version sits beside it, small and dim. The title is as large as the
-        // column leaves room for next to the version.
+        // The title: a link to Home for the pointer, not a stop for the keyboard or the pad (no ring: Home is the start page,
+        // the games are the rows below). The launcher's version beside it, on its baseline; everything on the rows' left edge.
+        const float left = ImGui::GetCursorScreenPos().x + ui::space::S;
         {
-            const ImVec2 titleAt = ImGui::GetCursorScreenPos();
+            const ImVec2 titleAt(left, ImGui::GetCursorScreenPos().y);
             const std::string version = "v" + LauncherVersion();
             const float versionW = ui::TextSize(ui::TextStyle::Caption, version.c_str(), nullptr, true).x;
-            const float room = SidebarW - 2 * ui::space::S - 2 * ui::space::XS - versionW - ui::space::XS;
+            const float room = SidebarW - 2 * ui::space::S - 2 * ui::space::S - versionW - ui::space::XS;
             const float titleSize = ui::FitSize(ui::Ctx().fonts.title, ui::type::Title, "ARKEYAN LAUNCHER", room);
             ImGui::PushFont(ui::Ctx().fonts.title, titleSize);
             const ImVec2 titleExtent = ImGui::CalcTextSize("ARKEYAN LAUNCHER");
             ImGui::PopFont();
-            ImGui::SetCursorScreenPos(ImVec2(titleAt.x + ui::space::XS, titleAt.y));
-            const bool pressed = ui::Hit("##home", titleExtent);
+            ImGui::SetCursorScreenPos(titleAt);
+            if (ImGui::InvisibleButton("##home", titleExtent)) // no ImGuiButtonFlags_EnableNav: the pointer's only
+                GoTo(Page::Home);
             const bool hovered = ImGui::IsItemHovered();
             if (hovered)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ui::FocusRing(ImVec2(titleAt.x + ui::space::XS, titleAt.y), ImVec2(titleAt.x + ui::space::XS + titleExtent.x, titleAt.y + titleExtent.y), ui::radius::Control);
-            if (pressed)
-                GoTo(Page::Home);
             ImGui::PushFont(ui::Ctx().fonts.title, titleSize);
-            draw->AddText(ImVec2(titleAt.x + ui::space::XS, titleAt.y), ui::Col(hovered ? 0xFFFFFF : SidebarInk), "ARKEYAN LAUNCHER");
+            draw->AddText(titleAt, ui::Col(hovered ? 0xFFFFFF : SidebarInk), "ARKEYAN LAUNCHER");
             ImGui::PopFont();
+            const float baseline = titleAt.y + ui::Baseline(ui::TextStyle::Title, false, titleSize);
             ui::PushText(ui::TextStyle::Caption, true);
-            ui::DrawText(draw, ImVec2(titleAt.x + 2 * ui::space::XS + titleExtent.x, titleAt.y + titleExtent.y - ImGui::GetFontSize() - ui::space::XXS / 2), ui::Col(ui::color::Dim), version.c_str());
+            ui::DrawText(draw, ImVec2(titleAt.x + titleExtent.x + ui::space::XS, baseline - ui::Baseline(ui::TextStyle::Caption, true)), ui::Col(ui::color::Dim), version.c_str());
             ui::PopText();
-            ImGui::SetCursorScreenPos(ImVec2(titleAt.x, titleAt.y + titleExtent.y));
+            // Under it, the tagline; a section's air (L), then the list's overline and the rows.
+            float y = titleAt.y + titleExtent.y + ui::space::XXS;
+            ui::PushText(ui::TextStyle::Caption);
+            ui::DrawText(draw, ImVec2(left, y), ui::Col(ui::color::Dim), Tr("Native PC ports"));
+            ui::PopText();
+            y += ui::type::Caption + ui::space::L;
+            ui::PushText(ui::TextStyle::Caption, true);
+            ui::DrawText(draw, ImVec2(left, y), ui::Col(ui::color::Dim), Tr("YOUR GAMES"));
+            ui::PopText();
+            ImGui::SetCursorScreenPos(ImVec2(left - ui::space::S, y + ui::type::Caption + ui::space::XS));
         }
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ui::space::XS);
-        ui::Text(ui::TextStyle::Caption, Tr("Native PC ports"), ui::color::Dim, -1);
-        ImGui::Dummy(ImVec2(0, ui::space::S));
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ui::space::XS);
-        ui::Text(ui::TextStyle::Caption, Tr("YOUR GAMES"), ui::color::Dim, -1, true);
 
         // The games: only those with a runtime can be selected. The ones not out yet fold into one row under them.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ui::space::XXS));
@@ -1281,9 +1299,12 @@ namespace launcher_ui
             SlotLine line = SlotStatus(slot);
             const ui::Status status = StatusOf(line.state);
             // Fits the column at the smallest window too: the row cuts its lines with "..." rather than run over the edge.
+            // Under the name, the state: its icon and its words on one line, on the name's left edge.
             ui::ListRowOptions options;
             options.subtitle = line.text.c_str();
             options.status = &status;
+            options.statusIcon = IconOf(line.state);
+            options.leadWidth = GameLogoW;
             options.note = version.empty() ? nullptr : version.c_str();
             options.selected = selected;
             options.progress = line.progress;
@@ -1312,6 +1333,7 @@ namespace launcher_ui
             ui::ListRowOptions options;
             options.trailing = count.c_str();
             options.icon = open ? ui::Icon::ChevronDown : ui::Icon::ChevronRight;
+            options.leadWidth = GameLogoW;
             options.dim = true;
             if (ui::ListRow(Tr("Coming later"), options))
                 storage->SetBool(openKey, !open);
@@ -1322,19 +1344,21 @@ namespace launcher_ui
                     game.disabled = true;
                     game.dim = true;
                     game.imageWidth = ui::height::Small;
+                    game.leadWidth = GameLogoW;
                     game.image = [&](ImDrawList* list, ImVec2 at, ImVec2 box) { DrawGameMark(list, *entry, at, ImVec2(ui::height::Small, std::min(box.y, ui::height::Small))); };
                     ui::ListRow(entry->name, game);
                 }
         }
 
         // The collection, then Settings, at the bottom of the sidebar; selected while their page is shown.
-        const float footer = 2 * ui::height::Large + ui::space::XXS;
+        const float footer = 2 * ui::height::Normal + ui::space::XXS;
         ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - ui::space::L - footer));
         {
             ui::ListRowOptions options;
             options.icon = ui::Icon::Star;
+            options.leadWidth = GameLogoW;
             options.selected = m_page == Page::Collection;
-            if (ui::ListRow(Tr("COLLECTION"), options))
+            if (ui::ListRow(Tr("Collection"), options))
                 GoTo(options.selected ? m_backPage : Page::Collection);
             if (options.selected)
                 TakeFocus(FocusTo::Sidebar);
@@ -1342,8 +1366,9 @@ namespace launcher_ui
         {
             ui::ListRowOptions options;
             options.icon = ui::Icon::Gear;
+            options.leadWidth = GameLogoW;
             options.selected = m_page == Page::Settings;
-            if (ui::ListRow(Tr("SETTINGS"), options))
+            if (ui::ListRow(Tr("Settings"), options))
                 GoTo(options.selected ? m_backPage : Page::Settings);
             if (options.selected)
                 TakeFocus(FocusTo::Sidebar);
@@ -1365,9 +1390,17 @@ namespace launcher_ui
         const ImVec2 origin = ImGui::GetCursorScreenPos();
         const float width = ImGui::GetContentRegionAvail().x;
 
-        ui::Text(ui::TextStyle::Display, Tr("Library"), ui::color::Ink, -1);
-        ui::Text(ui::TextStyle::Body, Tr("Game art comes from your own disc."), ui::color::Dim);
-        ImGui::Dummy(ImVec2(0, ui::space::S));
+        // The page's title, its line under it (XS), the cards a section's air (L) below.
+        float top = origin.y;
+        ui::PushText(ui::TextStyle::Display);
+        ui::DrawText(draw, origin, ui::Col(ui::color::Ink), Tr("Library"));
+        ui::PopText();
+        top += ui::type::Display + ui::space::XS;
+        ui::PushText(ui::TextStyle::Body);
+        ui::DrawText(draw, ImVec2(origin.x, top), ui::Col(ui::color::Dim), Tr("Game art comes from your own disc."));
+        ui::PopText();
+        top += ui::type::Body + ui::space::L;
+        ImGui::SetCursorScreenPos(ImVec2(origin.x, top));
 
         // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
         std::vector<const LauncherGameEntry*> playable, later;
@@ -1427,7 +1460,7 @@ namespace launcher_ui
             ui::GradientRect(draw, ImVec2(at.x, at.y + cardH * 0.45f), end, ui::Col(ui::color::Scrim, 0), ui::Col(ui::color::Scrim, 0.92f), ui::radius::Panel,
                 ImDrawFlags_RoundCornersBottom);
             // The logo above the name and the state: what the text takes at the foot is left out of its box.
-            const float textH = ui::space::L + ui::type::Caption + ui::space::XS + 2 + ui::space::XS + nameSize + ui::space::S;
+            const float textH = ui::space::L + ui::PillHeight + ui::space::XS + nameSize + ui::space::S;
             const float logoTop = at.y + ui::space::S, logoH = std::max(0.0f, cardH - textH - ui::space::S);
             if (const ArtTexture* logo = CachedArt(entry.id, LauncherAssets::Role::Logo, 640))
                 DrawLogo(draw, *logo, ImVec2(at.x + cardW * 0.12f, logoTop), ImVec2(cardW * 0.76f, logoH));
@@ -1445,24 +1478,27 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             const SlotLine line = SlotStatus(slot);
-            // The full name, at the row's size, and under it the state in a word and a shape.
-            const float pillH = ui::type::Caption + ui::space::XS + 2;
+            // The full name, at the row's size, and under it (XS) the state in a word and a shape; the card's padding (L) at
+            // the left and the foot.
+            const float pillTop = end.y - ui::space::L - ui::PillHeight;
             ImGui::PushFont(ui::Ctx().fonts.bold, nameSize);
-            draw->AddText(ImVec2(at.x + ui::space::L, end.y - ui::space::L - pillH - ui::space::XS - ImGui::GetFontSize()), ui::Col(ui::color::Ink), GameName(entry.id));
+            draw->AddText(ImVec2(at.x + ui::space::L, pillTop - ui::space::XS - nameSize), ui::Col(ui::color::Ink), GameName(entry.id));
             ImGui::PopFont();
-            ImGui::SetCursorScreenPos(ImVec2(at.x + ui::space::L, end.y - ui::space::M - pillH));
-            ui::StatusPill(StatusOf(line.state), line.text.c_str());
+            ImGui::SetCursorScreenPos(ImVec2(at.x + ui::space::L, pillTop));
+            ui::StatusPill(StatusOf(line.state), line.text.c_str(), IconOf(line.state));
             if (m_testSidebar)
                 m_drawn[std::string("home:") + entry.id] = line.text;
             // Under the pointer: the game's own colour around the card.
             draw->AddRect(at, end, hovered ? Rgb(style.glow) : ui::Col(ui::color::Ink, 0.11f), ui::radius::Panel, 0, hovered ? ui::stroke::Selection : ui::stroke::Hairline);
-            ui::FocusRingIf(state, ui::radius::Panel);
+            if (state.focused) // around the card (its state pill is the last item drawn)
+                ui::FocusRing(at, end, ui::radius::Panel);
         }
-        ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + cardH + ui::space::XL));
-
-        // The games still to come: their names, in their colours, quietly.
-        ui::Text(ui::TextStyle::Caption, Tr("COMING LATER"), ui::color::Dim, -1, true);
-        ImGui::Dummy(ImVec2(0, ui::space::XXS));
+        // The games still to come, a section's air (XL) below: their names, in their colours, quietly.
+        const float laterTop = row.y + cardH + ui::space::XL;
+        ui::PushText(ui::TextStyle::Caption, true);
+        ui::DrawText(draw, ImVec2(row.x, laterTop), ui::Col(ui::color::Dim), Tr("COMING LATER"));
+        ui::PopText();
+        ImGui::SetCursorScreenPos(ImVec2(row.x, laterTop + ui::type::Caption + ui::space::XS));
         for (size_t i = 0; i < later.size(); i++)
         {
             const float w = ui::BadgeSize(later[i]->name).x;
@@ -1520,6 +1556,7 @@ namespace launcher_ui
         const ImGuiID heightKey = ImGui::GetID("##disc-block-height");
         const float blockH = storage->GetFloat(heightKey, ui::HeightOf(ui::Size::Large) * 2);
         const float blockW = std::min(available.x - 2 * ui::space::XL, 720.0f);
+        const float blockX = std::round(position.x + (available.x - blockW) / 2); // centred, like the logo and the band's group
         const bool blockShown = !m_s->installView;
 
         // The logo (else the game's name), as large as fits and centred between the language menu and the disc block.
@@ -1557,7 +1594,7 @@ namespace launcher_ui
         {
             // First run: no disc yet. The whole area is one target (a click chooses, a drop reads), and it says the three steps.
             const float zoneH = blockH;
-            const ImVec2 min(position.x + ui::space::XL, end.y - ui::space::M - zoneH), max(min.x + blockW, end.y - ui::space::M);
+            const ImVec2 min(blockX, end.y - ui::space::M - zoneH), max(min.x + blockW, end.y - ui::space::M);
             draw->AddRectFilled(min, max, ui::Col(ui::elevation::Card.fill, m_dragOver ? 1.0f : 0.92f), ui::radius::Card);
             // A dashed edge: it reads as a place to drop something.
             const unsigned edge = m_dragOver ? ui::color::Focus : ui::color::Edge;
@@ -1623,7 +1660,7 @@ namespace launcher_ui
         }
         else if (blockShown)
         {
-            ImGui::SetCursorScreenPos(ImVec2(position.x + ui::space::XL, end.y - ui::space::M - blockH));
+            ImGui::SetCursorScreenPos(ImVec2(blockX, end.y - ui::space::M - blockH));
             ui::CardOptions card;
             card.padding = ui::space::M;
             card.flags = ImGuiChildFlags_AutoResizeY;
@@ -1635,27 +1672,34 @@ namespace launcher_ui
             const bool changeDisc = ready && !installing && !m_s->fromCopy;
             const ui::ButtonOptions change{ .size = ui::Size::Small };
             const float changeW = changeDisc ? ui::ButtonWidth(Tr("Change disc..."), change) : 0;
+            // The head: the overline and the file name (XXS between them), the button centred on the two; the body S below,
+            // its lines XS apart.
             const ImVec2 top = ImGui::GetCursorScreenPos();
-            ui::Text(ui::TextStyle::Caption, m_s->fromCopy ? Tr("GAME DATA:") : Tr("DISC IMAGE:"), ui::color::Dim, -1, true);
-            ui::Text(ui::TextStyle::Label, ui::Ellipsize(file.c_str(), blockW - 2 * ui::space::M - changeW - ui::space::S).c_str(), ui::color::Ink, -1, true);
+            const float headH = ui::type::Caption + ui::space::XXS + ui::type::Label;
+            ui::PushText(ui::TextStyle::Caption, true);
+            ui::DrawText(ImGui::GetWindowDrawList(), top, ui::Col(ui::color::Dim), m_s->fromCopy ? Tr("GAME DATA:") : Tr("DISC IMAGE:"));
+            ui::PopText();
+            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + ui::type::Caption + ui::space::XXS));
+            ui::PushText(ui::TextStyle::Label, true);
+            const std::string shownFile = ui::Ellipsize(file.c_str(), blockW - 2 * ui::space::M - changeW - ui::space::S);
+            ui::PopText();
+            ui::Text(ui::TextStyle::Label, shownFile.c_str(), ui::color::Ink, -1, true);
             if (!m_s->discPath.empty() && ImGui::IsItemHovered())
                 ui::Tooltip(m_s->discPath.c_str());
-            ImGui::Dummy(ImVec2(0, ui::space::XXS));
             if (changeDisc)
             {
-                const float below = ImGui::GetCursorScreenPos().y; // under the file name
-                ImGui::SetCursorScreenPos(ImVec2(top.x + blockW - 2 * ui::space::M - changeW, top.y));
+                ImGui::SetCursorScreenPos(ImVec2(top.x + blockW - 2 * ui::space::M - changeW, std::round(top.y + (headH - ui::height::Small) / 2)));
                 if (ui::Button(Tr("Change disc..."), change))
                     Browse();
-                ImGui::SetCursorScreenPos(ImVec2(top.x, std::max(below, ImGui::GetItemRectMax().y + ui::space::XS)));
             }
+            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + headH + ui::space::S));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ui::space::XS, ui::space::XS));
             switch (m_s->disc)
             {
             case DiscState::None:
                 break;
             case DiscState::Verifying:
                 ui::StatusPill(ui::Status::Busy, (m_s->verify.Stage() + "...").c_str());
-                ImGui::Dummy(ImVec2(0, ui::space::XXS));
                 if (m_s->verify.progress >= 0.97f) // the last stage has no count: a sweep, not a bar that sits at 98 %
                     ui::IndeterminateBar();
                 else
@@ -1709,7 +1753,8 @@ namespace launcher_ui
                 }
                 break;
             }
-            storage->SetFloat(heightKey, ImGui::GetCursorPosY() + ui::space::M);
+            storage->SetFloat(heightKey, ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y + ui::space::M);
+            ImGui::PopStyleVar();
             ui::EndCard();
         }
 
@@ -1756,12 +1801,11 @@ namespace launcher_ui
         {
             const std::string device = CurrentDevice();
             const std::string deviceName = device == "auto" ? Tr("Automatic") : device == "keyboard" ? Tr("Keyboard") : LauncherMiddleEllipsis(DeviceLabel(), 13);
-            const float pillY = std::floor(middle - ui::HeightOf(ui::Size::Small) / 2 + ui::space::S);
-            ui::PushText(ui::TextStyle::Caption, true);
-            ui::DrawText(draw, ImVec2(groupX + ui::space::XS, pillY - ui::space::XXS - ImGui::GetFontSize()), ui::Col(ui::color::Dim), Tr("CONTROLLER"));
-            ui::PopText();
+            // On the main action's middle line; the pad icon says what it picks (the tooltip says it in words).
+            const float pillY = std::floor(middle - ui::HeightOf(ui::Size::Small) / 2);
             ImGui::SetCursorScreenPos(ImVec2(groupX, pillY));
             ui::PillOptions picker;
+            picker.icon = ui::Icon::Gamepad;
             picker.trailing = ui::Icon::ChevronDown;
             picker.overArt = true;
             picker.width = ControllerW;
@@ -1805,8 +1849,8 @@ namespace launcher_ui
                 { ui::PadButton::North, nullptr, Tr("Game settings") },
                 { ui::PadButton::East, "Esc", Tr("Sidebar") },
             };
-            ImGui::SetCursorScreenPos(ImVec2(bar.x + ui::space::XL, barEnd.y - ui::height::Normal));
-            ui::PadLegend(hints, ui::Ctx().glyphs, barEnd.x - bar.x - 2 * ui::space::XL);
+            ImGui::SetCursorScreenPos(ImVec2(bar.x, barEnd.y - ui::height::Normal)); // the band's foot, edge to edge
+            ui::PadLegend(hints, ui::Ctx().glyphs, barEnd.x - bar.x);
         }
     }
 

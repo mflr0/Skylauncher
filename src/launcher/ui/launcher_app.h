@@ -174,8 +174,10 @@ namespace launcher_ui
         Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame, DataDamaged,
         DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready
     };
-    // The shape and colour that say a game's state: never the colour alone (the sidebar, Home's cards, the page).
+    // The shape and colour that say a game's state: never the colour alone (the sidebar, Home's cards, the page). IconOf: the
+    // state's own icon (a disc, an update, a download...), else the status's.
     ui::Status StatusOf(SlotState state);
+    ui::Icon IconOf(SlotState state);
     // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
     enum class FocusTo { None, Sidebar, Page };
 
