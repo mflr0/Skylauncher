@@ -186,6 +186,91 @@ namespace launcher_ui
             StartInstaller();
     }
 
+    // ---- Update all -----------------------------------------------------------------------------------------------------
+    // The games that have an update are started one after the other, each as UPDATE on its page would (StartInstall, with
+    // its own slot in place, the page the player is on left alone). The next one starts when the last has finished, built
+    // or not; a failure shows on that game's page as usual and the run goes on. Cancel stops the running one and the rest.
+
+    int App::GamesToUpdate() const
+    {
+        int count = 0;
+        for (const auto& slot : m_slots)
+            count += UpdateAvailable(*slot) ? 1 : 0;
+        return count;
+    }
+
+    void App::StartUpdateAll()
+    {
+        if (UpdatingAll())
+            return;
+        m_updateAll = {};
+        for (const auto& slot : m_slots)
+            if (UpdateAvailable(*slot) && !slot->installer.Running() && !slot->kitDownload.Running())
+                m_updateAll.queue.push_back(slot->game.id);
+        m_updateAll.total = int(m_updateAll.queue.size());
+        PollUpdateAll();
+    }
+
+    void App::CancelUpdateAll()
+    {
+        m_updateAll.queue.clear();
+        for (const auto& slot : m_slots)
+            if (std::string_view(slot->game.id) == m_updateAll.current)
+            {
+                slot->installer.Cancel();
+                slot->kitDownload.Cancel();
+            }
+        // PollInstall sees the cancel and says so; the run ends when the game has stopped.
+    }
+
+    void App::PollUpdateAll()
+    {
+        if (!UpdatingAll())
+            return;
+        if (!m_updateAll.current.empty())
+        {
+            GameSlot* slot = nullptr;
+            for (const auto& opened : m_slots)
+                if (std::string_view(opened->game.id) == m_updateAll.current)
+                    slot = opened.get();
+            if (slot != nullptr && (slot->installer.Running() || slot->kitDownload.Running()))
+                return;
+            if (slot != nullptr && (UpdateAvailable(*slot) || !slot->kitError.empty()))
+                m_updateAll.failed++; // stopped before it was built (failed or cancelled)
+            m_updateAll.current.clear();
+        }
+        while (!m_updateAll.queue.empty())
+        {
+            const std::string id = m_updateAll.queue.front();
+            m_updateAll.queue.erase(m_updateAll.queue.begin());
+            GameSlot* slot = nullptr;
+            for (const auto& opened : m_slots)
+                if (std::string_view(opened->game.id) == id)
+                    slot = opened.get();
+            if (slot == nullptr || !UpdateAvailable(*slot))
+                continue;
+            GameSlot* shown = m_s;
+            const Page page = m_page;
+            m_s = slot;
+            SetActiveGame(id);
+            StartInstall();
+            const bool started = m_s->installer.Running() || m_s->kitDownload.Running();
+            m_s = shown;
+            SetActiveGame(m_s->game.id);
+            m_page = page;
+            if (started)
+            {
+                m_updateAll.current = id;
+                m_updateAll.started++;
+                return;
+            }
+            m_updateAll.failed++;
+        }
+        if (m_updateAll.total > 1)
+            Toast(m_updateAll.failed == 0 ? Tr("All games are updated") : Tf("Games updated: {} of {}", m_updateAll.total - m_updateAll.failed, m_updateAll.total),
+                m_updateAll.failed != 0);
+    }
+
     // No kit, or one that is older than the release wanted or can't build this game: the first step of the install fetches
     // the right one (docs/install.md).
     void App::StartKitDownload()

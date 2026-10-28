@@ -29,6 +29,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `ssa` | `voice_language` | same codes | Voice language | yes |
 | `giants` | `language`, `voice_language` | `en` `fr` `de` `es` `es-419` `it` `nl` `pt` `sv` `no` `da` `fi` | Text and voice language (the disc's twelve); `voice_language` empty or absent: the voices follow the text | yes |
 | `swapforce` | `language`, `voice_language` | `en` `fr` (USA, Australia disc) or `es` `it` (Europe disc) | Text and voice language (the disc's two) | yes |
+| `swapforce` | `nightmare_from_start` | `0` (default), `1` | The Nightmare difficulty is offered before the story is beaten; the save is not changed (Swap Force's settings > Game > Difficulty). The other games have no locked difficulty | yes |
 | each game | `disc_text_languages`, `disc_voice_languages` | codes joined by commas | Written by the launcher at each disc check: the languages the disc holds, which the Language tab lists (absent: the full list). Not for editing | no |
 | `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes (the key is per game: see "Per-game video" below) |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
@@ -43,6 +44,8 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `input` | `device` | `auto`, `keyboard`, `gamepad` | What the game listens to | yes |
 | `input` | `gamepad` | SDL GUID | The gamepad chosen when `device=gamepad` | yes |
 | `input` | `key_<action>` | SDL scancode name (`Space`, `Return`, `W`...): a key's **physical place**, shown with the player's layout | Keyboard binding | yes |
+| `<game>.input` | `pad_<button>` | a pad button, or `none` | What a pad button does in that game: `pad_rb=b` gives RB B's job (settings > Controller; "Per-game controller" below) | yes (the game's section) |
+| `<game>.input` | `rumble_p1`, `rumble_p2` | `off`, `low`, `normal` (default), `strong` | The strength of the vibration the game asks for, per player | yes (the game's section) |
 | `input` | `glyphs` | `auto` (default), `xbox360`, `xboxone`, `playstation`, `nintendo`, `keyboard` (`xbox` is read as Xbox One / Series) | The button pictures the game shows | yes |
 | `portal` | `mode` | `auto` (default), `emulated` (Virtual), `real` (`hid` and `usb` still work) | Portal of Power backend | yes (`SKY_PORTAL`) |
 | `portal` | `toybox_auto_open` | `1` (default), `0` | The Toy Box opens by itself when the game asks for a figure | no: the game reads `launcher.ini` itself (Settings > Controls > Portal of Power) |
@@ -105,6 +108,25 @@ The runtime reads one `[input]` section (`key_<action>=<SDL key name>`), but the
   printed letter, so an AZERTY Z was stored "Z") is kept as it is and now shows as the game reads it. The defaults in
   `game_keys.cpp` are scancodes. Tests: the place/name round trip and the defaults (`tests/settings_test.cpp`; SDL lets a
   test set no AZERTY layout, so the layout's letter is checked on the default US one).
+
+## Per-game controller
+
+The game's settings page has a **Controller** tab beside Keyboard (`src/launcher/game_keys.{h,cpp}`, `ui/game_settings_page.cpp`): each of
+the pad's 16 buttons (A B X Y, LB RB LT RT, Start, Back, the two stick clicks, the D-pad's four directions), named as the pad in
+use prints it (the same family as the Keyboard tab's brackets: Cross on a PS5, B on a Switch for the 360's A), has a list that says
+**whose job it does**: its own (the default), another button's (shown with the game's word for that job: "B (Attack 3 / Back)"),
+or Nothing. Below, the **Rumble** of Player 1 and Player 2: Off, Low, Normal, Strong.
+
+- Stored in the game's own section, next to its keys: `[<game>.input] pad_<button>=<button>|none` and `rumble_p1` / `rumble_p2`. The
+  button names are the runtime's: `a b x y lb rb lt rt start back ls rs dpad_up dpad_down dpad_left dpad_right`. A button given back its
+  own job loses its line.
+- **The runtime reads them from the game's section itself** (`host/settings.cpp`, with `[input]` as a fallback for a game started
+  without the launcher), so PLAY copies nothing: unlike the keys, nothing is put in `[input]`, and `ApplyGameInput` leaves the lines alone.
+- They apply to every **real pad**, not to the keyboard (its keys are the Keyboard tab's); the sticks' axes are not remapped; the
+  rumble is sent to Player 1's and Player 2's pad. The runtime's docs say how (`docs/runtime/xbox360/input.md`, "Remapping and rumble").
+- **Reset to defaults** (hold) gives every button its own job back; the rumble has its own lists.
+- Tests: the stored lines, their precedence over nothing, the reset, the names per pad family (`tests/settings_test.cpp`,
+  `PadChecks`); screenshots with `SKY_LAUNCHER_TEST_PAD=1` (`pad-ssa`, `pad-giants`, `pad-swapforce`, and Swap Force's Game tab).
 
 Keyboard actions the runtime knows: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`,
 `left_left`, `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (right stick: Spyro's Adventure's Shake / Insert / Swing), `dpad_up`, `dpad_down`,

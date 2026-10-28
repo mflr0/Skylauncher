@@ -380,6 +380,7 @@ namespace launcher_ui
             m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
             m_testLogo = LauncherEnv("SKY_LAUNCHER_TEST_LOGO") != nullptr;
             m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
+            m_testPad = LauncherEnv("SKY_LAUNCHER_TEST_PAD") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -526,6 +527,7 @@ namespace launcher_ui
             while (SDL_PollEvent(&event))
                 HandleEvent(event);
             PollSlots();
+            PollUpdateAll();
             PollUpdates();
             AutoPlay();
             Frame();
@@ -1545,6 +1547,54 @@ namespace launcher_ui
 
     // The launcher's menu, opened by the ARKEYAN LAUNCHER title: the games as a library (a card each, with its art from the
     // player's disc), the games still to come under them, the project's links bottom right.
+    // "Update all" at the right of the Home title when two or more games have an update: one click updates them one after the
+    // other. While it runs the game and its progress show in its place, with Cancel.
+    void App::DrawUpdateAll(ImVec2 right)
+    {
+        const ImVec2 back = ImGui::GetCursorScreenPos();
+        if (UpdatingAll())
+        {
+            std::string text;
+            float progress = -1;
+            for (const auto& slot : m_slots)
+                if (std::string_view(slot->game.id) == m_updateAll.current)
+                {
+                    SlotLine line = SlotStatus(slot.get());
+                    const char* name = slot->game.name; // the short name ("Spyro's Adventure") as Home's cards give it where they must
+                    for (const LauncherGameEntry& entry : LauncherGameCatalog())
+                        if (std::string_view(entry.id) == slot->game.id)
+                            name = entry.name;
+                    text = Tf("{}: {} ({} of {})", name, line.text, m_updateAll.started, m_updateAll.total);
+                    progress = line.progress;
+                }
+            const float cancelW = PillWidth(Tr("Cancel"), 120);
+            ImGui::SetCursorScreenPos(ImVec2(right.x - cancelW, right.y));
+            if (PillButton(Tr("Cancel"), false, 120))
+                CancelUpdateAll();
+            ImGui::PushFont(nullptr, SmallSize);
+            const float textW = ImGui::CalcTextSize(text.c_str()).x;
+            const ImVec2 at(right.x - cancelW - 16 - textW, right.y + 12);
+            ImGui::GetWindowDrawList()->AddText(at, Rgb(TextSecondary), text.c_str());
+            if (progress >= 0)
+            {
+                const ImVec2 bar(at.x, at.y + ImGui::GetFontSize() + 5);
+                ImGui::GetWindowDrawList()->AddRectFilled(bar, ImVec2(bar.x + textW, bar.y + 4), Rgb(Field), 2);
+                ImGui::GetWindowDrawList()->AddRectFilled(bar, ImVec2(bar.x + std::max(4.0f, textW * progress), bar.y + 4), Rgb(Accent), 2);
+            }
+            ImGui::PopFont();
+        }
+        else if (GamesToUpdate() >= 2)
+        {
+            const float width = PillWidth(Tr("Update all"), 140, true);
+            ImGui::SetCursorScreenPos(ImVec2(right.x - width, right.y));
+            if (PillButton(Tr("Update all"), true, 140, true))
+                StartUpdateAll();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", Tf("Updates {} games, one after the other", GamesToUpdate()).c_str());
+        }
+        ImGui::SetCursorScreenPos(back);
+    }
+
     void App::DrawHome()
     {
         constexpr const char* Project = "https://github.com/mflr0/Skylauncher";
@@ -1558,6 +1608,7 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
         ImGui::TextUnformatted(Tr("Game art comes from your own disc."));
         ImGui::PopStyleColor();
+        DrawUpdateAll(ImVec2(origin.x + width, origin.y));
         ImGui::Dummy(ImVec2(0, 10));
 
         // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
@@ -2431,7 +2482,7 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || !m_testKit.empty())
+            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
                 Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
@@ -2596,7 +2647,7 @@ namespace launcher_ui
         }();
         if (m_testBegan == 0)
             m_testBegan = now;
-        if (now - m_testBegan > 180000)
+        if (now - m_testBegan > 240000)
         {
             expect(false, "timeout");
             m_running = false;
@@ -2685,7 +2736,57 @@ namespace launcher_ui
             expect(FindInstalledGame(m_config, a.check.xexSha256).kitVersion != "kit-new" && a.installed.gameVersion == "0.9.0", "Spyro's Adventure was not rebuilt");
             shoot("giants-updated");
             break;
-        case 11:
+        case 11: // "Update all" on Home: both games get an older build, the release names the versions the kit gives
+        {
+            for (GameSlot* slot : { &a, &g })
+            {
+                SelectGame(slot->game);
+                RecordInstalledGame(m_config, slot->check.xexSha256, slot->installed.runtime, slot->installed.kitVersion, "0.1.0");
+                RefreshInstall();
+            }
+            m_gameUpdates = { { ssa.id, "0.9.0", next }, { giants.id, "0.8.1", next } };
+            expect(GamesToUpdate() == 2 && !UpdatingAll(), "two games have an update");
+            m_page = Page::Home;
+            shoot("home-update-all");
+            break;
+        }
+        case 12: // one click: Spyro's Adventure first, then Giants; Home stays shown
+            StartUpdateAll();
+            expect(UpdatingAll() && m_updateAll.total == 2 && m_updateAll.current == ssa.id && a.installer.Running(), "Spyro's Adventure starts first");
+            expect(!g.installer.Running() && m_page == Page::Home, "the second waits, the page stays");
+            shoot("home-updating-all", 700);
+            break;
+        case 13:
+            if (UpdatingAll() || busy(a) || busy(g))
+                return;
+            expect(a.installed.gameVersion == "0.9.0" && g.installed.gameVersion == "0.8.1" && GamesToUpdate() == 0, "both games are updated, one after the other");
+            expect(m_updateAll.started == 2 && m_updateAll.failed == 0 && m_page == Page::Home, "none failed, still on Home");
+            shoot("home-updated-all");
+            break;
+        case 14: // Cancel stops the running one and the one waiting
+            for (GameSlot* slot : { &a, &g })
+            {
+                SelectGame(slot->game);
+                RecordInstalledGame(m_config, slot->check.xexSha256, slot->installed.runtime, slot->installed.kitVersion, "0.1.0");
+                RefreshInstall();
+            }
+            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.5", true);
+            StartUpdateAll();
+            expect(UpdatingAll() && a.installer.Running(), "a second run starts");
+            shoot("home-updating-again", 1500); // the shot is taken once the first build has run a moment; the step moves on after it
+            break;
+        case 15:
+            CancelUpdateAll();
+            expect(m_updateAll.queue.empty(), "Cancel empties the queue");
+            m_testStep++;
+            break;
+        case 16: // a cancelled build leaves its card (interrupted), which is not "busy": only the running jobs are waited for
+            if (UpdatingAll() || a.installer.Running() || g.installer.Running() || a.kitDownload.Running() || g.kitDownload.Running())
+                return;
+            expect(GamesToUpdate() == 2 && !g.installer.Running() && g.installed.gameVersion == "0.1.0", "cancelled: nothing more starts, both still old");
+            shoot("home-cancelled");
+            break;
+        case 17:
             m_running = false;
             break;
         case 20: // offline
@@ -3241,6 +3342,37 @@ namespace launcher_ui
         if (m_testUninstall)
         {
             TestUninstallScript(now);
+            return;
+        }
+        if (m_testPad)
+        {
+            // Each game's Controller tab (SKY_LAUNCHER_TEST_PAD): with a few buttons given other jobs, to see the rows; Swap Force's
+            // Game tab has the Nightmare option (a second shot).
+            static const char* const Games[] = { "ssa", "giants", "swapforce" };
+            if (m_testStep >= int(std::size(Games)) + 1)
+            {
+                m_running = false;
+                return;
+            }
+            if (m_testStep < int(std::size(Games)))
+            {
+                SelectGame(*FindGame(Games[m_testStep]));
+                SetPadTarget(m_config, Games[m_testStep], 5, 1);   // RB does B's job
+                SetPadTarget(m_config, Games[m_testStep], 6, -1);  // LT is off
+                m_config[GameInputSection(Games[m_testStep])]["rumble_p2"] = "low";
+                m_page = Page::GameSettings;
+                m_gameTab = GameTab::Controller;
+                m_testShot = fmt::format("pad-{}", Games[m_testStep]);
+            }
+            else
+            {
+                SelectGame(*FindGame("swapforce"));
+                m_config["swapforce"]["nightmare_from_start"] = "1";
+                m_page = Page::GameSettings;
+                m_gameTab = GameTab::Game;
+                m_testShot = "game-swapforce";
+            }
+            m_testAt = now + 600;
             return;
         }
         if (m_testKeys)
