@@ -77,7 +77,7 @@ margins, before a section, between tabs; was `TabGap` 34), `XXL` 48 (an empty st
 **Heights** (`ui::height`). `Small` 32 (chips, pills, compact buttons, the toggle, a select's rows), `Normal` 40 (buttons,
 fields, selects, tabs, segmented controls, one-line list rows), `Large` 56 (list rows with a subtitle, the sidebar's rows,
 settings rows, big buttons; was `GameRowH`), `Main` 64 with `MainWidth` 300 and `MainGear` 64 (the main action; were
-`PlayButtonH/W`, `PlayGearW`). `Mark` 22 (a checkbox, a radio, a slider's knob), `SettingControl` 320 (a settings row's control column).
+`PlayButtonH/W`, `PlayGearW`). `Mark` 22 (a checkbox, a radio, a slider's knob), `SettingControl` 320 (a settings row's control column). `ui::width::Page` 940 is a settings page's column.
 
 **Lines** (`ui::stroke`). `Hairline` 1 (card edges, dividers), `Edge` 1.5 (what shows a state: a toggle's track, a danger
 button, a field being edited), `Selection` 3 (the line under the selected tab, the bar of a selected row; was `TabUnderlineH`).
@@ -383,7 +383,7 @@ DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner an
 - Toasts: switched; every success passes `ToastKind::Success`, every error `ToastKind::Error`, then the "Couldn't" guess in
   `App::Toast` goes.
 
-**2. All settings pages** (`launcher_ui.cpp` DrawSettings, DrawControls, DrawLauncherTab, DrawLauncherLanguage; `game_settings_page.cpp`;
+**2. All settings pages: done in phase B** (`launcher_ui.cpp` DrawSettings, DrawControls, DrawLauncherTab, DrawLauncherLanguage; `game_settings_page.cpp`;
 `game_data_page.cpp`; `support_page.cpp`; `uninstall_page.cpp`; `update_page.cpp` About and Updates)
 - Page titles ("LAUNCHER SETTINGS", the game's name at `HeadlineSize`): Display, sentence case in the source.
 - `DrawTabBar` calls `ui::Tabs` directly; every `Title(..., TitleSize, Text)` section a SectionHeader (dividers); every
@@ -401,6 +401,20 @@ DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner an
 - Support: the problem report (`BeginPopupModal`, 880 by the window) a Modal (Large); logs keep `fonts.mono`.
 - Uninstall: its list ListRows with the size as `trailing`; "Also delete my saves and my figures" a Checkbox (an option of
   the action, not a setting); Uninstall everything a Danger `hold` Button.
+
+*As built.* `App::BeginSettingsPage` draws the head of both settings pages (the centred column, the Display title, a Ghost Back
+button with `ChevronLeft` on a game's). Every setting is a settings row (`ui::BeginSettings`, `SettingRow`) with its control in
+the column (`App::SettingSelect` for a choice kept in the settings file); what is an action rather than a setting (the disc,
+game data, folders, saves, the game tab's buttons, the data folder, "Remove Arkeyan Launcher") is a `SectionHeader` with its
+subtitle, then Buttons at their label's width. States are `StatusPill`s (verified, checking, wrong disc, copied, interrupted,
+damaged, the portal test), never a coloured line. The Keyboard tab keeps its grid of bindings (a table of Buttons, the pad
+button's name in Caption after the action, a warning icon on a duplicate); the Toy Box keys are KeyCaps in settings rows.
+Save backups are ListRows (when, files, size) with a Danger hold "Restore" beside each; the update check's last time and the
+backups' times use `FormatWhen`. The problem report is `ui::BeginModal(Large)` with `ModalActions` (Close, Save as...) and Copy
+at the left. Uninstall's list is ListRows with the size as `trailing` (not focusable: nobody presses them), "Also delete my saves
+and my figures" a Checkbox, Cancel then the Danger hold "Uninstall everything" at the right. Text is Caption, Body and Display
+through `ui::Text`; the portal test's verdicts name the game with `GameName`. The shots are listed in "Screenshot test"
+(`17-` to `19-` are Support, About and the report).
 
 **3. The Collection, its sheets and dialogs** (`collection_page.cpp`, `collection_figure.cpp`, `collection_add.cpp`,
 `collection_manage.cpp`)
@@ -424,6 +438,7 @@ DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner an
   backups' chips a Select or ListRows; "Move {} to the trash" Danger, not Primary.
 
 **Inconsistencies seen, for phase B to fix**
+(Done in the settings part: 1 for "LAUNCHER SETTINGS", 4 for the save backups, 6, 7 for "Create", 9 and 10 on the settings screens, 12 for the problem report, 13. Done: the Keyboard tab's warning is an icon, not red alone.)
 1. Casing: page titles written in capitals in the source ("LIBRARY", "COLLECTION", "LAUNCHER SETTINGS", "ADD A FIGURE",
    "EDIT", "MANAGE", "CHANGE THE BOTTOM", "CHANGE THE TOP") while section titles are sentence case; overline captions in
    capitals ("YOUR GAMES", "COMING LATER", "PORTAL AT THE NEXT START", "CONTROLLER", "DISC IMAGE:").
@@ -824,7 +839,7 @@ SKY_LAUNCHER_FONT_DIR="$PWD/resources/fonts" \
 ```
 It writes `01-no-iso.png`, `02-verified.png`, `03-graphics.png`, `04-controls.png`, `05-collection.png`, `06-home.png`,
 `07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-game-disc.png`,
-`12-game-saves.png`, `13-game-data.png`, `14-launcher-settings.png` and `15-disc-gone.png` (INSTALL on an image that moved; `03-` is the
+`12-game-saves.png`, `13-game-data.png`, `14-launcher-settings.png`, `15-disc-gone.png`, `16-logo-drop.png`, `17-launcher-support.png`, `18-launcher-about.png` and `19-problem-report.png` (INSTALL on an image that moved; `03-` is the
 game's Video tab, `04-` the launcher's Controls) (it creates a few figures in `SKY_COLLECTION` first: set it to a scratch folder). With `SKY_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
 
 `07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-disc-gone.png`
