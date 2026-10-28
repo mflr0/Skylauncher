@@ -87,6 +87,7 @@ namespace ui
     ImVec2 DrawKeyCap(ImDrawList* draw, ImVec2 at, const char* key);
     float KeyCapWidth(PadButton button, Glyphs glyphs);
     float KeyCapWidth(const char* key);
+    float KeyCapHeight();
     void KeyCap(PadButton button, Glyphs glyphs); // at the cursor, as an item
     void KeyCap(const char* key);
 

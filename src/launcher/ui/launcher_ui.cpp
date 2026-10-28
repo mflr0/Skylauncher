@@ -1865,16 +1865,81 @@ namespace launcher_ui
         ui::SectionHeader(Tr("Toy Box keys"));
         if (ui::BeginSettings("##toyboxkeys"))
         {
-            ui::SettingRow(Tr("Open the Toy Box"), nullptr);
-            ui::KeyCap("F6");
-            ImGui::SameLine(0, ui::space::XS);
-            ui::KeyCap("Tab");
-            ui::SettingRow(Tr("Add a figure"), nullptr);
-            ui::KeyCap("F7");
-            ui::SettingRow(Tr("Clear the figures"), nullptr);
-            ui::KeyCap("F8");
+            // Each line: the keyboard's keys ("F6 / Tab": either), then the pad's buttons ("View + Y": together) in the pad's own
+            // pictures (the pad in use or chosen, else Xbox's), a dash where the pad has none (F7 and F8 are the keyboard's
+            // only). The pad's column ends on the control column's edge, the keys' column before it: two columns.
+            struct Line
+            {
+                const char* label;
+                std::vector<const char*> keys;
+                std::vector<ui::PadButton> buttons;
+            };
+            const Line lines[] = {
+                { Tr("Open the Toy Box"), { "F6", "Tab" }, { ui::PadButton::Back, ui::PadButton::North } },
+                { Tr("Add a figure"), { "F7" }, {} },
+                { Tr("Clear the figures"), { "F8" }, {} },
+            };
+            const ui::Glyphs glyphs = PadGlyphs();
+            const float joint = ui::space::XS; // on each side of the "/" or the "+"
+            auto separator = [](bool both) { return both ? "+" : "/"; };
+            auto groupWidth = [&](const Line& line, bool pad) {
+                const size_t count = pad ? line.buttons.size() : line.keys.size();
+                float w = 0;
+                for (size_t i = 0; i < count; i++)
+                    w += (pad ? ui::KeyCapWidth(line.buttons[i], glyphs) : ui::KeyCapWidth(line.keys[i])) +
+                        (i > 0 ? 2 * joint + ui::TextSize(ui::TextStyle::Caption, separator(pad)).x : 0);
+                return w;
+            };
+            float padColumn = 0;
+            for (const Line& line : lines)
+                padColumn = std::max(padColumn, groupWidth(line, true));
+            for (const Line& line : lines)
+            {
+                ui::SettingRow(line.label, nullptr);
+                ImDrawList* draw = ImGui::GetWindowDrawList();
+                const ImVec2 start = ImGui::GetCursorScreenPos();
+                const float right = start.x + ImGui::GetContentRegionAvail().x, padX = right - padColumn;
+                const float capH = ui::KeyCapHeight(), middle = start.y + std::round(capH / 2);
+                auto group = [&](float x, bool pad) {
+                    const size_t count = pad ? line.buttons.size() : line.keys.size();
+                    for (size_t i = 0; i < count; i++)
+                    {
+                        if (i > 0)
+                        {
+                            ui::PushText(ui::TextStyle::Caption);
+                            ui::DrawText(draw, ImVec2(x + joint, std::round(middle - ui::CapMiddle(ui::TextStyle::Caption))), ui::Col(ui::color::Dim), separator(pad));
+                            x += 2 * joint + ImGui::CalcTextSize(separator(pad)).x;
+                            ui::PopText();
+                        }
+                        x += (pad ? ui::DrawKeyCap(draw, ImVec2(x, middle), line.buttons[i], glyphs) : ui::DrawKeyCap(draw, ImVec2(x, middle), line.keys[i])).x;
+                    }
+                };
+                const float keysX = padX - (padColumn > 0 ? ui::space::L : 0) - groupWidth(line, false);
+                group(keysX, false);
+                if (!line.buttons.empty())
+                    group(padX, true);
+                else // no pad button for it: a quiet dash in the pad's column
+                {
+                    ui::PushText(ui::TextStyle::Body);
+                    const char* none = "\xE2\x80\x94";
+                    ui::DrawText(draw, ImVec2(std::round(padX + (padColumn - ImGui::CalcTextSize(none).x) / 2), std::round(middle - ui::CapMiddle(ui::TextStyle::Body))),
+                        ui::Col(ui::color::Dim), none);
+                    ui::PopText();
+                }
+                ImGui::SetCursorScreenPos(ImVec2(keysX, start.y));
+                ImGui::Dummy(ImVec2(right - keysX, capH));
+            }
             ui::EndSettings();
         }
+    }
+
+    // The pictures of the pad's buttons where the window names them whatever the input in use (the Toy Box keys): the pad in
+    // use or the one chosen, else Xbox's.
+    ui::Glyphs App::PadGlyphs() const
+    {
+        const PadFamily family = PadFamilyNow();
+        return family == PadFamily::PlayStation || family == PadFamily::PlayStation3 ? ui::Glyphs::PlayStation
+            : family == PadFamily::Nintendo ? ui::Glyphs::Nintendo : ui::Glyphs::Xbox;
     }
 
     // The tabs of a settings page: words on one line, an accent line under the selected one (like the sidebar's bar).
@@ -2163,11 +2228,7 @@ namespace launcher_ui
         if (m_gamepads.empty() && !m_testNav && !m_testPadInput && !CollectionPage::TestPad())
             ui::Ctx().glyphs = ui::Glyphs::Keyboard;
         else
-        {
-            PadFamily family = PadFamilyNow();
-            ui::Ctx().glyphs = family == PadFamily::PlayStation || family == PadFamily::PlayStation3 ? ui::Glyphs::PlayStation
-                : family == PadFamily::Nintendo ? ui::Glyphs::Nintendo : ui::Glyphs::Xbox;
-        }
+            ui::Ctx().glyphs = PadGlyphs();
         if (m_testGallery)
         {
             DrawGallery();

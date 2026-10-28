@@ -453,6 +453,7 @@ namespace launcher_ui
         void Toast(std::string text, ui::ToastKind kind = ui::ToastKind::Info);
         void RefreshGamepads();
         PadFamily PadFamilyNow() const; // whose button names the Keyboard tab shows (game_keys.h)
+        ui::Glyphs PadGlyphs() const;   // the same family as the pictures of its buttons (never the keyboard)
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
         std::string CurrentDevice() const;
         std::string DeviceLabel() const;

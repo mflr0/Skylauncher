@@ -399,6 +399,7 @@ namespace ui
 
     float KeyCapWidth(PadButton button, Glyphs glyphs) { return CapWidth(PadButtonLabel(button, glyphs), button <= PadButton::North); }
     float KeyCapWidth(const char* key) { return CapWidth(key, false); }
+    float KeyCapHeight() { return CapH; }
 
     void KeyCap(PadButton button, Glyphs glyphs)
     {
