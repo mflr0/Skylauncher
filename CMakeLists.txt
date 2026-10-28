@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 project(ArkeyanLauncher LANGUAGES C CXX)
-set(LAUNCHER_VERSION "0.6.0" CACHE STRING "Version shown in the app bundle")
+set(LAUNCHER_VERSION "0.6.1" CACHE STRING "Version shown in the app bundle")
 # SKYLAUNCHER_VERSION is the name before 0.6.0: still accepted.
 if(SKYLAUNCHER_VERSION)
     set(LAUNCHER_VERSION "${SKYLAUNCHER_VERSION}")
