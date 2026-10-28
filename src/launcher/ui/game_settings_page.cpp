@@ -173,7 +173,9 @@ namespace launcher_ui
                     ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                ImGui::TextWrapped("%s", fmt::format("{} ({})", Tr(action.label), Tr(action.pad)).c_str()); // a long French name takes two lines
+                // The pad's buttons keep the names printed on the controller (A, Back, Start...); only the sticks are translated.
+                const bool stick = std::string_view(action.pad).ends_with("stick");
+                ImGui::TextWrapped("%s", fmt::format("{} ({})", Tr(action.label), stick ? Tr(action.pad) : action.pad).c_str()); // a long French name takes two lines
                 ImGui::TableNextColumn();
                 const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
                 const bool duplicate = GameKeyConflict(m_config, game, action);
