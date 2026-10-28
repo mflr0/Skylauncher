@@ -1,4 +1,5 @@
 #include "launcher/ui/collection_model.h"
+#include "launcher/game_names.h"
 #include "launcher/env.h"
 #include "launcher/launcher.h"
 #include "shared/dir_list.h"
@@ -189,6 +190,8 @@ namespace launcher_ui
 
     std::string ShortGameName(const std::string& game)
     {
+        if (const char* name = GameName(game, GameNameForm::Short)) // the launcher's games (game_names.h)
+            return name;
         const collection::Game* found = collection::Catalogue::Get().FindGame(game);
         if (found == nullptr)
             return game;

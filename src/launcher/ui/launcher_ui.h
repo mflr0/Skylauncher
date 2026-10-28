@@ -1,5 +1,6 @@
 #pragma once
 
+#include "launcher/game_names.h"
 #include "launcher/launcher.h"
 #include <cstdint>
 #include <span>
@@ -11,8 +12,7 @@
 struct LauncherGameEntry
 {
     const char* id;
-    const char* name;
-    const char* tagline;
+    const char* name; // the short name (GameName)
     uint32_t accent; // 0xRRGGBB
     bool enabled;
 };

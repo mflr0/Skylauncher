@@ -1488,6 +1488,15 @@ namespace launcher_ui
         float cardW = (width - CardGap * float(playable.size() - 1)) / float(std::max<size_t>(playable.size(), 1));
         float cardH = std::min(cardW * 0.6f, size.y - origin.y - 300);
         ImVec2 row = ImGui::GetCursorScreenPos();
+        // Every card says the game's full name, all at one size: the largest at which the longest fits (never cut, never
+        // the short name on one card and the full name on another). A card without the disc's logo shows the short name in
+        // its place, like a logo's big word, at one size too.
+        float nameSize = SidebarTextSize, logoNameSize = TitleSize + 6;
+        for (const LauncherGameEntry* entry : playable)
+        {
+            nameSize = std::min(nameSize, ui::FitSize(m_boldFont, SidebarTextSize, GameName(entry->id), cardW - 40));
+            logoNameSize = std::min(logoNameSize, ui::FitSize(m_titleFont, TitleSize + 6, GameName(entry->id, GameNameForm::Short), cardW * 0.84f));
+        }
         for (size_t i = 0; i < playable.size(); i++)
         {
             const LauncherGameEntry& entry = *playable[i];
@@ -1529,17 +1538,11 @@ namespace launcher_ui
                 DrawLogo(draw, *logo, ImVec2(at.x + cardW * 0.12f, at.y + cardH * 0.08f), ImVec2(cardW * 0.76f, cardH * 0.56f));
             else
             {
-                // The name in the title font, smaller when it would not fit the card's width with a margin.
-                float titleSize = TitleSize + 6;
-                ImGui::PushFont(m_titleFont, titleSize);
-                ImVec2 text = ImGui::CalcTextSize(entry.name);
-                if (text.x > cardW * 0.84f)
-                {
-                    ImGui::PopFont();
-                    ImGui::PushFont(m_titleFont, titleSize * cardW * 0.84f / text.x);
-                    text = ImGui::CalcTextSize(entry.name);
-                }
-                draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, at.y + cardH * 0.36f - text.y / 2), Rgb(Text), entry.name);
+                // The short name in the title font, at the row's size.
+                const char* word = GameName(entry.id, GameNameForm::Short);
+                ImGui::PushFont(m_titleFont, logoNameSize);
+                ImVec2 text = ImGui::CalcTextSize(word);
+                draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, at.y + cardH * 0.36f - text.y / 2), Rgb(Text), word);
                 ImGui::PopFont();
             }
             GameSlot* slot = nullptr;
@@ -1547,18 +1550,9 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             SlotLine line = SlotStatus(slot);
-            // The full name; on a narrow card the short one (without "Skylanders: "), smaller if it still does not fit
-            // between the card's 20 px margins. Never cut.
-            const char* name = FindGame(entry.id) != nullptr ? FindGame(entry.id)->name : entry.name;
-            ImGui::PushFont(m_boldFont, SidebarTextSize);
-            if (ImGui::CalcTextSize(name).x > cardW - 40)
-                name = entry.name;
-            if (float nameW = ImGui::CalcTextSize(name).x; nameW > cardW - 40)
-            {
-                ImGui::PopFont();
-                ImGui::PushFont(m_boldFont, SidebarTextSize * (cardW - 40) / nameW);
-            }
-            draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), name);
+            // The full name, at the row's size (between the card's 20 px margins).
+            ImGui::PushFont(m_boldFont, nameSize);
+            draw->AddText(ImVec2(at.x + 20, end.y - 56), Rgb(Text), GameName(entry.id));
             ImGui::PopFont();
             ImGui::PushFont(nullptr, SmallSize);
             draw->AddCircleFilled(ImVec2(at.x + 24, end.y - 22), 4, Rgb(line.dot));
@@ -3336,14 +3330,15 @@ void LauncherTheme::Apply(ImGuiStyle& style)
 
 std::span<const LauncherGameEntry> LauncherGameCatalog()
 {
+    // The names are game_names.h's (the short one: the sidebar's rows).
     static const LauncherGameEntry catalog[] = {
-        { "ssa", "Spyro's Adventure", "Spyro's Adventure", 0x6BBAFF, true },
-        { "giants", "Giants", "Giants", 0xFFC65C, true },
-        { "swapforce", "Swap Force", "Swap Force", 0xFF55A8, true },
-        { "trapteam", "Trap Team", "Trap Team", 0x6DF0B4, false },
-        { "superchargers", "SuperChargers", "SuperChargers", 0xFF8A5C, false },
-        { "racing", "SuperChargers Racing", "SuperChargers Racing", 0xE85D75, false },
-        { "imaginators", "Imaginators", "Imaginators", 0xB49BFF, false },
+        { "ssa", GameName("ssa", GameNameForm::Short), 0x6BBAFF, true },
+        { "giants", GameName("giants", GameNameForm::Short), 0xFFC65C, true },
+        { "swapforce", GameName("swapforce", GameNameForm::Short), 0xFF55A8, true },
+        { "trapteam", GameName("trapteam", GameNameForm::Short), 0x6DF0B4, false },
+        { "superchargers", GameName("superchargers", GameNameForm::Short), 0xFF8A5C, false },
+        { "racing", GameName("racing", GameNameForm::Short), 0xE85D75, false },
+        { "imaginators", GameName("imaginators", GameNameForm::Short), 0xB49BFF, false },
     };
     return catalog;
 }
