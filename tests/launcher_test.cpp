@@ -970,6 +970,35 @@ static void SeatXChecks(const std::filesystem::path& scratch)
     printf("Seat X: %d of 12 tries emptied their seat\n", emptied);
 }
 
+// The pad's way through the launcher (App::TestNavScript): B to the sidebar, down its rows (three games, Coming later) to
+// Collection, A, the search, a seat, a card on it, its sheet, back, then Settings and its next tab with RB, and Escape. Each
+// step's page is checked by the script ("FAIL nav step"); every step's shot must be taken (a wrong row would open a file
+// chooser and the run would stop). A child process, as SeatXChecks; scratch folders only.
+static void NavChecks(const std::filesystem::path& scratch, const std::string& iso)
+{
+    std::filesystem::path root = scratch / "nav";
+    std::filesystem::create_directories(root / "shots");
+    std::filesystem::create_directories(root / "home");
+    std::string command = "env -u SKY_MIGRATE_FROM -u SKY_FIGURES -u SKY_SETTINGS -u SSA_MIGRATE_FROM -u SSA_FIGURES -u SSA_SETTINGS SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy HOME='" + (root / "home").string() +
+        "' SKYLANDERS_DATA='" + (root / "data").string() + "' SKY_LAUNCHER_DATA='" + (root / "launcher").string() +
+        "' SKY_COLLECTION='" + (root / "collection").string() + "' SKY_SAVE_DIR='" + (root / "saves").string() +
+        "' SKY_LAUNCHER_INI='" + (root / "x.ini").string() + "' SKY_LAUNCHER_NO_UPDATE_CHECK=1 SKY_LAUNCHER_SHOTS='" + (root / "shots").string() +
+        "' SKY_LAUNCHER_TEST_DROP='" + iso + "' SKY_LAUNCHER_TEST_NAV=1 '" + SKYLAUNCHER_TEST_EXE + "' > '" + (root / "out.txt").string() + "' 2>&1";
+    EXPECT(std::system(command.c_str()) == 0);
+    std::ifstream in(root / "out.txt");
+    std::string line;
+    int shots = 0;
+    while (std::getline(in, line))
+    {
+        if (line.find("FAIL") != std::string::npos)
+            fprintf(stderr, "%s\n", line.c_str());
+        EXPECT(line.find("FAIL") == std::string::npos);
+        shots += line.find("launcher: shot") != std::string::npos;
+    }
+    EXPECT(shots == 14);
+    printf("Pad navigation: %d of 14 steps\n", shots);
+}
+
 // The achievements and the play time as the game page shows them (game_progress.h): rows from a list and the unlocks, the hidden
 // ones, the texts of the play time line. No disc: the disc's list is checked with each game's pictures below.
 int AchievementChecks()
@@ -1278,6 +1307,7 @@ int main(int argc, char** argv)
     g_failures += CopyChecks(scratch, iso.string(), skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") != nullptr ? skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO") : "");
     printf("The seats' X in the window:\n");
     SeatXChecks(scratch);
+    NavChecks(scratch, iso.string());
     printf("Command line without UI:\n");
     EXPECT(ResolveHeadless({ iso.string() }) == iso.string());
     EXPECT(ResolveHeadless({ "--select-iso", iso.string() }) == iso.string());

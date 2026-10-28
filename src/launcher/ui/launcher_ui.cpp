@@ -2937,7 +2937,7 @@ namespace launcher_ui
         static const std::vector<int> Steps[] = {
             {},                                                        // 40: the launcher opens, the focus in the sidebar
             { ImGuiKey_Escape },                                       // 41: B: the ring on the game's row
-            { ImGuiKey_DownArrow, ImGuiKey_DownArrow },                // 42: down: past Giants and the games coming later
+            { ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow }, // 42: down: past Giants, Swap Force and Coming later
             { ImGuiKey_Space },                                        // 43: A: Collection, the ring on Add a figure
             { ImGuiKey_GamepadFaceUp },                                // 44: Y: the search box takes the keyboard
             { ImGuiKey_Escape },                                       // 45: B: out of the search
@@ -2947,9 +2947,35 @@ namespace launcher_ui
             { ImGuiKey_Space },                                        // 49: A: it goes on the seat, the choosing ends
             { ImGuiKey_GamepadFaceLeft },                              // 50: X: the focused card's sheet
             { ImGuiKey_GamepadFaceRight, ImGuiKey_GamepadFaceRight },  // 51: B, B: closed, back to Play
-            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_GamepadR1 }, // 52: Settings > Controls
+            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space,
+              ImGuiKey_GamepadR1 },                                    // 52: B to the sidebar, down to Settings, A, RB: Settings > Launcher
             { ImGuiKey_Escape },                                       // 53: Escape: back to Play
         };
+        // Where each step's keys must have led (checked when the next step begins): the sidebar's rows, the collection, the
+        // settings; a step that went elsewhere would open what the next keys press (a file chooser: the run would wait).
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL nav step %d: %s\n", 39 + m_testStep, what);
+                m_testFailures++;
+            }
+        };
+        if (m_testBegan == 0)
+            m_testBegan = now;
+        if (now - m_testBegan > 120000)
+        {
+            expect(false, "timeout");
+            m_running = false;
+            return;
+        }
+        switch (m_testStep)
+        {
+        case 4: expect(m_page == Page::Collection, "A on the sidebar's Collection row opens the collection"); break;
+        case 12: expect(m_page == Page::Play, "B, B close the sheet and the collection"); break;
+        case 13: expect(m_page == Page::Settings && m_tab == SettingsTab::Launcher, "Settings, then RB: its Launcher tab"); break;
+        case 14: expect(m_page == Page::Play, "Escape leaves Settings"); break;
+        default: break;
+        }
         if (m_testStep >= int(std::size(Steps)))
         {
             m_running = false;
