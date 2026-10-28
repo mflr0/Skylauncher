@@ -9,6 +9,7 @@
 #include "launcher/ui/launcher_app.h"
 #include "shared/collection/save_backup.h"
 #include <SDL3/SDL.h>
+#include <stb_image_write.h>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -204,6 +205,17 @@ namespace
         std::vector<uint8_t> big = MacIcns(PngOf(256));
         SETTINGS_EXPECT(std::string(big.begin() + 8, big.begin() + 12) == "ic08");
         SETTINGS_EXPECT(MacIcns(PngOf(100)).empty() && MacIcns({ 1, 2, 3 }).empty());
+        {
+            // A real 512 px PNG (the game's icon): the .ico entry holds it halved to 256 px.
+            std::vector<uint8_t> pixels(512 * 512 * 4, 200), real;
+            auto append = [](void* context, void* data, int size) {
+                auto* bytes = static_cast<std::vector<uint8_t>*>(context);
+                bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+            };
+            SETTINGS_EXPECT(stbi_write_png_to_func(append, &real, 512, 512, 4, pixels.data(), 512 * 4) != 0);
+            std::vector<uint8_t> bigIco = WindowsIco(real);
+            SETTINGS_EXPECT(bigIco.size() > 22 + 24 && bigIco[6] == 0 && bigIco[22 + 16] == 0 && bigIco[22 + 17] == 0 && bigIco[22 + 18] == 1 && bigIco[22 + 19] == 0); // IHDR width 256
+        }
         std::vector<uint8_t> ico = WindowsIco(png);
         SETTINGS_EXPECT(ico.size() == 22 + png.size() && ico[0] == 0 && ico[1] == 0 && ico[2] == 1 && ico[3] == 0 && ico[4] == 1 && ico[5] == 0);
         SETTINGS_EXPECT(ico[6] == 64 && ico[7] == 64 && ico[10] == 1 && ico[12] == 32 && ico[14] == png.size() && ico[18] == 22);

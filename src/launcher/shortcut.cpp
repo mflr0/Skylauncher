@@ -3,6 +3,8 @@
 #include "launcher/i18n.h"
 #include "shared/collection/datadir.h"
 #include <SDL3/SDL.h>
+#include <stb_image.h>
+#include <stb_image_write.h>
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -183,9 +185,51 @@ std::string LinuxDesktopEntry(std::string_view gameName, const fs::path& launche
     return text + "Terminal=false\nCategories=Game;\n";
 }
 
-std::vector<uint8_t> WindowsIco(const std::vector<uint8_t>& png)
+namespace
+{
+    // An .ico entry is at most 256 px: a larger square PNG (the game's 512 px icon) is halved, 2 x 2 pixels averaged, until it
+    // fits. Anything that does not decode is left as it is.
+    std::vector<uint8_t> FitIcoPng(std::vector<uint8_t> png)
+    {
+        uint32_t width = 0, height = 0;
+        while (PngSize(png, width, height) && width == height && width > 256 && width % 2 == 0)
+        {
+            int w = 0, h = 0, channels = 0;
+            stbi_uc* pixels = stbi_load_from_memory(png.data(), int(png.size()), &w, &h, &channels, 4);
+            if (pixels == nullptr || uint32_t(w) != width || uint32_t(h) != height)
+            {
+                stbi_image_free(pixels);
+                break;
+            }
+            std::vector<uint8_t> half(size_t(w / 2) * size_t(h / 2) * 4);
+            for (int y = 0; y < h / 2; y++)
+                for (int x = 0; x < w / 2; x++)
+                    for (int c = 0; c < 4; c++)
+                    {
+                        int sum = 0;
+                        for (int dy = 0; dy < 2; dy++)
+                            for (int dx = 0; dx < 2; dx++)
+                                sum += pixels[((size_t(2 * y + dy) * w) + size_t(2 * x + dx)) * 4 + c];
+                        half[(size_t(y) * (w / 2) + x) * 4 + c] = uint8_t((sum + 2) / 4);
+                    }
+            stbi_image_free(pixels);
+            std::vector<uint8_t> out;
+            auto append = [](void* context, void* data, int size) {
+                auto* bytes = static_cast<std::vector<uint8_t>*>(context);
+                bytes->insert(bytes->end(), static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + size);
+            };
+            if (!stbi_write_png_to_func(append, &out, w / 2, h / 2, 4, half.data(), (w / 2) * 4))
+                break;
+            png = std::move(out);
+        }
+        return png;
+    }
+}
+
+std::vector<uint8_t> WindowsIco(const std::vector<uint8_t>& smallOrBigPng)
 {
     uint32_t width = 0, height = 0;
+    std::vector<uint8_t> png = FitIcoPng(smallOrBigPng);
     if (!PngSize(png, width, height))
         return {};
     std::vector<uint8_t> out;
