@@ -408,11 +408,8 @@ just now	à l'instant
 less than a minute left	moins d'une minute restante
 no answer	aucune réponse
 nothing yet	0 octet
-{:.0f} KB	{:.0f} Ko
 {} KB	{} Ko
-{:.0f} MB	{:.0f} Mo
 {} MB	{} Mo
-{:.1f} GB	{:.1f} Go
 {} GB	{} Go
 {} Xbox, PlayStation and Switch pads work.	{} Les manettes Xbox, PlayStation et Switch fonctionnent.
 {} already plays from its copied game data	{} fonctionne déjà avec ses données copiées

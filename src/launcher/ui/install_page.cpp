@@ -75,7 +75,7 @@ namespace launcher_ui
         m_s->installSha = m_s->check.xexSha256;
         m_s->installView = true;
         m_s->installLog = false;
-        m_toasts.clear(); // the page comes back with the card's own buttons at the toasts' corner: nothing stale over them
+        m_toasts.Clear(); // the page comes back with the card's own buttons at the toasts' corner: nothing stale over them
         if (m_shots.empty())
             m_page = Page::Play;
     }

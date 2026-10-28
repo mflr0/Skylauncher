@@ -131,24 +131,10 @@ namespace launcher_ui
 
     bool App::Chip(const char* label, bool selected, unsigned color)
     {
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        const char* end = strstr(label, "##");
-        ImVec2 text = ImGui::CalcTextSize(label, end);
-        ImVec2 size(text.x + 26, text.y + 14);
-        bool pressed = ImGui::InvisibleButton(label, size, ImGuiButtonFlags_EnableNav);
-        bool hovered = ImGui::IsItemHovered();
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        unsigned fill = selected ? color : hovered ? PanelRaisedHover : PanelRaised;
-        draw->AddRectFilled(at, ImVec2(at.x + size.x, at.y + size.y), Rgb(fill, selected ? 255 : 235), size.y / 2);
-        if (!selected)
-            draw->AddRect(at, ImVec2(at.x + size.x, at.y + size.y), Rgb(Border), size.y / 2);
-        ImU32 ink = Rgb(selected ? AccentInk : Text);
-        if (selected)
-            AddBoldText(draw, ImVec2(at.x + 13, at.y + 7), ink, std::string(label, end != nullptr ? end : label + strlen(label)).c_str());
-        else
-            draw->AddText(ImVec2(at.x + 13, at.y + 7), ink, label, end);
-        FocusRing(size.y / 2);
-        return pressed;
+        ui::ChipOptions options;
+        options.selected = selected;
+        options.color = color == Accent ? 0 : color;
+        return ui::Chip(label, options);
     }
 
     unsigned KindInk(uint32_t rgb)
@@ -156,16 +142,7 @@ namespace launcher_ui
         return ((rgb >> 16 & 0xFF) * 3 + (rgb >> 8 & 0xFF) * 6 + (rgb & 0xFF)) / 10 > 120 ? AccentInk : Text;
     }
 
-    void App::Badge(ImDrawList* draw, ImVec2 at, const char* text, unsigned fill, unsigned ink)
-    {
-        ImGui::PushFont(nullptr, SmallSize - 1);
-        ImVec2 size = ImGui::CalcTextSize(text);
-        draw->AddRectFilled(at, ImVec2(at.x + size.x + 12, at.y + size.y + 4), Rgb(fill), (size.y + 4) / 2);
-        if (((fill >> 16 & 0xFF) * 3 + (fill >> 8 & 0xFF) * 6 + (fill & 0xFF)) / 10 < 70) // a very dark badge (Dark) gets a light edge on the dark cards
-            draw->AddRect(at, ImVec2(at.x + size.x + 12, at.y + size.y + 4), Rgb(TextDim), (size.y + 4) / 2);
-        AddBoldText(draw, ImVec2(at.x + 6, at.y + 2), Rgb(ink), text);
-        ImGui::PopFont();
-    }
+    void App::Badge(ImDrawList* draw, ImVec2 at, const char* text, unsigned fill, unsigned ink) { ui::DrawBadge(draw, at, text, fill, ink); }
 
     // ---- Icons ----------------------------------------------------------------------------------------------------
 

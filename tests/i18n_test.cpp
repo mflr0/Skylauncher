@@ -133,6 +133,8 @@ namespace
     void CheckNoRawText(const std::vector<fs::path>& files)
     {
         static const char* const Calls[] = { "PillButton(", "Title(", "BoldText(", "Toast(", "Chip(", "HoldButton(", "SettingRow(",
+            "ui::Button(", "ui::Pill(", "ui::Chip(", "ui::Badge(", "ui::StatusPill(", "ui::Toggle(", "ui::Checkbox(", "ui::Radio(",
+            "ui::ListRow(", "ui::SectionHeader(", "ui::MenuItem(", "ui::Tooltip(",
             "ImGui::Button(", "ImGui::TextUnformatted(", "ImGui::Selectable(", "ImGui::BeginCombo(", "ImGui::TextWrapped(", "ImGui::SetTooltip(",
             "ImGui::Text(" };
         for (const fs::path& file : files)
