@@ -287,7 +287,7 @@ int I18nChecks()
     // A failure toast is known in any language (it gets the red ring and the cross).
     I18N_EXPECT(i18n::StartsLike(i18n::Tr("Couldn't save the settings"), "Couldn't"));
     I18N_EXPECT(i18n::StartsLike("Couldn't do it", "Couldn't") && !i18n::StartsLike(i18n::Tr("Log copied"), "Couldn't"));
-    I18N_EXPECT(i18n::Tf("{} min ago", 5) != "5 min ago");
+    I18N_EXPECT(i18n::Tf("Last checked {}", 5) != "Last checked 5");
     i18n::SetLanguage("zz"); // a language without a file: English
     I18N_EXPECT(i18n::Current() == "en" && std::string(i18n::Tr("Cancel")) == "Cancel");
     I18N_EXPECT(i18n::Tf("about {} min left", 3) == "about 3 min left");

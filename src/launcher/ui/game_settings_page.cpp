@@ -4,6 +4,7 @@
 #include "launcher/ui/launcher_app.h"
 #include "launcher/shortcut.h"
 #include "shared/collection/datadir.h"
+#include <ctime>
 #include <fmt/format.h>
 #include <fstream>
 #include <iterator>
@@ -22,6 +23,7 @@ namespace launcher_ui
             constexpr const char* RestoreSavesHint = N_("Hold to restore; your current saves are kept first.");
             constexpr const char* Reinstall = N_("Reinstall");
             constexpr const char* ReinstallHint = N_("Hold to rebuild the game.");
+            constexpr const char* ClearCachesHint = N_("Hold to clear the caches.");
             constexpr const char* DeleteData = N_("Delete saves and data");
             constexpr const char* DeleteDataHint = N_("Hold to delete saves, backups and caches.");
             constexpr const char* Uninstall = N_("Remove game");
@@ -32,7 +34,27 @@ namespace launcher_ui
         }
 
         // "12.3 GB" for what a button would free, nothing for less than a megabyte of noise.
-        std::string Freed(uint64_t bytes) { return bytes == 0 ? std::string(Tr("nothing yet")) : LauncherFormatSize(bytes); }
+        std::string Freed(uint64_t bytes) { return bytes == 0 ? std::string(Tr("nothing yet")) : ui::FormatSize(bytes); }
+
+        // A save backup's folder name ("YYYYMMDD-HHMMSS", local time) as the time it was made.
+        std::time_t StampTime(const std::string& stamp)
+        {
+            std::tm when{};
+            int year = 0, month = 0, day = 0, hour = 0, minute = 0;
+            if (std::sscanf(stamp.c_str(), "%4d%2d%2d-%2d%2d", &year, &month, &day, &hour, &minute) != 5)
+                return 0;
+            when.tm_year = year - 1900, when.tm_mon = month - 1, when.tm_mday = day, when.tm_hour = hour, when.tm_min = minute;
+            when.tm_isdst = -1;
+            return std::mktime(&when);
+        }
+
+        // "Today 09:30", "Yesterday 09:30", else the date and the time (backups come several a day).
+        std::string BackupWhen(const std::string& stamp)
+        {
+            const std::time_t when = StampTime(stamp);
+            const std::string text = ui::FormatWhen(when, std::time(nullptr));
+            return text.find(':') != std::string::npos ? text : fmt::format("{}, {}", text, ui::FormatTime(when));
+        }
     }
 
     // ---- The page ----------------------------------------------------------------------------------------------------
@@ -40,16 +62,8 @@ namespace launcher_ui
     void App::DrawGameSettings()
     {
         // A centred column, like the launcher's settings.
-        float available = ImGui::GetContentRegionAvail().x;
-        float width = std::min(available, 940.0f);
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        BeginPageColumn("##gamesettingscolumn", width, true);
-
-        Title(m_s->game.name, HeadlineSize, Text);
-        ImGui::SameLine(ImGui::GetContentRegionMax().x - PillWidth(Tr("Back"), 120)); // the column's right edge, scrollbar or not
-        if (PillButton(Tr("Back"), false, 120))
-            GoTo(Page::Play);
-        ImGui::Dummy(ImVec2(0, 4));
+        const char* title = GameName(m_s->game.id, GameNameForm::Full);
+        BeginSettingsPage("##gamesettingscolumn", title != nullptr ? title : m_s->game.name, true);
 
         static const char* const Tabs[] = { N_("Video"), N_("Keyboard"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
         int tab = int(m_gameTab);
@@ -66,76 +80,78 @@ namespace launcher_ui
         case GameTab::Game: DrawGameTab(); break;
         }
         EndCard();
-        EndPageColumn();
+        EndSettingsPage();
     }
 
     // ---- Video and language ------------------------------------------------------------------------------------------
 
     void App::DrawGameVideo()
     {
-        if (!BeginSettingsTable("##graphics"))
+        if (!ui::BeginSettings("##graphics"))
             return;
         const std::string videoSection = GameVideoSection(m_s->game.id);
         const char* video = videoSection.c_str();
         auto toggle = [&](const char* id, const char* key, const char* fallback) {
             bool value = ParseBool(SettingGet(m_config, video, key, fallback));
-            if (Toggle(id, &value))
+            if (ui::Toggle(id, &value))
                 Set(video, key, value ? "1" : "0");
         };
 
-        SettingRow(Tr("Fullscreen"), nullptr);
+        ui::SettingRow(Tr("Fullscreen"), nullptr);
         toggle("##fullscreen", "fullscreen", "0");
 
-        SettingRow(Tr("Resolution scale"), Tr("Higher scales need a dedicated graphics card."));
-        Combo("##scale", video, "resolution_scale", ScaleChoices, 0);
+        std::string scaleHint = Tr("Higher scales need a dedicated graphics card.");
         if (int scale = SettingInt(m_config, video, "resolution_scale", 0); scale >= 1)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-            ImGui::Text("%s", Tf("{} x {} for the 3D scene", 1120 * std::min(scale, 10), 704 * std::min(scale, 10)).c_str());
-            ImGui::PopStyleColor();
-        }
+            scaleHint += "\n" + Tf("{} x {} for the 3D scene", 1120 * std::min(scale, 10), 704 * std::min(scale, 10));
+        ui::SettingRow(Tr("Resolution scale"), scaleHint.c_str());
+        SettingSelect("##scale", video, "resolution_scale", ScaleChoices, 0);
 
-        SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 is experimental."));
-        Combo("##fps", video, "fps_limit", FpsChoices, 0);
+        ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 is experimental."));
+        SettingSelect("##fps", video, "fps_limit", FpsChoices, 0);
 
-        SettingRow(Tr("Skip intro movies"), nullptr);
+        ui::SettingRow(Tr("Skip intro movies"), nullptr);
         toggle("##skipintromovies", "skip_intro_movies", "0");
 
         if (m_s->game.id == std::string_view("swapforce"))
         {
-            SettingRow(Tr("Original resolution"), Tr("The 3D scene at the console's size."));
+            ui::SettingRow(Tr("Original resolution"), Tr("The 3D scene at the console's size."));
             toggle("##originalresolution", "original_resolution", "0");
         }
 
-        SettingRow(Tr("VSync"), Tr("No tearing, a little more latency."));
+        ui::SettingRow(Tr("VSync"), Tr("No tearing, a little more latency."));
         toggle("##vsync", "vsync", "1");
 
-        SettingRow(Tr("Texture filtering"), Tr("Keeps textures sharp at an angle."));
-        Combo("##filter", video, "anisotropy", FilterChoices, 0);
+        ui::SettingRow(Tr("Texture filtering"), Tr("Keeps textures sharp at an angle."));
+        SettingSelect("##filter", video, "anisotropy", FilterChoices, 0);
 
-        SettingRow(Tr("Widescreen"), Tr("Auto shows more when wide; 16:9 adds bars."));
-        Combo("##aspect", video, "aspect", AspectChoices, 0);
+        ui::SettingRow(Tr("Widescreen"), Tr("Auto shows more when wide; 16:9 adds bars."));
+        SettingSelect("##aspect", video, "aspect", AspectChoices, 0);
 
-        SettingRow(Tr("HD texture packs"), Tr("Replaces the game's textures with your pack."));
+        ui::SettingRow(Tr("HD texture packs"), Tr("Replaces the game's textures with your pack."));
         toggle("##texturepacks", "texture_packs", "1");
-        if (PillButton(Tr("Show in folder"), false, ImGui::GetContentRegionAvail().x))
+        ui::SettingRow(Tr("Texture pack folder"), nullptr);
+        ui::ButtonOptions folder;
+        folder.icon = ui::Icon::Folder;
+        folder.width = -1;
+        if (ui::Button(Tr("Show in folder"), folder))
         {
             std::error_code error;
             std::filesystem::create_directories(GameInstallFolder({}) / "textures", error);
             if (!OpenFolder(GameInstallFolder({}) / "textures"))
                 Toast(Tr("Couldn't open the folder"), true);
         }
-        EndSettingsTable();
+        ui::EndSettings();
 
-        if (ImGui::CollapsingHeader(Tr("Advanced")) && BeginSettingsTable("##graphicsadvanced"))
+        ui::SectionHeader(Tr("Advanced"));
+        if (ui::BeginSettings("##graphicsadvanced"))
         {
-            SettingRow(Tr("Dump textures"), Tr("For pack makers: saves the textures as DDS files."));
+            ui::SettingRow(Tr("Dump textures"), Tr("For pack makers: saves the textures as DDS files."));
             toggle("##texturedump", "texture_dump", "0");
-            EndSettingsTable();
+            ui::EndSettings();
         }
     }
 
-    // The keys of this game: one row per action the game uses, named as the game names it, the pad button in brackets.
+    // The keys of this game: one row per action the game uses, named as the game names it, the pad button beside it.
     // [<game>.input] holds them; PLAY puts them in [input] (game_keys.h).
     void App::DrawGameKeyboard()
     {
@@ -143,70 +159,72 @@ namespace launcher_ui
         const std::string section = GameInputSection(game);
         const std::span<const GameKey> keys = GameKeys(game);
         const PadFamily family = PadFamilyNow();
-        const float headingY = ImGui::GetCursorPosY();
-        ImGui::SetCursorPosY(headingY + 8); // the heading centred on the 40-point button beside it
-        Title(Tr("Keyboard"), TitleSize, Text);
-        ImGui::SameLine(0, 24);
-        ImGui::SetCursorPosY(headingY);
-        if (HoldButton(Tr(strings::ResetKeys), 200, Tr(strings::ResetKeysHint)))
+        ui::SectionHeader(Tr("Keyboard"), m_capturing != nullptr ? Tf("Press a key for \"{}\" (Escape cancels)", Tr(m_capturing->label)).c_str()
+                                                                  : Tr("Click a key to change it."), false);
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(ui::space::S, ui::space::XS));
+        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
         {
-            ResetGameKeys(m_config, game);
-            Set(section.c_str(), "seeded", "1");
-            m_capturing = nullptr;
-            Toast(Tr("Keyboard bindings reset"));
-        }
-        if (m_capturing != nullptr)
-            ImGui::TextColored(ImColor(Rgb(Accent)), "%s", Tf("Press a key for \"{}\" (Escape cancels)", Tr(m_capturing->label)).c_str());
-        else
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Click a key to change it."));
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
-        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingFixedFit))
-        {
-            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 172);
-            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 124);
-            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 172);
-            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 124);
+            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthStretch, 3);
+            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthStretch, 2);
+            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthStretch, 3);
+            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthStretch, 2);
             for (size_t i = 0; i < keys.size(); i++)
             {
                 const GameKey& action = keys[i];
                 if (i % 2 == 0)
                     ImGui::TableNextRow();
                 ImGui::TableNextColumn();
-                ImGui::AlignTextToFramePadding();
                 // The pad's button as the pad in use prints it (A on a 360 pad, Cross on a PS5, B on a Switch); words translated.
+                // Beside the name when it fits, else under it.
                 const std::string name = Tr(action.label), pad = PadButtonName(action, family);
-                // One line, or the button in brackets on a second one (never a break inside the brackets).
-                const bool oneLine = ImGui::CalcTextSize(fmt::format("{} ({})", name, pad).c_str()).x <= 172;
-                ImGui::TextWrapped("%s", (name + (oneLine ? " (" : "\n(") + pad + ")").c_str());
+                const float room = ImGui::GetContentRegionAvail().x;
+                const bool oneLine = ui::TextSize(ui::TextStyle::Body, name.c_str()).x + ui::space::XS + ui::TextSize(ui::TextStyle::Caption, pad.c_str()).x + 2 * ui::space::S <= room;
+                ImGui::AlignTextToFramePadding();
+                ui::Text(ui::TextStyle::Body, name.c_str(), ui::color::Ink, oneLine ? -1 : 0);
+                if (oneLine)
+                    ImGui::SameLine(0, ui::space::XS);
+                ui::Text(ui::TextStyle::Caption, ("(" + pad + ")").c_str(), ui::color::Dim, -1);
                 ImGui::TableNextColumn();
                 const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
                 const bool duplicate = GameKeyConflict(m_config, game, action);
                 ImGui::PushID(action.action);
-                ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Accent : Field));
-                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? AccentInk : duplicate ? Danger : Text));
-                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(118, 32)))
+                ui::ButtonOptions options;
+                options.kind = m_capturing == &action ? ui::ButtonKind::Primary : ui::ButtonKind::Secondary;
+                options.icon = duplicate ? ui::Icon::Warning : ui::Icon::None;
+                options.width = -1;
+                options.tooltip = duplicate ? Tr("This key is used by another action") : nullptr;
+                if (ui::Button(m_capturing == &action ? "..." : key.c_str(), options))
                     m_capturing = &action;
-                ImGui::PopStyleColor(2);
-                if (duplicate && ImGui::IsItemHovered())
-                    ImGui::SetTooltip("%s", Tr("This key is used by another action"));
                 ImGui::PopID();
             }
             ImGui::EndTable();
         }
         ImGui::PopStyleVar();
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::ButtonOptions reset;
+        reset.kind = ui::ButtonKind::Danger;
+        reset.hold = true;
+        reset.tooltip = Tr(strings::ResetKeysHint);
+        if (ui::Button(Tr(strings::ResetKeys), reset))
+        {
+            ResetGameKeys(m_config, game);
+            Set(section.c_str(), "seeded", "1");
+            m_capturing = nullptr;
+            Toast(Tr("Keyboard bindings reset"), ui::ToastKind::Success);
+        }
     }
 
     void App::DrawGameLanguage()
     {
-        if (!BeginSettingsTable("##language"))
+        if (!ui::BeginSettings("##language"))
             return;
-        SettingRow(Tr(strings::GameText), Tr(strings::GameTextHint));
+        ui::SettingRow(Tr(strings::GameText), Tr(strings::GameTextHint));
         const std::vector<Choice> text = GameLanguageChoices(m_config, m_s->game.id, false);
-        Combo("##text", m_s->game.id, "language", text, 0);
-        SettingRow(Tr(strings::GameVoices), Tr(strings::GameVoicesHint));
+        SettingSelect("##text", m_s->game.id, "language", text, 0);
+        ui::SettingRow(Tr(strings::GameVoices), Tr(strings::GameVoicesHint));
         const std::vector<Choice> voice = GameLanguageChoices(m_config, m_s->game.id, true);
-        Combo("##voice", m_s->game.id, "voice_language", voice, 0);
-        EndSettingsTable();
+        SettingSelect("##voice", m_s->game.id, "voice_language", voice, 0);
+        ui::EndSettings();
     }
 
     // ---- Disc --------------------------------------------------------------------------------------------------------
@@ -230,63 +248,71 @@ namespace launcher_ui
 
     void App::DrawGameDisc()
     {
-        Title(Tr("Disc image"), TitleSize, Text);
-        auto note = [](const char* text) {
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-            ImGui::TextWrapped("%s", text);
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
+        ui::SectionHeader(Tr("Disc image"), nullptr, false);
+        auto filename = [](const std::string& path) {
+            return LauncherMiddleEllipsis(std::filesystem::path(std::u8string(path.begin(), path.end())).filename().string(), 60);
         };
         if (m_s->fromCopy)
         {
             // The game plays from its copied game data: the image is not used, so its buttons are not offered.
-            std::string iso = SettingGet(m_config, m_s->game.id, "iso");
-            ImGui::TextWrapped("%s", iso.empty() ? Tr("None chosen.") : LauncherMiddleEllipsis(std::filesystem::path(std::u8string(iso.begin(), iso.end())).filename().string(), 60).c_str());
-            note(Tr("Not needed: the game plays from its copied data."));
+            const std::string iso = SettingGet(m_config, m_s->game.id, "iso");
+            ui::Text(ui::TextStyle::Body, iso.empty() ? Tr("None chosen.") : filename(iso).c_str());
+            ui::Text(ui::TextStyle::Caption, Tr("Not needed: the game plays from its copied data."), ui::color::Dim);
         }
         else
         {
-            ImGui::TextWrapped("%s", m_s->discPath.empty() ? Tr("None chosen yet.") : LauncherMiddleEllipsis(std::filesystem::path(std::u8string(m_s->discPath.begin(), m_s->discPath.end())).filename().string(), 60).c_str());
+            ui::Text(ui::TextStyle::Body, m_s->discPath.empty() ? Tr("None chosen yet.") : filename(m_s->discPath).c_str());
+            const GameInfo* other = nullptr;
             switch (m_s->disc)
             {
             case DiscState::Ready:
-                ImGui::TextColored(ImColor(Rgb(Ok)), "%s", Tf("Verified, {}", LauncherFormatSize(m_s->discSize)).c_str());
+                ui::StatusPill(ui::Status::Success, Tf("Verified, {}", ui::FormatSize(m_s->discSize)).c_str());
                 break;
             case DiscState::Verifying:
-                ImGui::TextColored(ImColor(Rgb(Play)), "%s...", m_s->verify.Stage().c_str());
+                ui::StatusPill(ui::Status::Busy, (m_s->verify.Stage() + "...").c_str());
                 break;
             case DiscState::Failed:
-                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-                ImGui::TextWrapped("%s", m_s->check.message.c_str());
-                ImGui::PopStyleColor();
-                if (const GameInfo* other = FindGame(m_s->check.otherGame); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
-                    if (PillButton(Tf("Use it for {}", other->name).c_str(), true, 0, true))
-                        UseDiscForOtherGame();
+                ui::StatusPill(ui::Status::Error, SlotStatus(m_s).text.c_str());
+                ui::Text(ui::TextStyle::Body, m_s->check.message.c_str(), ui::color::InkSoft);
+                if (m_s->check.status == GameSourceStatus::WrongGame)
+                    other = FindGame(m_s->check.otherGame);
                 break;
             case DiscState::None:
                 break;
             }
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
             const bool busy = Installing() || m_s->disc == DiscState::Verifying || m_s->copyJob.Running();
-            ImGui::BeginDisabled(busy);
-            if (PillButton(m_s->discPath.empty() ? Tr("Choose...") : Tr("Change..."), true, 200))
+            if (other != nullptr)
+            {
+                ui::ButtonOptions use;
+                use.kind = ui::ButtonKind::Primary;
+                use.disabled = busy;
+                if (ui::Button(Tf("Use it for {}", other->name).c_str(), use))
+                    UseDiscForOtherGame();
+                ImGui::SameLine(0, ui::space::S);
+            }
+            ui::ButtonOptions choose;
+            choose.kind = other != nullptr || !m_s->discPath.empty() ? ui::ButtonKind::Secondary : ui::ButtonKind::Primary; // Primary: the disc to choose
+            choose.disabled = busy;
+            if (ui::Button(m_s->discPath.empty() ? Tr("Choose...") : Tr("Change..."), choose))
                 Browse();
-            ImGui::SameLine();
-            ImGui::BeginDisabled(m_s->discPath.empty());
-            if (PillButton(Tr("Remove"), false, 200))
+            ImGui::SameLine(0, ui::space::S);
+            ui::ButtonOptions remove;
+            remove.disabled = busy || m_s->discPath.empty();
+            if (ui::Button(Tr("Remove"), remove))
                 ForgetDisc();
-            ImGui::SameLine();
-            if (PillButton(Tr("Show in folder"), false, 200))
+            ImGui::SameLine(0, ui::space::S);
+            ui::ButtonOptions folder;
+            folder.icon = ui::Icon::Folder;
+            folder.disabled = busy || m_s->discPath.empty();
+            if (ui::Button(Tr("Show in folder"), folder))
             {
                 std::filesystem::path parent = std::filesystem::path(std::u8string(m_s->discPath.begin(), m_s->discPath.end())).parent_path();
                 if (!OpenFolder(parent))
                     Toast(Tr("Couldn't open the folder"), true);
             }
-            ImGui::EndDisabled();
-            ImGui::EndDisabled();
-            note(Tr("The file stays where it is."));
+            ui::Text(ui::TextStyle::Caption, Tr("The file stays where it is."), ui::color::Dim);
         }
-        ImGui::Dummy(ImVec2(0, 16));
         DrawGameData();
     }
 
@@ -305,8 +331,7 @@ namespace launcher_ui
         const savebackup::Restore restore = savebackup::RestoreBackup(savebackup::Root(m_s->game.id), stamp);
         m_s->saveBackupsLoaded = false; // the restore made a backup of its own
         if (restore.ok)
-            Toast(Tf("Saves restored from {}", stamp.substr(0, 4) + "-" + stamp.substr(4, 2) + "-" + stamp.substr(6, 2) + " " +
-                stamp.substr(9, 2) + ":" + stamp.substr(11, 2)));
+            Toast(Tf("Saves restored from {}", BackupWhen(stamp)), ui::ToastKind::Success);
         else if (restore.error == "the game is running")
             Toast(Tr("Quit the game before restoring a backup"), true);
         else
@@ -315,11 +340,13 @@ namespace launcher_ui
 
     void App::DrawSaveBackups()
     {
-        Title(Tr("Save backups"), TitleSize, Text);
         if (!m_s->saveBackupsLoaded)
             RefreshSaveBackups();
         const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id));
-        if (PillButton(Tr("Show in folder"), false, 260))
+        ui::SectionHeader(Tr("Save backups"), running ? Tr("The game is running: quit it to restore a backup.") : Tr("Earlier versions of your saves."), false);
+        ui::ButtonOptions folder;
+        folder.icon = ui::Icon::Folder;
+        if (ui::Button(Tr("Show in folder"), folder))
         {
             std::filesystem::path saves = savebackup::Root(m_s->game.id);
             std::error_code error;
@@ -327,51 +354,40 @@ namespace launcher_ui
             if (!OpenFolder(saves))
                 Toast(Tr("Couldn't open the folder"), true);
         }
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x);
-        ImGui::TextWrapped("%s", running ? Tr("The game is running: quit it to restore a backup.")
-            : Tr("Earlier versions of your saves."));
-        ImGui::PopTextWrapPos();
-        ImGui::PopStyleColor();
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
         if (m_s->saveBackups.empty())
         {
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-            ImGui::TextUnformatted(Tr("No backups yet."));
-            ImGui::PopStyleColor();
+            ui::EmptyState(ui::Icon::Folder, Tr("No backups yet."));
             return;
         }
 
-        // Ten rows at a time; the newest first.
-        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(300.0f, 44.0f * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
-        if (ImGui::BeginTable("##savebackups", 3, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
+        // Five rows at a time; the newest first. Each: when, how many files, the size, and the hold button that puts it back.
+        ui::ButtonOptions restore;
+        restore.kind = ui::ButtonKind::Danger;
+        restore.hold = true;
+        restore.disabled = running;
+        restore.tooltip = Tr(strings::RestoreSavesHint);
+        const float rowHeight = ui::height::Large + ui::space::XXS + ImGui::GetStyle().ItemSpacing.y; // a row and the gap after it
+        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(5 * rowHeight, rowHeight * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
+        const float buttonWidth = ui::ButtonWidth(Tr(strings::RestoreSaves), restore);
+        for (const savebackup::Entry& backup : m_s->saveBackups)
         {
-            ImGui::TableSetupColumn("when");
-            ImGui::TableSetupColumn("size", ImGuiTableColumnFlags_WidthFixed, 110);
-            ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthFixed, 128);
-            for (const savebackup::Entry& backup : m_s->saveBackups)
-            {
-                ImGui::TableNextRow(ImGuiTableRowFlags_None, 40);
-                ImGui::TableSetColumnIndex(0);
-                ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(backup.date.c_str());
-                ImGui::SameLine();
-                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-                ImGui::TextUnformatted(backup.time.c_str());
-                ImGui::PopStyleColor();
-                if (backup.files == 1 && ImGui::IsItemHovered())
-                    ImGui::SetTooltip("%s", Tr("One file"));
-                ImGui::TableSetColumnIndex(1);
-                ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(LauncherFormatSize(backup.bytes).c_str());
-                ImGui::TableSetColumnIndex(2);
-                ImGui::BeginDisabled(running);
-                ImGui::PushID(backup.stamp.c_str());
-                if (HoldButton(Tr(strings::RestoreSaves), 112, Tr(strings::RestoreSavesHint)))
-                    RestoreSaveBackup(backup.stamp);
-                ImGui::PopID();
-                ImGui::EndDisabled();
-            }
-            ImGui::EndTable();
+            ImGui::PushID(backup.stamp.c_str());
+            const float top = ImGui::GetCursorPosY();
+            const std::string when = BackupWhen(backup.stamp), size = ui::FormatSize(backup.bytes);
+            const std::string files = backup.files == 1 ? std::string(Tr("One file")) : Tf("{} files", ui::FormatNumber(backup.files));
+            ui::ListRowOptions row;
+            row.subtitle = files.c_str();
+            row.trailing = size.c_str();
+            row.width = ImGui::GetContentRegionAvail().x - buttonWidth - ui::space::S;
+            ui::ListRow(when.c_str(), row);
+            ImGui::SameLine(0, ui::space::S);
+            ImGui::SetCursorPosY(top + (ui::height::Large - ui::height::Normal) / 2);
+            if (ui::Button(Tr(strings::RestoreSaves), restore))
+                RestoreSaveBackup(backup.stamp);
+            ImGui::SetCursorPosY(top + ui::height::Large);
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
+            ImGui::PopID();
         }
         ImGui::EndChild();
     }
@@ -387,7 +403,7 @@ namespace launcher_ui
     void App::RunDataAction(const DataResult& result, const char* done) // `done`: an English string, translated here
     {
         m_s->saveBackupsLoaded = m_s->dataSizesLoaded = false;
-        Toast(result.ok ? Tf("{}: {} freed", Tr(done), LauncherFormatSize(result.freed)) : result.error, !result.ok);
+        Toast(result.ok ? Tf("{}: {} freed", Tr(done), ui::FormatSize(result.freed)) : result.error, result.ok ? ui::ToastKind::Success : ui::ToastKind::Error);
     }
 
     void App::RunUninstall(const DataResult& result)
@@ -414,7 +430,7 @@ namespace launcher_ui
             spec.iconPng = m_s->meta.iconPng;
         spec.folder = DesktopFolder();
         ShortcutResult result = CreateDesktopShortcut(spec);
-        Toast(result.ok ? Tr("Shortcut added to the Desktop") : result.error, !result.ok);
+        Toast(result.ok ? Tr("Shortcut added to the Desktop") : result.error, result.ok ? ui::ToastKind::Success : ui::ToastKind::Error);
     }
 
     void App::DrawGameTab()
@@ -423,71 +439,54 @@ namespace launcher_ui
             RefreshDataSizes();
         const GameFolders folders = FoldersOf(m_s->game.id);
         const bool busy = Installing(), running = GameIsRunning(folders);
-        auto note = [](const char* text) {
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-            ImGui::TextWrapped("%s", text);
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
+        auto hold = [](const char* tooltip, bool disabled = false) {
+            ui::ButtonOptions options;
+            options.kind = ui::ButtonKind::Danger;
+            options.hold = true;
+            options.tooltip = tooltip;
+            options.disabled = disabled;
+            return options;
         };
 
-        Title(Tr("Desktop shortcut"), TitleSize, Text);
-        ImGui::BeginDisabled(m_s->disc != DiscState::Ready);
-        if (PillButton(Tr("Create"), true, 300, true))
+        ui::SectionHeader(Tr("Desktop shortcut"), m_s->disc != DiscState::Ready ? Tr("Choose the disc image first.") : nullptr, false);
+        ui::ButtonOptions shortcut;
+        shortcut.disabled = m_s->disc != DiscState::Ready;
+        if (ui::Button(Tr("Create"), shortcut))
             CreateShortcut();
-        ImGui::EndDisabled();
-        if (m_s->disc != DiscState::Ready)
-            note(Tr("Choose the disc image first."));
-        ImGui::Dummy(ImVec2(0, 16));
 
-        Title(Tr("Folders"), TitleSize, Text);
-        if (PillButton(Tr("Game files"), false, 260))
+        ui::SectionHeader(Tr("Folders"));
+        ui::ButtonOptions folder;
+        folder.icon = ui::Icon::Folder;
+        if (ui::Button(Tr("Game files"), folder))
         {
             std::error_code error;
             std::filesystem::create_directories(folders.game, error);
             if (!OpenFolder(folders.game))
                 Toast(Tr("Couldn't open the folder"), true);
         }
-        ImGui::SameLine();
-        if (PillButton(Tr(strings::OpenFigures), false, 260))
+        ImGui::SameLine(0, ui::space::S);
+        if (ui::Button(Tr(strings::OpenFigures), folder))
         {
             SDL_CreateDirectory(m_s->collection->Folder().c_str());
-            std::string folder = m_s->collection->Folder();
-            OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end())));
+            std::string figures = m_s->collection->Folder();
+            OpenFolder(std::filesystem::path(std::u8string(figures.begin(), figures.end())));
         }
-        ImGui::Dummy(ImVec2(0, 16));
 
-        Title(Tr("Game"), TitleSize, Text);
-        if (!m_s->installed.runtime.empty())
-        {
-            ImGui::TextWrapped("%s", Tr("Built for this disc."));
-            ImGui::BeginDisabled(busy || running);
-            if (HoldButton(Tr(strings::Reinstall), 260, Tr(strings::ReinstallHint)) && !Installing())
-                StartInstall();
-            ImGui::EndDisabled();
-        }
-        else
-            ImGui::TextWrapped("%s", Tr("Not built yet."));
-        ImGui::Dummy(ImVec2(0, 16));
+        ui::SectionHeader(Tr("Game"), !m_s->installed.runtime.empty() ? Tr("Built for this disc.") : Tr("Not built yet."));
+        if (ui::Button(Tr(strings::Reinstall), hold(Tr(strings::ReinstallHint), busy || running || m_s->installed.runtime.empty())) && !Installing())
+            StartInstall();
 
-        Title(Tr("Clean up"), TitleSize, Text);
-        ImGui::BeginDisabled(busy || running);
-        if (PillButton(Tr("Clear caches"), false, 200))
+        ui::SectionHeader(Tr("Clean up"), running ? Tr("The game is running: quit it first.")
+                                                  : Tf("Clearing caches frees {}; deleting saves and data frees {} more.",
+                                                        Freed(m_s->dataSizes.caches), Freed(m_s->dataSizes.saves)).c_str());
+        if (ui::Button(Tr("Clear caches"), hold(Tr(strings::ClearCachesHint), busy || running)))
             RunDataAction(ClearGameCaches(folders), N_("Caches cleared"));
-        ImGui::SameLine();
-        if (HoldButton(Tr(strings::DeleteData), 300, Tr(strings::DeleteDataHint)))
+        ImGui::SameLine(0, ui::space::S);
+        if (ui::Button(Tr(strings::DeleteData), hold(Tr(strings::DeleteDataHint), busy || running)))
             RunDataAction(DeleteGameData(folders), N_("Saves and data deleted"));
-        ImGui::EndDisabled();
-        note(running ? Tr("The game is running: quit it first.")
-                     : Tf("Clearing caches frees {}; deleting saves and data frees {} more.",
-                           Freed(m_s->dataSizes.caches), Freed(m_s->dataSizes.saves)).c_str());
-        ImGui::Dummy(ImVec2(0, 16));
 
-        Title(Tr("Uninstall"), TitleSize, Text);
-        ImGui::BeginDisabled(busy || running || m_s->installed.runtime.empty());
-        if (HoldButton(Tr(strings::Uninstall), 300, Tr(strings::UninstallHint)))
+        ui::SectionHeader(Tr("Uninstall"), Tf("Frees {}. Saves and settings are kept.", Freed(m_s->dataSizes.installed)).c_str());
+        if (ui::Button(Tr(strings::Uninstall), hold(Tr(strings::UninstallHint), busy || running || m_s->installed.runtime.empty())))
             RunUninstall(UninstallGame(folders, m_config));
-        ImGui::EndDisabled();
-        note(Tf("Frees {}. Saves and settings are kept.", Freed(m_s->dataSizes.installed)).c_str());
     }
 }

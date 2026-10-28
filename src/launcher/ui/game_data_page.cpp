@@ -79,7 +79,7 @@ namespace launcher_ui
         m_s->copy = gamedata::Inspect(gamedata::Folder(m_s->game.id));
         if (result.outcome == Outcome::Done)
         {
-            Toast(Tf("{}: game data copied", m_s->game.name));
+            Toast(Tf("{}: game data copied", m_s->game.name), ui::ToastKind::Success);
             m_s->copyMessage.clear();
             StartVerify(datadir::Text(gamedata::Folder(m_s->game.id))); // from now on the game plays from the copy
         }
@@ -106,35 +106,44 @@ namespace launcher_ui
         }
         m_s->copyMessage.clear();
         StartGameDisc(); // the disc image again, if the player has one
-        Toast(Tf("Copy removed: {} freed", LauncherFormatSize(size)));
+        Toast(Tf("Copy removed: {} freed", ui::FormatSize(size)), ui::ToastKind::Success);
     }
 
     void App::DrawGameData()
     {
-        Title(Tr("Game data"), TitleSize, Text);
-        auto note = [](const std::string& text) {
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-            ImGui::TextWrapped("%s", text.c_str());
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
-        };
+        ui::SectionHeader(Tr("Game data"));
+        auto note = [](const std::string& text) { ui::Text(ui::TextStyle::Caption, text.c_str(), ui::color::Dim); };
         const gamedata::Status& copy = m_s->copy;
         const bool ready = m_s->disc == DiscState::Ready && !m_s->fromCopy;
         const bool canCopy = ready && !Installing();
-        auto showFolder = [&] {
-            if (PillButton(Tr("Show in folder"), false, 200))
-                if (!OpenFolder(gamedata::Folder(m_s->game.id)))
+        auto primary = [](bool disabled) {
+            ui::ButtonOptions options;
+            options.kind = disabled ? ui::ButtonKind::Secondary : ui::ButtonKind::Primary; // one Primary in view: the disc's, until then
+            options.disabled = disabled;
+            return options;
+        };
+        auto remove = [](const char* hint) {
+            ui::ButtonOptions options;
+            options.kind = ui::ButtonKind::Danger;
+            options.hold = true;
+            options.tooltip = hint;
+            return options;
+        };
+        auto showFolder = [&](const std::filesystem::path& folder) {
+            ui::ButtonOptions options;
+            options.icon = ui::Icon::Folder;
+            if (ui::Button(Tr("Show in folder"), options))
+                if (!OpenFolder(folder))
                     Toast(Tr("Couldn't open the folder"), true);
         };
 
         if (m_s->copyJob.Running())
         {
             const uint64_t total = m_s->copyJob.Total();
-            ImGui::TextColored(ImColor(Rgb(Play)), "%s", total == 0 ? Tr("Copying...") :
-                Tf("Copying: {} of {}", LauncherFormatSize(m_s->copyJob.Bytes()), LauncherFormatSize(total)).c_str());
-            ProgressBar(m_s->copyJob.Fraction(), ImVec2(420, 10));
-            if (PillButton(Tr("Stop"), false, 160))
+            note(total == 0 ? Tr("Copying...") : Tf("Copying: {} of {}", ui::FormatSize(m_s->copyJob.Bytes()), ui::FormatSize(total)));
+            ui::ProgressBar(m_s->copyJob.Fraction(), -1, true);
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
+            if (ui::Button(Tr("Stop")))
                 m_s->copyJob.Cancel();
             note(Tr("Stopping keeps the files already copied."));
             return;
@@ -143,58 +152,52 @@ namespace launcher_ui
         switch (copy.state)
         {
         case gamedata::State::Complete:
-            ImGui::TextColored(ImColor(Rgb(Ok)), "%s", (copy.files == 1 ? Tf("Copied: {}, 1 file", LauncherFormatSize(copy.total))
-                                                                       : Tf("Copied: {}, {} files", LauncherFormatSize(copy.total), copy.files)).c_str());
-            if (HoldButton(Tr("Remove the copy"), 260, Tr("Hold to delete the copy.")))
+            ui::StatusPill(ui::Status::Success, (copy.files == 1 ? Tf("Copied: {}, 1 file", ui::FormatSize(copy.total))
+                                                                 : Tf("Copied: {}, {} files", ui::FormatSize(copy.total), copy.files)).c_str());
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
+            showFolder(gamedata::Folder(m_s->game.id));
+            ImGui::SameLine(0, ui::space::S);
+            if (ui::Button(Tr("Remove the copy"), remove(Tr("Hold to delete the copy."))))
                 RemoveCopy();
-            ImGui::SameLine();
-            showFolder();
             note(Tr("No disc image needed."));
             break;
         case gamedata::State::Partial:
-            ImGui::TextColored(ImColor(Rgb(Play)), "%s", Tf("Interrupted: {} of {} copied", LauncherFormatSize(copy.present), LauncherFormatSize(copy.total)).c_str());
-            ImGui::BeginDisabled(!canCopy);
-            if (PillButton(Tr("Carry on copying"), true, 260, true))
+            ui::StatusPill(ui::Status::Warning, Tf("Interrupted: {} of {} copied", ui::FormatSize(copy.present), ui::FormatSize(copy.total)).c_str());
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
+            if (ui::Button(Tr("Carry on copying"), primary(!canCopy)))
                 StartCopy();
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (HoldButton(Tr("Remove the copy"), 300, Tr("Hold to delete the partial copy.")))
+            ImGui::SameLine(0, ui::space::S);
+            if (ui::Button(Tr("Remove the copy"), remove(Tr("Hold to delete the partial copy."))))
                 RemoveCopy();
             if (!ready)
                 note(Tr("Choose the disc image to carry on."));
             break;
         case gamedata::State::Damaged:
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-            ImGui::TextWrapped("%s", Tf("Game data damaged: {}", copy.problem).c_str());
-            ImGui::PopStyleColor();
-            ImGui::BeginDisabled(!canCopy);
-            if (PillButton(Tr("Repair the copy"), true, 260, true))
+            ui::StatusPill(ui::Status::Error, Tr("Game data damaged"));
+            ui::Text(ui::TextStyle::Body, copy.problem.c_str(), ui::color::InkSoft);
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
+            if (ui::Button(Tr("Repair the copy"), primary(!canCopy)))
                 StartCopy();
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (HoldButton(Tr("Remove the copy"), 260, Tr("Hold to delete the copy.")))
+            ImGui::SameLine(0, ui::space::S);
+            if (ui::Button(Tr("Remove the copy"), remove(Tr("Hold to delete the copy."))))
                 RemoveCopy();
             note(ready ? Tr("The game uses the disc image instead.") : Tr("Choose the disc image to repair."));
             break;
         case gamedata::State::None:
-            ImGui::BeginDisabled(!canCopy);
-            if (PillButton(Tr("Copy files"), true, 300, true))
+            if (ui::Button(Tr("Copy files"), primary(!canCopy)))
                 StartCopy();
-            ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (PillButton(Tr("Show in folder"), false, 200))
-                if (!OpenFolder(gamedata::Folder(m_s->game.id).parent_path()))
-                    Toast(Tr("Couldn't open the folder"), true);
+            ImGui::SameLine(0, ui::space::S);
+            showFolder(gamedata::Folder(m_s->game.id).parent_path());
             note(!ready ? Tr("Choose the disc image first.")
-                : m_s->discSize > 0 ? Tf("Copies the disc's files ({}). No image needed after.", LauncherFormatSize(m_s->discSize))
+                : m_s->discSize > 0 ? Tf("Copies the disc's files ({}). No image needed after.", ui::FormatSize(m_s->discSize))
                                     : Tr("Copies the disc's files. No image needed after."));
             break;
         }
         if (!m_s->copyMessage.empty())
         {
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(Danger));
-            ImGui::TextWrapped("%s", m_s->copyMessage.c_str());
-            ImGui::PopStyleColor();
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
+            ui::StatusPill(ui::Status::Error, Tr("The copy failed"));
+            ui::Text(ui::TextStyle::Body, m_s->copyMessage.c_str(), ui::color::InkSoft);
         }
     }
 
