@@ -2256,7 +2256,8 @@ namespace launcher_ui
         {
             static const char* const Names[] = { "01-no-iso", "02-verified", "03-game-video", "04-controls", "05-collection", "06-home",
                 "07-figure-sheet", "08-new-figure", "09-play-with", "10-language", "11-game-disc", "12-game-saves", "13-game-data",
-                "14-launcher-settings", "15-disc-gone", "16-logo-drop" };
+                "14-launcher-settings", "15-disc-gone", "16-logo-drop",
+                "17-launcher-support", "18-launcher-about", "19-problem-report" };
             static const char* const InstallNames[] = { "10-install", "11-installing", "12-quit-while-installing", "13-install-details",
                 "14-install-failed", "15-installed", "16-game-data", "17-install-interrupted" };
             static const char* const UpdateNames[] = { "20-update-banner", "21-whats-new", "22-about", "23-about-checked", "24-update-failed" };
