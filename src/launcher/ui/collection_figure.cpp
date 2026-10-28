@@ -8,6 +8,7 @@
 #include <bit>
 #include <cmath>
 #include <fmt/format.h>
+#include <imgui_internal.h> // the text baseline offset SameLine leaves
 
 namespace launcher_ui
 {
@@ -662,11 +663,14 @@ namespace launcher_ui
         ImGui::SameLine(0, 12);
         ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{} of {}", collection::BoughtCount(bits, table), table.upgrades.size()).c_str());
         ImGui::SameLine(0, 16);
-        if (ImGui::SmallButton(Tr("All")))
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, RadiusSmall);
+        if (ImGui::Button(Tr("All")))
             setBits(collection::AllUpgrades(bits, table));
         ImGui::SameLine(0, 6);
-        if (ImGui::SmallButton(Tr("None")))
+        if (ImGui::Button(Tr("None")))
             setBits(collection::NoUpgrades(bits));
+        ImGui::PopStyleVar(2);
         constexpr float Gap = 10, Row = 40;
         float columnW = (ImGui::GetContentRegionAvail().x - 2 * Gap) / 3;
         ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -745,6 +749,7 @@ namespace launcher_ui
         };
         // Two columns: who it is (name, level, experience, hat), then what it carries (gold, hero points, nickname).
         constexpr float FieldW = 380, ColumnGap = 36;
+        const float columnsTop = ImGui::GetCursorPosY();
         ImGui::BeginGroup();
         label(Tr("Name (empty: the toy's name)"));
         ImGui::SetNextItemWidth(FieldW);
@@ -756,9 +761,13 @@ namespace launcher_ui
             const int cap = figures::LevelCap(m_model.gameId);
             int level = figures::LevelForExperience(figures::ExperienceFor(m_edit, cap), cap);
             label(Tf("Level in {}", ShortGameName(m_model.gameId)).c_str());
-            ImGui::SetNextItemWidth(FieldW);
-            if (ImGui::SliderInt("##level", &level, 1, cap, "%d", ImGuiSliderFlags_AlwaysClamp))
+            // The value beside the slider, not on it: the grab would run over a centred one.
+            ImGui::SetNextItemWidth(FieldW - 44);
+            if (ImGui::SliderInt("##level", &level, 1, cap, "", ImGuiSliderFlags_AlwaysClamp))
                 figures::SetExperienceFor(m_edit, cap, figures::LevelExperience[std::clamp(level, 1, cap) - 1]);
+            ImGui::SameLine(0, 12);
+            ImGui::AlignTextToFramePadding();
+            ImGui::TextUnformatted(std::to_string(level).c_str());
             int experience = int(figures::ExperienceFor(m_edit, cap));
             label(Tf("Experience (0 to {})", figures::LevelExperience[cap - 1]).c_str());
             ImGui::SetNextItemWidth(FieldW);
@@ -785,6 +794,8 @@ namespace launcher_ui
         if (stats)
         {
             ImGui::SameLine(0, ColumnGap);
+            ImGui::SetCursorPosY(columnsTop); // SameLine lined the group's baseline up with the left one's last row
+            ImGui::GetCurrentWindow()->DC.CurrLineTextBaseOffset = 0; // and gave its first text the left row's frame padding
             ImGui::BeginGroup();
             label(Tf("Gold (0 to {})", figures::MaxGold).c_str());
             ImGui::SetNextItemWidth(FieldW);

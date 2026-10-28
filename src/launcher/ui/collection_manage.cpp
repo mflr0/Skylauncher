@@ -179,12 +179,18 @@ namespace launcher_ui
             ImGui::PopID();
             if (m_backupsOf != figure.path)
                 continue;
+            float labelsW = 0; // the Restore buttons line up
+            for (const BackupRow& backup : backups)
+                labelsW = std::max(labelsW, ImGui::CalcTextSize(backup.label.c_str()).x);
             for (const BackupRow& backup : backups)
             {
                 ImGui::PushID(backup.path.c_str());
                 ImGui::Indent(20);
+                float rowY = ImGui::GetCursorPosY(), rowX = ImGui::GetCursorPosX();
+                ImGui::SetCursorPosY(rowY + (40 - ImGui::GetTextLineHeight()) / 2); // centred on the 40-point button
                 ImGui::TextUnformatted(backup.label.c_str());
-                ImGui::SameLine(0, 14);
+                ImGui::SameLine(rowX + labelsW + 14, 0);
+                ImGui::SetCursorPosY(rowY);
                 ImGui::BeginDisabled(!Writable(figure));
                 if (m_app.PillButton(Tr("Restore"), false, 100, true))
                 {

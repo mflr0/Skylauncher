@@ -365,12 +365,13 @@ namespace launcher_ui
         Look gear;
         gear.hovered = ImGui::IsItemHovered() || gearFocused;
         gear.held = ImGui::IsItemActive();
+        gear.enabled = action.enabled || gear.hovered || gear.held; // greyed with the main half, lit again when it is the one pointed at
         GradientRect(draw, gearMin, gearMax, Rgb(Shade(top, gear)), Rgb(Shade(bottom, gear)), rounding, ImDrawFlags_RoundCornersRight);
         draw->AddLine(ImVec2(gearMin.x, gearMin.y + 0.5f), ImVec2(gearMax.x - rounding, gearMin.y + 0.5f), Rgb(0xFFFFFF, 70));
-        // The split: a dark hairline and a light one beside it, short of the edges.
-        draw->AddLine(ImVec2(gearMin.x - 0.5f, gearMin.y + 14), ImVec2(gearMin.x - 0.5f, gearMax.y - 14), Rgb(style.outline, 110));
-        draw->AddLine(ImVec2(gearMin.x + 0.5f, gearMin.y + 14), ImVec2(gearMin.x + 0.5f, gearMax.y - 14), Rgb(0xFFFFFF, 45));
-        DrawGear(draw, m_testGearAt, PlayButtonH * 0.22f, Rgb(InkOn(middle, style.outline)), Rgb(Shade(middle, gear)));
+        // The split: a dark hairline and a light one beside it, from edge to edge.
+        draw->AddLine(ImVec2(gearMin.x - 0.5f, gearMin.y + 1), ImVec2(gearMin.x - 0.5f, gearMax.y - 1), Rgb(style.outline, 110));
+        draw->AddLine(ImVec2(gearMin.x + 0.5f, gearMin.y + 1), ImVec2(gearMin.x + 0.5f, gearMax.y - 1), Rgb(0xFFFFFF, 45));
+        DrawGear(draw, m_testGearAt, PlayButtonH * 0.22f, Rgb(InkOn(middle, style.outline), gear.enabled ? 255 : 150), Rgb(Shade(middle, gear)));
         ImGui::PopStyleColor();
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", Tf("{} settings", m_s->game.name).c_str());

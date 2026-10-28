@@ -15,14 +15,25 @@ switch, copy, seat X) in its scratch folder.
 | Every primary pill (Add a figure, Keep installing, Retry, Resume, Create, Quit, Install details...) | ImGui's grey frame showed as a dark, jagged ring around the light-blue fill | `PillButton` draws a transparent frame for primary buttons |
 | Keyboard tab, French | "Retour arrière" touched the key button's edges; "Déplacement haut (stick gauche)" wrapped to two lines and made uneven rows | Key buttons 118 wide in 124-point columns; the four movement rows are named "Haut", "Bas", "Gauche", "Droite" (stick gauche) |
 
-## Left (small, not touched)
+## Fixed in the second round
 
-- Toasts sit over the top-right buttons while shown and reach 20 points from the window's edge (Collection, Game tab).
-- The disabled main button greys its label half only; the gear segment stays blue.
-- The divider before the gear stops a few points short of the button's edges; the installing button's fill ends in a lighter band.
-- Edit figure dialog: the Level slider's value sits on the grab; the two columns' rows are offset by a few points; All / None are very small pills.
-- Add a figure: the selected Versions row is square-cornered; Manage > Backups: Restore buttons do not line up when a row has no level text.
-- PLAY WITH popup is wider than its button; the hovered row is square inside the rounded popup.
-- Focus rings on sidebar rows are cut by the window's left edge (they are drawn inside on purpose, `FocusRing(0, -2)`).
-- French: "Objet magique" runs into the seat's X; two-line descriptions in the Video tab leave one-word lines.
-- A long data-folder path breaks mid-word.
+| Where | Defect (before) | Fix |
+|---|---|---|
+| Toasts | Over the top-right buttons | Bottom right, stacked upwards, above the game page's band and Home's buttons |
+| Main button, disabled | The gear segment stayed bright, its icon dark | The segment greys with the main half (lit again under the pointer), its icon fades like the label |
+| Main button | The divider before the gear stopped short of the edges | It runs from edge to edge |
+| Edit figure | The Level value sat under the grab; the right column was 8 points lower than the left; All / None were tiny pills | The value beside the slider; the second column starts at the first one's top; All / None as the other small buttons |
+| Manage > Backups | Restore buttons at different x, text off the button's centre | One column (the widest label), text centred on the button |
+| PLAY WITH | Wider than the picker, square hover row | As wide as the picker (names cut to the row, tooltip), "Automatic (gamepad first)" is now "Automatic", the row highlight uses the popup's corners |
+| Seats | A long seat name ran into the X | The name is cut before the X; French "Objet" and "Voir ci-dessous" |
+| Launcher settings | A long data-folder path broke inside a name | It breaks after a separator |
+| Game settings | The Back button's right edge matched neither the card nor the scrollbar | It sits at the column's right edge |
+| Collection | The choose banner's right border was still shaved (the shelf clipped it) | The shelf reaches 4 points past each side too |
+
+## Left (checked again, small, not touched)
+
+- Sidebar rows' focus ring is drawn inside on purpose and is flat at the window's left edge.
+- ImGui's own widgets: the combo's arrow cell, the Level slider's grab at its maximum, square Selectable rows (Add a figure > Versions).
+- The tab row sits 6 points lower on game settings than on the launcher's settings; at 1024x680 the sidebar's footer is 40 points under the game list.
+- Two-line French descriptions in the Video tab; "Change disc..." is 40 points past the main button's edge.
+- The install log's first line can be cut by the box's top; the kit's own error lines stay in English.
