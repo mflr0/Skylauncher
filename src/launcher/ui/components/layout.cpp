@@ -53,7 +53,7 @@ namespace ui
         }
         if (options.image)
         {
-            options.image(draw, ImVec2(x, min.y + space::XS), ImVec2(options.imageWidth, h - 2 * space::XS));
+            options.image(draw, ImVec2(x, min.y + space::XXS), ImVec2(options.imageWidth, h - 2 * space::XXS));
             x += options.imageWidth + space::S;
         }
         if (options.chevron)
@@ -309,17 +309,17 @@ namespace ui
 
     namespace
     {
-        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59, AnchorAbove = 0x4D454E5A; // "MENX", "MENY", "MENZ": where a menu opens, by its id
+        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59, AnchorPivot = 0x4D454E5A; // "MENX", "MENY", "MENZ": where a menu opens, by its id
         constexpr float IconSlot = space::L; // a menu row's room for its icon or check, kept when it has none (the labels align)
     }
 
-    void OpenMenu(const char* id, bool above)
+    void OpenMenu(const char* id, MenuAnchor anchor)
     {
         ImGuiStorage* storage = ImGui::GetStateStorage();
         const ImGuiID key = ImGui::GetID(id);
-        storage->SetFloat(key ^ AnchorX, ImGui::GetItemRectMin().x);
-        storage->SetFloat(key ^ AnchorY, above ? ImGui::GetItemRectMin().y - space::XS : ImGui::GetItemRectMax().y + space::XS);
-        storage->SetBool(key ^ AnchorAbove, above);
+        storage->SetFloat(key ^ AnchorX, anchor.alignRight ? ImGui::GetItemRectMax().x : ImGui::GetItemRectMin().x);
+        storage->SetFloat(key ^ AnchorY, anchor.above ? ImGui::GetItemRectMin().y - space::XS : ImGui::GetItemRectMax().y + space::XS);
+        storage->SetInt(key ^ AnchorPivot, (anchor.alignRight ? 1 : 0) | (anchor.above ? 2 : 0));
         ImGui::OpenPopup(id);
     }
 
@@ -329,7 +329,7 @@ namespace ui
         const ImGuiID key = ImGui::GetID(id);
         if (ImGui::IsPopupOpen(id))
             ImGui::SetNextWindowPos(ImVec2(storage->GetFloat(key ^ AnchorX), storage->GetFloat(key ^ AnchorY)), ImGuiCond_Appearing,
-                ImVec2(0, storage->GetBool(key ^ AnchorAbove) ? 1.0f : 0.0f));
+                ImVec2(storage->GetInt(key ^ AnchorPivot) & 1 ? 1.0f : 0.0f, storage->GetInt(key ^ AnchorPivot) & 2 ? 1.0f : 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(space::XS, space::XS));
         ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, radius::Control);
         ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, elevation::Raised.border);

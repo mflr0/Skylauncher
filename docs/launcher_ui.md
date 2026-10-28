@@ -231,7 +231,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 | | |
 |---|---|
 | When | One row of a list or a menu-like page: a backup, a trashed figure, a setting that opens a page, a game. |
-| API | `bool ui::ListRow(title, ListRowOptions{subtitle, trailing, icon, chevron, selected, disabled, width})`; `Normal` high, `Large` with a subtitle; the whole row is pressable. |
+| API | `bool ui::ListRow(title, ListRowOptions{subtitle, trailing, icon, chevron, selected, disabled, width, image, imageWidth, note, status, progress, progressColor, dim})`; `Normal` high, `Large` with a subtitle; the whole row is pressable. `image` draws a picture at the row's left, `imageWidth` wide and the row's height less `XXS` above and below (a game's logo, a figure's). |
 | States | Hover, pressed, focus ring, disabled; selected: the raised grey and the orange bar (as the sidebar). Title and subtitle are cut with "..." before the trailing part. |
 
 ### Settings rows
@@ -259,7 +259,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 | | |
 |---|---|
 | When | A short list of actions under the item that opens it ("...", a figure's actions). |
-| API | `ui::OpenMenu(id)` after the opener; `if (ui::BeginMenu(id)) { ui::MenuItem(label, MenuItemOptions{icon, checked, danger, disabled}); ui::MenuSeparator(); ...; ui::EndMenu(); }` |
+| API | `ui::OpenMenu(id, MenuAnchor{above, alignRight})` after the opener (`above`: the menu over it, for one at the window's foot; `alignRight`: the menu's right edge on the opener's, for one at the window's right); `if (ui::BeginMenu(id)) { ui::MenuItem(label, MenuItemOptions{icon, checked, danger, disabled}); ui::MenuSeparator(); ...; ui::EndMenu(); }` |
 | States | Rows `Small` high, hover / focus highlight, a check for a checked row, danger rows in `Danger`, disabled rows dim; a row closes the menu. |
 
 ### Tooltip
@@ -335,7 +335,7 @@ Phase B applies these on every screen it touches.
   ("28 Oct 2026", "28 oct. 2026"), times `ui::FormatTime` ("15:05", 24 hours), when something happened `ui::FormatWhen`
   ("Today 15:05", "Yesterday 15:05", else the date), the collection's ISO times `ui::ParseIsoUtc`. Local time, never "UTC" in the window.
 - **French punctuation**: a no-break space (U+00A0) before ":", "?", "!" and "%" and inside « »; the translation test fails on a
-  plain space there. The decimal mark is a comma, the thousands separator a narrow no-break space (the helpers).
+  plain space there. The decimal mark is a comma, the thousands separator a no-break space (the helpers; the font has no narrow one).
 - **Numbers and units**: digits, a space and the unit ("6 GB", "10 min", "30 FPS"); sizes rounded as `FormatSize` does;
   durations in minutes; a count with its noun has two strings, singular and plural.
 - **Hold buttons**: the label is the plain verb ("Delete", "Reset"); the hint ("Hold to confirm", or a sentence saying what
@@ -395,7 +395,7 @@ elevation shadow and the Scrim fade, the status a `StatusPill`, "Coming later" B
 install or update note, "Play without updating" a Ghost Button, "Use it for {}" a Primary Button); the disc check's bar is an
 `IndeterminateBar` once it passes 97 % (the main action sweeps too: `MainAction::indeterminate`); **first run** (no disc): a dashed
 drop zone with the three steps and "Your disc is read on this computer only." (a click chooses, a drop reads); the controller is a
-`Pill` opening a `Menu` above it (`OpenMenu(id, above)`); the portal line a `StatusPill`; a `PadLegend` (Play, Game settings, Sidebar)
+`Pill` opening a `Menu` above it (`OpenMenu(id, {.above = true})`); the portal line a `StatusPill`; a `PadLegend` (Play, Game settings, Sidebar)
 in a strip under the band while a pad is in use (`App::PlayBandH`). Install card: `BeginCard`, one `ProgressBar` with its
 percentage (the percentage is said once in the card), status icons per step, Retry (Primary) first then Copy log, Open logs folder
 (`Icon::Folder`), Show details (Ghost); Cancel stays Secondary (it keeps the install going on a tap, no hold). Update banner:
@@ -437,7 +437,13 @@ through `ui::Text`; the portal test's verdicts name the game with `GameName`. Th
 (`17-` to `19-` are Support, About and the report).
 
 **3. The Collection, its sheets and dialogs** (`collection_page.cpp`, `collection_figure.cpp`, `collection_add.cpp`,
-`collection_manage.cpp`)
+`collection_manage.cpp`) - **done (phase B, 2026-10-28)**. What was decided: the portal's game is a Select "Next start: ..."
+(tooltip says what it is) on the count's line; Sort is a Select beside Filters (it is not a filter: no chip, Clear all keeps
+it) and Filters a Button opening a Menu with three Selects; the figure sheet, Add a figure and Manage are one `ui::Modal`
+(Large) whose title is the view's, Edit and "Change the bottom" being views of the sheet (B steps back); Reset and Delete ask
+in a danger `ConfirmDialog` (the hold is for the buttons in a list: Delete for good, Restore, Tidy, Mark as not in use); the
+sheet's "Restore a backup..." opens Manage > Backups on that figure (the Menu has no submenu); Edit is a settings list; the
+pad legend closes the page while a pad is in use. The list that follows is what was asked.
 - Header: "COLLECTION" Display, sentence case; "+ Add a figure" a Primary Button with `Icon::Plus` (the "+" leaves the
   string); "..." an IconButton (`Icon::More`, tooltip "Manage") or a Pill "Manage"; the portal's game dropdown (a 28-point
   pill) a Select with short names.
@@ -459,6 +465,8 @@ through `ui::Text`; the portal test's verdicts name the game with `GameName`. Th
 
 **Inconsistencies seen, for phase B to fix**
 (Done in the settings part: 1 for "LAUNCHER SETTINGS", 4 for the save backups, 6, 7 for "Create", 9 and 10 on the settings screens, 12 for the problem report, 13. Done: the Keyboard tab's warning is an icon, not red alone.)
+(Collection: every item that names it is done: casing, ellipsis, dates, hold wording, Primary, text sizes, raw colours, the
+shells, the toast kinds.)
 1. Casing: page titles written in capitals in the source ("LIBRARY", "COLLECTION", "LAUNCHER SETTINGS", "ADD A FIGURE",
    "EDIT", "MANAGE", "CHANGE THE BOTTOM", "CHANGE THE TOP") while section titles are sentence case; overline captions in
    capitals ("YOUR GAMES", "COMING LATER", "PORTAL AT THE NEXT START", "CONTROLLER", "DISC IMAGE:").

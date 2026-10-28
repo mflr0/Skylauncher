@@ -201,6 +201,14 @@ namespace launcher_ui
         return name;
     }
 
+    std::string FullGameName(const std::string& game)
+    {
+        if (const char* name = GameName(game, GameNameForm::Full))
+            return name;
+        const collection::Game* found = collection::Catalogue::Get().FindGame(game);
+        return found == nullptr ? game : found->name;
+    }
+
     std::vector<std::string> MoveLauncherSettings(const collection::Game& game, const std::string& legacy,
         const std::vector<std::string>& favourites, const std::vector<std::string>& place)
     {

@@ -30,8 +30,8 @@ namespace ui
         bool selected = false;
         bool disabled = false;
         float width = -1;
-        // An image at the row's left (a game's logo, an initial): drawn by the caller in `imageWidth` points of the row's
-        // height, called with the box's top left and size. The sidebar's rows have one.
+        // An image at the row's left (a game's logo, a figure's picture): `imageWidth` points wide, the row's height less
+        // space::XXS above and below, drawn by the caller, called with the box's top left and size.
         std::function<void(ImDrawList*, ImVec2 at, ImVec2 size)> image;
         float imageWidth = 0;
         const char* note = nullptr;     // a small word after the title (a version)
@@ -68,8 +68,14 @@ namespace ui
         ModalKind kind = ModalKind::Normal);
 
     // ---- Menu: a popover under the item that opens it, with its rows. ----
-    // After the item that opens it: the menu opens under that item, or above it (`above`: an item at the window's foot, a band).
-    void OpenMenu(const char* id, bool above = false);
+    // After the item that opens it: the menu opens under that item, its left edge on the item's; `above`: above it (an item
+    // at the window's foot, a band); `alignRight`: its right edge on the item's (an opener at the window's right).
+    struct MenuAnchor
+    {
+        bool above = false;
+        bool alignRight = false;
+    };
+    void OpenMenu(const char* id, MenuAnchor anchor = {});
     bool BeginMenu(const char* id);
     struct MenuItemOptions
     {

@@ -8,7 +8,7 @@
 Hold to confirm	Maintenez pour confirmer
 {}%	{} %
 .	,
-,	 
+,	 
 {0} {1} {2}	{0} {1} {2}
 Today {}	Aujourd'hui {}
 Yesterday {}	Hier {}
@@ -19,7 +19,6 @@ Apr	avr.
 May	mai
 Jun	juin
 Jul	juil.
-Add a figure	Ajouter une figurine
 Aug	août
 Check for updates	Rechercher les mises à jour
 Clear the figures	Retirer les figurines
@@ -440,19 +439,48 @@ nothing yet	0 octet
 {}: {} freed	{} : {} libérés
 
 # The Collection page, the figure sheet, Add a figure and Manage
-   level {} · {} gold	   niveau {} · {} or
-  (replaces {})	  (remplace {})
- · maximum level	 · niveau maximum
+{} backup	{} copie
+{} backups	{} copies
+What it wears in the game	Ce qu'il porte dans le jeu
+level {} · {} gold	niveau {} · {} or
+maximum level	niveau maximum
+{} XP · {}	{} XP · {}
+{} to level {}	{} avant le niveau {}
+{} · {}	{} · {}
+{} · {} played	{} · {} de jeu
+{} · {} · {} upgrades	{} · {} · {} améliorations
+ (replaces {})	 (remplace {})
+0 to {}	0 à {}
+1 to {}	1 à {}
+16 characters at most	16 caractères au maximum
+Add a figure	Ajouter une figurine
+Collection	Collection
+Empty: the toy's name	Vide : le nom du jouet
+Experience	Expérience
+Figure sheet	Fiche
+Hold to move them to the trash.	Maintenez pour les mettre à la corbeille.
+Hold to put this copy back.	Maintenez pour remettre cette copie.
+Later games	Jeux suivants
+Move to the trash	Mettre à la corbeille
+Move {} to the trash? It stays there for 30 days.	Mettre {} à la corbeille ? Elle y reste 30 jours.
+Name	Nom
+Name, element, game, level...	Nom, élément, jeu, niveau...
+Next start: {}	Prochain lancement : {}
+No figures yet. Add one, or drop your figure files on the window.	Aucune figurine. Ajoutez-en une, ou déposez vos fichiers de figurines sur la fenêtre.
+Reset	Réinitialiser
+Restore a backup...	Restaurer une copie de secours...
+Search	Rechercher
+Select	Choisir
+The figures on the portal when the game starts	Les figurines sur le portail au lancement du jeu
+Tidy · {}	Ranger · {}
+Trash · {}	Corbeille · {}
+Unknown toys · {}	Jouets inconnus · {}
  · {} already there	 · {} déjà présent(s)
  · {} favourite	 · {} favori
  · {} favourites	 · {} favoris
  · {} not a figure	 · {} qui n'est pas une figurine
- · {} to level {}	 · {} avant le niveau {}
  · {} unknown toy (Manage)	 · {} jouet inconnu (Gérer)
  · {} unknown toys (Manage)	 · {} jouets inconnus (Gérer)
-+  Add a figure	+  Ajouter une figurine
-ADD A FIGURE	AJOUTER UNE FIGURINE
-Add a figure or import yours.	Ajoutez une figurine ou importez les vôtres.
 Add to favourites	Ajouter aux favoris
 Adventure	Aventure
 Adventure Packs	Packs d'aventure
@@ -472,7 +500,6 @@ Pick a figure.	Choisissez une figurine.
 Choose another	En choisir une autre
 Chrome	Chrome
 Clear search and filters	Effacer recherche et filtres
-Click a seat, then a figure	Cliquez sur une place, puis sur une figurine
 Click: sheet · drag to a seat	Clic : fiche · glisser vers une place
 Click: put it on {}	Clic : la mettre sur {}
 Couldn't back it up	Sauvegarde impossible
@@ -499,7 +526,6 @@ Drop figure files or a folder on the window.	Déposez des fichiers de figurines 
 Duplicate	Dupliquer
 More actions	Plus d'actions
 Duplicated: 	Dupliquée : 
-EDIT	MODIFIER
 Earth	Terre
 Edit	Modifier
 Element	Élément
@@ -508,7 +534,6 @@ Eon's Elite	Élite d'Eon
 Event and exclusive	Événement et exclusif
 The latest 10 backups are kept.	Les 10 dernières copies sont gardées.
 No unknown toys.	Aucun jouet inconnu.
-Experience (0 to {})	Expérience (0 à {})
 Export everything...	Tout exporter...
 Export the figures to	Exporter les figurines vers
 Exported {} figure to {}	{} figurine exportée vers {}
@@ -525,16 +550,10 @@ For {}	Pour {}
 Giants	Géants
 Glow in the Dark	Phosphorescent
 Gold	Or
-Gold (0 to {})	Or (0 à {})
 Hat	Chapeau
 Hero points	Points de héros
-Hero points (0 to {})	Points de héros (0 à {})
 Hold if its game has quit.	Maintenez si son jeu est fermé.
-Hold to delete	Maintenir pour supprimer
 Hold to delete it for good.	Maintenez pour la supprimer pour de bon.
-Hold to move it to the trash.	Maintenez pour la mettre à la corbeille.
-Hold to reset	Maintenir pour réinitialiser
-Hold to reset it.	Maintenez pour la remettre à neuf.
 Import a folder...	Importer un dossier...
 Import and export	Import et export
 Import figures	Importer des figurines
@@ -544,14 +563,12 @@ Imported {}	{} importée(s)
 Item or adventure	Objet ou aventure
 Its name	Son nom
 Last played	Dernière partie
-Later games  {}	Jeux suivants  {}
 Legendary	Légendaire
 Level in {}	Niveau dans {}
 Level {}	Niveau {}
 Life	Vie
 Light	Lumière
 LightCore	LightCore
-MANAGE	GÉRER
 Magic	Magie
 Magic Items	Objets magiques
 Magic item	Objet
@@ -561,17 +578,13 @@ Metallic	Métallisé
 Minis and sidekicks	Minis et acolytes
 Missing figure	Figurine absente
 Move {} to the trash	Mettre {} à la corbeille
-Move {} to the trash?	Mettre {} à la corbeille ?
 Moved to the trash	Mise à la corbeille
-My Skylanders is empty	Mes Skylanders est vide
 Name (optional)	Nom (facultatif)
-Name (empty: the toy's name)	Nom (vide : celui du jouet)
 Name this toy	Nommer ce jouet
 Named: shown at the next start	Nommé : affiché au prochain lancement
 Never	Jamais
 New: never played.	Neuve : jamais jouée.
 Nickname	Surnom
-Nickname (16 max)	Surnom (16 max)
 No element	Aucun élément
 No figure matches	Aucune figurine ne correspond
 No game this launcher knows	Aucun jeu connu de ce launcher
@@ -580,28 +593,23 @@ None	Aucun
 None yet	Aucune pour l'instant
 Not for {}	Pas pour {}
 Nothing for this seat yet	Rien pour cette place pour l'instant
-ON THE PORTAL NOW	SUR LE PORTAIL MAINTENANT
 Blank figures from old versions. Tidy trashes them.	Figurines vierges d'anciennes versions. Ranger les met à la corbeille.
 On	Sur
 On the portal in {}: read-only	Sur le portail dans {} : lecture seule
 On {} at the next start of {}	Sur {} au prochain lancement de {}
 Open its sheet	Ouvrir sa fiche
 Other	Autre
-PORTAL AT THE NEXT START	PORTAIL AU PROCHAIN LANCEMENT
-Pick a figure below	Choisissez une figurine ci-dessous
 Pick one below	Voir ci-dessous
 Player {}	Joueur {}
 Playing now	En jeu
 Plays in	Joue dans
 Put back	Remettre
-Put back the copy from {}?	Remettre la copie du {} ?
 Put back: 	Remise : 
 Put it on {}	La mettre sur {}
 Put on the portal	Mettre sur le portail
 Reset to new	Remise à neuf
 Reset to new...	Remettre à neuf...
 Reset {} to new? Level, gold and upgrades are lost.	Remettre {} à neuf ? Niveau, or et améliorations seront perdus.
-Restore a backup	Restaurer une copie de secours
 Save	Enregistrer
 Saved	Enregistré
 Search the catalogue	Rechercher dans le catalogue
@@ -621,7 +629,6 @@ The game is running: use its Toy Box	Le jeu tourne : utilisez son Coffre à jou
 The game isn't installed yet	Le jeu n'est pas encore installé
 The trash is empty.	La corbeille est vide.
 Not available for this game yet	Pas encore disponible pour ce jeu
-Tidy  {}	Ranger  {}
 Tidy the starters	Ranger les figurines de départ
 Toy	Jouet
 Toy type {}	Jouet de type {}
@@ -631,7 +638,6 @@ Trap Masters	Maîtres des pièges
 Trap shape	Forme de piège
 Traps	Pièges
 Trash	Corbeille
-Trash  {}	Corbeille  {}
 Trophies	Trophées
 Type	Type
 Undead	Mort-vivant
@@ -639,18 +645,15 @@ Unknown	Inconnu
 Unknown toy {}	Jouet inconnu {}
 Unknown toy {} (variant {:04X})	Jouet inconnu {} (variante {:04X})
 Unknown toys	Jouets inconnus
-Unknown toys  {}	Jouets inconnus  {}
 Unreadable. Restore a backup or reset it.	Illisible. Restaurez une copie ou remettez-la à neuf.
 Vehicle {}	Véhicule {}
 Vehicles	Véhicules
 Villains	Méchants
 Water	Eau
-Works in {}  {}	Fonctionne dans {}  {}
 Your figures	Vos figurines
 deleted	supprimée
 every game	tous les jeux
 figure	figurine
-For other games	Pour d'autres jeux
 hat {}	chapeau {}
 needs {}	demande {}
 no hat	sans chapeau
@@ -658,15 +661,10 @@ only what {} reads	seulement ce que {} lit
 owned x{}	possédé x{}
 the collection's index can't be written	l'index de la collection ne peut pas être écrit
 tidied	rangée
-{}   ·   {}   ·   {} upgrades	{}   ·   {}   ·   {} améliorations
-{}   ·   {} played	{}   ·   {} de jeu
-{}  {}##b	{}  {}##b
 Not available for {} yet	Pas encore disponible pour {}
 {} doesn't go on {}	{} ne va pas sur {}
-{} figure	{} figurine
 {} figure copied	{} figurine copiée
 {} figure moved to the trash	{} figurine mise à la corbeille
-{} figures	{} figurines
 {} figures copied	{} figurines copiées
 {} figures moved to the trash	{} figurines mises à la corbeille
 {} h {:02} min	{} h {:02} min
@@ -677,9 +675,7 @@ Not available for {} yet	Pas encore disponible pour {}
 {} min	{} min
 {} · type {} · variant {:04X}	{} · type {} · variante {:04X}
 {}: {} taken off	{} : {} retirée
-Name, element, game, level…	Nom, élément, jeu, niveau…
 Filters	Filtres
-Sort by	Trier par
 Sort: {}	Tri : {}
 Clear all	Tout effacer
 Versions	Versions
@@ -694,8 +690,6 @@ Bottom file	Fichier du bas
 Top: {} · Bottom: {}	Haut : {} · Bas : {}
 Change the bottom	Changer le bas
 Change the top	Changer le haut
-CHANGE THE BOTTOM	CHANGER LE BAS
-CHANGE THE TOP	CHANGER LE HAUT
 {}: pick the new {}	{} : choisis le nouveau {}
 bottom	bas
 top	haut

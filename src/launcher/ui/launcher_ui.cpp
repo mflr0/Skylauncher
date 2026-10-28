@@ -1021,14 +1021,6 @@ namespace launcher_ui
         return pressed;
     }
 
-    bool App::LevelSlider(const char* id, int* value, int min, int max, float width)
-    {
-        ui::SliderOptions options;
-        options.width = width;
-        options.showValue = false;
-        return ui::Slider(id, value, min, max, options);
-    }
-
     void App::BeginPageColumn(const char* id, float width, bool alwaysScrollbar)
     {
         constexpr float Bleed = 4;
@@ -1773,7 +1765,7 @@ namespace launcher_ui
             {
                 m_testControllers = false;
                 RefreshGamepads();
-                ui::OpenMenu("##controllers", true);
+                ui::OpenMenu("##controllers", {.above = true});
             }
             // PLAY WITH: the choices, the one in use checked.
             if (ui::BeginMenu("##controllers"))
@@ -2153,7 +2145,7 @@ namespace launcher_ui
         ui::NewFrame(SDL_GetTicks());
         ui::Ctx().accent = m_page == Page::Play || m_page == Page::GameSettings ? StyleOf(m_s->game.id).glow : Accent;
         ui::Ctx().reduceMotion = ReduceMotion();
-        if (m_gamepads.empty() && !m_testNav)
+        if (m_gamepads.empty() && !m_testNav && !CollectionPage::TestPad())
             ui::Ctx().glyphs = ui::Glyphs::Keyboard;
         else
         {

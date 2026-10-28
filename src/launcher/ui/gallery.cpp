@@ -410,6 +410,14 @@ namespace launcher_ui
             folder.icon = ui::Icon::Folder;
             folder.chevron = true;
             ui::ListRow(Tr("Show in folder"), folder);
+            // `image`: a picture the caller draws at the row's left (a figure's).
+            ui::ListRowOptions picture;
+            picture.subtitle = Tr("Water");
+            picture.imageWidth = ui::height::Large - 2 * ui::space::XXS;
+            picture.image = [](ImDrawList* draw, ImVec2 at, ImVec2 size) {
+                draw->AddCircleFilled(ImVec2(at.x + size.x / 2, at.y + size.y / 2), size.y / 2, ui::Col(ui::color::AccentFill));
+            };
+            ui::ListRow(GameName("giants", GameNameForm::Short), picture);
             ui::SectionHeader(Tr("Language"), Tr("Only contacts github.com."));
             ui::EndCard();
             ImGui::SetCursorScreenPos(ImVec2(row.x + 2 * (cardW + ui::space::L), row.y));
