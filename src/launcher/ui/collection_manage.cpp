@@ -18,7 +18,6 @@ namespace launcher_ui
 
     namespace
     {
-        // Manage's words that changed in the polish pass (the rest are still inline, for #4).
         namespace strings
         {
             constexpr const char* DeleteForGood = N_("Delete for good");
@@ -102,22 +101,15 @@ namespace launcher_ui
         Toast(count == 1 ? Tf("Exported {} figure to {}", count, folder) : Tf("Exported {} figures to {}", count, folder));
     }
 
-    void CollectionPage::DrawManage(ImVec2 size)
+    void CollectionPage::DrawManage()
     {
-        m_app.Title(Tr("MANAGE"), HeadlineSize - 6, Text);
         RefreshDisk();
         size_t unknown = std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return f.toy == nullptr; });
-        const std::string tabs[] = { Tf("Trash  {}", m_trash.size()), Tr("Backups"), Tr("Import and export"), Tf("Unknown toys  {}", unknown),
-            Tf("Tidy  {}", m_starters) };
-        for (int i = 0; i < 5; i++)
-        {
-            if (i > 0)
-                ImGui::SameLine(0, 8);
-            if (m_app.Chip((tabs[i] + "##managetab" + std::to_string(i)).c_str(), m_manageTab == i))
-                m_manageTab = i;
-        }
-        ImGui::Dummy(ImVec2(0, 6));
-        ImGui::BeginChild("##managebody", ImVec2(0, size.y - ImGui::GetCursorPosY() - Pad - 50), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        const std::string tabs[] = { Tf("Trash · {}", m_trash.size()), Tr("Backups"), Tr("Import and export"), Tf("Unknown toys · {}", unknown),
+            Tf("Tidy · {}", m_starters) };
+        const char* labels[] = { tabs[0].c_str(), tabs[1].c_str(), tabs[2].c_str(), tabs[3].c_str(), tabs[4].c_str() };
+        ui::Tabs("##managetabs", labels, &m_manageTab);
+        ImGui::BeginChild("##managebody", ImVec2(0, OverlayBody(3 * ui::height::Main, 3 * ui::height::Main, 6 * ui::height::Main)), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         switch (m_manageTab)
         {
@@ -128,44 +120,48 @@ namespace launcher_ui
         default: DrawTidy(); break;
         }
         ImGui::EndChild();
-        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetWindowPos().x + size.x - Pad - m_app.PillWidth(Tr("Close"), 110, true), ImGui::GetWindowPos().y + size.y - Pad - 40));
-        if (m_app.PillButton(Tr("Close"), false, 110, true))
-            CloseOverlay();
     }
 
     void CollectionPage::DrawTrash()
     {
         const std::vector<collection::TrashEntry> trash = m_trash; // a copy: the buttons below reload it
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Deleted figures are kept 30 days."));
-        ImGui::Dummy(ImVec2(0, 6));
+        const std::vector<std::string> names = m_trashNames;
+        ui::Text(ui::TextStyle::Caption, Tr("Deleted figures are kept 30 days."), ui::color::Dim);
         if (trash.empty())
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("The trash is empty."));
-        for (const collection::TrashEntry& entry : trash)
         {
+            ui::EmptyState(ui::Icon::Trash, Tr("The trash is empty."));
+            return;
+        }
+        if (!ui::BeginSettings("##trash"))
+            return;
+        for (size_t i = 0; i < trash.size(); i++)
+        {
+            const collection::TrashEntry& entry = trash[i];
             ImGui::PushID(entry.id.c_str());
-            m_app.BoldText(entry.file.c_str(), Text);
-            ImGui::SameLine(0, 12);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ShortDate(entry.deleted).c_str(), entry.reason == "tidy" ? Tr("tidied") : Tr("deleted"));
-            if (m_app.PillButton(Tr("Put back"), false, 120, true))
+            ui::SettingRow(names[i].c_str(), Tf("{} · {}", When(entry.deleted), entry.reason == "tidy" ? Tr("tidied") : Tr("deleted")).c_str());
+            if (ui::Button(Tr("Put back")))
             {
-                Toast(collection::Undelete(entry.id).empty() ? Tr("Couldn't put it back") : Tr("Put back: ") + entry.file);
+                Toast(collection::Undelete(entry.id).empty() ? Tr("Couldn't put it back") : Tr("Put back: ") + names[i], false);
                 Reload();
             }
-            ImGui::SameLine(0, 8);
-            if (m_app.HoldButton(Tr(strings::DeleteForGood), 200, Tr(strings::DeleteForGoodHint)))
+            ImGui::SameLine(0, ui::space::XS);
+            ui::ButtonOptions forGood;
+            forGood.kind = ui::ButtonKind::Danger;
+            forGood.hold = true;
+            forGood.tooltip = Tr(strings::DeleteForGoodHint);
+            if (ui::Button(Tr(strings::DeleteForGood), forGood))
             {
                 collection::DeleteForGood(entry.id);
                 Reload();
             }
             ImGui::PopID();
-            ImGui::Dummy(ImVec2(0, 6));
         }
+        ui::EndSettings();
     }
 
     void CollectionPage::DrawBackups()
     {
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("The latest 10 backups are kept."));
-        ImGui::Dummy(ImVec2(0, 6));
+        ui::Text(ui::TextStyle::Caption, Tr("The latest 10 backups are kept."), ui::color::Dim);
         bool any = false;
         for (const Figure& figure : m_model.figures)
         {
@@ -173,125 +169,134 @@ namespace launcher_ui
             if (backups.empty())
                 continue;
             any = true;
+            const bool open = m_backupsOf == figure.path;
+            const std::string count = backups.size() == 1 ? Tf("{} backup", backups.size()) : Tf("{} backups", backups.size());
+            ui::ListRowOptions options;
+            options.trailing = count.c_str();
+            options.selected = open;
             ImGui::PushID(figure.path.c_str());
-            if (m_app.Chip(Tf("{}  {}##b", Name(figure), backups.size()).c_str(), m_backupsOf == figure.path))
-                m_backupsOf = m_backupsOf == figure.path ? std::string() : figure.path;
+            if (ui::ListRow(Name(figure).c_str(), options))
+                m_backupsOf = open ? std::string() : figure.path;
             ImGui::PopID();
-            if (m_backupsOf != figure.path)
+            if (!open)
                 continue;
-            float labelsW = 0; // the Restore buttons line up
-            for (const BackupRow& backup : backups)
-                labelsW = std::max(labelsW, ImGui::CalcTextSize(backup.label.c_str()).x);
-            for (const BackupRow& backup : backups)
+            if (ui::BeginSettings("##backups"))
             {
-                ImGui::PushID(backup.path.c_str());
-                ImGui::Indent(20);
-                float rowY = ImGui::GetCursorPosY(), rowX = ImGui::GetCursorPosX();
-                ImGui::SetCursorPosY(rowY + (40 - ImGui::GetTextLineHeight()) / 2); // centred on the 40-point button
-                ImGui::TextUnformatted(backup.label.c_str());
-                ImGui::SameLine(rowX + labelsW + 14, 0);
-                ImGui::SetCursorPosY(rowY);
-                ImGui::BeginDisabled(!Writable(figure));
-                if (m_app.PillButton(Tr("Restore"), false, 100, true))
+                for (const BackupRow& backup : backups)
                 {
-                    std::string error;
-                    Toast(collection::Restore(figure.path, backup.path, &error) ? Tr("Backup restored") : Tr("Couldn't restore it: ") + error);
-                    Reload();
+                    ImGui::PushID(backup.path.c_str());
+                    ui::SettingRow(backup.label.c_str(), backup.detail.empty() ? nullptr : backup.detail.c_str());
+                    ui::ButtonOptions restore;
+                    restore.kind = ui::ButtonKind::Danger;
+                    restore.hold = true;
+                    restore.disabled = !Writable(figure);
+                    restore.tooltip = Tr("Hold to put this copy back.");
+                    if (ui::Button(Tr("Restore"), restore))
+                    {
+                        std::string error;
+                        const bool done = collection::Restore(figure.path, backup.path, &error);
+                        Toast(done ? Tr("Backup restored") : Tr("Couldn't restore it: ") + error, !done);
+                        Reload();
+                    }
+                    ImGui::PopID();
                 }
-                ImGui::EndDisabled();
-                ImGui::Unindent(20);
-                ImGui::PopID();
+                ui::EndSettings();
             }
         }
         if (!any)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("No backups yet."));
+            ui::EmptyState(ui::Icon::Info, Tr("No backups yet."));
     }
 
     void CollectionPage::DrawImportExport()
     {
-        ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Drop figure files or a folder on the window."));
-        ImGui::PopTextWrapPos();
-        ImGui::Dummy(ImVec2(0, 8));
-        if (m_app.PillButton(Tr("Import files..."), true, 190, true))
+        ui::Text(ui::TextStyle::Body, Tr("Drop figure files or a folder on the window."), ui::color::InkSoft);
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::ButtonOptions primary;
+        primary.kind = ui::ButtonKind::Primary;
+        primary.icon = ui::Icon::Download;
+        if (ui::Button(Tr("Import files..."), primary))
             Import(ChooseFigureFiles(m_app.m_window));
-        ImGui::SameLine(0, 8);
-        if (m_app.PillButton(Tr("Import a folder..."), false, 210, true))
-            if (std::string folder = ChooseFolder(m_app.m_window, Tr("Import the figures of a folder")); !folder.empty())
-                Import({ folder });
-        ImGui::Dummy(ImVec2(0, 12));
-        if (m_app.PillButton(Tr("Export everything..."), false, 230, true))
+        ImGui::SameLine(0, ui::space::S);
+        ui::ButtonOptions folder;
+        folder.icon = ui::Icon::Folder;
+        if (ui::Button(Tr("Import a folder..."), folder))
+            if (std::string chosen = ChooseFolder(m_app.m_window, Tr("Import the figures of a folder")); !chosen.empty())
+                Import({ chosen });
+        ImGui::Dummy(ImVec2(0, ui::space::S));
+        if (ui::Button(Tr("Export everything..."), folder))
         {
             std::vector<std::string> paths;
             for (const Figure& figure : m_model.figures)
                 paths.push_back(figure.path);
             ExportTo(paths);
         }
-        ImGui::SameLine(0, 8);
-        if (m_app.PillButton(Tr("Show in folder"), false, 190, true))
+        ImGui::SameLine(0, ui::space::S);
+        if (ui::Button(Tr("Show in folder"), folder))
         {
             SDL_CreateDirectory(collection::Folder().c_str());
-            { std::string folder = collection::Folder(); OpenFolder(std::filesystem::path(std::u8string(folder.begin(), folder.end()))); }
+            { std::string path = collection::Folder(); OpenFolder(std::filesystem::path(std::u8string(path.begin(), path.end()))); }
         }
-        ImGui::Dummy(ImVec2(0, 10));
-        ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", collection::Folder().c_str());
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::Text(ui::TextStyle::Caption, collection::Folder().c_str(), ui::color::Dim);
     }
 
     void CollectionPage::DrawUnknown()
     {
-        ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Not in the catalogue. Name one to show it."));
-        ImGui::PopTextWrapPos();
-        ImGui::Dummy(ImVec2(0, 8));
+        ui::Text(ui::TextStyle::Caption, Tr("Not in the catalogue. Name one to show it."), ui::color::Dim);
         bool any = false;
-        for (const Figure& figure : m_model.figures)
+        if (ui::BeginSettings("##unknown"))
         {
-            if (figure.toy != nullptr)
-                continue;
-            any = true;
-            ImGui::PushID(figure.path.c_str());
-            m_app.BoldText(Tf("Unknown toy {} (variant {:04X})", figure.type, figure.variant).c_str(), Text);
-            ImGui::SameLine(0, 12);
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", figure.file.c_str());
-            if (m_unknownType == figure.type)
+            for (const Figure& figure : m_model.figures)
             {
-                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 8));
-                ImGui::SetNextItemWidth(260);
-                ImGui::InputTextWithHint("##unknownname", Tr("Its name"), m_unknownName, sizeof(m_unknownName));
-                ImGui::PopStyleVar();
-                ImGui::SameLine(0, 8);
-                if (m_app.PillButton(Tr("Save"), true, 100, true) && m_unknownName[0] != 0)
+                if (figure.toy != nullptr)
+                    continue;
+                any = true;
+                ImGui::PushID(figure.path.c_str());
+                ui::SettingRow(Tf("Unknown toy {} (variant {:04X})", figure.type, figure.variant).c_str(), figure.file.c_str());
+                if (m_unknownType == figure.type)
                 {
-                    Toast(NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId) ? Tr("Named: shown at the next start")
-                                                                                                                : Tr("Couldn't save the name"));
-                    m_unknownType = 0xFFFF;
-                    m_unknownName[0] = 0;
+                    ui::TextFieldOptions field;
+                    field.hint = Tr("Its name");
+                    field.width = ui::height::SettingControl - ui::height::Main - ui::space::XS;
+                    ui::TextField("##unknownname", m_unknownName, sizeof(m_unknownName), field);
+                    ImGui::SameLine(0, ui::space::XS);
+                    ui::ButtonOptions save;
+                    save.kind = ui::ButtonKind::Primary;
+                    save.disabled = m_unknownName[0] == 0;
+                    if (ui::Button(Tr("Save"), save))
+                    {
+                        const bool named = NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId);
+                        Toast(named ? Tr("Named: shown at the next start") : Tr("Couldn't save the name"), !named);
+                        m_unknownType = 0xFFFF;
+                        m_unknownName[0] = 0;
+                    }
                 }
+                else if (ui::Button(Tr("Name this toy")))
+                    m_unknownType = figure.type;
+                ImGui::PopID();
             }
-            else if (m_app.PillButton(Tr("Name this toy"), false, 170, true))
-                m_unknownType = figure.type;
-            ImGui::PopID();
-            ImGui::Dummy(ImVec2(0, 6));
+            ui::EndSettings();
         }
         if (!any)
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("No unknown toys."));
+            ui::EmptyState(ui::Icon::Check, Tr("No unknown toys."));
     }
 
     void CollectionPage::DrawTidy()
     {
         RefreshDisk();
-        ImGui::PushTextWrapPos(ImGui::GetCursorScreenPos().x + 640);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Blank figures from old versions. Tidy trashes them."));
-        ImGui::PopTextWrapPos();
-        ImGui::Dummy(ImVec2(0, 8));
-        ImGui::BeginDisabled(m_starters == 0);
-        if (m_app.PillButton(Tf("Move {} to the trash", m_starters).c_str(), true, 260, true))
+        ui::Text(ui::TextStyle::Body, Tr("Blank figures from old versions. Tidy trashes them."), ui::color::InkSoft);
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::ButtonOptions tidy;
+        tidy.kind = ui::ButtonKind::Danger;
+        tidy.hold = true;
+        tidy.disabled = m_starters == 0;
+        tidy.tooltip = Tr("Hold to move them to the trash.");
+        if (ui::Button(Tf("Move {} to the trash", m_starters).c_str(), tidy))
         {
             int moved = collection::Tidy();
             Toast(moved == 1 ? Tf("{} figure moved to the trash", moved) : Tf("{} figures moved to the trash", moved));
             Reload();
         }
-        ImGui::EndDisabled();
     }
 
     // ---- The screenshot test's scratch collection -----------------------------------------------------------------
@@ -305,12 +310,18 @@ namespace launcher_ui
             "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet", "42-swapforce-portal", "43-swapper-sheet",
             "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-versions", "47-search-element", "48-search-level",
             "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name", "53-all-swappers", "54-mixed-swapper-sheet",
-            "55-add-swapper-versions", "56-add-no-match" };
+            "55-add-swapper-versions", "56-add-no-match", "57-manage-menu", "58-figure-menu", "59-put-on-menu", "60-focus-card", "61-focus-seat" };
     }
 
     const char* CollectionPage::TestShotName(int step)
     {
         return Shots[std::clamp(step, 0, int(std::size(Shots)) - 1)];
+    }
+
+    bool CollectionPage::TestPad()
+    {
+        const char* mode = LauncherEnv("SKY_LAUNCHER_TEST_COLLECTION");
+        return mode != nullptr && std::string_view(mode) == "pad";
     }
 
     int CollectionPage::TestShotCount()
@@ -434,6 +445,7 @@ namespace launcher_ui
         m_search[0] = 0;
         m_addSearch[0] = 0;
         m_closeFilters = true;
+        m_testMenu = 0;
         auto figureOf = [&](uint16_t type) -> std::string {
             for (const Figure& figure : m_model.figures)
                 if (figure.type == type && !collection::UntouchedStarter(figure) && figure.level > 1)
@@ -686,6 +698,23 @@ namespace launcher_ui
             m_addCategory = -1;
             m_addVersion = 0;
             snprintf(m_addSearch, sizeof(m_addSearch), "%s", "zzz");
+            break;
+        case 37: // Manage's menu, open
+            m_testMenu = 1;
+            break;
+        case 38: // the sheet's menu, open
+            OpenFigure(figureOf(14));
+            m_testMenu = 2;
+            break;
+        case 39: // the sheet's "Put on the portal" menu, open
+            OpenFigure(figureOf(14));
+            m_testMenu = 3;
+            break;
+        case 40: // the keyboard or pad focus on the shelf's first card
+            m_focusCard = true;
+            break;
+        case 41: // and on the first seat
+            m_focusSeat = 0;
             break;
         default: break;
         }

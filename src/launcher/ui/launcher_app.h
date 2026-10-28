@@ -400,10 +400,9 @@ namespace launcher_ui
         float m_columnBelow = 0;
         void BeginPageColumn(const char* id, float width, bool alwaysScrollbar = false);
         // The combo and its list rows as the launcher draws them: the chevron inside the rounded box (no arrow cell), rows with
-        // the rounded highlight; a level slider with a round knob of one size along the whole track.
+        // the rounded highlight.
         bool BeginCombo(const char* id, const char* preview);
         bool Option(const char* label, bool selected = false, ImGuiSelectableFlags flags = 0, ImVec2 size = ImVec2(0, 0));
-        bool LevelSlider(const char* id, int* value, int min, int max, float width);
         void EndPageColumn();
         bool Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
@@ -412,9 +411,6 @@ namespace launcher_ui
         void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
         void EndCard();
         void Title(const char* text, float size = TitleSize, unsigned color = Accent);
-        // A rounded "chip" (filters, badges); returns true when clicked.
-        bool Chip(const char* label, bool selected, unsigned color = Accent);
-        void Badge(ImDrawList* draw, ImVec2 at, const char* text, unsigned fill, unsigned ink);
 
         // Installing the game (the band's INSTALL button, the progress card in place of the logo).
         void RefreshInstall();
