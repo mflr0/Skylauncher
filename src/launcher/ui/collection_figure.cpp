@@ -476,7 +476,7 @@ namespace launcher_ui
             if (ui::MenuItem(Tf("On the wheel: {}", ShortGameName(g.id)).c_str(), { ui::Icon::None, on }))
             {
                 if (!collection::SetOnWheel(g.id, f.file, !on))
-                    Toast(Tr("The wheel is full: take a figure off it first"), true);
+                    Toast(Tr("The wheel is full: take a figure off it first"), ui::ToastKind::Error);
                 Reload();
             }
         }
@@ -485,13 +485,13 @@ namespace launcher_ui
         {
             std::string error;
             std::string copy = collection::Duplicate(f.path, &error);
-            Toast(copy.empty() ? Tr("Couldn't duplicate it: ") + error : Tr("Duplicated: ") + fs::path(copy).filename().string(), copy.empty());
+            Toast(copy.empty() ? Tr("Couldn't duplicate it: ") + error : Tr("Duplicated: ") + fs::path(copy).filename().string(), copy.empty() ? ui::ToastKind::Error : ui::ToastKind::Success);
             Reload();
         }
         if (ui::MenuItem(Tr("Back up now"), { ui::Icon::None, false, false, !writable }))
         {
             std::string backup = collection::Backup(f.path);
-            Toast(backup.empty() ? Tr("Couldn't back it up") : Tr("Backed up"), backup.empty());
+            Toast(backup.empty() ? Tr("Couldn't back it up") : Tr("Backed up"), backup.empty() ? ui::ToastKind::Error : ui::ToastKind::Success);
             m_generation++; // Restore lists it
         }
         if (ui::MenuItem(Tr("Restore a backup..."), { ui::Icon::None, false, false, !writable || Backups(f.path).empty() }))
@@ -533,7 +533,7 @@ namespace launcher_ui
         {
             std::string error;
             const bool done = collection::ResetToNew(path, &error);
-            Toast(done ? Tr("Reset to new") : Tr("Couldn't reset it: ") + error, !done);
+            Toast(done ? Tr("Reset to new") : Tr("Couldn't reset it: ") + error, !done ? ui::ToastKind::Error : ui::ToastKind::Success);
             Reload();
         }
         else
@@ -557,12 +557,12 @@ namespace launcher_ui
         std::string error;
         if (!m_model.DeleteCard(path, &error))
         {
-            Toast(Tr("Couldn't delete it: ") + error, true);
+            Toast(Tr("Couldn't delete it: ") + error, ui::ToastKind::Error);
             return;
         }
         m_selected = next;
         m_figure.clear();
-        Toast(Tr("Moved to the trash"));
+        Toast(Tr("Moved to the trash"), ui::ToastKind::Success);
         m_generation++;
         CloseOverlay();
     }
@@ -582,7 +582,7 @@ namespace launcher_ui
         {
             if (seat >= 0)
                 m_model.SetSeat(size_t(seat), seated);
-            Toast(Tr("Couldn't change it: ") + error, true);
+            Toast(Tr("Couldn't change it: ") + error, ui::ToastKind::Error);
             return;
         }
         Reload();
@@ -592,7 +592,7 @@ namespace launcher_ui
             m_figure = CardOf(*now).first->path;
         m_changeKeep.clear();
         Reload();
-        Toast(Tr("Changed"));
+        Toast(Tr("Changed"), ui::ToastKind::Success);
     }
 
     // The list of the other halves to take: one row each, the ones in use or on a seat left out; a half that belongs to another
@@ -821,12 +821,12 @@ namespace launcher_ui
             }
             if (saved)
             {
-                Toast(Tr("Saved"));
+                Toast(Tr("Saved"), ui::ToastKind::Success);
                 m_editing = false;
                 Reload();
             }
             else
-                Toast(Tr("Couldn't save it: ") + (error.empty() ? std::string(Tr("the collection's index can't be written")) : error), true);
+                Toast(Tr("Couldn't save it: ") + (error.empty() ? std::string(Tr("the collection's index can't be written")) : error), ui::ToastKind::Error);
         }
     }
 }

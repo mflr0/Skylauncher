@@ -39,7 +39,7 @@ namespace launcher_ui
         GameSlot& target = SlotFor(*other);
         if (target.installer.Running() || target.kitDownload.Running() || target.copyJob.Running() || target.disc == DiscState::Verifying)
         {
-            Toast(Tf("{} is busy: try again when it is done", other->name), true);
+            Toast(Tf("{} is busy: try again when it is done", other->name), ui::ToastKind::Error);
             return;
         }
         const std::string path = m_s->discPath;
@@ -47,7 +47,7 @@ namespace launcher_ui
             m_config[m_s->game.id].erase("iso"); // it never was this game's disc
         StartGameDisc();
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
 
         target.started = true; // its own start (below) replaces the first-visit one
         SelectGame(*other);
@@ -88,7 +88,7 @@ namespace launcher_ui
         else
         {
             m_s->copyMessage = CopyFailureText(result);
-            Toast(m_s->copyMessage, true);
+            Toast(m_s->copyMessage, ui::ToastKind::Error);
         }
     }
 
@@ -101,7 +101,7 @@ namespace launcher_ui
         std::string error;
         if (!gamedata::Remove(folder, error))
         {
-            Toast(Tf("Couldn't remove the copy: {}", error), true);
+            Toast(Tf("Couldn't remove the copy: {}", error), ui::ToastKind::Error);
             return;
         }
         m_s->copyMessage.clear();
@@ -134,7 +134,7 @@ namespace launcher_ui
             options.icon = ui::Icon::Folder;
             if (ui::Button(Tr("Show in folder"), options))
                 if (!OpenFolder(folder))
-                    Toast(Tr("Couldn't open the folder"), true);
+                    Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         };
 
         if (m_s->copyJob.Running())

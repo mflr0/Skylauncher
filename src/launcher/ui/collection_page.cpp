@@ -228,9 +228,9 @@ namespace launcher_ui
         return collection::Folder();
     }
 
-    void CollectionPage::Toast(const std::string& text, bool error)
+    void CollectionPage::Toast(const std::string& text, ui::ToastKind kind)
     {
-        m_app.Toast(text, error);
+        m_app.Toast(text, kind);
     }
 
     void CollectionPage::Open()
@@ -243,7 +243,7 @@ namespace launcher_ui
             collection::Migration migration = collection::Migrate(legacy);
             if (migration.copied > 0)
                 Toast(migration.copied == 1 ? Tf("{} figure copied", migration.copied)
-                                            : Tf("{} figures copied", migration.copied));
+                                            : Tf("{} figures copied", migration.copied), ui::ToastKind::Success);
         }
         // The launcher's own favourites and portal list, from before the shared collection, move once.
         if (SettingGet(m_app.m_config, "collection", "moved") != "1")
@@ -456,11 +456,11 @@ namespace launcher_ui
             return;
         }
         if (figure->toy != nullptr && !collection::Catalogue::Get().Accepts(m_model.gameId, figure->type))
-            Toast(Tf("{} is not for {}", Name(*figure), FullGameName(m_model.gameId)), true);
+            Toast(Tf("{} is not for {}", Name(*figure), FullGameName(m_model.gameId)), ui::ToastKind::Error);
         else if (!SeatAccepts(game->seats[seat], *figure))
-            Toast(Tf("{} doesn't go on {}", Name(*figure), SeatName(seat)), true);
+            Toast(Tf("{} doesn't go on {}", Name(*figure), SeatName(seat)), ui::ToastKind::Error);
         else if (Busy(*figure))
-            Toast(Tf("{} is in use by {}", Name(*figure), LiveGame(*figure)), true);
+            Toast(Tf("{} is in use by {}", Name(*figure), LiveGame(*figure)), ui::ToastKind::Error);
         else if (m_model.SetSeat(seat, path))
         {
             m_generation++;
@@ -468,7 +468,7 @@ namespace launcher_ui
             Toast(fmt::format("{}: {}", SeatName(seat), Name(*figure)));
         }
         else
-            Toast(Tr("Couldn't write the seats for the next start"), true);
+            Toast(Tr("Couldn't write the seats for the next start"), ui::ToastKind::Error);
     }
 
     bool CollectionPage::Drop(const std::string& path)
@@ -526,7 +526,7 @@ namespace launcher_ui
             Toast(Tf("{}: {} taken off", SeatName(seat), figure != nullptr ? Name(*figure) : std::string(Tr("figure"))));
         }
         else
-            Toast(Tr("Couldn't write the seats for the next start"), true);
+            Toast(Tr("Couldn't write the seats for the next start"), ui::ToastKind::Error);
     }
 
     void CollectionPage::TestSetSeats(const std::vector<std::string>& seats)

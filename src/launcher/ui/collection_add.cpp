@@ -296,7 +296,7 @@ namespace launcher_ui
             else
                 path = collection::Create(chosen->type, variant != nullptr ? (variant->sameTag ? collection::StandardVariant(*chosen) : variant->id) : collection::StandardVariant(*chosen));
             if (path.empty())
-                Toast(Tr("Couldn't create the figure"), true);
+                Toast(Tr("Couldn't create the figure"), ui::ToastKind::Error);
             else
             {
                 if (variant != nullptr && variant->sameTag)
@@ -306,7 +306,7 @@ namespace launcher_ui
                 m_created = path;
                 m_addLabel[0] = 0;
                 Reload();
-                Toast(Tf("Created {}", versionName));
+                Toast(Tf("Created {}", versionName), ui::ToastKind::Success);
             }
         }
     }

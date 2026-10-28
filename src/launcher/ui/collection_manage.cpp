@@ -85,7 +85,7 @@ namespace launcher_ui
         if (folder.empty())
             return;
         int count = collection::Export(paths, folder);
-        Toast(count == 1 ? Tf("Exported {} figure to {}", count, folder) : Tf("Exported {} figures to {}", count, folder));
+        Toast(count == 1 ? Tf("Exported {} figure to {}", count, folder) : Tf("Exported {} figures to {}", count, folder), ui::ToastKind::Success);
     }
 
     // "Export first" before uninstalling: every figure of the collection, to a folder the player picks.
@@ -141,7 +141,8 @@ namespace launcher_ui
             ui::SettingRow(names[i].c_str(), Tf("{} · {}", When(entry.deleted), entry.reason == "tidy" ? Tr("tidied") : Tr("deleted")).c_str());
             if (ui::Button(Tr("Put back")))
             {
-                Toast(collection::Undelete(entry.id).empty() ? Tr("Couldn't put it back") : Tr("Put back: ") + names[i], false);
+                const bool failed = collection::Undelete(entry.id).empty();
+                Toast(failed ? Tr("Couldn't put it back") : Tr("Put back: ") + names[i], failed ? ui::ToastKind::Error : ui::ToastKind::Success);
                 Reload();
             }
             ImGui::SameLine(0, ui::space::XS);
@@ -195,7 +196,7 @@ namespace launcher_ui
                     {
                         std::string error;
                         const bool done = collection::Restore(figure.path, backup.path, &error);
-                        Toast(done ? Tr("Backup restored") : Tr("Couldn't restore it: ") + error, !done);
+                        Toast(done ? Tr("Backup restored") : Tr("Couldn't restore it: ") + error, !done ? ui::ToastKind::Error : ui::ToastKind::Success);
                         Reload();
                     }
                     ImGui::PopID();
@@ -266,7 +267,7 @@ namespace launcher_ui
                     if (ui::Button(Tr("Save"), save))
                     {
                         const bool named = NameUnknownToy(figure.type, m_unknownName, collection::Category::Core, m_model.gameId);
-                        Toast(named ? Tr("Named: shown at the next start") : Tr("Couldn't save the name"), !named);
+                        Toast(named ? Tr("Named: shown at the next start") : Tr("Couldn't save the name"), !named ? ui::ToastKind::Error : ui::ToastKind::Success);
                         m_unknownType = 0xFFFF;
                         m_unknownName[0] = 0;
                     }
@@ -294,7 +295,7 @@ namespace launcher_ui
         if (ui::Button(Tf("Move {} to the trash", m_starters).c_str(), tidy))
         {
             int moved = collection::Tidy();
-            Toast(moved == 1 ? Tf("{} figure moved to the trash", moved) : Tf("{} figures moved to the trash", moved));
+            Toast(moved == 1 ? Tf("{} figure moved to the trash", moved) : Tf("{} figures moved to the trash", moved), ui::ToastKind::Success);
             Reload();
         }
     }

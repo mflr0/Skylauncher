@@ -82,7 +82,7 @@ namespace launcher_ui
             }
             else if (g_saveFailed)
             {
-                Toast(Tr("Couldn't save the report"), true);
+                Toast(Tr("Couldn't save the report"), ui::ToastKind::Error);
                 g_saveFailed = false;
             }
         }
@@ -217,7 +217,7 @@ namespace launcher_ui
         open.icon = ui::Icon::Folder;
         open.width = -1;
         if (ui::Button(Tr("Open logs folder"), open) && !OpenFolder(folder))
-            Toast(Tr("Couldn't open the folder"), true);
+            Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         ui::EndSettings();
     }
 }

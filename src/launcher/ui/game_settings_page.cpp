@@ -149,7 +149,7 @@ namespace launcher_ui
             std::error_code error;
             std::filesystem::create_directories(GameInstallFolder({}) / "textures", error);
             if (!OpenFolder(GameInstallFolder({}) / "textures"))
-                Toast(Tr("Couldn't open the folder"), true);
+                Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         }
         ui::EndSettings();
 
@@ -382,7 +382,7 @@ namespace launcher_ui
         m_config[m_s->game.id].erase("iso");
         StoreDiscLanguages(m_config, m_s->game.id, {});
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
         RefreshInstall();
     }
 
@@ -449,7 +449,7 @@ namespace launcher_ui
             {
                 std::filesystem::path parent = std::filesystem::path(std::u8string(m_s->discPath.begin(), m_s->discPath.end())).parent_path();
                 if (!OpenFolder(parent))
-                    Toast(Tr("Couldn't open the folder"), true);
+                    Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
             }
             ui::Text(ui::TextStyle::Caption, Tr("The file stays where it is."), ui::color::Dim);
         }
@@ -473,9 +473,9 @@ namespace launcher_ui
         if (restore.ok)
             Toast(Tf("Saves restored from {}", BackupWhen(stamp)), ui::ToastKind::Success);
         else if (restore.error == "the game is running")
-            Toast(Tr("Quit the game before restoring a backup"), true);
+            Toast(Tr("Quit the game before restoring a backup"), ui::ToastKind::Error);
         else
-            Toast(Tf("Couldn't restore the backup: {}", restore.error), true);
+            Toast(Tf("Couldn't restore the backup: {}", restore.error), ui::ToastKind::Error);
     }
 
     void App::DrawSaveBackups()
@@ -492,7 +492,7 @@ namespace launcher_ui
             std::error_code error;
             std::filesystem::create_directories(saves, error);
             if (!OpenFolder(saves))
-                Toast(Tr("Couldn't open the folder"), true);
+                Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         }
         ImGui::Dummy(ImVec2(0, ui::space::XS));
         if (m_s->saveBackups.empty())
@@ -549,7 +549,7 @@ namespace launcher_ui
     void App::RunUninstall(const DataResult& result)
     {
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
         m_s->installed = {};
         RefreshInstall();
         RunDataAction(result, N_("Game uninstalled"));
@@ -617,7 +617,7 @@ namespace launcher_ui
             std::error_code error;
             std::filesystem::create_directories(folders.game, error);
             if (!OpenFolder(folders.game))
-                Toast(Tr("Couldn't open the folder"), true);
+                Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         }
         ImGui::SameLine(0, ui::space::S);
         if (ui::Button(Tr(strings::OpenFigures), folder))

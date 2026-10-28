@@ -731,7 +731,7 @@ namespace launcher_ui
     {
         m_config[section][key] = value;
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
     }
 
     void App::StartVerify(const std::string& path)
@@ -787,7 +787,7 @@ namespace launcher_ui
             Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
         StoreDiscLanguages(m_config, m_s->game.id, m_s->check.languages);
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
         m_s->disc = DiscState::Ready;
         RefreshInstall();
     }
@@ -806,7 +806,7 @@ namespace launcher_ui
             m_page = Page::Play;
             if (std::string iso = SettingGet(m_config, m_s->game.id, "iso"); !iso.empty())
             {
-                Toast(Tr("Game data damaged: using the disc image"), true);
+                Toast(Tr("Game data damaged: using the disc image"), ui::ToastKind::Error);
                 StartVerify(iso);
             }
             else

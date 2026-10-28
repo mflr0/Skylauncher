@@ -449,8 +449,8 @@ namespace launcher_ui
         void Browse();
         bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
-        void Toast(std::string text, bool error = false); // an error stays until it is closed; the rest go by themselves
-        void Toast(std::string text, ui::ToastKind kind);
+        // A message at the bottom right: an Error stays until it is closed; Info and Success go by themselves.
+        void Toast(std::string text, ui::ToastKind kind = ui::ToastKind::Info);
         void RefreshGamepads();
         PadFamily PadFamilyNow() const; // whose button names the Keyboard tab shows (game_keys.h)
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label

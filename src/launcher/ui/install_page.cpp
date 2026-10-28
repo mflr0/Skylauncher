@@ -278,7 +278,7 @@ namespace launcher_ui
         }
         if (m_updateAll.total > 1)
             Toast(m_updateAll.failed == 0 ? Tr("All games are updated") : Tf("Games updated: {} of {}", m_updateAll.total - m_updateAll.failed, m_updateAll.total),
-                m_updateAll.failed != 0);
+                m_updateAll.failed != 0 ? ui::ToastKind::Error : ui::ToastKind::Success);
     }
 
     // No kit, or one that is older than the release wanted or can't build this game: the first step of the install fetches

@@ -130,7 +130,7 @@ namespace launcher_ui
         bool Busy(const collection::Figure& figure) const { return CardOf(figure).Busy(); }
         void DrawBottom(ImDrawList* draw, const collection::Figure& bottom, ImVec2 at, float size);
         void CloseOverlay();
-        void Toast(const std::string& text, bool error = false);
+        void Toast(const std::string& text, ui::ToastKind kind = ui::ToastKind::Info);
 
         // What Manage and the Figure page show from disk, read again only once the collection changed (m_generation):
         // drawn every frame, they read and decrypted every dump and backup at the display's rate.
