@@ -511,6 +511,13 @@ namespace launcher_ui
         {
             ImGui::Dummy(ImVec2(0, 2));
             float logH = std::max(60.0f, ImGui::GetContentRegionAvail().y - ButtonsH);
+            {
+                // A whole number of lines (and its padding), so the line at the top is never half cut while it follows the end.
+                ImGui::PushFont(m_monoFont, SmallSize);
+                const float step = ImGui::GetTextLineHeight() + 2;
+                ImGui::PopFont();
+                logH = std::max(60.0f, std::floor((logH - 16) / step) * step + 16);
+            }
             ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusSmall);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 8));
@@ -531,7 +538,7 @@ namespace launcher_ui
             ImGui::PopStyleVar();
             ImGui::PopFont();
             if (atBottom)
-                ImGui::SetScrollHereY(1.0f);
+                ImGui::SetScrollY(ImGui::GetScrollMaxY());
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor();

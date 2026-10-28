@@ -29,7 +29,7 @@ Keeps textures sharp at an angle.	Garde les textures nettes en biais.
 Auto	Auto
 Auto (follows the window)	Auto (suit la fenêtre)
 Higher scales need a dedicated graphics card.	Les échelles élevées demandent une carte graphique dédiée.
-Auto shows more on wide windows; 16:9 adds bars.	Auto montre plus sur les fenêtres larges ; 16:9 ajoute des bandes.
+Auto shows more when wide; 16:9 adds bars.	Auto montre plus en large ; 16:9 ajoute des bandes.
 Auto: a real portal if plugged in, else virtual	Auto : un vrai portail s'il est branché, sinon virtuel
 Automatic	Automatique
 Back	Retour
@@ -308,7 +308,7 @@ Couldn't download the game tools. Check your connection.	Téléchargement des ou
 The game tools are incomplete.	Les outils du jeu sont incomplets.
 Same as text	Identique au texte
 These game tools can't build {}	Ces outils ne permettent pas de créer {}
-The game was made for 30 FPS; 60 is experimental.	Le jeu a été conçu pour 30 images par seconde ; 60 est expérimental.
+Made for 30 FPS; 60 is experimental.	Conçu pour 30 FPS ; 60 est expérimental.
 Choose the disc image first	Choisissez d'abord l'image disque
 Menus, subtitles and on-screen text.	Menus, sous-titres et textes à l'écran.
 Spoken lines and cutscenes.	Voix et cinématiques.

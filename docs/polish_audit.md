@@ -30,10 +30,25 @@ switch, copy, seat X) in its scratch folder.
 | Game settings | The Back button's right edge matched neither the card nor the scrollbar | It sits at the column's right edge |
 | Collection | The choose banner's right border was still shaved (the shelf clipped it) | The shelf reaches 4 points past each side too |
 
-## Left (checked again, small, not touched)
+## Fixed in the third round
 
-- Sidebar rows' focus ring is drawn inside on purpose and is flat at the window's left edge.
-- ImGui's own widgets: the combo's arrow cell, the Level slider's grab at its maximum, square Selectable rows (Add a figure > Versions).
-- The tab row sits 6 points lower on game settings than on the launcher's settings; at 1024x680 the sidebar's footer is 40 points under the game list.
-- Two-line French descriptions in the Video tab; "Change disc..." is 40 points past the main button's edge.
-- The install log's first line can be cut by the box's top; the kit's own error lines stay in English.
+| Where | Defect (before) | Fix |
+|---|---|---|
+| Sidebar rows (keyboard/pad focus) | Two rings (ImGui's and ours), flat at the window's left edge | ImGui's nav cursor is off in the sidebar; one rounded ring inside the row |
+| Every combo | A square arrow cell glued to the rounded box | `App::BeginCombo`: the chevron inside the box (`ImGuiComboFlags_NoArrowButton`) |
+| Every list row (combos, Versions, devices...) | Square hover/selected highlight | `App::Option` draws it under the row with the launcher's radius |
+| Edit figure, Level | ImGui's slider: grab squeezed at the maximum, box corners cut | `App::LevelSlider`: round knob, one size along the track, focus ring, arrows when focused |
+| Settings tabs | Game settings' tab bar 6 points lower than the launcher's | Same spacing under the heading; the tab focus ring has room around the label |
+| Sidebar footer | At 1024x680 the footer touched the game list | A hairline midway between them when there is room (none when they nearly touch) |
+| Video tab, French | Descriptions on two lines | "Made for 30 FPS; 60 is experimental." and "Auto shows more when wide; 16:9 adds bars." |
+| Game page | "Change disc..." 40 points past the main button | Its right edge is the action button's |
+| Install details | The log's top line half cut | The box holds a whole number of lines |
+| Settings pages | The card and the Back button changed width with the scrollbar | The scrollbar is always shown |
+| Keyboard tab | A long label wrapped inside its brackets; the heading sat 8 points above the Reset button | The brackets go on a second line; the heading is centred on the button |
+| Misc | "..." 4 points past the seats' edge; Auto-open Toy Box cramped; Video "Show in folder" narrower than the dropdowns; French "Fonctionne dans" cut; edit fields narrower than the upgrade cards | Each aligned or spaced |
+
+## Left
+
+- Text that is not ours: the kit's log and error lines (English), its "compile: file 20 of 80" caption.
+- Add a figure: the catalogue grid is cut by the footer strip and its scrollbar sits in the gutter; no "no match" text in the grid.
+- The hold-to-confirm fill and the disc check's thin progress bar end square; toasts' 2-point rings are not smoothed at 1x.

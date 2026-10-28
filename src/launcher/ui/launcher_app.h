@@ -394,7 +394,12 @@ namespace launcher_ui
         // A page's centred column (the cursor is at its left): it reaches a few points past each side and over the page's
         // bottom padding, so the clip rect neither shaves the borders at its edges nor cuts the scrolling content short of the window.
         float m_columnBelow = 0;
-        void BeginPageColumn(const char* id, float width);
+        void BeginPageColumn(const char* id, float width, bool alwaysScrollbar = false);
+        // The combo and its list rows as the launcher draws them: the chevron inside the rounded box (no arrow cell), rows with
+        // the rounded highlight; a level slider with a round knob of one size along the whole track.
+        bool BeginCombo(const char* id, const char* preview);
+        bool Option(const char* label, bool selected = false, ImGuiSelectableFlags flags = 0, ImVec2 size = ImVec2(0, 0));
+        bool LevelSlider(const char* id, int* value, int min, int max, float width);
         void EndPageColumn();
         bool Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width = -1);
         void SettingRow(const char* label, const char* hint);
@@ -582,10 +587,10 @@ namespace launcher_ui
         int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
         bool changed = false;
         ImGui::SetNextItemWidth(width);
-        if (ImGui::BeginCombo(label, Tr(choices[index].label)))
+        if (BeginCombo(label, Tr(choices[index].label)))
         {
             for (size_t i = 0; i < N; i++)
-                if (ImGui::Selectable(Tr(choices[i].label), int(i) == index))
+                if (Option(Tr(choices[i].label), int(i) == index))
                 {
                     Set(section, key, choices[i].value);
                     changed = true;

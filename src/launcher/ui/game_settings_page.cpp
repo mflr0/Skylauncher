@@ -43,7 +43,7 @@ namespace launcher_ui
         float available = ImGui::GetContentRegionAvail().x;
         float width = std::min(available, 940.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        BeginPageColumn("##gamesettingscolumn", width);
+        BeginPageColumn("##gamesettingscolumn", width, true);
 
         Title(m_s->game.name, HeadlineSize, Text);
         ImGui::SameLine(ImGui::GetContentRegionMax().x - PillWidth(Tr("Back"), 120)); // the column's right edge, scrollbar or not
@@ -95,7 +95,7 @@ namespace launcher_ui
             ImGui::PopStyleColor();
         }
 
-        SettingRow(Tr("Frame rate limit"), Tr("The game was made for 30 FPS; 60 is experimental."));
+        SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 is experimental."));
         Combo("##fps", video, "fps_limit", FpsChoices, 0);
 
         SettingRow(Tr("Skip intro movies"), nullptr);
@@ -113,12 +113,12 @@ namespace launcher_ui
         SettingRow(Tr("Texture filtering"), Tr("Keeps textures sharp at an angle."));
         Combo("##filter", video, "anisotropy", FilterChoices, 0);
 
-        SettingRow(Tr("Widescreen"), Tr("Auto shows more on wide windows; 16:9 adds bars."));
+        SettingRow(Tr("Widescreen"), Tr("Auto shows more when wide; 16:9 adds bars."));
         Combo("##aspect", video, "aspect", AspectChoices, 0);
 
         SettingRow(Tr("HD texture packs"), Tr("Replaces the game's textures with your pack."));
         toggle("##texturepacks", "texture_packs", "1");
-        if (PillButton(Tr("Show in folder"), false, 300))
+        if (PillButton(Tr("Show in folder"), false, ImGui::GetContentRegionAvail().x))
         {
             std::error_code error;
             std::filesystem::create_directories(GameInstallFolder({}) / "textures", error);
@@ -142,8 +142,11 @@ namespace launcher_ui
         const std::string& game = m_s->game.id;
         const std::string section = GameInputSection(game);
         const std::span<const GameKey> keys = GameKeys(game);
+        const float headingY = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(headingY + 8); // the heading centred on the 40-point button beside it
         Title(Tr("Keyboard"), TitleSize, Text);
         ImGui::SameLine(0, 24);
+        ImGui::SetCursorPosY(headingY);
         if (HoldButton(Tr(strings::ResetKeys), 200, Tr(strings::ResetKeysHint)))
         {
             ResetGameKeys(m_config, game);
@@ -171,7 +174,10 @@ namespace launcher_ui
                 ImGui::AlignTextToFramePadding();
                 // The pad's buttons keep the names printed on the controller (A, Back, Start...); only the sticks are translated.
                 const bool stick = std::string_view(action.pad).substr(1, 6) == " stick";
-                ImGui::TextWrapped("%s", fmt::format("{} ({})", Tr(action.label), stick ? Tr(action.pad) : action.pad).c_str()); // a long French name takes two lines
+                const std::string name = Tr(action.label), pad = stick ? Tr(action.pad) : action.pad;
+                // One line, or the button in brackets on a second one (never a break inside the brackets).
+                const bool oneLine = ImGui::CalcTextSize(fmt::format("{} ({})", name, pad).c_str()).x <= 172;
+                ImGui::TextWrapped("%s", (name + (oneLine ? " (" : "\n(") + pad + ")").c_str());
                 ImGui::TableNextColumn();
                 const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
                 const bool duplicate = GameKeyConflict(m_config, game, action);

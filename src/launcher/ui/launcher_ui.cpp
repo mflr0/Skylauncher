@@ -1027,14 +1027,76 @@ namespace launcher_ui
             std::max(0.0f, rounding + gap), flags, 2.0f);
     }
 
-    void App::BeginPageColumn(const char* id, float width)
+    bool App::BeginCombo(const char* id, const char* preview)
+    {
+        ImDrawList* draw = ImGui::GetWindowDrawList(); // the box's window, not the list's
+        ImVec2 at = ImGui::GetCursorScreenPos();
+        const float width = ImGui::CalcItemWidth(), height = ImGui::GetFrameHeight();
+        const bool open = ImGui::BeginCombo(id, preview, ImGuiComboFlags_NoArrowButton);
+        DrawChevron(draw, ImVec2(at.x + width - 18, at.y + height / 2), 10, TextSecondary, open ? -1 : 1);
+        return open;
+    }
+
+    bool App::Option(const char* label, bool selected, ImGuiSelectableFlags flags, ImVec2 size)
+    {
+        // ImGui's highlight is square: it is left out, and drawn with rounded corners under the row's text.
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->ChannelsSplit(2);
+        draw->ChannelsSetCurrent(1);
+        ImGui::PushStyleColor(ImGuiCol_Header, 0);
+        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+        ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+        const bool pressed = ImGui::Selectable(label, selected, flags, size);
+        ImGui::PopStyleColor(3);
+        draw->ChannelsSetCurrent(0);
+        if (selected || ImGui::IsItemHovered())
+            draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), Rgb(FieldActive), RadiusSmall);
+        draw->ChannelsMerge();
+        return pressed;
+    }
+
+    bool App::LevelSlider(const char* id, int* value, int min, int max, float width)
+    {
+        const float height = ImGui::GetFrameHeight(), knob = 11, track = 8;
+        ImVec2 at = ImGui::GetCursorScreenPos();
+        ImGui::InvisibleButton(id, ImVec2(width, height), ImGuiButtonFlags_EnableNav);
+        bool changed = false;
+        const float left = at.x + knob + 2, right = at.x + width - knob - 2;
+        if (ImGui::IsItemActive())
+        {
+            int next = min + int(std::lround(std::clamp((ImGui::GetIO().MousePos.x - left) / (right - left), 0.0f, 1.0f) * float(max - min)));
+            changed = next != *value;
+            *value = next;
+        }
+        else if (ImGui::IsItemFocused())
+        {
+            int step = (ImGui::IsKeyPressed(ImGuiKey_RightArrow) ? 1 : 0) - (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) ? 1 : 0);
+            if (step != 0)
+            {
+                *value = std::clamp(*value + step, min, max);
+                changed = true;
+            }
+        }
+        const float t = max > min ? float(*value - min) / float(max - min) : 0.0f, x = left + (right - left) * t, mid = at.y + height / 2;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        const bool hovered = ImGui::IsItemHovered();
+        draw->AddRectFilled(ImVec2(at.x, mid - track / 2), ImVec2(at.x + width, mid + track / 2), Rgb(Field), track / 2);
+        draw->AddRect(ImVec2(at.x, mid - track / 2), ImVec2(at.x + width, mid + track / 2), Rgb(Border), track / 2);
+        draw->AddRectFilled(ImVec2(at.x, mid - track / 2), ImVec2(x, mid + track / 2), Rgb(Accent), track / 2);
+        draw->AddCircleFilled(ImVec2(x, mid), knob, Rgb(hovered || ImGui::IsItemActive() ? AccentHover : Accent), 24);
+        FocusRing(height / 2);
+        return changed;
+    }
+
+    void App::BeginPageColumn(const char* id, float width, bool alwaysScrollbar)
     {
         constexpr float Bleed = 4;
         float below = ImGui::GetStyle().WindowPadding.y;
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() - Bleed);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Bleed, 0));
         ImGui::BeginChild(id, ImVec2(width + 2 * Bleed, ImGui::GetContentRegionAvail().y + below),
-            ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoBackground);
+            ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding,
+            ImGuiWindowFlags_NoBackground | (alwaysScrollbar ? ImGuiWindowFlags_AlwaysVerticalScrollbar : 0));
         ImGui::PopStyleVar();
         ImGui::SetScrollX(0.0f);
         m_columnBelow = below;
@@ -1258,6 +1320,7 @@ namespace launcher_ui
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18, Pad));
         ImGui::Begin("##sidebar", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoScrollWithMouse);
+        ImGui::PushStyleColor(ImGuiCol_NavCursor, 0); // the rows draw their own ring (FocusRing), not ImGui's as well
         ImDrawList* draw = ImGui::GetWindowDrawList();
         float rowW = SidebarW;
 
@@ -1273,7 +1336,7 @@ namespace launcher_ui
                 draw->AddRectFilled(at, ImVec2(rowW, at.y + height), Rgb(selected ? SidebarSelected : SidebarHover));
             if (selected)
                 draw->AddRectFilled(at, ImVec2(SidebarBarW, at.y + height), Rgb(SidebarBar));
-            FocusRing(0, -2);
+            FocusRing(8, -4); // inside the row, rounded, clear of the window's edges
             return pressed;
         };
 
@@ -1407,7 +1470,12 @@ namespace launcher_ui
         }
 
         // The collection, then Settings (the gear), at the bottom of the sidebar; selected while their page is shown.
+        const float listEnd = ImGui::GetCursorScreenPos().y;
         ImGui::SetCursorPosY(ImGui::GetWindowHeight() - Pad - 2 * GameRowH);
+        // A hairline sets the two apart from the games, midway between them (none when they nearly touch).
+        const float lineY = std::round((listEnd + ImGui::GetCursorScreenPos().y) / 2);
+        if (ImGui::GetCursorScreenPos().y - listEnd >= 24)
+            draw->AddLine(ImVec2(18, lineY), ImVec2(rowW - 18, lineY), Rgb(Border, 160));
         ImVec2 at;
         bool collection = m_page == Page::Collection;
         if (row("##collection", GameRowH, collection, true, at))
@@ -1444,6 +1512,7 @@ namespace launcher_ui
         draw->AddText(ImVec2(at.x + GameTextX, center.y - label.y / 2), Rgb(SidebarInk), name);
         ImGui::PopFont();
 
+        ImGui::PopStyleColor();
         ImGui::End();
         ImGui::PopStyleVar();
         ImGui::PopStyleColor();
@@ -1836,15 +1905,8 @@ namespace launcher_ui
                 bool current = value == device;
                 ImVec2 at = ImGui::GetCursorScreenPos();
                 ImGui::PushID(value.c_str());
-                // The highlight is drawn here, with the popup's corners, not as the Selectable's square one.
-                ImGui::PushStyleColor(ImGuiCol_Header, 0);
-                ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
-                ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
-                if (ImGui::Selectable("##device", current, 0, ImVec2(rowW, RowH)))
+                if (Option("##device", current, 0, ImVec2(rowW, RowH)))
                     SetDevice(value);
-                ImGui::PopStyleColor(3);
-                if (current || ImGui::IsItemHovered())
-                    popup->AddRectFilled(at, ImVec2(at.x + rowW, at.y + RowH), Rgb(FieldActive, 255), RadiusSmall);
                 ImGui::PopID();
                 float mid = at.y + RowH / 2;
                 popup->AddCircle(ImVec2(at.x + DotX, mid), Dot, Rgb(current ? Accent : TextDim), 16, 2.0f);
@@ -1878,7 +1940,7 @@ namespace launcher_ui
         {
             constexpr float ChangeDiscMin = 160;
             const float ChangeDiscW = PillWidth(Tr("Change disc..."), ChangeDiscMin, true);
-            ImGui::SetCursorScreenPos(ImVec2(end.x - 40 - ChangeDiscW, end.y - 112));
+            ImGui::SetCursorScreenPos(ImVec2(mainX + PlayButtonW + PlayGearW - ChangeDiscW, end.y - 112)); // its right edge is the action button's
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
             if (PillButton(Tr("Change disc..."), false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
                 Browse();
@@ -1901,10 +1963,10 @@ namespace launcher_ui
         std::string current = CurrentDevice();
         Title(Tr("Controller"), TitleSize, Text);
         ImGui::SetNextItemWidth(440);
-        if (ImGui::BeginCombo("##device", DeviceLabel().c_str()))
+        if (BeginCombo("##device", DeviceLabel().c_str()))
         {
             for (const auto& [value, label] : DeviceOptions())
-                if (ImGui::Selectable(label.c_str(), value == current))
+                if (Option(label.c_str(), value == current))
                     SetDevice(value);
             ImGui::EndCombo();
         }
@@ -1918,6 +1980,7 @@ namespace launcher_ui
         Title(Tr("Portal of Power"), TitleSize, Text);
         Combo("##portal", "portal", "mode", PortalChoices, 0, 440);
         bool autoOpen = ParseBool(SettingGet(m_config, "portal", "toybox_auto_open", "1"));
+        ImGui::Dummy(ImVec2(0, 10));
         if (Toggle("##toyboxautoopen", &autoOpen))
             Set("portal", "toybox_auto_open", autoOpen ? "1" : "0");
         ImGui::SameLine(0, 14);
@@ -1963,7 +2026,7 @@ namespace launcher_ui
                 *current = i;
             }
             bool hovered = ImGui::IsItemHovered();
-            FocusRing(RadiusSmall);
+            FocusRing(RadiusSmall, 6);
             if (active)
                 TakeFocus(FocusTo::Page);
             ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -1996,11 +2059,11 @@ namespace launcher_ui
         float available = ImGui::GetContentRegionAvail().x;
         float width = std::min(available, 940.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        BeginPageColumn("##settingscolumn", width);
+        BeginPageColumn("##settingscolumn", width, true); // the scrollbar is always there: the card is as wide on every tab
 
         static const char* const Tabs[] = { N_("Controls"), N_("Launcher"), N_("Support"), N_("About") };
         Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);
-        ImGui::Dummy(ImVec2(0, 4));
+        ImGui::Dummy(ImVec2(0, 10));
         int tab = int(m_tab);
         DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
         m_tab = m_uninstalled ? SettingsTab::Launcher : SettingsTab(tab); // once uninstalled the window shows the result only
@@ -2107,12 +2170,12 @@ namespace launcher_ui
         if (setting.empty())
             shown = Tr("System default");
         ImGui::SetNextItemWidth(440);
-        if (ImGui::BeginCombo("##launcherlanguage", shown.c_str()))
+        if (BeginCombo("##launcherlanguage", shown.c_str()))
         {
-            if (ImGui::Selectable(Tr("System default"), setting.empty()))
+            if (Option(Tr("System default"), setting.empty()))
                 Set("launcher", "language", "");
             for (const i18n::Language& language : i18n::Languages())
-                if (ImGui::Selectable(language.name.c_str(), language.code == setting))
+                if (Option(language.name.c_str(), language.code == setting))
                     Set("launcher", "language", language.code);
             ImGui::EndCombo();
         }
