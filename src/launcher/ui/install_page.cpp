@@ -21,12 +21,6 @@ namespace launcher_ui
             std::u8string text = path.u8string();
             return std::string(text.begin(), text.end());
         }
-
-        // `text` cut to `width` with "..." at its end.
-        std::string Fit(const std::string& text, float width)
-        {
-            return launcher_ui::FitText(text, width, [](const std::string& s) { return ImGui::CalcTextSize(s.c_str()).x; });
-        }
     }
 
     bool OpenFolder(const std::filesystem::path& folder)
@@ -147,7 +141,7 @@ namespace launcher_ui
         else
             section["state"] = state;
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
     }
 
     bool App::KitNeedsFetch(const GameSlot& slot) const
@@ -180,7 +174,7 @@ namespace launcher_ui
         RefreshInstall();
         if (m_s->kit && m_s->kit->chosen && !m_s->kit->Builds(m_s->game.id))
         {
-            Toast(Tf("These game tools can't build {}", m_s->game.name), true); // the player's own kit: not ours to replace
+            Toast(Tf("These game tools can't build {}", m_s->game.name), ui::ToastKind::Error); // the player's own kit: not ours to replace
             return;
         }
         m_s->installSha = m_s->check.xexSha256;
@@ -288,7 +282,7 @@ namespace launcher_ui
             else if (kit.state == KitDownloader::State::Cancelled)
             {
                 m_s->installView = m_s->kitUsed = false;
-                Toast(Tr("Installation cancelled"));
+                Toast(Tr("Installation cancelled"), ui::ToastKind::Info);
             }
             return;
         }
@@ -311,7 +305,7 @@ namespace launcher_ui
         {
             SetInstallState(m_s->installSha, nullptr);
             m_s->installView = false;
-            Toast(Tr("Installation cancelled"));
+            Toast(Tr("Installation cancelled"), ui::ToastKind::Info);
         }
         else if (progress.state == InstallProgress::State::Failed && SettingGet(m_config, "install." + m_s->installSha, "state") != "failed")
             SetInstallState(m_s->installSha, "failed");
@@ -332,53 +326,31 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(at);
         BeginCard("##install", size);
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        float width = ImGui::GetContentRegionAvail().x;
-        float left = ImGui::GetCursorScreenPos().x;
+        const float width = ImGui::GetContentRegionAvail().x;
+        const float left = ImGui::GetCursorScreenPos().x;
+        using RowState = InstallChecklist::RowState;
 
-        // Title, and on its right the percentage, or once stopped a close button.
+        // Title, and once stopped a close button on its right. The percentage is the bar's, said once.
         const char* title = failed ? Tr("INSTALLATION STOPPED") : interrupted ? Tr("INSTALLATION INTERRUPTED") : Tr(m_s->installed.runtime.empty() ? N_("INSTALLING THE GAME") : N_("UPDATING THE GAME")); // a built game being rebuilt is an update
-        ImVec2 titleAt = ImGui::GetCursorScreenPos();
-        Title(title, TitleSize, failed ? Danger : Text);
+        const ImVec2 titleAt = ImGui::GetCursorScreenPos();
+        ui::Text(ui::TextStyle::Title, title, failed ? ui::color::Danger : ui::color::Ink, -1);
+        const float titleBottom = ImGui::GetCursorPosY();
         if (failed || interrupted)
         {
-            constexpr float CloseSize = 30;
-            ImVec2 closeAt(left + width - CloseSize, titleAt.y - 4);
-            ImGui::SetCursorScreenPos(closeAt);
-            if (ImGui::InvisibleButton("##closeinstall", ImVec2(CloseSize, CloseSize), ImGuiButtonFlags_EnableNav))
+            const float closeSize = ui::HeightOf(ui::Size::Normal);
+            ImGui::SetCursorScreenPos(ImVec2(left + width - closeSize, titleAt.y - (closeSize - ui::SizeOf(ui::TextStyle::Title)) / 2));
+            if (ui::IconButton("##closeinstall", ui::Icon::Cross, Tr("Close")))
             {
                 m_s->installView = m_s->kitUsed = false;
                 SetInstallState(m_s->installSha, nullptr);
                 m_s->installPast = {};
             }
-            bool hovered = ImGui::IsItemHovered();
-            FocusRing(CloseSize / 2);
-            if (hovered)
-                ImGui::SetTooltip("%s", Tr("Close"));
-            ImVec2 c(closeAt.x + CloseSize / 2, closeAt.y + CloseSize / 2);
-            if (hovered)
-                draw->AddCircleFilled(c, CloseSize / 2, Rgb(PanelRaisedHover), 24);
-            draw->AddLine(ImVec2(c.x - 6, c.y - 6), ImVec2(c.x + 6, c.y + 6), Rgb(Text), 2.0f);
-            draw->AddLine(ImVec2(c.x - 6, c.y + 6), ImVec2(c.x + 6, c.y - 6), Rgb(Text), 2.0f);
-            ImGui::SetCursorScreenPos(ImVec2(left, titleAt.y + ImGui::GetFrameHeight() - 2));
-        }
-        else
-        {
-            std::string percent = fmt::format("{}%", int(std::floor(list.overall * 100)));
-            ImGui::PushFont(m_titleFont, TitleSize);
-            float w = ImGui::CalcTextSize(percent.c_str()).x;
-            draw->AddText(ImVec2(left + width - w, titleAt.y), Rgb(Accent), percent.c_str());
-            ImGui::PopFont();
+            ImGui::SetCursorPosY(titleBottom);
         }
 
-        // The overall bar, then the step count and the times under it.
-        ImGui::Dummy(ImVec2(0, 2));
-        ImVec2 barAt = ImGui::GetCursorScreenPos();
-        constexpr float BarH = 10;
-        draw->AddRectFilled(barAt, ImVec2(barAt.x + width, barAt.y + BarH), Rgb(Field), BarH / 2);
-        if (list.overall > 0)
-            draw->AddRectFilled(barAt, ImVec2(barAt.x + std::max(BarH, width * list.overall), barAt.y + BarH),
-                Rgb(failed ? Danger : interrupted ? TextDim : Accent), BarH / 2);
-        ImGui::Dummy(ImVec2(width, BarH));
+        // The overall bar with its percentage, then the step count and the times under it.
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::ProgressBar(list.overall, -1, true);
         {
             int stepNumber = list.current >= 0 ? list.current + 1 : int(list.rows.size());
             std::string where = Tf("Step {} of {}", stepNumber, list.rows.size());
@@ -390,29 +362,37 @@ namespace launcher_ui
                 std::string timeLeft = InstallTimeLeft(list.etaMs);
                 times += (times.empty() || timeLeft.empty() ? "" : "  \xC2\xB7  ") + timeLeft;
             }
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", where.c_str());
-            float w = ImGui::CalcTextSize(times.c_str()).x;
-            ImGui::SameLine(Pad + width - w);
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", times.c_str());
-            ImGui::PopFont();
+            const ImVec2 rowAt = ImGui::GetCursorScreenPos();
+            ui::Text(ui::TextStyle::Caption, where.c_str(), ui::color::InkSoft, -1);
+            ui::PushText(ui::TextStyle::Caption);
+            const float w = ImGui::CalcTextSize(times.c_str()).x;
+            ui::DrawText(draw, ImVec2(left + width - w, rowAt.y), ui::Col(ui::color::InkSoft), times.c_str());
+            ui::PopText();
         }
-        ImGui::Dummy(ImVec2(0, 4));
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
 
         // The checklist. With the details open, only the current step: the log takes the room.
         // Once stopped, the steps done fold into one line, to leave room for the message.
-        float lineH = ImGui::GetTextLineHeight();
-        float rowH = lineH + 10;
+        const float iconSize = ui::type::Body;
+        const float rowH = ui::SizeOf(ui::TextStyle::Body) + ui::space::XS;
         bool fold = (failed || interrupted) && list.current > 0;
+        auto rowIcon = [&](RowState state, ImVec2 centre) {
+            switch (state)
+            {
+            case RowState::Done: ui::DrawStatusIcon(draw, ui::Status::Success, centre, iconSize); break;
+            case RowState::Running: ui::DrawStatusIcon(draw, ui::Status::Busy, centre, iconSize); break;
+            case RowState::Failed: ui::DrawStatusIcon(draw, ui::Status::Error, centre, iconSize); break;
+            case RowState::Stopped: ui::DrawIcon(draw, ui::Icon::Minus, centre, iconSize, ui::Col(ui::color::Dim)); break;
+            case RowState::Waiting: draw->AddCircle(centre, iconSize * 0.4f, ui::Col(ui::color::Edge), 24, ui::stroke::Hairline); break;
+            }
+        };
+        const float textX = iconSize + ui::space::S;
         if (fold && !m_s->installLog)
         {
-            ImVec2 rowAt = ImGui::GetCursorScreenPos();
-            ImVec2 dot(rowAt.x + 10, rowAt.y + lineH / 2 + 1);
-            draw->AddCircleFilled(dot, 9, Rgb(Ok), 20);
-            draw->AddPolyline(std::array{ ImVec2(dot.x - 4.5f, dot.y), ImVec2(dot.x - 1.2f, dot.y + 3.5f), ImVec2(dot.x + 4.5f, dot.y - 3.5f) }.data(),
-                3, Rgb(Panel), 0, 2.2f);
-            ImGui::SetCursorScreenPos(ImVec2(rowAt.x + 30, rowAt.y));
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("{} of {} steps done", list.current, list.rows.size()).c_str());
+            const ImVec2 rowAt = ImGui::GetCursorScreenPos();
+            rowIcon(RowState::Done, ImVec2(rowAt.x + iconSize / 2, rowAt.y + rowH / 2));
+            ImGui::SetCursorScreenPos(ImVec2(rowAt.x + textX, rowAt.y));
+            ui::Text(ui::TextStyle::Body, Tf("{} of {} steps done", list.current, list.rows.size()).c_str(), ui::color::InkSoft, -1);
             ImGui::SetCursorScreenPos(ImVec2(rowAt.x, rowAt.y + rowH));
         }
         for (size_t i = 0; i < list.rows.size(); i++)
@@ -421,43 +401,12 @@ namespace launcher_ui
             bool current = int(i) == list.current;
             if ((m_s->installLog || fold) && !current)
                 continue;
-            ImVec2 rowAt = ImGui::GetCursorScreenPos();
-            ImVec2 dot(rowAt.x + 10, rowAt.y + lineH / 2 + 1);
-            using RowState = InstallChecklist::RowState;
-            switch (row.state)
-            {
-            case RowState::Done:
-                draw->AddCircleFilled(dot, 9, Rgb(Ok), 20);
-                draw->AddPolyline(std::array{ ImVec2(dot.x - 4.5f, dot.y), ImVec2(dot.x - 1.2f, dot.y + 3.5f), ImVec2(dot.x + 4.5f, dot.y - 3.5f) }.data(),
-                    3, Rgb(Panel), 0, 2.2f);
-                break;
-            case RowState::Running:
-            {
-                draw->AddCircle(dot, 8, Rgb(Border), 24, 2.5f);
-                float angle = float(now % 900) / 900.0f * 6.2832f;
-                draw->PathArcTo(dot, 8, angle, angle + 2.2f, 14);
-                draw->PathStroke(Rgb(Accent), 0, 2.8f);
-                break;
-            }
-            case RowState::Failed:
-                draw->AddCircleFilled(dot, 9, Rgb(Danger), 20);
-                draw->AddLine(ImVec2(dot.x - 3.5f, dot.y - 3.5f), ImVec2(dot.x + 3.5f, dot.y + 3.5f), Rgb(Panel), 2.2f);
-                draw->AddLine(ImVec2(dot.x - 3.5f, dot.y + 3.5f), ImVec2(dot.x + 3.5f, dot.y - 3.5f), Rgb(Panel), 2.2f);
-                break;
-            case RowState::Stopped:
-                draw->AddCircleFilled(dot, 9, Rgb(TextDim), 20);
-                draw->AddRectFilled(ImVec2(dot.x - 3.5f, dot.y - 1.2f), ImVec2(dot.x + 3.5f, dot.y + 1.2f), Rgb(Panel));
-                break;
-            case RowState::Waiting:
-                draw->AddCircle(dot, 8, Rgb(BorderBright), 24, 1.5f);
-                break;
-            }
-            ImGui::SetCursorScreenPos(ImVec2(rowAt.x + 30, rowAt.y));
-            unsigned ink = row.state == RowState::Waiting ? TextDim : row.state == RowState::Failed ? Danger : current ? Text : TextSecondary;
-            if (current)
-                BoldText(row.title.c_str(), ink);
-            else
-                ImGui::TextColored(ImColor(Rgb(ink)), "%s", row.title.c_str());
+            const ImVec2 rowAt = ImGui::GetCursorScreenPos();
+            rowIcon(row.state, ImVec2(rowAt.x + iconSize / 2, rowAt.y + rowH / 2 - 1));
+            ImGui::SetCursorScreenPos(ImVec2(rowAt.x + textX, rowAt.y));
+            unsigned ink = row.state == RowState::Waiting ? ui::color::Dim : row.state == RowState::Failed ? ui::color::Danger : current ? ui::color::Ink : ui::color::InkSoft;
+            ui::Text(ui::TextStyle::Body, row.title.c_str(), ink, -1, current);
+            const float titleW = ImGui::GetItemRectSize().x;
 
             // Its time on the right: the running time, or how long a done step took.
             std::string time;
@@ -465,90 +414,83 @@ namespace launcher_ui
                 time = InstallDuration(row.ms);
             else if (row.state == RowState::Done && row.timed && row.ms >= 1000)
                 time = InstallDuration(row.ms);
+            float timeW = 0;
             if (!time.empty())
             {
-                float w = ImGui::CalcTextSize(time.c_str()).x;
-                draw->AddText(ImVec2(left + width - w, rowAt.y), Rgb(current ? Text : TextDim), time.c_str());
+                ui::PushText(ui::TextStyle::Caption);
+                timeW = ImGui::CalcTextSize(time.c_str()).x;
+                ui::DrawText(draw, ImVec2(left + width - timeW, rowAt.y + (rowH - ImGui::GetFontSize()) / 2 - 1), ui::Col(current ? ui::color::Ink : ui::color::Dim), time.c_str());
+                ui::PopText();
             }
-            // The running step's own bar, between its title and its time.
+            // The running step's own bar, between its title and its time, with its count.
             if (current && running && row.fraction >= 0)
             {
-                std::string count = fmt::format("{} / {}", row.done, row.total);
-                ImGui::PushFont(nullptr, SmallSize);
-                float countW = ImGui::CalcTextSize(count.c_str()).x;
-                float barLeft = rowAt.x + 30 + std::max(ImGui::GetItemRectSize().x + 20, width * 0.42f);
-                float barRight = left + width - 70 - countW - 12;
-                if (barRight - barLeft > 40)
+                const std::string count = fmt::format("{} / {}", row.done, row.total);
+                const float countW = ui::TextSize(ui::TextStyle::Caption, count.c_str()).x;
+                const float barLeft = rowAt.x + textX + std::max(titleW + ui::space::M, width * 0.42f);
+                const float barW = left + width - timeW - ui::space::M - countW - ui::space::S - barLeft;
+                if (barW > 2 * ui::space::XXL)
                 {
-                    float y = rowAt.y + lineH / 2 - 3;
-                    draw->AddRectFilled(ImVec2(barLeft, y), ImVec2(barRight, y + 6), Rgb(Field), 3);
-                    draw->AddRectFilled(ImVec2(barLeft, y), ImVec2(barLeft + std::max(6.0f, (barRight - barLeft) * row.fraction), y + 6), Rgb(Accent), 3);
-                    draw->AddText(ImVec2(barRight + 12, rowAt.y + (lineH - ImGui::GetTextLineHeight()) / 2), Rgb(TextSecondary), count.c_str());
+                    ImGui::SetCursorScreenPos(ImVec2(barLeft, rowAt.y + (rowH - ui::space::XS) / 2 - 1));
+                    ui::ProgressBar(row.fraction, barW);
+                    ui::PushText(ui::TextStyle::Caption);
+                    ui::DrawText(draw, ImVec2(barLeft + barW + ui::space::S, rowAt.y + (rowH - ImGui::GetFontSize()) / 2 - 1), ui::Col(ui::color::InkSoft), count.c_str());
+                    ui::PopText();
                 }
-                ImGui::PopFont();
             }
             ImGui::SetCursorScreenPos(ImVec2(rowAt.x, rowAt.y + rowH));
         }
 
         // Under the steps: what SSABuild does now (one line that replaces itself), or why it stopped.
-        ImGui::Dummy(ImVec2(0, 2));
+        ImGui::Dummy(ImVec2(0, ui::space::XXS));
         if (running)
         {
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Fit(list.action, width).c_str());
-            ImGui::PopFont();
+            ui::PushText(ui::TextStyle::Caption);
+            const std::string action = ui::Ellipsize(list.action.c_str(), width);
+            ui::PopText();
+            ui::Text(ui::TextStyle::Caption, action.c_str(), ui::color::InkSoft, -1);
         }
         else if (failed)
         {
-            BoldText(InstallFailureHeadline(list, progress).c_str(), Text);
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-            ImGui::PushTextWrapPos(left + width);
+            ui::Text(ui::TextStyle::Label, InstallFailureHeadline(list, progress).c_str(), ui::color::Ink, 0, true);
             if (!progress.error.empty())
-                ImGui::TextWrapped("%s", progress.error.c_str());
-            ImGui::TextWrapped("%s", Tr("Retry carries on from this step."));
-            ImGui::PopTextWrapPos();
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
+                ui::Text(ui::TextStyle::Caption, progress.error.c_str(), ui::color::InkSoft);
+            ui::Text(ui::TextStyle::Caption, Tr("Retry carries on from this step."), ui::color::InkSoft);
         }
         else if (interrupted)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-            ImGui::PushTextWrapPos(left + width);
-            ImGui::TextWrapped("%s", m_s->installPastPid != 0 ? Tr("The earlier install is still stopping. Resume in a moment.")
-                                                           : Tr("Arkeyan Launcher closed during the install. Resume carries on."));
-            ImGui::PopTextWrapPos();
-            ImGui::PopStyleColor();
-        }
+            ui::Text(ui::TextStyle::Body, m_s->installPastPid != 0 ? Tr("The earlier install is still stopping. Resume in a moment.")
+                                                                  : Tr("Arkeyan Launcher closed during the install. Resume carries on."), ui::color::InkSoft);
 
         // The log, in the space left above the buttons: monospace, scrollable, following its end.
-        constexpr float ButtonsH = 52;
+        const float buttonsH = ui::HeightOf(ui::Size::Normal) + ui::space::M;
         if (m_s->installLog)
         {
-            ImGui::Dummy(ImVec2(0, 2));
-            float logH = std::max(60.0f, ImGui::GetContentRegionAvail().y - ButtonsH);
+            ImGui::Dummy(ImVec2(0, ui::space::XXS));
+            float logH = std::max(60.0f, ImGui::GetContentRegionAvail().y - buttonsH);
+            ImFont* mono = ui::Ctx().fonts.mono;
+            const float monoSize = ui::SizeOf(ui::TextStyle::Caption);
             {
                 // A whole number of lines (and its padding), so the line at the top is never half cut while it follows the end.
-                ImGui::PushFont(m_monoFont, SmallSize);
-                const float step = ImGui::GetTextLineHeight() + 2;
+                ImGui::PushFont(mono, monoSize);
+                const float step = ImGui::GetTextLineHeight() + ui::space::XXS / 2;
                 ImGui::PopFont();
-                logH = std::max(60.0f, std::floor((logH - 16) / step) * step + 16);
+                logH = std::max(60.0f, std::floor((logH - 2 * ui::space::S) / step) * step + 2 * ui::space::S);
             }
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
-            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusSmall);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 8));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(ui::color::Inset));
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, ui::radius::Control);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ui::space::S, ui::space::S));
             ImGui::BeginChild("##installlog", ImVec2(0, logH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
             ImGui::PushTextWrapPos(0.0f); // the kit's lines are long and not ours: they wrap inside the box, nothing scrolls sideways
             bool atBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4;
-            ImGui::PushFont(m_monoFont, SmallSize);
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));
+            ImGui::PushFont(mono, monoSize);
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ui::space::XXS / 2));
             if (progress.logLines > progress.log.size())
-                ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tf("({} earlier lines in Copy log)", progress.logLines - progress.log.size()).c_str());
+                ImGui::TextColored(ImColor(Rgb(ui::color::Dim)), "%s", Tf("({} earlier lines in Copy log)", progress.logLines - progress.log.size()).c_str());
             for (const std::string& line : progress.log)
             {
                 bool error = line.starts_with("error") || line.find(": error") != std::string::npos;
                 bool heading = line.starts_with("== ");
-                ImGui::TextColored(ImColor(Rgb(error ? Danger : heading ? Text : TextSecondary)), "%s", line.c_str());
+                ImGui::TextColored(ImColor(Rgb(error ? ui::color::Danger : heading ? ui::color::Ink : ui::color::InkSoft)), "%s", line.c_str());
             }
             ImGui::PopTextWrapPos();
             ImGui::PopStyleVar();
@@ -560,20 +502,16 @@ namespace launcher_ui
             ImGui::PopStyleColor();
         }
 
-        // Buttons along the card's bottom edge: details on the left, the actions on the right.
-        ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - Pad - 40));
-        float rowY = ImGui::GetCursorPosY();
-        if (PillButton(m_s->installLog ? Tr("Hide details") : Tr("Show details"), false, 130))
-            m_s->installLog = !m_s->installLog;
-        constexpr float ButtonW = 150;
-        // The action on the right edge, at its real width (a longer translation widens it).
-        auto rightButton = [&](const char* label, bool bold) {
-            ImGui::SetCursorPos(ImVec2(Pad + width - PillWidth(label, ButtonW, bold), rowY));
-        };
+        // Buttons along the card's bottom edge: the action to take first (Retry, Resume), then the quieter ones; Cancel while it runs.
+        ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - ui::space::L - ui::HeightOf(ui::Size::Normal)));
         if (failed || interrupted)
         {
+            ImGui::BeginDisabled(m_s->installPastPid != 0);
+            if (ui::Button(failed ? Tr("Retry") : Tr("Resume"), { .kind = ui::ButtonKind::Primary }))
+                StartInstall();
+            ImGui::EndDisabled();
             ImGui::SameLine();
-            if (PillButton(Tr("Copy log"), false, 120))
+            if (ui::Button(Tr("Copy log")))
             {
                 std::string text;
                 if (m_s->installPast.state == State::Idle)
@@ -583,21 +521,20 @@ namespace launcher_ui
                 for (const std::string& line : m_s->installPast.log)
                     text += line + "\n";
                 SDL_SetClipboardText(text.c_str());
-                Toast(Tr("Log copied"));
+                Toast(Tr("Log copied"), ui::ToastKind::Success);
             }
             ImGui::SameLine();
-            if (PillButton(Tr("Open logs folder"), false, 140))
+            if (ui::Button(Tr("Open logs folder"), { .icon = ui::Icon::Folder }))
                 OpenFolder(GameInstallFolder(m_s->installSha));
-            rightButton(failed ? Tr("Retry") : Tr("Resume"), true);
-            ImGui::BeginDisabled(m_s->installPastPid != 0);
-            if (PillButton(failed ? Tr("Retry") : Tr("Resume"), true, ButtonW, true))
-                StartInstall();
-            ImGui::EndDisabled();
+            ImGui::SameLine();
         }
-        else if (running)
+        if (ui::Button(m_s->installLog ? Tr("Hide details") : Tr("Show details"), { .kind = failed || interrupted ? ui::ButtonKind::Ghost : ui::ButtonKind::Secondary }))
+            m_s->installLog = !m_s->installLog;
+        if (running)
         {
-            rightButton(Tr("Cancel"), false);
-            if (PillButton(Tr("Cancel"), false, ButtonW))
+            const ui::ButtonOptions cancel;
+            ImGui::SameLine(ImGui::GetWindowWidth() - ui::space::L - ui::ButtonWidth(Tr("Cancel"), cancel));
+            if (ui::Button(Tr("Cancel"), cancel))
             {
                 m_s->installer.Cancel();
                 m_s->kitDownload.Cancel();
