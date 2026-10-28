@@ -15,7 +15,6 @@ Not an Xbox 360 disc image, or the file is incomplete.	Ce n'est pas une image di
 16:9 (with bars)	16:9 (avec bandes)
 30 (original)	30 (d'origine)
 60 (experimental)	60 (expérimental)
-A (jump, confirm)	A (saut, valider)
 Only asks github.com for the latest version. Nothing else is sent.	Interroge seulement github.com pour connaître la dernière version. Rien d'autre n'est envoyé.
 Couldn't write to the game folder.	Impossible d'écrire dans le dossier du jeu.
 A launcher for the native PC ports of Skylanders. It has no game code or art: all of it comes from your own disc.	Un lanceur pour les portages PC natifs de Skylanders. Il ne contient ni code ni images du jeu : tout vient de votre propre disque.
@@ -34,7 +33,6 @@ Auto shows more on wide windows; 16:9 adds bars.	Auto montre plus sur les fenêt
 Auto: a real portal if plugged in, else virtual	Auto : un vrai portail s'il est branché, sinon virtuel
 Automatic	Automatique
 Automatic (gamepad first)	Automatique (manette d'abord)
-B (back)	B (retour)
 Back	Retour
 Built for this disc.	Construit pour ce disque.
 Button glyphs	Icônes des boutons
@@ -105,10 +103,6 @@ Couldn't unpack {}	Impossible de décompresser {}
 Couldn't create the shortcut	Impossible de créer le raccourci
 Create	Créer
 Credits	Crédits
-D-pad down	Croix bas
-D-pad left	Croix gauche
-D-pad right	Croix droite
-D-pad up	Croix haut
 DISC IMAGE:	IMAGE DISQUE :
 Data folder	Dossier de données
 Clean up	Nettoyage
@@ -157,7 +151,6 @@ Hold to delete the copy.	Maintenez pour supprimer la copie.
 Hold to delete the partial copy.	Maintenez pour supprimer la copie partielle.
 Hold to delete the built game. Saves are kept.	Maintenez pour supprimer le jeu construit. Les sauvegardes sont gardées.
 Hold to delete saves, backups and caches.	Maintenez pour supprimer sauvegardes, copies de secours et caches.
-Hold to reset every key.	Maintenez pour réinitialiser toutes les touches.
 Hold to restore; your current saves are kept first.	Maintenez pour restaurer ; vos sauvegardes actuelles sont gardées d'abord.
 INSTALL	INSTALLER
 INSTALLATION INTERRUPTED	INSTALLATION INTERROMPUE
@@ -182,8 +175,6 @@ Language	Langue
 Last checked {}	Dernière vérification : {}
 Later	Plus tard
 Launcher	Lanceur
-Left bumper	Bouton d'épaule gauche
-Left trigger	Gâchette gauche
 Licences	Licences
 Linking the game	Assemblage du jeu
 Log copied	Journal copié
@@ -262,8 +253,6 @@ Restart now	Redémarrer maintenant
 Restore	Restaurer
 Resume	Reprendre
 Retry	Réessayer
-Right bumper	Bouton d'épaule droit
-Right trigger	Gâchette droite
 SETTINGS	RÉGLAGES
 {} can't be verified, so it wasn't installed	{} ne peut pas être vérifié : rien n'a été installé
 Same as the game	Identique au jeu
@@ -291,7 +280,6 @@ Something went wrong while {}.	Un problème est survenu pendant l'étape « {}�
 Spyro's Adventure accepts this portal.	Spyro's Adventure accepte ce portail.
 Spyro's Adventure rejects this portal: {}.	Spyro's Adventure refuse ce portail : {}.
 Spyro's Adventure warns about this portal: {}.	Spyro's Adventure signale un problème avec ce portail : {}.
-Start	Start
 Starting the installer	Démarrage de l'installateur
 Step {} of {}	Étape {} sur {}
 Stop	Arrêter
@@ -394,10 +382,8 @@ Without a real portal, the game uses its virtual one (the Toy Box).	Sans vrai po
 Working	En cours
 For pack makers: saves the textures as DDS files.	Pour les créateurs de packs : enregistre les textures en DDS.
 Wrong disc	Mauvais disque
-X (attack)	X (attaque)
 Xbox One / Series	Xbox One / Series
 Xbox portal	Portail Xbox
-Y (attack)	Y (attaque)
 YOUR GAMES	VOS JEUX
 Zoom: automatic	Zoom : automatique
 Zoom: {:g}%	Zoom : {:g} %
@@ -742,3 +728,19 @@ Arkeyan Launcher can't remove itself from here: delete it by hand.	Arkeyan Launc
 {} couldn't be removed.	{} n'a pas pu être supprimé.
 Other files in the figures folder stay.	Les autres fichiers du dossier des figurines restent.
 Kept: Xbox signing keys	Gardé : clés de signature Xbox
+
+# Keyboard tab of a game: the names are the game's own, as the disc words them (docs/settings.md, "Where the names come from")
+1st Power / Accept	1er pouvoir / Accepter
+2nd Power / Back	2e pouvoir / Retour
+Use / Talk	Utiliser / Parler
+Special Power	Pouvoir spécial
+Skylander Info	Infos du Skylander
+Action / Accept	Action / Accepter
+Attack 1	Attaque 1
+Attack 2	Attaque 2
+Attack 3	Attaque 3
+Attack 3 / Back	Attaque 3 / Retour
+Jump	Sauter
+Skylanders Stats	Stats Skylanders
+Pause	Pause
+Hold to reset every key of this game.	Maintenez pour réinitialiser toutes les touches de ce jeu.

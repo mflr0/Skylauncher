@@ -1,6 +1,6 @@
-// A game's own settings (the Settings button on its Play page): Video, Language, Disc, Saves and Game (shortcut, folders,
-// reinstall, delete data, uninstall). Arkeyan Launcher's own settings and what both games share (the controller, the keys) are in
-// the gear's Settings (launcher_ui.cpp). The video keys are the game's own copy in [<game>.video] (game_settings.h).
+// A game's own settings (the Settings button on its Play page): Video, Keyboard, Language, Disc, Saves and Game (shortcut, folders,
+// reinstall, delete data, uninstall). Arkeyan Launcher's own settings and what all games share (the controller) are in
+// the gear's Settings (launcher_ui.cpp). The video keys and the keyboard keys are the game's own copy in [<game>.video] and [<game>.input] (game_settings.h, game_keys.h).
 #include "launcher/ui/launcher_app.h"
 #include "launcher/shortcut.h"
 #include "shared/collection/datadir.h"
@@ -25,6 +25,8 @@ namespace launcher_ui
             constexpr const char* Uninstall = N_("Remove game");
             constexpr const char* UninstallHint = N_("Hold to delete the built game. Saves are kept.");
             constexpr const char* OpenFigures = N_("Figures");
+            constexpr const char* ResetKeys = N_("Reset to defaults");
+            constexpr const char* ResetKeysHint = N_("Hold to reset every key of this game.");
         }
 
         // "12.3 GB" for what a button would free, nothing for less than a megabyte of noise.
@@ -53,7 +55,7 @@ namespace launcher_ui
         ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
 
-        static const char* const Tabs[] = { N_("Video"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
+        static const char* const Tabs[] = { N_("Video"), N_("Keyboard"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
         int tab = int(m_gameTab);
         DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
         m_gameTab = GameTab(tab);
@@ -61,6 +63,7 @@ namespace launcher_ui
         switch (m_gameTab)
         {
         case GameTab::Video: DrawGameVideo(); break;
+        case GameTab::Keyboard: DrawGameKeyboard(); break;
         case GameTab::Language: DrawGameLanguage(); break;
         case GameTab::Disc: DrawGameDisc(); break;
         case GameTab::Saves: DrawSaveBackups(); break;
@@ -134,6 +137,59 @@ namespace launcher_ui
             toggle("##texturedump", "texture_dump", "0");
             EndSettingsTable();
         }
+    }
+
+    // The keys of this game: one row per action the game uses, named as the game names it, the pad button in brackets.
+    // [<game>.input] holds them; PLAY puts them in [input] (game_keys.h).
+    void App::DrawGameKeyboard()
+    {
+        const std::string& game = m_s->game.id;
+        const std::string section = GameInputSection(game);
+        const std::span<const GameKey> keys = GameKeys(game);
+        Title(Tr("Keyboard"), TitleSize, Text);
+        ImGui::SameLine(0, 24);
+        if (HoldButton(Tr(strings::ResetKeys), 200, Tr(strings::ResetKeysHint)))
+        {
+            ResetGameKeys(m_config, game);
+            Set(section.c_str(), "seeded", "1");
+            m_capturing = nullptr;
+            Toast(Tr("Keyboard bindings reset"));
+        }
+        if (m_capturing != nullptr)
+            ImGui::TextColored(ImColor(Rgb(Accent)), "%s", Tf("Press a key for \"{}\" (Escape cancels)", Tr(m_capturing->label)).c_str());
+        else
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Click a key to change it."));
+        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
+        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingFixedFit))
+        {
+            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 200);
+            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 96);
+            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 200);
+            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 96);
+            for (size_t i = 0; i < keys.size(); i++)
+            {
+                const GameKey& action = keys[i];
+                if (i % 2 == 0)
+                    ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::AlignTextToFramePadding();
+                ImGui::TextUnformatted(fmt::format("{} ({})", Tr(action.label), action.pad).c_str());
+                ImGui::TableNextColumn();
+                const std::string key = GameKeyName(m_config, game, action);
+                const bool duplicate = GameKeyConflict(m_config, game, action);
+                ImGui::PushID(action.action);
+                ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Accent : Field));
+                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? AccentInk : duplicate ? Danger : Text));
+                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(90, 32)))
+                    m_capturing = &action;
+                ImGui::PopStyleColor(2);
+                if (duplicate && ImGui::IsItemHovered())
+                    ImGui::SetTooltip("%s", Tr("This key is used by another action"));
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
+        }
+        ImGui::PopStyleVar();
     }
 
     void App::DrawGameLanguage()

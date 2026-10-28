@@ -48,13 +48,16 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
    INSTALL check that the image is still there first. Changing the disc moved to the game's settings (Disc tab); CHOOSE DISC
    stays the main button while there is no disc.
 3. Collection - see below.
-4. Settings (the gear) - **the launcher's own settings and what both games share**, in four tabs: Controls (device, portal, glyphs,
-   keyboard bindings), Launcher (language slot, updates, data folder, **Remove Arkeyan Launcher**: "Uninstall everything", below), Support (report a problem, logs), About (version, credits).
+4. Settings (the gear) - **the launcher's own settings and what both games share**, in four tabs: Controls (device, portal, glyphs), Launcher (language slot, updates, data folder, **Remove Arkeyan Launcher**: "Uninstall everything", below), Support (report a problem, logs), About (version, credits).
    Clicking a game goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
-5. Game settings (the Settings button on a game's Play page) - **that game's own settings**, five tabs (the sidebar keeps the
+5. Game settings (the Settings button on a game's Play page) - **that game's own settings**, six tabs (the sidebar keeps the
    game selected; B / Escape or **Back** return to its Play page):
    - Video: fullscreen, resolution scale, frame rate limit (30 or 60), skip intro movies, Original resolution (Swap Force only), VSync, texture filtering, widescreen,
      HD texture packs (and their folder), Advanced > dump textures. The game's own copy, `[<game>.video]` (docs/settings.md).
+   - Keyboard: one row per action **the game uses**, named as the game names it with the pad button in brackets ("Attack 1 (X)",
+     "1st Power / Accept (A)"), two rows a line: the key's button (click it, press a key; Escape cancels), red when another row of
+     the game has the same key, and **Reset to defaults** (held) for this game's keys. The game's own copy, `[<game>.input]`; PLAY puts it
+     in `[input]` (docs/settings.md, "Per-game keyboard keys", which also lists each game's rows and where their names come from).
    - Language: game text and game voices (`[<game>] language`, `voice_language`). Giants' disc has twelve languages for both (English,
      French, German, Spanish, Latin-American Spanish `es-419`, Italian, Dutch, Portuguese, Swedish, Norwegian, Danish, Finnish) and its
      voices default to **Same as text** (an empty `voice_language`); Spyro's Adventure has ten, its voices default to English; Swap Force's
@@ -71,10 +74,11 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
 
 **Why the split.** The gear used to hold game things (disc image, graphics, game languages, saves) that looked like the
 launcher's. Now the gear is only what is the launcher's or is shared, and anything about one game is on that game's page, so
-the two games can differ (30 fps for one, 60 for the other, another disc, deleting one's saves). **The controller, the keys,
-the button glyphs and the portal stay in the launcher's settings** because both games read the same `[input]` and `[portal]`
-sections and the same hardware: a game page would only show the same values twice. If the games ever need different keys, the
-Controls tab moves to the game pages the way Video did (`GameVideoKeys` shows how).
+the two games can differ (30 fps for one, 60 for the other, another disc, deleting one's saves). **The controller, the button
+glyphs and the portal stay in the launcher's settings** because the games read the same `[input]` (device, glyphs) and `[portal]`
+sections and the same hardware: a game page would only show the same values twice. **The keyboard keys moved to the game pages**
+(Keyboard tab) because the games name and use their buttons differently (Giants' X is "Attack 1", Spyro's Adventure's is "Use / Talk"):
+`[<game>.input]` works like `[<game>.video]` (`game_keys.h`).
 
 The launcher opens on **Home**, the menu page (the ARKEYAN LAUNCHER title goes back to it): the **library**, a card per
 playable game (its painting from the disc behind its logo, its name and state; the game's colours before its disc was
@@ -107,7 +111,7 @@ in the sidebar (`[launcher] game=`); the other is one click away.
      PLAY) and the **game's settings** (a gear) in its right segment, with the portal's line under it. PLAY and INSTALL
      check that the image is still there first.
 3. Collection - see below.
-4. Settings (the gear) - Graphics, Controls (device, portal, keyboard bindings), Language, Game data, About. Clicking a game
+4. Settings (the gear) - Graphics, Controls (device, portal), Language, Game data, About. Clicking a game
    goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from. The game page's settings
    button opens it too, until each game has a settings page of its own (another branch).
 
@@ -247,7 +251,7 @@ always animates (`docs/settings.md`).
   launcher starts with the focus in the sidebar.
 - **Hold to confirm.** What deletes or overwrites is a red button held for a second (`App::HoldButton`, the state in
   `hold_confirm.h`): Reset and Delete (Figure page), Delete for good (trash), Mark as not in use (a stale lock), Restore
-  (a save backup), Reset to defaults (keyboard), Reinstall, Delete saves and data, Remove game. The fill shows the time; releasing, or the pointer
+  (a save backup), Reset to defaults (a game's keyboard), Reinstall, Delete saves and data, Remove game. The fill shows the time; releasing, or the pointer
   leaving, cancels; it acts once per press; Space, Enter and the pad's A hold it too. The label is a plain verb, the
   instruction is the tooltip (shown on keyboard and pad focus too). Buttons are told apart by their ImGui ID.
 - **Quitting.** The window's close, Cmd+Q or Alt+F4 during an install asks: Keep installing (default) or Quit.
@@ -408,6 +412,7 @@ With `SKY_LAUNCHER_TEST_INSTALL=1` and `SKY_LAUNCHER_KIT=$PWD/build/fake-kit` it
 (`docs/install.md`).
 
 ## Other screenshot variables
+`SKY_LAUNCHER_TEST_KEYS=1` shoots each game's Keyboard tab (`keys-ssa`, `keys-giants`, `keys-swapforce`; `SKY_LAUNCHER_LANGUAGE=fr` for the French ones).
 `SKY_LAUNCHER_TEST_LOGO=1` shoots each game's page (`logo-ssa`, `logo-giants`, `logo-swapforce`) from the art already cached in
 `SKYLANDERS_DATA`; `SKY_LAUNCHER_TEST_SIZE=<w>x<h>` sets the window (the default one, a large one).
 `SKY_LAUNCHER_TEST_UPDATE=1` with `SKY_LAUNCHER_UPDATE_URL=file://<fake latest.json>` shows the update screens (`20-` to `24-`).

@@ -68,12 +68,52 @@ ten keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `
   the runtime needs no change (`ApplyGameVideo`).
 - When the game ends, what is in `[video]` (the player may have changed it in the game's own Settings menu) becomes that
   game's copy again (`StoreGameVideo`), so the other game never sees it.
-- What both games share stays in its own section: `[input]` (device, keys, glyphs), `[portal]`, and the launcher's
-  `[launcher]` and `[update]`. They are in the gear's Settings, not on a game page.
+- What the games share stays in its own section: `[input]` (device, glyphs), `[portal]`, and the launcher's
+  `[launcher]` and `[update]`. They are in the gear's Settings, not on a game page. The keyboard keys are per game, below.
 
-Keyboard actions: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`, `left_left`,
-`left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (camera), `dpad_up`, `dpad_down`,
-`dpad_left`, `dpad_right`. Defaults: Space, X, C, V, Return, Backspace, Q, E, 1, 3, W, S, A, D, I, K, J, L and the arrow keys.
+## Per-game keyboard keys
+
+The runtime reads one `[input]` section (`key_<action>=<SDL key name>`), but the keys are each game's own: **`[ssa.input]`**,
+**`[giants.input]`** and **`[swapforce.input]`** hold a game's `key_<action>` lines, edited on the game's settings page
+(Keyboard tab). Only the keys are per game: `device`, `gamepad` and `glyphs` stay in `[input]`.
+
+| Section | Key | Meaning |
+| --- | --- | --- |
+| `<game>.input` | `key_<action>` | The key (an SDL key name) the game's copy gives to an action. Absent: the game's default key. |
+| `<game>.input` | `seeded` | `1` once the copy has been made from `[input]` (an empty copy is not written to the file, so this says it was). |
+
+- The first time (`SeedGameInput`, when the launcher starts), every game's copy starts from the `key_` lines the player
+  already had in `[input]`, so nobody loses a binding. It never happens again for that game.
+- **PLAY** puts the game's keys in `[input]` (`ApplyGameInput`): the keys it has set; for the actions on its page, its default
+  where none is set; the other `key_` lines follow the copy, or are dropped so the runtime's own default applies. The runtime
+  needs no change. Nothing is stored back (the runtime never changes keys).
+- **Reset to defaults** empties the game's copy (every `key_` line of it); the defaults then apply at PLAY.
+- Two rows of one game on the same key are marked (a conflict is only possible inside a game).
+
+Keyboard actions the runtime knows: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`,
+`left_left`, `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (camera), `dpad_up`, `dpad_down`,
+`dpad_left`, `dpad_right`. Defaults (all three games): A Space, B X, X C, Y V, Start Return, Back Backspace, W S A D for the
+left stick, I K J L for the right stick, the arrow keys for the D-pad.
+
+### What each game's Keyboard tab lists (`src/launcher/game_keys.cpp`)
+
+A row names what the key does **in that game, in the game's own words**, with the pad button in brackets ("Attack 1 (X)").
+Only the actions the game uses have a row; the other actions keep whatever the copy was seeded with (the runtime's default
+otherwise). The names are English; the French is the disc's own wording (`resources/lang/fr.txt`); the other launcher
+languages show English until translated. The sources are each game's disc, read once by hand; nothing from it is in the
+repository (the names are short words, written in the table).
+
+| Game | Rows (pad button) | Where the names come from |
+| --- | --- | --- |
+| Spyro's Adventure | Move up, down, left, right (L stick); **1st Power / Accept** (A), **2nd Power / Back** (B), **Use / Talk** (X), **Special Power** (Y), **Skylander Info** (Back), **Pause** (Start); Camera up, down, left, right (R stick) | The key-binding screen in `text/<lang>/global.lxb`: "1st Power/Accept", "2nd Power", "Use/Talk", "Special Power/Back", "Skylander Info", "Pause" (French "1er pouvoir/Accepter", "2e pouvoir", "Utiliser/Parler", "Pouvoir spécial/Retour", "Infos du Skylander"). Which button each is: the console legend that Giants' options screen also carries ("1st Power/Accept", "2nd Power/Back", "Use/Talk", "Special Power"). Camera: the tutorial's "Move right stick" |
+| Giants | Move up, down, left, right (L stick); **Action / Accept** (A), **Attack 1** (X), **Attack 2** (Y), **Attack 3 / Back** (B), **Skylander Info** (Back), **Pause** (Start) | The controls screen of `misc/UI_Options.bld` (the controller diagram's labels "Attack 1", "Attack 2", "Attack 3", "Action", "Skylander Info", "Pause", "Move"; French "Attaque 1", "Attaque 2", "Attaque 3", "Action", "Infos Skylander", "Pause", "Déplacement"); "Accept" and "Back" from the legend in the same file. The tutorial's "[ to use your primary attack" and "Use [ and ] to defeat monsters" agree. No camera rows: the screen shows no right stick |
+| Swap Force | Move up, down, left, right (L stick); **Jump** (A), **Attack 1** (X), **Attack 2** (Y), **Attack 3** (B), **Skylanders Stats** (Back), **Pause** (Start); Camera up, down, left, right (R stick) | `archives/controller_schemexenon.pak`, the Xbox 360 controls screen (assets `A_Jump`, `X_Attack`, `Y_Attack`, `B_Attack`, `Start_Pause`, `Skylanders_Stats`; labels "Attack 1", "Attack 2", "Attack 3", "Interact", "Jump", "Move", "Skylanders Stats", "Pause"; French "Attaque 1", "Attaque 2", "Attaque 3", "Interagir", "Sauter", "Bouger", "Stats Skylanders") |
+
+**Not settled [?]**: the screens give the names, and the asset names say which of A, B, X, Y are attacks, but nothing was
+read from a running game for: which of Attack 2 and Attack 3 sits on Y and on B (Giants, Swap Force); which button is
+"Interact" in Swap Force (it has no row for now); whether "Skylander Info" and "Skylanders Stats" are the Back button; the
+camera rows of Spyro's Adventure and Swap Force. Each is one line of `game_keys.cpp`. Giants' French "Infos Skylander" and
+Spyro's Adventure's "Infos du Skylander" share one English key ("Skylander Info"): the launcher shows the second.
 
 ## Figures
 

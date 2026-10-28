@@ -1,5 +1,6 @@
 // Arkeyan Launcher: shows the launcher, then starts the game runtime with the disc image the player chose.
 #include "launcher/game_install.h"
+#include "launcher/game_keys.h"
 #include "launcher/game_settings.h"
 #include "launcher/i18n.h"
 #include "shared/collection/datadir.h"
@@ -119,6 +120,7 @@ int main(int argc, char** argv)
     };
     // The video settings of this game are what the runtime reads from [video] (game_settings.h).
     ApplyGameVideo(config, game->id);
+    ApplyGameInput(config, game->id); // and its keys, in [input]
     SaveLauncherConfig(configPath, config);
     pass("SKY_PORTAL", "portal", "mode");
     // [portal] place is the older list of figures to start on the portal; once the seats moved to the session file

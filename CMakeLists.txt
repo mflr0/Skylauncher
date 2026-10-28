@@ -157,6 +157,7 @@ target_sources(ArkeyanLauncherCore PRIVATE
     src/launcher/install_checklist.cpp
     src/launcher/game_run.cpp
     src/launcher/portal_status.cpp
+    src/launcher/game_keys.cpp
     src/launcher/game_settings.cpp
     src/launcher/game_copy.cpp
     src/launcher/shortcut.cpp

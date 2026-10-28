@@ -6,6 +6,7 @@
 #include "assets/launcher_assets.h"
 #include "launcher/game_copy.h"
 #include "launcher/game_install.h"
+#include "launcher/game_keys.h"
 #include "launcher/game_run.h"
 #include "launcher/game_settings.h"
 #include "launcher/i18n.h"
@@ -40,25 +41,6 @@ namespace launcher_ui
     std::string SettingGet(const LauncherConfig& config, std::string_view section, std::string_view key, std::string fallback = {});
     int SettingInt(const LauncherConfig& config, std::string_view section, std::string_view key, int fallback);
     bool ParseBool(std::string_view value);
-
-    // Keyboard bindings: the runtime reads "[input] key_<action>=<SDL key name>".
-    struct KeyAction
-    {
-        const char* id;
-        const char* label;
-        SDL_Keycode fallback;
-    };
-
-    inline constexpr KeyAction KeyActions[] = {
-        { "a", N_("A (jump, confirm)"), SDLK_SPACE }, { "b", N_("B (back)"), SDLK_X }, { "x", N_("X (attack)"), SDLK_C },
-        { "y", N_("Y (attack)"), SDLK_V }, { "start", N_("Start"), SDLK_RETURN }, { "back", N_("Back"), SDLK_BACKSPACE },
-        { "lb", N_("Left bumper"), SDLK_Q }, { "rb", N_("Right bumper"), SDLK_E }, { "lt", N_("Left trigger"), SDLK_1 },
-        { "rt", N_("Right trigger"), SDLK_3 }, { "left_up", N_("Move up"), SDLK_W }, { "left_down", N_("Move down"), SDLK_S },
-        { "left_left", N_("Move left"), SDLK_A }, { "left_right", N_("Move right"), SDLK_D }, { "right_up", N_("Camera up"), SDLK_I },
-        { "right_down", N_("Camera down"), SDLK_K }, { "right_left", N_("Camera left"), SDLK_J },
-        { "right_right", N_("Camera right"), SDLK_L }, { "dpad_up", N_("D-pad up"), SDLK_UP }, { "dpad_down", N_("D-pad down"), SDLK_DOWN },
-        { "dpad_left", N_("D-pad left"), SDLK_LEFT }, { "dpad_right", N_("D-pad right"), SDLK_RIGHT },
-    };
 
     struct Choice
     {
@@ -186,7 +168,7 @@ namespace launcher_ui
     // page) opens that game's own settings.
     enum class Page { Home, Play, Collection, Settings, GameSettings };
     enum class SettingsTab { Controls, Launcher, Support, About };
-    enum class GameTab { Video, Language, Disc, Saves, Game };
+    enum class GameTab { Video, Keyboard, Language, Disc, Saves, Game };
     enum class DiscState { None, Verifying, Ready, Failed };
     // Everything a game can be in, read from its slot by App::SlotStatus: the one place that decides (docs/launcher_ui.md).
     enum class SlotState
@@ -320,6 +302,7 @@ namespace launcher_ui
         // A game's own settings (game_settings_page.cpp), opened from the Settings button on its Play page.
         void DrawGameSettings();
         void DrawGameVideo();
+        void DrawGameKeyboard();
         void DrawGameLanguage();
         void DrawGameDisc();
         void DrawGameData();     // game_data_page.cpp: the Disc tab's "Game data" section
@@ -517,7 +500,7 @@ namespace launcher_ui
         bool m_dragOver = false;
 
         std::vector<SDL_JoystickID> m_gamepads;
-        const KeyAction* m_capturing = nullptr;
+        const GameKey* m_capturing = nullptr; // the key row of the shown game waiting for a key press
 
         // The games opened this session (one slot each), and the one shown. Every slot's jobs are polled; the shown
         // one's state is what the pages draw (m_s).
@@ -540,6 +523,7 @@ namespace launcher_ui
         } m_un;
         bool m_uninstalled = false;    // done: the window only shows the result and quits
         bool m_testUninstall = false;  // SKY_LAUNCHER_TEST_UNINSTALL: the uninstall screens
+        bool m_testKeys = false;       // SKY_LAUNCHER_TEST_KEYS: each game's Keyboard tab, one shot each
         bool m_testLogo = false;       // SKY_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
         uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)

@@ -3,6 +3,7 @@
 // data folder or the real Desktop. Called from launcher_test.cpp's main; returns the number of failures.
 #include "launcher/env.h"
 #include "launcher/game_install.h"
+#include "launcher/game_keys.h"
 #include "launcher/game_settings.h"
 #include "launcher/launcher.h"
 #include "launcher/shortcut.h"
@@ -110,6 +111,90 @@ namespace
         SETTINGS_EXPECT(back["giants.video"]["fps_limit"] == "30" && back["ssa.video"]["resolution_scale"] == "3");
         fs::remove(scratch);
         printf("Settings: each game's video settings are its own, [video] follows the game that plays\n");
+    }
+
+    // ---- Per-game keyboard keys ------------------------------------------------------------------------------------------
+
+    bool HasRow(std::string_view game, std::string_view action, std::string_view label)
+    {
+        for (const GameKey& key : GameKeys(game))
+            if (action == key.action && label == key.label)
+                return true;
+        return false;
+    }
+
+    void KeyChecks()
+    {
+        // Each game lists the actions it uses, named as it names them; a button it ignores has no row.
+        SETTINGS_EXPECT(HasRow("ssa", "a", "1st Power / Accept") && HasRow("ssa", "y", "Special Power") && HasRow("ssa", "start", "Pause"));
+        SETTINGS_EXPECT(HasRow("giants", "x", "Attack 1") && HasRow("giants", "a", "Action / Accept") && HasRow("giants", "b", "Attack 3 / Back"));
+        SETTINGS_EXPECT(HasRow("swapforce", "a", "Jump") && HasRow("swapforce", "back", "Skylanders Stats"));
+        SETTINGS_EXPECT(!HasRow("giants", "right_up", "Camera up") && HasRow("swapforce", "right_up", "Camera up"));
+        SETTINGS_EXPECT(GameKeys("giants").size() == 10 && GameKeys("ssa").size() == 14 && GameKeys("nothing").empty());
+        for (const char* game : { "ssa", "giants", "swapforce" })
+            for (const GameKey& key : GameKeys(game))
+            {
+                bool known = false;
+                for (const char* action : InputActions())
+                    known = known || std::string_view(action) == key.action;
+                SETTINGS_EXPECT(known && key.pad != nullptr && *key.pad != 0);
+            }
+
+        // Seeded once from the player's [input] keys; the other keys of [input] are not copied; the device stays.
+        LauncherConfig config;
+        config["input"] = { { "device", "keyboard" }, { "key_x", "F" }, { "key_dpad_up", "T" }, { "glyphs", "keyboard" } };
+        SeedGameInput(config, "ssa");
+        SeedGameInput(config, "giants");
+        SETTINGS_EXPECT(config["ssa.input"]["key_x"] == "F" && config["giants.input"]["key_dpad_up"] == "T");
+        SETTINGS_EXPECT(config["ssa.input"].count("device") == 0 && config["ssa.input"].count("glyphs") == 0);
+        SETTINGS_EXPECT(GameKeyName(config, "ssa", GameKeys("ssa")[6]) == "F"); // ssa's X row
+        config["input"]["key_x"] = "G"; // later changes of [input] (a game was played) never seed a game again
+        SeedGameInput(config, "ssa");
+        SETTINGS_EXPECT(config["ssa.input"]["key_x"] == "F");
+
+        // A game that had nothing to seed is still marked, so [input] (another game's keys by then) does not seed it later.
+        LauncherConfig fresh;
+        SeedGameInput(fresh, "swapforce");
+        fresh["input"]["key_a"] = "Z";
+        SeedGameInput(fresh, "swapforce");
+        SETTINGS_EXPECT(fresh["swapforce.input"].count("key_a") == 0 && fresh["swapforce.input"]["seeded"] == "1");
+
+        // PLAY: the game's keys go to [input]; its defaults fill what it has not set; its unused actions follow the copy or
+        // the runtime's default; the device and the glyph style stay; the other game's copy is not touched.
+        config["ssa.input"]["key_a"] = "J";
+        config["giants.input"]["key_a"] = "K";
+        ApplyGameInput(config, "ssa");
+        SETTINGS_EXPECT(config["input"]["key_a"] == "J" && config["input"]["key_x"] == "F" && config["input"]["key_y"] == "V");
+        SETTINGS_EXPECT(config["input"]["device"] == "keyboard" && config["input"]["glyphs"] == "keyboard");
+        SETTINGS_EXPECT(config["input"]["key_dpad_up"] == "T" && config["input"].count("key_lb") == 0); // an unused action keeps what it was seeded with
+        ApplyGameInput(config, "giants");
+        SETTINGS_EXPECT(config["input"]["key_a"] == "K" && config["input"]["key_x"] == "F" && config["input"]["key_dpad_up"] == "T");
+        SETTINGS_EXPECT(config["ssa.input"]["key_a"] == "J" && config["giants.input"]["key_a"] == "K");
+
+        // Two rows of one game on the same key are a conflict, in that game only.
+        config["giants.input"]["key_y"] = "K";
+        const std::span<const GameKey> giants = GameKeys("giants");
+        int conflicts = 0;
+        for (const GameKey& key : giants)
+            conflicts += GameKeyConflict(config, "giants", key) ? 1 : 0;
+        SETTINGS_EXPECT(conflicts == 2);
+        for (const GameKey& key : GameKeys("ssa"))
+            SETTINGS_EXPECT(!GameKeyConflict(config, "ssa", key) || std::string_view(key.action) != "y");
+
+        // Reset: the game's copy loses its keys (the marker stays), and PLAY then puts the defaults in [input].
+        ResetGameKeys(config, "giants");
+        SETTINGS_EXPECT(config["giants.input"].count("key_a") == 0 && config["giants.input"].count("key_dpad_up") == 0 && config["giants.input"]["seeded"] == "1");
+        SETTINGS_EXPECT(GameKeyName(config, "giants", giants[4]) == "Space");
+        ApplyGameInput(config, "giants");
+        SETTINGS_EXPECT(config["input"]["key_a"] == "Space" && config["input"]["key_y"] == "V" && config["input"].count("key_dpad_up") == 0);
+
+        // Through the settings file, sections with a dot included.
+        fs::path scratch = fs::temp_directory_path() / "skylauncher-keys-test.ini";
+        SETTINGS_EXPECT(SaveLauncherConfig(scratch.string(), config));
+        LauncherConfig back = LoadLauncherConfig(scratch.string());
+        SETTINGS_EXPECT(back["ssa.input"]["key_a"] == "J" && back["giants.input"]["seeded"] == "1");
+        fs::remove(scratch);
+        printf("Settings: each game's keys are its own (its own actions and names), seeded once, put in [input] at PLAY, reset, conflicts\n");
     }
 
     // ---- The command line ------------------------------------------------------------------------------------------------
@@ -466,6 +551,7 @@ int SettingsChecks(const fs::path& scratch)
 {
     fs::create_directories(scratch);
     VideoChecks();
+    KeyChecks();
     ArgumentChecks();
     EnvironmentChecks();
     ShortcutChecks(scratch / "shortcut");

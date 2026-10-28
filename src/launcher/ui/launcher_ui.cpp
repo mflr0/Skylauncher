@@ -48,8 +48,6 @@ namespace launcher_ui
             constexpr const char* LauncherLanguageHint = N_("Arkeyan Launcher's own language. \"Same as the game\" follows its text language.");
             constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds, shared by all games.");
             constexpr const char* GameSettings = N_("Game settings");
-            constexpr const char* ResetKeys = N_("Reset to defaults");
-            constexpr const char* ResetKeysHint = N_("Hold to reset every key.");
             constexpr const char* NoGamepad = N_("No gamepad connected.");
             constexpr const char* OneGamepad = N_("1 gamepad connected.");
             constexpr const char* Gamepads = N_("{} gamepads connected.");
@@ -381,6 +379,7 @@ namespace launcher_ui
             m_testButtons = LauncherEnv("SKY_LAUNCHER_TEST_BUTTONS") != nullptr;
             m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
             m_testLogo = LauncherEnv("SKY_LAUNCHER_TEST_LOGO") != nullptr;
+            m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -397,7 +396,10 @@ namespace launcher_ui
         if (options.openGame)
             m_page = Page::Play; // a shortcut opens on the game, not on the launcher's menu
         for (const GameInfo& each : g_games)
+        {
             SeedGameVideo(m_config, each.id); // each game starts from the video settings the player already had
+            SeedGameInput(m_config, each.id); // and from the keys
+        }
     }
 
     // The slot of `game`, made the first time it is asked for.
@@ -568,7 +570,7 @@ namespace launcher_ui
         if (m_capturing != nullptr && event.type == SDL_EVENT_KEY_DOWN)
         {
             if (event.key.key != SDLK_ESCAPE)
-                Set("input", (std::string("key_") + m_capturing->id).c_str(), SDL_GetKeyName(event.key.key));
+                Set(GameInputSection(m_s->game.id).c_str(), (std::string("key_") + m_capturing->action).c_str(), SDL_GetKeyName(event.key.key));
             m_capturing = nullptr;
             return;
         }
@@ -1900,54 +1902,6 @@ namespace launcher_ui
         Combo("##glyphs", "input", "glyphs", GlyphChoices, 0, 440);
         ImGui::Dummy(ImVec2(0, 12));
 
-        // Keyboard bindings, two columns of actions.
-        Title(Tr("Keyboard"), TitleSize, Text);
-        ImGui::SameLine(0, 24);
-        if (HoldButton(Tr(strings::ResetKeys), 200, Tr(strings::ResetKeysHint)))
-        {
-            for (const KeyAction& action : KeyActions)
-                m_config["input"].erase(std::string("key_") + action.id);
-            Set("input", "device", SettingGet(m_config, "input", "device", "auto"));
-            Toast(Tr("Keyboard bindings reset"));
-        }
-        if (m_capturing != nullptr)
-            ImGui::TextColored(ImColor(Rgb(Accent)), "%s", Tf("Press a key for \"{}\" (Escape cancels)", Tr(m_capturing->label)).c_str());
-        else
-            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("Click a key to change it."));
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
-        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingFixedFit))
-        {
-            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 190);
-            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 150);
-            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 190);
-            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 150);
-            for (size_t i = 0; i < std::size(KeyActions); i++)
-            {
-                const KeyAction& action = KeyActions[i];
-                if (i % 2 == 0)
-                    ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                ImGui::AlignTextToFramePadding();
-                ImGui::TextUnformatted(Tr(action.label));
-                ImGui::TableNextColumn();
-                std::string key = SettingGet(m_config, "input", std::string("key_") + action.id, SDL_GetKeyName(action.fallback));
-                bool duplicate = false;
-                for (const KeyAction& other : KeyActions)
-                    if (&other != &action && SettingGet(m_config, "input", std::string("key_") + other.id, SDL_GetKeyName(other.fallback)) == key)
-                        duplicate = true;
-                ImGui::PushID(action.id);
-                ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Accent : Field));
-                ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? AccentInk : duplicate ? Danger : Text));
-                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(140, 32)))
-                    m_capturing = &action;
-                ImGui::PopStyleColor(2);
-                if (duplicate && ImGui::IsItemHovered())
-                    ImGui::SetTooltip("%s", Tr("This key is used by another action"));
-                ImGui::PopID();
-            }
-            ImGui::EndTable();
-        }
-        ImGui::PopStyleVar();
         ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
         ImGui::TextUnformatted(Tr("F6 or Tab opens the Toy Box, F7 adds a figure, F8 clears them."));
         ImGui::PopStyleColor();
@@ -2006,7 +1960,7 @@ namespace launcher_ui
         return changed;
     }
 
-    // The launcher's settings, apart from any game's: the controller and keys (both games read the same), the launcher
+    // The launcher's settings, apart from any game's: the controller (all games read the same), the launcher
     // itself, support and About. Each game has its own settings page (game_settings_page.cpp).
     void App::DrawSettings()
     {
@@ -2348,7 +2302,7 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || !m_testKit.empty())
+            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
                 Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
@@ -3158,6 +3112,22 @@ namespace launcher_ui
         if (m_testUninstall)
         {
             TestUninstallScript(now);
+            return;
+        }
+        if (m_testKeys)
+        {
+            // Each game's Keyboard tab (set SKY_LAUNCHER_LANGUAGE for the language of the shots).
+            static const char* const Games[] = { "ssa", "giants", "swapforce" };
+            if (m_testStep >= int(std::size(Games)))
+            {
+                m_running = false;
+                return;
+            }
+            SelectGame(*FindGame(Games[m_testStep]));
+            m_page = Page::GameSettings;
+            m_gameTab = GameTab::Keyboard;
+            m_testShot = fmt::format("keys-{}", Games[m_testStep]);
+            m_testAt = now + 600;
             return;
         }
         if (m_testLogo)
