@@ -814,7 +814,7 @@ namespace launcher_ui
                 const ImVec2 box(picture.x + SeatPicture, picture.y + SeatPicture);
                 draw->AddRectFilled(picture, box, ui::Col(ui::color::Inset), ui::radius::Control);
                 draw->AddRect(picture, box, ui::Col(choosing ? ui::color::AccentFill : ui::color::Hairline), ui::radius::Control, 0, ui::stroke::Edge);
-                ui::DrawIcon(draw, ui::Icon::Plus, ImVec2(picture.x + SeatPicture / 2, picture.y + SeatPicture / 2), ui::type::Label,
+                ui::DrawIcon(draw, ui::Icon::Plus, ImVec2(picture.x + SeatPicture / 2, picture.y + SeatPicture / 2), ui::icon::Normal,
                     ui::Col(choosing ? ui::color::AccentFill : ui::color::Dim));
                 PutText(draw, ImVec2(tx, second), ui::TextStyle::Body, true, occupied ? ui::color::Danger : ui::color::InkSoft,
                     occupied ? Tr("Missing figure") : Tr("Empty"), room);
@@ -1131,7 +1131,7 @@ namespace launcher_ui
         if (kind != collection::VariantKind::Base)
             ui::DrawBadge(draw, ImVec2(at.x + ui::space::XS, at.y + ui::space::XS), KindLabel(kind).c_str(), collection::VariantKindRgb(kind));
         if (figure.favourite)
-            ui::DrawIcon(draw, ui::Icon::Star, ImVec2(end.x - ui::space::M, at.y + ui::space::M), ui::space::M, ui::Col(ui::color::Warning));
+            ui::DrawIcon(draw, ui::Icon::Star, ImVec2(end.x - ui::space::M, at.y + ui::space::M), ui::icon::Small, ui::Col(ui::color::Warning));
         if (seat >= 0)
             ui::DrawBadge(draw, ImVec2(at.x + ui::space::XS, picture.y + art - ui::space::L), SeatTag(size_t(seat)).c_str(), ui::color::AccentFill, ui::color::OnAccent);
         if (dim)

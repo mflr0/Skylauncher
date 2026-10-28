@@ -64,6 +64,14 @@ namespace ui
         inline constexpr float Selection = 3; // the line under the selected tab, the bar of a selected row
     }
 
+    // ---- Icons: Lucide's, drawn in a square of one of these sizes (its stroke is 1/12 of it). ----
+    namespace icon
+    {
+        inline constexpr float Small = 16;  // on a line of Caption or Body text: a status, a pill, a chip, a select's chevron
+        inline constexpr float Normal = 20; // a button, a list row, a menu row, a toast
+        inline constexpr float Large = 32;  // the picture of an empty state or a drop zone, the main action's gear
+    }
+
     // ---- Keyboard and pad focus: one ring, around every focusable control. Its colour is the shown game's accent
     // (Context::accent: the launcher's blue, Giants' gold, Swap Force's green). ----
     namespace focus

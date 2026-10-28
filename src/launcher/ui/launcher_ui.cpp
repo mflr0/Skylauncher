@@ -296,8 +296,10 @@ namespace launcher_ui
         g_boldFont = m_boldFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[2].data(), int(m_fontData[2].size()), TextSize, &config);
         m_titleFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[1].data(), int(m_fontData[1].size()), TitleSize, &config);
         m_monoFont = io.Fonts->AddFontDefaultVector(); // logs: Dear ImGui's own monospace font
-        ui::Ctx().fonts = { m_textFont, m_boldFont, m_titleFont, m_monoFont }; // the components' text styles
-        return m_textFont != nullptr && m_boldFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr;
+        // The icons (Lucide, ui::DrawIcon): always the built-in subset.
+        ImFont* icons = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(g_embeddedLucide), int(g_embeddedLucideSize), TextSize, &config);
+        ui::Ctx().fonts = { m_textFont, m_boldFont, m_titleFont, m_monoFont, icons }; // the components' text styles
+        return m_textFont != nullptr && m_boldFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr && icons != nullptr;
     }
 
     bool App::Init()
@@ -1579,8 +1581,8 @@ namespace launcher_ui
             }
             const float pad = ui::space::L;
             float y = min.y + pad;
-            ui::DrawIcon(draw, ui::Icon::Disc, ImVec2(min.x + pad + ui::type::Display / 2, y + ui::type::Display / 2), ui::type::Display, ui::Col(ui::color::Info));
-            const float textX = min.x + pad + ui::type::Display + ui::space::M;
+            ui::DrawIcon(draw, ui::Icon::Disc, ImVec2(min.x + pad + ui::icon::Large / 2, y + ui::icon::Large / 2), ui::icon::Large, ui::Col(ui::color::Info));
+            const float textX = min.x + pad + ui::icon::Large + ui::space::M;
             ui::PushText(ui::TextStyle::Label, true);
             ui::DrawText(draw, ImVec2(textX, y), ui::Col(ui::color::Ink), Tf("Choose your {} disc image", GameName(m_s->game.id, GameNameForm::Short)).c_str());
             y += ImGui::GetFontSize() + ui::space::XXS;
@@ -1599,7 +1601,7 @@ namespace launcher_ui
                 x += ImGui::CalcTextSize(steps[i]).x + ui::space::XS;
                 if (i < 2)
                 {
-                    ui::DrawIcon(draw, ui::Icon::ChevronRight, ImVec2(x + ui::space::XS, y + ImGui::GetFontSize() / 2), ui::type::Caption, ui::Col(ui::color::Dim));
+                    ui::DrawIcon(draw, ui::Icon::ChevronRight, ImVec2(x + ui::space::XS, y + ui::CapMiddle(ui::TextStyle::Caption, true)), ui::icon::Small, ui::Col(ui::color::Dim));
                     x += 2 * ui::space::XS + ui::space::XS;
                 }
             }

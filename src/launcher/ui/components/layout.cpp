@@ -44,28 +44,43 @@ namespace ui
         if (options.selected)
             draw->AddRectFilled(min, ImVec2(min.x + stroke::Selection + 2, max.y), Col(color::Selected), radius::Control, ImDrawFlags_RoundCornersLeft);
 
+        // The leading column (an icon, or the caller's image), centred in `leadWidth` when the list gives one: the titles of a
+        // list's rows then start on one edge.
         float x = min.x + space::S, right = max.x - space::S;
         const float mid = std::round((min.y + max.y) / 2);
         if (options.icon != Icon::None)
         {
-            DrawIcon(draw, options.icon, ImVec2(x + type::Label / 2, mid), type::Label, Col(color::InkSoft));
-            x += type::Label + space::S;
+            const float slot = std::max(icon::Normal, options.leadWidth);
+            DrawIcon(draw, options.icon, ImVec2(x + slot / 2, mid), icon::Normal, Col(color::InkSoft));
+            x += slot + space::S;
         }
-        if (options.image)
+        else if (options.image)
         {
-            options.image(draw, ImVec2(x, min.y + space::XXS), ImVec2(options.imageWidth, h - 2 * space::XXS));
-            x += options.imageWidth + space::S;
+            const float slot = std::max(options.imageWidth, options.leadWidth);
+            options.image(draw, ImVec2(x + std::round((slot - options.imageWidth) / 2), min.y + space::XXS), ImVec2(options.imageWidth, h - 2 * space::XXS));
+            x += slot + space::S;
         }
+        else if (options.leadWidth > 0)
+            x += options.leadWidth + space::S;
         if (options.chevron)
         {
-            DrawIcon(draw, Icon::ChevronRight, ImVec2(right - 5, mid), 12, Col(color::Dim));
-            right -= 12 + space::S;
+            DrawIcon(draw, Icon::ChevronRight, ImVec2(right - icon::Small / 2, mid), icon::Small, Col(color::Dim));
+            right -= icon::Small + space::S;
         }
+        // One line: the title's capitals centred on the row. Two: the title and the subtitle as one block centred on it.
+        const TextStyle titleStyle = TextStyle::Body;
+        const bool titleBold = options.subtitle != nullptr;
+        const float gap = space::XXS;
+        const float titleTop = options.subtitle != nullptr ? std::round(mid - (SizeOf(TextStyle::Body) + gap + SizeOf(TextStyle::Caption)) / 2)
+                                                           : std::round(mid - CapMiddle(titleStyle, titleBold));
+        const float baseline = titleTop + Baseline(titleStyle, titleBold);
         if (options.trailing != nullptr)
         {
+            // On the title's baseline on a row of one line, else centred on the row.
             PushText(TextStyle::Caption);
             ImVec2 text = ImGui::CalcTextSize(options.trailing);
-            DrawText(draw, ImVec2(right - text.x, mid - text.y / 2), Col(color::InkSoft), options.trailing);
+            const float y = options.subtitle != nullptr ? std::round(mid - CapMiddle(TextStyle::Caption)) : baseline - Baseline(TextStyle::Caption);
+            DrawText(draw, ImVec2(right - text.x, y), Col(color::InkSoft), options.trailing);
             right -= text.x + space::S;
             PopText();
         }
@@ -78,41 +93,37 @@ namespace ui
             PushText(TextStyle::Caption);
             noteW = ImGui::CalcTextSize(options.note).x + space::XS;
             PopText();
-            PushText(TextStyle::Body, options.subtitle != nullptr);
+            PushText(titleStyle, titleBold);
             if (ImGui::CalcTextSize(title).x + noteW > room) // the name comes first: a note that would cut it is left out
                 noteW = 0;
             PopText();
         }
-        auto drawTitle = [&](float y, bool bold, TextStyle style) {
-            PushText(style, bold);
-            const std::string shown = Ellipsize(title, room - noteW);
-            DrawText(draw, ImVec2(x, y), Col(titleInk), shown.c_str());
-            const float end = x + ImGui::CalcTextSize(shown.c_str()).x;
+        PushText(titleStyle, titleBold);
+        const std::string shown = Ellipsize(title, room - noteW);
+        DrawText(draw, ImVec2(x, titleTop), Col(titleInk), shown.c_str());
+        const float titleEnd = x + ImGui::CalcTextSize(shown.c_str()).x;
+        PopText();
+        if (options.note != nullptr && noteW > 0) // on the title's baseline
+        {
+            PushText(TextStyle::Caption);
+            DrawText(draw, ImVec2(titleEnd + space::XS, baseline - Baseline(TextStyle::Caption)), Col(color::InkSoft), options.note);
             PopText();
-            if (options.note != nullptr && noteW > 0)
-            {
-                PushText(TextStyle::Caption);
-                DrawText(draw, ImVec2(end + space::XS, y + (SizeOf(style) - ImGui::GetFontSize()) * 0.6f), Col(color::InkSoft), options.note);
-                PopText();
-            }
-        };
+        }
         if (options.subtitle != nullptr)
         {
-            const float titleH = type::Body;
-            const float subH = type::Caption, gap = space::XXS, top = std::round(mid - (titleH + gap + subH) / 2);
-            drawTitle(top, true, TextStyle::Body);
+            // The state's icon on the subtitle's line, centred on its capitals, at the title's left edge.
+            const float subTop = titleTop + SizeOf(TextStyle::Body) + gap;
             float subX = x;
             if (options.status != nullptr)
             {
-                DrawStatusIcon(draw, *options.status, ImVec2(x + subH / 2, top + titleH + gap + subH / 2 + 1), subH);
-                subX += subH + space::XXS;
+                DrawStatusIcon(draw, *options.status, options.statusIcon != Icon::None ? options.statusIcon : IconOf(*options.status),
+                    ImVec2(x + icon::Small / 2, std::round(subTop + CapMiddle(TextStyle::Caption))), icon::Small);
+                subX += icon::Small + space::XXS;
             }
             PushText(TextStyle::Caption);
-            DrawText(draw, ImVec2(subX, top + titleH + gap), Col(color::Dim), Ellipsize(options.subtitle, room - (subX - x)).c_str());
+            DrawText(draw, ImVec2(subX, subTop), Col(color::Dim), Ellipsize(options.subtitle, room - (subX - x)).c_str());
             PopText();
         }
-        else
-            drawTitle(mid - SizeOf(TextStyle::Body) / 2, false, TextStyle::Body);
         if (options.progress >= 0)
         {
             const float barLeft = x, barRight = max.x - space::S, y = max.y - space::XS + 1;
@@ -361,9 +372,9 @@ namespace ui
         const float mid = std::round((min.y + max.y) / 2);
         Icon icon = options.checked ? Icon::Check : options.icon;
         if (icon != Icon::None)
-            DrawIcon(draw, icon, ImVec2(min.x + space::S + IconSlot / 2 - space::XXS, mid), 14, Col(options.checked ? Ctx().accent : ink));
+            DrawIcon(draw, icon, ImVec2(min.x + space::S + IconSlot / 2 - space::XXS, mid), icon::Small, Col(options.checked ? Ctx().accent : ink));
         PushText(TextStyle::Body);
-        DrawText(draw, ImVec2(min.x + lead, mid - ImGui::GetFontSize() / 2), Col(ink), label, end);
+        DrawText(draw, ImVec2(min.x + lead, std::round(mid - CapMiddle(TextStyle::Body))), Col(ink), label, end);
         PopText();
         ImGui::EndDisabled();
         if (pressed && !options.disabled)
@@ -399,7 +410,7 @@ namespace ui
         const float width = ImGui::GetContentRegionAvail().x, x = ImGui::GetCursorPosX();
         ImGui::Dummy(ImVec2(0, space::XL));
         ImVec2 at = ImGui::GetCursorScreenPos();
-        DrawIcon(ImGui::GetWindowDrawList(), icon, ImVec2(at.x + width / 2, at.y + space::XXL / 2), space::XXL, Col(color::Dim), Col(color::Surface));
+        DrawIcon(ImGui::GetWindowDrawList(), icon, ImVec2(at.x + width / 2, at.y + space::XXL / 2), icon::Large, Col(color::Dim));
         ImGui::Dummy(ImVec2(0, space::XXL + space::XS));
         const float wrap = std::min(width, 420.0f);
         ImVec2 text = TextSize(TextStyle::Body, line, nullptr, false, wrap);

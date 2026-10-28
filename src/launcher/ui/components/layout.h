@@ -35,7 +35,9 @@ namespace ui
         std::function<void(ImDrawList*, ImVec2 at, ImVec2 size)> image;
         float imageWidth = 0;
         const char* note = nullptr;     // a small word after the title (a version)
-        const Status* status = nullptr; // the shape of the subtitle's state, before it
+        const Status* status = nullptr; // the subtitle's state: its icon before it, in its colour
+        Icon statusIcon = Icon::None;   // that icon when the state has its own (a disc, an update), else the status's
+        float leadWidth = 0;            // the leading column's width (the icon or the image centred in it): one per list
         float progress = -1;            // 0..1: a thin bar along the row's foot (an install running)
         unsigned progressColor = 0;     // its fill; 0: the accent
         bool dim = false;               // the title in the dim ink (a game not out yet)

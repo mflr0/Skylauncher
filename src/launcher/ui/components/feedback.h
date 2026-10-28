@@ -30,10 +30,13 @@ namespace ui
     enum class Status { Neutral, Info, Success, Warning, Error, Busy };
     unsigned ColorOf(Status status);
     Icon IconOf(Status status); // Busy: a spinner is drawn instead
-    // The shape alone, `size` points (the sidebar's status dot): a check, a down arrow, a triangle, a cross, a spinner.
+    // The shape alone, `size` points, in the status's colour: its icon (IconOf), or `icon` (a state's own: a disc, an update);
+    // Busy turns the loader.
     void DrawStatusIcon(ImDrawList* draw, Status status, ImVec2 centre, float size);
-    // The icon and the text in a tinted pill.
-    void StatusPill(Status status, const char* text);
+    void DrawStatusIcon(ImDrawList* draw, Status status, Icon icon, ImVec2 centre, float size);
+    // The icon and the text in a tinted pill, PillHeight high (`icon`: the state's own, else the status's).
+    inline constexpr float PillHeight = 24;
+    void StatusPill(Status status, const char* text, Icon icon = Icon::None);
 
     // ---- Progress. ----
     // A determinate bar (`fraction` 0..1) with its percentage after it when `showPercent`.

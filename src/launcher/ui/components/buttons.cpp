@@ -63,8 +63,8 @@ namespace ui
                 draw->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), Col(paint.edge), rounding, 0, paint.edgeWidth);
         }
 
-        constexpr float IconSize = space::M;   // an icon beside a label
-        constexpr float TrailingSize = 10;     // the chevron after a label
+        constexpr float IconSize = icon::Normal;    // an icon beside a label
+        constexpr float TrailingSize = icon::Small; // the chevron after a label
 
         // The content of a button: [icon] label [trailing], centred in min..max, one point lower when pressed.
         void DrawContent(ImDrawList* draw, ImVec2 min, ImVec2 max, const char* label, TextStyle style, Icon icon, bool spinner,
@@ -74,18 +74,18 @@ namespace ui
             PushText(style, true);
             ImVec2 text = ImGui::CalcTextSize(label, end);
             bool hasText = end != label, lead = icon != Icon::None || spinner;
-            float width = text.x + (lead ? IconSize + (hasText ? space::XS : 0) : 0) + (trailing != Icon::None ? TrailingSize + space::XS : 0);
+            float width = text.x + (lead ? IconSize + (hasText ? space::XS : 0) : 0) + (trailing != Icon::None ? TrailingSize + space::XXS : 0);
             float x = std::round((min.x + max.x - width) / 2), mid = std::round((min.y + max.y) / 2) + (pressed ? 1.0f : 0.0f);
             if (spinner)
-                DrawSpinner(draw, ImVec2(x + IconSize / 2, mid), IconSize * 0.42f, Col(ink));
+                DrawSpinner(draw, ImVec2(x + IconSize / 2, mid), IconSize, Col(ink));
             else if (icon != Icon::None)
                 DrawIcon(draw, icon, ImVec2(x + IconSize / 2, mid), IconSize, Col(ink));
             if (lead)
                 x += IconSize + (hasText ? space::XS : 0);
-            if (hasText)
-                DrawText(draw, ImVec2(x, mid - text.y / 2), Col(ink), label, end);
+            if (hasText) // the capitals' middle on the button's: the icons beside the label line up with it
+                DrawText(draw, ImVec2(x, std::round(mid - CapMiddle(style, true))), Col(ink), label, end);
             if (trailing != Icon::None)
-                DrawIcon(draw, trailing, ImVec2(x + text.x + space::XS + TrailingSize / 2, mid), TrailingSize, Col(ink));
+                DrawIcon(draw, trailing, ImVec2(x + text.x + space::XXS + TrailingSize / 2, mid), TrailingSize, Col(ink));
             PopText();
         }
 
@@ -102,7 +102,7 @@ namespace ui
         const char* end = LabelEnd(label);
         float text = TextSize(LabelStyle(options.size), label, end, true).x;
         bool lead = options.icon != Icon::None || options.loading || options.hold;
-        float content = text + (lead ? IconSize + (end != label ? space::XS : 0) : 0) + (options.trailing != Icon::None ? TrailingSize + space::XS : 0);
+        float content = text + (lead ? IconSize + (end != label ? space::XS : 0) : 0) + (options.trailing != Icon::None ? TrailingSize + space::XXS : 0);
         return std::max(options.width, std::ceil(content + 2 * SidePad(options.size)));
     }
 
@@ -178,7 +178,7 @@ namespace ui
         const float h = height::Small;
         const char* end = LabelEnd(label);
         float text = TextSize(TextStyle::Body, label, end, true).x;
-        float content = text + (options.icon != Icon::None ? IconSize + space::XS : 0) + (options.trailing != Icon::None ? TrailingSize + space::XS : 0);
+        float content = text + (options.icon != Icon::None ? IconSize + space::XS : 0) + (options.trailing != Icon::None ? TrailingSize + space::XXS : 0);
         float w = std::max(options.width, std::ceil(content + 2 * space::M));
         const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + w, min.y + h);
         ImGui::BeginDisabled(options.disabled);
@@ -206,12 +206,14 @@ namespace ui
         ImDrawList* draw = ImGui::GetWindowDrawList();
         DrawFace(draw, min, max, h / 2, paint);
         ImVec2 centre(std::round((min.x + max.x) / 2), std::round((min.y + max.y) / 2) + (state.pressed ? 1.0f : 0.0f));
-        const float mark = std::round(h * 0.45f);
         if (options.image.GetTexID() != ImTextureID_Invalid)
+        {
+            const float mark = std::round(h * 0.45f);
             draw->AddImage(options.image, ImVec2(centre.x - mark / 2, centre.y - mark / 2), ImVec2(centre.x + mark / 2, centre.y + mark / 2),
                 ImVec2(0, 0), ImVec2(1, 1), Col(paint.ink));
+        }
         else
-            DrawIcon(draw, icon, centre, mark, Col(paint.ink), Col(paint.fill, paint.fillAlpha > 0 ? 1.0f : 0.0f));
+            DrawIcon(draw, icon, centre, options.size == Size::Small ? icon::Small : icon::Normal, Col(paint.ink));
         ImGui::EndDisabled();
         FocusRingIf(state, h / 2);
         if (tooltip != nullptr && WantsTooltip(state))
@@ -343,8 +345,7 @@ namespace ui
         // The split: a dark hairline and a light one beside it, from edge to edge.
         draw->AddLine(ImVec2(gearMin.x - 0.5f, gearMin.y + 1), ImVec2(gearMin.x - 0.5f, gearMax.y - 1), Col(style.outline, 0.43f));
         draw->AddLine(ImVec2(gearMin.x + 0.5f, gearMin.y + 1), ImVec2(gearMin.x + 0.5f, gearMax.y - 1), Col(0xFFFFFF, 0.18f));
-        DrawIcon(draw, Icon::Gear, result.gearCentre, height::Main * 0.46f, Col(InkOn(middle, style.outline), gear.enabled ? 1.0f : 0.6f),
-            Col(Shade(middle, gear)));
+        DrawIcon(draw, Icon::Gear, result.gearCentre, icon::Large, Col(InkOn(middle, style.outline), gear.enabled ? 1.0f : 0.6f));
         ImGui::PopStyleColor();
         if (options.gearTooltip != nullptr && WantsTooltip(gearState))
             Bubble(options.gearTooltip, gearMin, gearMax);

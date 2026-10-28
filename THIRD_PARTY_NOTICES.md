@@ -314,6 +314,32 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## Lucide icons
+
+Licence: ISC (the icons derived from Feather: MIT). Source: lucide-static 1.54.0 (https://lucide.dev), the icon font cut down
+to the icons used by `tools/lucide_subset.py` into `resources/fonts/Lucide.ttf`; the full licence is `LICENSE-Lucide.txt`
+next to it.
+
+```
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+The icons derived from Feather: MIT, Copyright (c) 2013-present Cole Bemis (full text in `LICENSE-Lucide.txt`).
+
 ## Bungee and Outfit fonts
 
 Licence: SIL Open Font License 1.1. Source: `resources/fonts/`; the full licences are `OFL-Bungee.txt` and `OFL-Outfit.txt` next to the fonts.

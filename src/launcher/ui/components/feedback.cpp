@@ -48,7 +48,7 @@ namespace ui
     {
         const bool sort = options.kind == ChipKind::Sort, on = !sort && options.selected;
         const char* end = LabelEnd(label);
-        const float h = height::Small, icon = 12;
+        const float h = height::Small, icon = icon::Small;
         const bool lead = on || sort;
         const float textW = TextSize(TextStyle::Body, label, end, on).x;
         const float w = std::ceil(textW + 2 * space::S + (lead ? icon + space::XS : 0));
@@ -84,7 +84,7 @@ namespace ui
             x += icon + space::XS;
         }
         PushText(TextStyle::Body, on);
-        DrawText(draw, ImVec2(x, mid - ImGui::GetFontSize() / 2), Col(ink), label, end);
+        DrawText(draw, ImVec2(x, std::round(mid - CapMiddle(TextStyle::Body, on))), Col(ink), label, end);
         PopText();
         ImGui::EndDisabled();
         FocusRingIf(state, rounding);
@@ -111,35 +111,42 @@ namespace ui
         switch (status)
         {
         case Status::Info: return Icon::Info;
-        case Status::Success: return Icon::Check;
+        case Status::Success: return Icon::Success;
         case Status::Warning: return Icon::Warning;
         case Status::Error: return Icon::Error;
-        case Status::Busy: return Icon::None;
-        default: return Icon::Minus;
+        case Status::Busy: return Icon::Loader;
+        default: return Icon::Unknown;
         }
     }
 
     void DrawStatusIcon(ImDrawList* draw, Status status, ImVec2 centre, float size)
     {
-        if (status == Status::Busy)
-            DrawSpinner(draw, centre, size * 0.42f, Col(ColorOf(status)));
-        else
-            DrawIcon(draw, IconOf(status), centre, size, Col(ColorOf(status)));
+        DrawStatusIcon(draw, status, IconOf(status), centre, size);
     }
 
-    void StatusPill(Status status, const char* text)
+    void DrawStatusIcon(ImDrawList* draw, Status status, Icon icon, ImVec2 centre, float size)
     {
-        const float icon = 12, h = std::round(type::Caption + space::XS + 2);
+        if (status == Status::Busy)
+            DrawSpinner(draw, centre, size, Col(ColorOf(status)));
+        else
+            DrawIcon(draw, icon, centre, size, Col(ColorOf(status)));
+    }
+
+    void StatusPill(Status status, const char* text, Icon icon)
+    {
+        // [XS] icon [XXS] text [XS + 2]: the icon's own margin (Lucide's 2 of 24) evens the ends.
+        const float iconSize = icon::Small, h = PillHeight;
         const float textW = TextSize(TextStyle::Caption, text, nullptr, true).x;
-        const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + std::ceil(textW + icon + 2 * space::XS + space::XXS + 2), min.y + h);
+        const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + std::ceil(space::XS + iconSize + space::XXS + textW + space::XS + 2), min.y + h);
         ImGui::Dummy(ImVec2(max.x - min.x, h));
         ImDrawList* draw = ImGui::GetWindowDrawList();
         const unsigned tone = ColorOf(status);
+        const float mid = min.y + h / 2;
         draw->AddRectFilled(min, max, Col(Mix(color::Surface, tone, 0.16f)), h / 2);
         draw->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), Col(tone, 0.5f), h / 2, 0, stroke::Hairline);
-        DrawStatusIcon(draw, status, ImVec2(min.x + space::XS + icon / 2, (min.y + max.y) / 2), icon);
+        DrawStatusIcon(draw, status, icon != Icon::None ? icon : IconOf(status), ImVec2(min.x + space::XS + iconSize / 2, mid), iconSize);
         PushText(TextStyle::Caption, true);
-        DrawText(draw, ImVec2(min.x + space::XS + icon + space::XXS + 2, (min.y + max.y - ImGui::GetFontSize()) / 2), Col(color::Ink), text);
+        DrawText(draw, ImVec2(min.x + space::XS + iconSize + space::XXS, std::round(mid - CapMiddle(TextStyle::Caption, true))), Col(color::Ink), text);
         PopText();
     }
 
@@ -199,7 +206,7 @@ namespace ui
     {
         const ImVec2 at = ImGui::GetCursorScreenPos();
         ImGui::Dummy(ImVec2(size, size));
-        DrawSpinner(ImGui::GetWindowDrawList(), ImVec2(at.x + size / 2, at.y + size / 2), size * 0.4f, Col(color::Info));
+        DrawSpinner(ImGui::GetWindowDrawList(), ImVec2(at.x + size / 2, at.y + size / 2), size, Col(color::Info));
     }
 
     // ---- Toasts ----------------------------------------------------------------------------------------------------
@@ -246,7 +253,7 @@ namespace ui
         // Bottom right, stacked upwards, newest at the bottom; each at most `maxTextWidth` of text (a long one wraps).
         const ImVec2 display = ImGui::GetIO().DisplaySize;
         const bool navigating = ImGui::GetIO().NavVisible;
-        const float icon = space::M, padX = space::M, padY = space::S, cross = height::Small;
+        const float icon = icon::Normal, padX = space::M, padY = space::S, cross = height::Small;
         ImDrawList* draw = ImGui::GetForegroundDrawList();
         float bottom = display.y - space::L - bottomInset;
         int closed = -1;
@@ -315,7 +322,7 @@ namespace ui
                 if (focused)
                     DrawKeyCap(draw, ImVec2(centre.x - 12, centre.y), PadButton::South, Ctx().glyphs == Glyphs::Keyboard ? Glyphs::Xbox : Ctx().glyphs);
                 else
-                    DrawIcon(draw, Icon::Cross, centre, 10, LauncherTheme::Rgb(hovered ? color::Ink : color::Dim));
+                    DrawIcon(draw, Icon::Cross, centre, icon::Small, LauncherTheme::Rgb(hovered ? color::Ink : color::Dim));
             }
             if (focused)
             {

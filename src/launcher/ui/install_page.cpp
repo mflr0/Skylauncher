@@ -373,7 +373,7 @@ namespace launcher_ui
 
         // The checklist. With the details open, only the current step: the log takes the room.
         // Once stopped, the steps done fold into one line, to leave room for the message.
-        const float iconSize = ui::type::Body;
+        const float iconSize = ui::icon::Small;
         const float rowH = ui::SizeOf(ui::TextStyle::Body) + ui::space::XS;
         bool fold = (failed || interrupted) && list.current > 0;
         auto rowIcon = [&](RowState state, ImVec2 centre) {
@@ -383,7 +383,7 @@ namespace launcher_ui
             case RowState::Running: ui::DrawStatusIcon(draw, ui::Status::Busy, centre, iconSize); break;
             case RowState::Failed: ui::DrawStatusIcon(draw, ui::Status::Error, centre, iconSize); break;
             case RowState::Stopped: ui::DrawIcon(draw, ui::Icon::Minus, centre, iconSize, ui::Col(ui::color::Dim)); break;
-            case RowState::Waiting: draw->AddCircle(centre, iconSize * 0.4f, ui::Col(ui::color::Edge), 24, ui::stroke::Hairline); break;
+            case RowState::Waiting: ui::DrawIcon(draw, ui::Icon::Unknown, centre, iconSize, ui::Col(ui::color::Edge)); break;
             }
         };
         const float textX = iconSize + ui::space::S;

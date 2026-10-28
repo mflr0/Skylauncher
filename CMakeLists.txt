@@ -67,11 +67,12 @@ target_link_libraries(XenonXex PUBLIC fmt::fmt)
 # The fonts are also built into the executable, so a lone executable works (Windows .exe).
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
     COMMAND ${CMAKE_COMMAND} -DOUTFIT=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf -DOUTFIT_BOLD=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf
-        -DBUNGEE=${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf -DICON=${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_fonts.cpp
+        -DBUNGEE=${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf -DLUCIDE=${CMAKE_SOURCE_DIR}/resources/fonts/Lucide.ttf -DICON=${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_fonts.cpp
         -P ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake
     DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf
         ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf
-        ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf ${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png
+        ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf ${CMAKE_SOURCE_DIR}/resources/fonts/Lucide.ttf
+        ${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png
     COMMENT "Embedding the launcher fonts")
 
 # SSARecomp's collection library (src/shared/collection, tools/sync_collection.sh) builds its toy catalogue in.

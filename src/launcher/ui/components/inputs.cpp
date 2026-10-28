@@ -209,7 +209,7 @@ namespace ui
             State state = ItemState(options.disabled);
             if (options.disabled)
                 ImGui::BeginDisabled();
-            DrawIcon(draw, Icon::ChevronDown, ImVec2(max.x - space::M - 5, (min.y + max.y) / 2), 10, Col(color::InkSoft));
+            DrawIcon(draw, Icon::ChevronDown, ImVec2(max.x - space::S - icon::Small / 2, (min.y + max.y) / 2), icon::Small, Col(color::InkSoft));
             if (options.disabled)
                 ImGui::EndDisabled();
             FocusRingIf(state, radius::Control);
@@ -219,7 +219,7 @@ namespace ui
             return false;
         }
         draw->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), Col(Ctx().accent), radius::Control, 0, stroke::Edge);
-        DrawIcon(draw, Icon::ChevronUp, ImVec2(max.x - space::M - 5, (min.y + max.y) / 2), 10, Col(color::Ink));
+        DrawIcon(draw, Icon::ChevronUp, ImVec2(max.x - space::S - icon::Small / 2, (min.y + max.y) / 2), icon::Small, Col(color::Ink));
         // The list's rows: height::Small, text centred on them, a little air between them.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, space::XXS / 2));
         ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0, 0.5f));
@@ -245,9 +245,10 @@ namespace ui
             ImGui::SetItemDefaultFocus();
         State state = ItemState(disabled);
         ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        DrawText(draw, ImVec2(min.x + space::S, (min.y + max.y - ImGui::GetFontSize()) / 2), Col(disabled ? color::Dim : color::Ink), label);
+        const float mid = std::round((min.y + max.y) / 2);
+        DrawText(draw, ImVec2(min.x + space::S, std::round(mid - CapMiddle(TextStyle::Body))), Col(disabled ? color::Dim : color::Ink), label);
         if (selected)
-            DrawIcon(draw, Icon::Check, ImVec2(max.x - space::M, (min.y + max.y) / 2), 12, Col(Ctx().accent));
+            DrawIcon(draw, Icon::Check, ImVec2(max.x - space::S - icon::Small / 2, mid), icon::Small, Col(Ctx().accent));
         draw->ChannelsSetCurrent(0);
         if (selected || state.hovered || state.pressed)
             draw->AddRectFilled(min, max, Col(state.pressed ? color::RaisedPressed : state.hovered ? color::RaisedHover : color::InsetActive), radius::Control);
@@ -310,7 +311,7 @@ namespace ui
         if (*value)
         {
             draw->AddRectFilled(a, b, Col(lit ? color::AccentFillHover : color::AccentFill), r);
-            DrawIcon(draw, Icon::Check, ImVec2((a.x + b.x) / 2, (a.y + b.y) / 2), height::Mark * 0.62f, Col(color::OnAccent));
+            DrawIcon(draw, Icon::Check, ImVec2((a.x + b.x) / 2, (a.y + b.y) / 2), icon::Small, Col(color::OnAccent));
         }
         else
         {
@@ -431,7 +432,7 @@ namespace ui
 
     bool SearchField(const char* id, char* buffer, size_t size, const char* hint, float width)
     {
-        constexpr float Glass = space::M;
+        constexpr float Glass = icon::Small;
         TextFieldOptions options;
         options.hint = hint;
         options.width = width;
