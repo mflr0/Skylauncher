@@ -188,6 +188,42 @@ namespace
         i18n::SetLanguage("en");
         SETTINGS_EXPECT(KeyDisplayName("Space") == "Space");
 
+        // Keys are places (scancodes): a captured key stores its place's name, which reads back as the same place, and is
+        // shown with the letter the layout prints there (the test's default layout is US: W shows as W).
+        for (SDL_Scancode place : { SDL_SCANCODE_W, SDL_SCANCODE_Q, SDL_SCANCODE_SEMICOLON, SDL_SCANCODE_RETURN, SDL_SCANCODE_1 })
+            SETTINGS_EXPECT(SDL_GetScancodeFromName(CapturedKeyName(place).c_str()) == place);
+        SETTINGS_EXPECT(CapturedKeyName(SDL_SCANCODE_W) == "W" && KeyDisplayName("W") == "W" && KeyDisplayName("Return") == "Return");
+        for (const char* game : { "ssa", "giants", "swapforce" }) // the defaults are places too
+            for (const GameKey& key : GameKeys(game))
+                SETTINGS_EXPECT(SDL_GetScancodeFromName(GameKeyName(LauncherConfig{}, game, key).c_str()) == key.fallback);
+
+        // The pad's button names follow the pad in use (a fixed glyph style wins), by place on a Switch.
+        auto row = [](std::string_view action) -> const GameKey*
+        {
+            for (const GameKey& key : GameKeys("ssa"))
+                if (action == key.action)
+                    return &key;
+            return nullptr;
+        };
+        const GameKey* a = row("a"), *ssaBack = row("back"), *ssaStart = row("start");
+        SETTINGS_EXPECT(a != nullptr && ssaBack != nullptr && ssaStart != nullptr);
+        const GameKey& ssaA = *a;
+        SETTINGS_EXPECT(PadButtonName(ssaA, PadFamily::Xbox360) == "A" && PadButtonName(ssaA, PadFamily::PlayStation) == "Cross");
+        SETTINGS_EXPECT(PadButtonName(ssaA, PadFamily::Nintendo) == "B" && PadButtonName(ssaA, PadFamily::XboxOne) == "A");
+        SETTINGS_EXPECT(PadButtonName(*ssaBack, PadFamily::XboxOne) == "View" && PadButtonName(*ssaStart, PadFamily::XboxOne) == "Menu");
+        SETTINGS_EXPECT(PadButtonName(*ssaBack, PadFamily::PlayStation) == "Touchpad" && PadButtonName(*ssaStart, PadFamily::PlayStation) == "Options");
+        SETTINGS_EXPECT(PadButtonName(*ssaBack, PadFamily::PlayStation3) == "Select" && PadButtonName(*ssaStart, PadFamily::Nintendo) == "+");
+        SETTINGS_EXPECT(PadButtonName(*row("left_up"), PadFamily::PlayStation) == "L stick");
+        SETTINGS_EXPECT(PadFamilyOf(SDL_GAMEPAD_TYPE_PS5) == PadFamily::PlayStation && PadFamilyOf(SDL_GAMEPAD_TYPE_PS3) == PadFamily::PlayStation3);
+        SETTINGS_EXPECT(PadFamilyOf(SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO) == PadFamily::Nintendo && PadFamilyOf(SDL_GAMEPAD_TYPE_XBOXONE) == PadFamily::XboxOne);
+        SETTINGS_EXPECT(PadFamilyOf(SDL_GAMEPAD_TYPE_STANDARD) == PadFamily::Xbox360);
+        SETTINGS_EXPECT(PadFamilyFor("auto", PadFamily::Nintendo) == PadFamily::Nintendo && PadFamilyFor("playstation", PadFamily::Nintendo) == PadFamily::PlayStation);
+        SETTINGS_EXPECT(PadFamilyFor("xbox", PadFamily::PlayStation) == PadFamily::Xbox360 && PadFamilyFor("xbox", PadFamily::XboxOne) == PadFamily::XboxOne);
+        i18n::SetLanguage("fr");
+        SETTINGS_EXPECT(PadButtonName(ssaA, PadFamily::PlayStation) == "Croix" && PadButtonName(*ssaBack, PadFamily::PlayStation) == "Pavé tactile");
+        SETTINGS_EXPECT(PadButtonName(ssaA, PadFamily::Xbox360) == "A");
+        i18n::SetLanguage("en");
+
         // Seeded once from the player's [input] keys; the other keys of [input] are not copied; the device stays.
         LauncherConfig config;
         config["input"] = { { "device", "keyboard" }, { "key_x", "F" }, { "key_dpad_up", "T" }, { "glyphs", "keyboard" } };

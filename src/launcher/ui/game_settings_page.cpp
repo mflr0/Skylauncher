@@ -142,6 +142,7 @@ namespace launcher_ui
         const std::string& game = m_s->game.id;
         const std::string section = GameInputSection(game);
         const std::span<const GameKey> keys = GameKeys(game);
+        const PadFamily family = PadFamilyNow();
         Title(Tr("Keyboard"), TitleSize, Text);
         ImGui::SameLine(0, 24);
         if (HoldButton(Tr(strings::ResetKeys), 200, Tr(strings::ResetKeysHint)))
@@ -169,9 +170,8 @@ namespace launcher_ui
                     ImGui::TableNextRow();
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
-                // The pad's buttons keep the names printed on the controller (A, Back, Start...); only the sticks are translated.
-                const bool stick = std::string_view(action.pad).substr(1, 6) == " stick";
-                ImGui::TextWrapped("%s", fmt::format("{} ({})", Tr(action.label), stick ? Tr(action.pad) : action.pad).c_str()); // a long French name takes two lines
+                // The pad's button as the pad in use prints it (A on a 360 pad, Cross on a PS5, B on a Switch); words translated.
+                ImGui::TextWrapped("%s", fmt::format("{} ({})", Tr(action.label), PadButtonName(action, family)).c_str()); // a long French name takes two lines
                 ImGui::TableNextColumn();
                 const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
                 const bool duplicate = GameKeyConflict(m_config, game, action);

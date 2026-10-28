@@ -42,7 +42,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `video` | `original_resolution` | `0` (default), `1` | Swap Force only: keep the console's 3D image (1040x620) stretched to the screen instead of the full frame (<game> settings > Video > Original resolution) | yes |
 | `input` | `device` | `auto`, `keyboard`, `gamepad` | What the game listens to | yes |
 | `input` | `gamepad` | SDL GUID | The gamepad chosen when `device=gamepad` | yes |
-| `input` | `key_<action>` | SDL key name (`Space`, `Return`, `A`...) | Keyboard binding | yes |
+| `input` | `key_<action>` | SDL scancode name (`Space`, `Return`, `W`...): a key's **physical place**, shown with the player's layout | Keyboard binding | yes |
 | `input` | `glyphs` | `auto` (default), `xbox360`, `xboxone`, `playstation`, `nintendo`, `keyboard` (`xbox` is read as Xbox One / Series) | The button pictures the game shows | yes |
 | `portal` | `mode` | `auto` (default), `emulated` (Virtual), `real` (`hid` and `usb` still work) | Portal of Power backend | yes (`SKY_PORTAL`) |
 | `portal` | `toybox_auto_open` | `1` (default), `0` | The Toy Box opens by itself when the game asks for a figure | no: the game reads `launcher.ini` itself (Settings > Controls > Portal of Power) |
@@ -96,6 +96,15 @@ The runtime reads one `[input]` section (`key_<action>=<SDL key name>`), but the
   needs no change. Nothing is stored back (the runtime never changes keys).
 - **Reset to defaults** empties the game's copy (every `key_` line of it); the defaults then apply at PLAY.
 - Two rows of one game on the same key are marked (a conflict is only possible inside a game).
+- **Keys are physical places** (2026-10-28): the runtime reads `key_<action>` as an SDL **scancode** name
+  (`SDL_GetScancodeFromName`), so `W` is the key where a US keyboard prints W, which an AZERTY keyboard prints Z. The
+  launcher stores the place of the key pressed (`event.key.scancode`, `SDL_GetScancodeName`: `CapturedKeyName`) and shows
+  every key with the letter the player's layout prints there (`SDL_GetKeyName(SDL_GetKeyFromScancode(place))`:
+  `KeyDisplayName`), the named keys in the player's language. On AZERTY the defaults `W A S D` read **Z Q S D**, the keys
+  the player presses and the ones the game's keycaps show. A binding stored before by an older launcher (it stored the
+  printed letter, so an AZERTY Z was stored "Z") is kept as it is and now shows as the game reads it. The defaults in
+  `game_keys.cpp` are scancodes. Tests: the place/name round trip and the defaults (`tests/settings_test.cpp`; SDL lets a
+  test set no AZERTY layout, so the layout's letter is checked on the default US one).
 
 Keyboard actions the runtime knows: `a`, `b`, `x`, `y`, `start`, `back`, `lb`, `rb`, `lt`, `rt`, `left_up`, `left_down`,
 `left_left`, `left_right` (movement), `right_up`, `right_down`, `right_left`, `right_right` (right stick: Spyro's Adventure's Shake / Insert / Swing), `dpad_up`, `dpad_down`,
@@ -105,7 +114,13 @@ left stick, I K J L for the right stick, the arrow keys for the D-pad.
 ### What each game's Keyboard tab lists (`src/launcher/game_keys.cpp`)
 
 A row names what the key does **in that game, in the game's own words**, with the pad button in brackets ("Attack 1 (X)";
-the sticks in the player's language: "(stick gauche)"). Only the actions the game uses have a row; the other actions keep
+the sticks in the player's language: "(stick gauche)"). The bracket names the button **as the pad in use prints it**
+(`PadButtonName`, 2026-10-28), the family the games' button pictures follow: a fixed `[input] glyphs` style wins; else
+the pad chosen in Controls when it is connected, else the last pad connected, else the first one there, else the Xbox 360
+names. Xbox 360: A B X Y, Back, Start, LB RB LT RT. Xbox One / Series: View, Menu. PlayStation 4 / 5: Cross, Circle,
+Square, Triangle (translated: Croix, Rond, Carré, Triangle), Touchpad (the game's Back: the touchpad's click, or
+Share / Create), Options, L1 R1 L2 R2. PlayStation 3: Select, Start. Nintendo Switch, **by place**: the 360's A (south)
+is the Switch's B, B is A, X is Y, Y is X, Back is -, Start is +, L R ZL ZR. Only the actions the game uses have a row; the other actions keep
 whatever the copy was seeded with (the runtime's default otherwise). The names are English; the French is the disc's own
 wording (`resources/lang/fr.txt`); the other launcher languages show English until translated. A key's name is shown in the
 player's language where the launcher has one ("Espace", "Entrée", "Retour arrière", "Échap", "Flèche haut"); the stored value

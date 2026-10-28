@@ -2,6 +2,7 @@
 #include "launcher/i18n.h"
 #include <array>
 #include <SDL3/SDL_keyboard.h>
+#include <utility>
 
 namespace
 {
@@ -11,30 +12,30 @@ namespace
     // The defaults, shared by the games: the pad's buttons sit on the same keys in each (A Space, X C, Y V, B X).
     // Names and buttons: each game's own controls screen, read in the running game (docs/settings.md, "Where the names come from").
     #define MOVE_ROWS \
-        { "left_up", N_("Move up"), N_("L stick"), SDLK_W }, { "left_down", N_("Move down"), N_("L stick"), SDLK_S }, \
-        { "left_left", N_("Move left"), N_("L stick"), SDLK_A }, { "left_right", N_("Move right"), N_("L stick"), SDLK_D }
+        { "left_up", N_("Move up"), N_("L stick"), SDL_SCANCODE_W }, { "left_down", N_("Move down"), N_("L stick"), SDL_SCANCODE_S }, \
+        { "left_left", N_("Move left"), N_("L stick"), SDL_SCANCODE_A }, { "left_right", N_("Move right"), N_("L stick"), SDL_SCANCODE_D }
 
     constexpr GameKey Ssa[] = {
         MOVE_ROWS,
-        { "a", N_("1st Power / Accept"), "A", SDLK_SPACE }, { "x", N_("2nd Power"), "X", SDLK_C },
-        { "y", N_("Use / Talk"), "Y", SDLK_V }, { "b", N_("Special Power / Back"), "B", SDLK_X },
-        { "back", N_("Skylander Info"), "Back", SDLK_BACKSPACE }, { "start", N_("Pause"), "Start", SDLK_RETURN },
-        { "right_up", N_("Shake / Insert / Swing"), N_("R stick up"), SDLK_I }, { "right_down", N_("Same"), N_("R stick down"), SDLK_K },
-        { "right_left", N_("Same"), N_("R stick left"), SDLK_J }, { "right_right", N_("Same"), N_("R stick right"), SDLK_L },
+        { "a", N_("1st Power / Accept"), "A", SDL_SCANCODE_SPACE }, { "x", N_("2nd Power"), "X", SDL_SCANCODE_C },
+        { "y", N_("Use / Talk"), "Y", SDL_SCANCODE_V }, { "b", N_("Special Power / Back"), "B", SDL_SCANCODE_X },
+        { "back", N_("Skylander Info"), "Back", SDL_SCANCODE_BACKSPACE }, { "start", N_("Pause"), "Start", SDL_SCANCODE_RETURN },
+        { "right_up", N_("Shake / Insert / Swing"), N_("R stick up"), SDL_SCANCODE_I }, { "right_down", N_("Same"), N_("R stick down"), SDL_SCANCODE_K },
+        { "right_left", N_("Same"), N_("R stick left"), SDL_SCANCODE_J }, { "right_right", N_("Same"), N_("R stick right"), SDL_SCANCODE_L },
     };
     constexpr GameKey Giants[] = {
         MOVE_ROWS,
-        { "a", N_("Attack 1 / Accept"), "A", SDLK_SPACE }, { "x", N_("Attack 2"), "X", SDLK_C },
-        { "y", N_("Action"), "Y", SDLK_V }, { "b", N_("Attack 3 / Back"), "B", SDLK_X },
-        { "back", N_("Skylander Info"), "Back", SDLK_BACKSPACE }, { "start", N_("Pause"), "Start", SDLK_RETURN },
+        { "a", N_("Attack 1 / Accept"), "A", SDL_SCANCODE_SPACE }, { "x", N_("Attack 2"), "X", SDL_SCANCODE_C },
+        { "y", N_("Action"), "Y", SDL_SCANCODE_V }, { "b", N_("Attack 3 / Back"), "B", SDL_SCANCODE_X },
+        { "back", N_("Skylander Info"), "Back", SDL_SCANCODE_BACKSPACE }, { "start", N_("Pause"), "Start", SDL_SCANCODE_RETURN },
     };
     constexpr GameKey SwapForce[] = {
         MOVE_ROWS,
-        { "a", N_("Jump"), "A", SDLK_SPACE }, { "x", N_("Attack 1"), "X", SDLK_C },
-        { "b", N_("Attack 2"), "B", SDLK_X }, { "y", N_("Attack 3"), "Y", SDLK_V },
-        { "rb", N_("Attack 2"), "RB", SDLK_E }, { "lb", N_("Attack 3"), "LB", SDLK_Q },
-        { "lt", N_("Interact"), "LT", SDLK_1 }, { "rt", N_("Interact"), "RT", SDLK_3 },
-        { "back", N_("Skylanders Stats"), "Back", SDLK_BACKSPACE }, { "start", N_("Pause"), "Start", SDLK_RETURN },
+        { "a", N_("Jump"), "A", SDL_SCANCODE_SPACE }, { "x", N_("Attack 1"), "X", SDL_SCANCODE_C },
+        { "b", N_("Attack 2"), "B", SDL_SCANCODE_X }, { "y", N_("Attack 3"), "Y", SDL_SCANCODE_V },
+        { "rb", N_("Attack 2"), "RB", SDL_SCANCODE_E }, { "lb", N_("Attack 3"), "LB", SDL_SCANCODE_Q },
+        { "lt", N_("Interact"), "LT", SDL_SCANCODE_1 }, { "rt", N_("Interact"), "RT", SDL_SCANCODE_3 },
+        { "back", N_("Skylanders Stats"), "Back", SDL_SCANCODE_BACKSPACE }, { "start", N_("Pause"), "Start", SDL_SCANCODE_RETURN },
     };
 
     // The SDL names of the keys the launcher words in the player's language (the others, letters and digits, are the same everywhere).
@@ -81,15 +82,69 @@ std::string GameKeyName(const LauncherConfig& config, std::string_view gameId, c
 {
     if (const std::string* value = Find(config, GameInputSection(gameId), KeyLine(key.action)))
         return *value;
-    return SDL_GetKeyName(key.fallback);
+    return SDL_GetScancodeName(key.fallback);
 }
 
 std::string KeyDisplayName(const std::string& sdlName)
 {
+    std::string shown = sdlName;
+    if (SDL_Scancode place = SDL_GetScancodeFromName(sdlName.c_str()); place != SDL_SCANCODE_UNKNOWN)
+        if (const char* name = SDL_GetKeyName(SDL_GetKeyFromScancode(place, SDL_KMOD_NONE, false)); name != nullptr && *name != 0)
+            shown = name;
     for (const char* name : KeyNames)
-        if (sdlName == name)
+        if (shown == name)
             return i18n::Tr(name);
-    return sdlName;
+    return shown;
+}
+
+std::string CapturedKeyName(SDL_Scancode scancode) { return SDL_GetScancodeName(scancode); }
+
+PadFamily PadFamilyOf(SDL_GamepadType type)
+{
+    switch (type)
+    {
+    case SDL_GAMEPAD_TYPE_XBOXONE: return PadFamily::XboxOne;
+    case SDL_GAMEPAD_TYPE_PS3: return PadFamily::PlayStation3;
+    case SDL_GAMEPAD_TYPE_PS4:
+    case SDL_GAMEPAD_TYPE_PS5: return PadFamily::PlayStation;
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_PRO:
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_LEFT:
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
+    case SDL_GAMEPAD_TYPE_NINTENDO_SWITCH_JOYCON_PAIR: return PadFamily::Nintendo;
+    default: return PadFamily::Xbox360;
+    }
+}
+
+PadFamily PadFamilyFor(std::string_view glyphs, PadFamily seen)
+{
+    if (glyphs == "xbox360") return PadFamily::Xbox360;
+    if (glyphs == "xboxone") return PadFamily::XboxOne;
+    if (glyphs == "playstation") return PadFamily::PlayStation;
+    if (glyphs == "nintendo") return PadFamily::Nintendo;
+    if (glyphs == "xbox") return seen == PadFamily::XboxOne ? PadFamily::XboxOne : PadFamily::Xbox360;
+    return seen;
+}
+
+std::string PadButtonName(const GameKey& key, PadFamily family)
+{
+    // Per Xbox 360 name: Xbox One / Series, PlayStation 4 / 5, PlayStation 3, Nintendo Switch (by place: the 360's A is
+    // the Switch's B). N_: the words are translated.
+    static const std::pair<const char*, std::array<const char*, 4>> Names[] = {
+        { "A", { "A", N_("Cross"), N_("Cross"), "B" } }, { "B", { "B", N_("Circle"), N_("Circle"), "A" } },
+        { "X", { "X", N_("Square"), N_("Square"), "Y" } }, { "Y", { "Y", N_("Triangle"), N_("Triangle"), "X" } },
+        { "Back", { "View", N_("Touchpad"), "Select", "-" } }, { "Start", { "Menu", "Options", "Start", "+" } },
+        { "LB", { "LB", "L1", "L1", "L" } }, { "RB", { "RB", "R1", "R1", "R" } },
+        { "LT", { "LT", "L2", "L2", "ZL" } }, { "RT", { "RT", "R2", "R2", "ZR" } },
+    };
+    if (family != PadFamily::Xbox360)
+    {
+        size_t column = family == PadFamily::XboxOne ? 0 : family == PadFamily::PlayStation ? 1 : family == PadFamily::PlayStation3 ? 2 : 3;
+        for (const auto& [xbox360, names] : Names)
+            if (std::string_view(key.pad) == xbox360)
+                return i18n::Tr(names[column]);
+    }
+    // The 360's names as printed on the pad (Back stays Back, not the B button's "Back" action); the sticks' are words.
+    return std::string_view(key.pad).find("stick") != std::string_view::npos ? i18n::Tr(key.pad) : std::string(key.pad);
 }
 
 bool GameKeyConflict(const LauncherConfig& config, std::string_view gameId, const GameKey& key)
@@ -135,7 +190,7 @@ void ApplyGameInput(LauncherConfig& config, std::string_view gameId)
         if (const std::string* value = Find(config, section, line))
             config["input"][line] = *value;
         else if (const GameKey* row = Row(gameId, action))
-            config["input"][line] = SDL_GetKeyName(row->fallback);
+            config["input"][line] = SDL_GetScancodeName(row->fallback);
         else if (auto shared = config.find("input"); shared != config.end())
             shared->second.erase(line); // not one of this game's actions: the runtime's own default
     }

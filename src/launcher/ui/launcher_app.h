@@ -443,6 +443,7 @@ namespace launcher_ui
         void Set(const char* section, const char* key, const std::string& value);
         void Toast(std::string text, bool error = false); // an error stays until it is closed; the rest go by themselves
         void RefreshGamepads();
+        PadFamily PadFamilyNow() const; // whose button names the Keyboard tab shows (game_keys.h)
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
         std::string CurrentDevice() const;
         std::string DeviceLabel() const;
@@ -505,6 +506,7 @@ namespace launcher_ui
         bool m_dragOver = false;
 
         std::vector<SDL_JoystickID> m_gamepads;
+        SDL_GamepadType m_lastPadType = SDL_GAMEPAD_TYPE_UNKNOWN; // the last pad connected
         const GameKey* m_capturing = nullptr; // the key row of the shown game waiting for a key press
 
         // The games opened this session (one slot each), and the one shown. Every slot's jobs are polled; the shown
