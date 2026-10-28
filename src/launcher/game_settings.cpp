@@ -124,8 +124,8 @@ std::string GameVideoSection(std::string_view gameId) { return std::string(gameI
 void SeedGameVideo(LauncherConfig& config, std::string_view gameId)
 {
     std::string section = GameVideoSection(gameId);
-    if (config.count(section) != 0)
-        return;
+    if (auto own = config.find(section); own != config.end() && !own->second.empty())
+        return; // an empty section is one something only looked at (operator[]): it has nothing to keep
     auto shared = config.find("video");
     if (shared == config.end())
         return;

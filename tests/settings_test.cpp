@@ -110,6 +110,33 @@ namespace
         LauncherConfig back = LoadLauncherConfig(scratch.string());
         SETTINGS_EXPECT(back["giants.video"]["fps_limit"] == "30" && back["ssa.video"]["resolution_scale"] == "3");
         fs::remove(scratch);
+
+        // The whole way of the two options a player turns on in a game's page (Video): the page writes the game's copy,
+        // PLAY puts it into [video] on disk, which is what the game reads, and the game's end keeps it.
+        {
+            LauncherConfig page;
+            page["video"]["fps_limit"] = "30"; // what an older launcher.ini held: the game's copy is what counts
+            SeedGameVideo(page, "ssa");
+            page["ssa.video"]["skip_intro_movies"] = "1";
+            page["ssa.video"]["fps_limit"] = "60";
+            SeedGameVideo(page, "ssa"); // the window seeds again on its next start
+            SETTINGS_EXPECT(page["ssa.video"]["skip_intro_movies"] == "1" && page["ssa.video"]["fps_limit"] == "60");
+            ApplyGameVideo(page, "ssa");
+            fs::path played = fs::temp_directory_path() / "skylauncher-play-test.ini";
+            SETTINGS_EXPECT(SaveLauncherConfig(played.string(), page));
+            LauncherConfig game = LoadLauncherConfig(played.string()); // the runtime parses the same file
+            SETTINGS_EXPECT(game["video"]["skip_intro_movies"] == "1" && game["video"]["fps_limit"] == "60");
+            StoreGameVideo(game, "ssa");
+            SETTINGS_EXPECT(game["ssa.video"]["skip_intro_movies"] == "1" && game["ssa.video"]["fps_limit"] == "60");
+            fs::remove(played);
+
+            // A section that was only looked at (empty) does not stop the seeding from the player's older [video].
+            LauncherConfig looked;
+            looked["video"]["fps_limit"] = "60";
+            looked["ssa.video"];
+            SeedGameVideo(looked, "ssa");
+            SETTINGS_EXPECT(looked["ssa.video"]["fps_limit"] == "60");
+        }
         printf("Settings: each game's video settings are its own, [video] follows the game that plays\n");
     }
 

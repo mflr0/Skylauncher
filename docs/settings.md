@@ -32,7 +32,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | each game | `disc_text_languages`, `disc_voice_languages` | codes joined by commas | Written by the launcher at each disc check: the languages the disc holds, which the Language tab lists (absent: the full list). Not for editing | no |
 | `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes (the key is per game: see "Per-game video" below) |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
-| `video` | `fps_limit` | `30`, `60` | Frame rate cap (the game is made for 30; 60 is experimental). Other values the runtime reads as 60 | yes |
+| `video` | `fps_limit` | `30`, `60` | Frame rate cap (the game is made for 30; 60 is experimental; a computer that cannot hold 60 gets a steady 30). Other values the runtime reads as 60 | yes |
 | `video` | `skip_intro_movies` | `0`, `1` | Skip the start-up logos (legal, ATVI, XPEC, Toys for Bob); the story movies still play | yes |
 | `video` | `vsync` | `0`, `1` | Wait for the display's refresh | yes |
 | `video` | `anisotropy` | `1`, `2`, `4`, `8`, `16` | Texture filtering | yes |
@@ -66,6 +66,13 @@ ten keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `
 - The first time, a game's copy starts from the `[video]` the player already had (`SeedGameVideo`).
 - **PLAY** puts the copy of the game that starts into `[video]` (keys it lacks are dropped, so the runtime's defaults apply):
   the runtime needs no change (`ApplyGameVideo`).
+- The runtime also reads the game's own `[<game>.video]` after `[video]` and lets it win for every key it has, so a game
+  started without PLAY (its own icon) gets what its page shows too. Two options a player turns on, `skip_intro_movies`
+  and `fps_limit=60`, travel this way; `tests/settings_test.cpp` follows them from the page's write to the file the game
+  parses. With 60 FPS on, a computer that cannot hold 60 gets a steady 30 FPS (the game says "30 FPS: 60 not held" once
+  per run) and goes back to 60 when it holds.
+- A game's copy that is still empty (a page only looked at it) is seeded from the `[video]` the player already had, like a
+  missing one (`SeedGameVideo`).
 - When the game ends, what is in `[video]` (the player may have changed it in the game's own Settings menu) becomes that
   game's copy again (`StoreGameVideo`), so the other game never sees it.
 - What both games share stays in its own section: `[input]` (device, keys, glyphs), `[portal]`, and the launcher's
