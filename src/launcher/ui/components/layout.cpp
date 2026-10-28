@@ -156,20 +156,77 @@ namespace ui
         return true;
     }
 
-    void SettingRow(const char* label, const char* hint)
+    namespace
     {
+        // The row being drawn: its label waits until its control is drawn, to be centred on it.
+        struct PendingLabel
+        {
+            bool open = false;
+            std::string label, hint, note;
+            float controlTop = 0;
+        };
+        PendingLabel g_row;
+
+        float LabelBlockHeight(const char* hint, float width)
+        {
+            return SizeOf(TextStyle::Body) + (hint != nullptr ? space::XXS + TextSize(TextStyle::Caption, hint, nullptr, false, width).y : 0);
+        }
+
+        // The label (and its note, its hint) in the first column, centred on what the second column holds: one line's
+        // capitals on its middle, a label and its hint as a block.
+        void FlushSettingRow()
+        {
+            if (!g_row.open)
+                return;
+            g_row.open = false;
+            const float controlBottom = std::max(g_row.controlTop, ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y);
+            const float centre = (g_row.controlTop + controlBottom) / 2;
+            ImGui::TableSetColumnIndex(0);
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            const float width = ImGui::GetContentRegionAvail().x;
+            const char* hint = g_row.hint.empty() ? nullptr : g_row.hint.c_str();
+            const float top = hint != nullptr ? std::round(centre - LabelBlockHeight(hint, width) / 2) : std::round(centre - CapMiddle(TextStyle::Body));
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            PushText(TextStyle::Body);
+            const std::string label = Ellipsize(g_row.label.c_str(), width);
+            DrawText(draw, ImVec2(at.x, top), Col(color::Ink), label.c_str());
+            const float labelEnd = at.x + ImGui::CalcTextSize(label.c_str()).x;
+            PopText();
+            if (!g_row.note.empty()) // on the label's baseline
+            {
+                PushText(TextStyle::Caption);
+                DrawText(draw, ImVec2(labelEnd + space::XS, top + Baseline(TextStyle::Body) - Baseline(TextStyle::Caption)), Col(color::Dim), g_row.note.c_str());
+                PopText();
+            }
+            float bottom = top + SizeOf(TextStyle::Body);
+            if (hint != nullptr)
+            {
+                ImGui::SetCursorScreenPos(ImVec2(at.x, bottom + space::XXS));
+                Text(TextStyle::Caption, hint, color::Dim, width);
+                bottom = ImGui::GetItemRectMax().y;
+            }
+            ImGui::SetCursorScreenPos(at);
+            ImGui::Dummy(ImVec2(0, std::max(0.0f, bottom - at.y))); // the row is as tall as the label needs
+        }
+    }
+
+    void SettingRow(const char* label, const char* hint, const char* note)
+    {
+        FlushSettingRow();
         ImGui::TableNextRow(ImGuiTableRowFlags_None, height::Large);
         ImGui::TableSetColumnIndex(0);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(space::XS, space::XXS - 1));
-        Text(TextStyle::Body, label, color::Ink);
-        if (hint != nullptr)
-            Text(TextStyle::Caption, hint, color::Dim);
-        ImGui::PopStyleVar();
+        const float block = LabelBlockHeight(hint, ImGui::GetContentRegionAvail().x);
         ImGui::TableSetColumnIndex(1);
+        // A label taller than a control (a hint on two lines) moves the control down to its middle.
+        const float lower = std::max(0.0f, std::round((block - height::Normal) / 2));
+        if (lower > 0)
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + lower);
+        g_row = { true, label, hint != nullptr ? hint : "", note != nullptr ? note : "", ImGui::GetCursorScreenPos().y };
     }
 
     void EndSettings()
     {
+        FlushSettingRow();
         ImGui::EndTable();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
