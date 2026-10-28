@@ -3,6 +3,7 @@
 // Every choice is written to launcher.ini, which the game runtime reads (docs/settings.md lists the keys).
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/env.h"
+#include "launcher/ui/text_fit.h"
 #include "launcher/install_checklist.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/collection/datadir.h"
@@ -1366,15 +1367,7 @@ namespace launcher_ui
                 statusX += 12;
             }
             // Fits the column at the smallest window too: cut with "..." rather than run over the edge.
-            std::string status = line.text;
-            while (status.size() > 4 && ImGui::CalcTextSize(status.c_str()).x > rowW - 10 - statusX)
-            {
-                status.resize(status.size() - 1);
-                while (!status.empty() && (status.back() & 0xC0) == 0x80)
-                    status.pop_back();
-                status.pop_back();
-                status += "...";
-            }
+            std::string status = FitText(line.text, rowW - 10 - statusX, [](const std::string& s) { return ImGui::CalcTextSize(s.c_str()).x; });
             draw->AddText(ImVec2(statusX, statusY), Rgb(entry.enabled ? TextSecondary : TextDim, entry.enabled ? 255 : 200), status.c_str());
             if (m_testSidebar)
                 m_drawn[std::string("sidebar:") + entry.id] = line.text;
