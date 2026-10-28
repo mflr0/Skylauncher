@@ -3,6 +3,7 @@
 // (docs/support.md).
 #include "launcher/report.h"
 #include "launcher/ui/launcher_app.h"
+#include "launcher/game_names.h"
 #include <fmt/format.h>
 #include <fstream>
 #include <memory>
@@ -86,7 +87,7 @@ namespace launcher_ui
             std::lock_guard lock(g_saveMutex);
             if (g_saveOk)
             {
-                Toast(Tr("Report saved"));
+                Toast(Tr("Report saved"), ui::ToastKind::Success);
                 g_saveOk = false;
             }
             else if (g_saveFailed)
@@ -96,155 +97,127 @@ namespace launcher_ui
             }
         }
 
-        if (m_reportOpen && !ImGui::IsPopupOpen("##problemreport"))
-            ImGui::OpenPopup("##problemreport");
-        ImVec2 display = ImGui::GetIO().DisplaySize;
-        ImGui::SetNextWindowSize(ImVec2(std::min(880.0f, display.x - 80), std::min(680.0f, display.y - 60)));
-        ImGui::SetNextWindowPos(ImVec2(display.x / 2, display.y / 2), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(Panel, 250));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, RadiusLarge);
-        if (ImGui::BeginPopupModal("##problemreport", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+        if (!ui::BeginModal("##problemreport", Tr("Report a problem"), &m_reportOpen, ui::ModalSize::Large))
+            return;
+        ui::Text(ui::TextStyle::Caption, Tr("Your names are removed and nothing is sent."), ui::color::Dim);
+        // The room under the text is the title, the line above and the actions (Normal high); the rest is the report.
+        const float room = ImGui::GetIO().DisplaySize.y - 2 * ui::space::XL - 3 * ui::height::Large;
+        ui::BeginCard("##reporttext", ImVec2(0, std::clamp(room, 3.0f * ui::height::Large, 8.0f * ui::height::Large)), { .inset = true, .padding = ui::space::M });
+        ImGui::SetScrollX(0.0f);
+        ImGui::PushFont(m_monoFont, ui::type::Caption); // logs keep the monospaced font (null: the text font)
+        ImGui::PushTextWrapPos(0);
+        ImGui::TextUnformatted(m_reportText.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::PopFont();
+        ui::EndCard();
+        // Save as... is the action (the dialog takes over, so the report closes); Copy stays at the left of the same row.
+        const float rowY = ImGui::GetCursorPosY() + ui::space::XS;
+        ui::ModalResult result = ui::ModalActions(&m_reportOpen, Tr("Save as..."), Tr("Close"));
+        const float afterY = ImGui::GetCursorPosY();
+        ImGui::SetCursorPos(ImVec2(ui::space::L, rowY));
+        if (ui::Button(Tr("Copy")))
         {
-            if (!m_reportOpen)
-                ImGui::CloseCurrentPopup();
-            Title(Tr("Report a problem"), TitleSize, Text);
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s",
-                Tr("Your names are removed and nothing is sent."));
-            ImGui::PopFont();
-            ImGui::Dummy(ImVec2(0, 6));
-            ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
-            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusSmall);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 12));
-            ImGui::BeginChild("##reporttext", ImVec2(0, -52), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
-                ImGuiWindowFlags_NoBackground);
-            ImGui::SetScrollX(0.0f);
-            if (m_monoFont != nullptr)
-                ImGui::PushFont(m_monoFont, SmallSize);
-            ImGui::PushTextWrapPos(0);
-            ImGui::TextUnformatted(m_reportText.c_str());
-            ImGui::PopTextWrapPos();
-            if (m_monoFont != nullptr)
-                ImGui::PopFont();
-            ImGui::EndChild();
-            ImGui::PopStyleVar(2);
-            ImGui::PopStyleColor();
-            if (PillButton(Tr("Save as..."), true, 160, true))
-            {
-                std::filesystem::path folder = GameLogFolder();
-                std::string name = launcher_report::FileName();
-                std::string start = (folder / name).string();
-                static const SDL_DialogFileFilter Filters[] = { { "Text file", "txt" } };
-                SDL_ShowSaveFileDialog(SaveReport, new std::string(m_reportText), m_window, Filters, 1, start.c_str());
-            }
-            ImGui::SameLine();
-            if (PillButton(Tr("Copy"), false, 140))
-            {
-                SDL_SetClipboardText(m_reportText.c_str());
-                Toast(Tr("Report copied"));
-            }
-            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - PillWidth(Tr("Close"), 120));
-            // B / Escape close it, as every dialog (A presses the focused button).
-            if (PillButton(Tr("Close"), false, 120) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
-            {
-                m_reportOpen = false;
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::EndPopup();
+            SDL_SetClipboardText(m_reportText.c_str());
+            Toast(Tr("Report copied"), ui::ToastKind::Success);
         }
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor();
+        ImGui::SetCursorPosY(afterY);
+        ImGui::Dummy(ImVec2(0, 0)); // the cursor went back and forth: an item ends it
+        if (result == ui::ModalResult::Confirm)
+        {
+            std::filesystem::path folder = GameLogFolder();
+            std::string name = launcher_report::FileName();
+            std::string start = (folder / name).string();
+            static const SDL_DialogFileFilter Filters[] = { { "Text file", "txt" } };
+            SDL_ShowSaveFileDialog(SaveReport, new std::string(m_reportText), m_window, Filters, 1, start.c_str());
+        }
+        ui::EndModal();
     }
 
+    // The "Test the portal" row, drawn inside the open settings table; DrawPortalResult shows what the test found under it.
     void App::DrawPortalTest()
     {
-        std::string runtime = !m_s->installed.runtime.empty() ? m_s->installed.runtime : m_s->ownRuntime;
-        bool testing = !m_probe.done;
-        ImGui::BeginDisabled(testing || runtime.empty());
-        if (PillButton(testing ? Tr("Testing...") : Tr("Test the portal"), false, 200))
+        const std::string runtime = !m_s->installed.runtime.empty() ? m_s->installed.runtime : m_s->ownRuntime;
+        const bool testing = !m_probe.done;
+        ui::SettingRow(Tr("Test the portal"), runtime.empty() ? Tr("Install the game first.") : !m_probe.ran ? Tr("Plug in the portal, then test it.") : nullptr);
+        ui::ButtonOptions options;
+        options.loading = testing;
+        options.disabled = runtime.empty();
+        if (ui::Button(testing ? Tr("Testing...") : Tr("Test"), options) && !testing)
             m_probe.Start(runtime);
-        ImGui::EndDisabled();
-        float buttonY = ImGui::GetItemRectMin().y, buttonH = ImGui::GetItemRectSize().y;
-        ImGui::SameLine(0, 14);
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, buttonY + (buttonH - ImGui::GetTextLineHeight()) / 2)); // centred on the button
-        if (runtime.empty())
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Install the game first."));
-        else if (!m_probe.ran)
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr("Plug in the portal, then test it."));
-        ImGui::PopFont();
-        if (!m_probe.ran || testing)
-            return;
+    }
 
+    void App::DrawPortalResult()
+    {
+        if (!m_probe.ran || !m_probe.done)
+            return;
         const PortalProbeResult& result = m_probe.result;
-        std::string mode = SettingGet(m_config, "portal", "mode", "auto");
+        const std::string mode = SettingGet(m_config, "portal", "mode", "auto");
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
         if (!result.error.empty())
         {
-            ImGui::TextColored(ImColor(Rgb(Danger)), "%s", result.error.c_str());
+            ui::StatusPill(ui::Status::Error, Tr("The test failed"));
+            ui::Text(ui::TextStyle::Caption, result.error.c_str(), ui::color::Dim);
             return;
         }
+        const char* spyro = GameName("ssa");
         for (const PortalProbeEntry& entry : result.portals)
         {
             std::string name = entry.product.empty() ? std::string(entry.kind == "usb" ? Tr("Xbox portal") : Tr("Portal")) : entry.product;
-            ImGui::TextColored(ImColor(Rgb(entry.opened ? Ok : Danger)), "%s", entry.opened ? Tr("Found") : Tr("Found, not usable"));
-            ImGui::SameLine(0, 8);
-            ImGui::TextUnformatted(fmt::format("{} ({} {}:{})", name, entry.kind == "usb" ? "USB" : "HID", entry.vid, entry.pid).c_str());
+            ui::StatusPill(entry.opened ? ui::Status::Success : ui::Status::Error, entry.opened ? Tr("Found") : Tr("Found, not usable"));
+            ImGui::SameLine(0, ui::space::XS);
+            ImGui::AlignTextToFramePadding();
+            ui::Text(ui::TextStyle::Body, fmt::format("{} ({} {}:{})", name, entry.kind == "usb" ? "USB" : "HID", entry.vid, entry.pid).c_str(), ui::color::Ink, -1);
             if (!entry.model.empty())
             {
                 // The model from the id the portal answered to the game's reset, and what the game thinks of it.
-                ImGui::PushFont(nullptr, SmallSize);
-                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Model: {} (id {})", entry.model, entry.id).c_str());
+                ui::Text(ui::TextStyle::Caption, Tf("Model: {} (id {})", entry.model, entry.id).c_str(), ui::color::Dim);
                 if (entry.verdict == "works")
-                    ImGui::TextColored(ImColor(Rgb(Ok)), "%s", Tr("Spyro's Adventure accepts this portal."));
+                    ui::Text(ui::TextStyle::Caption, Tf("{} accepts this portal.", spyro).c_str(), ui::color::InkSoft);
                 else if (entry.verdict == "warns" || entry.verdict == "rejected")
-                    ImGui::TextColored(ImColor(Rgb(Danger)), "%s", (entry.verdict == "rejected" ? Tf("Spyro's Adventure rejects this portal: {}.", entry.verdictReason)
-                                                           : Tf("Spyro's Adventure warns about this portal: {}.", entry.verdictReason)).c_str());
-                ImGui::PopFont();
+                    ui::Text(ui::TextStyle::Caption, (entry.verdict == "rejected" ? Tf("{} rejects this portal: {}.", spyro, entry.verdictReason)
+                                                           : Tf("{} warns about this portal: {}.", spyro, entry.verdictReason)).c_str(), ui::color::InkSoft);
             }
             if (!entry.opened)
             {
                 std::string why = entry.status.starts_with("error: ") ? entry.status.substr(7) : entry.status;
-                ImGui::PushFont(nullptr, SmallSize);
-                ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", why.c_str());
-                ImGui::PopFont();
+                ui::Text(ui::TextStyle::Caption, why.c_str(), ui::color::Dim);
             }
         }
         for (const std::string& note : result.notes)
-        {
-            ImGui::PushFont(nullptr, SmallSize);
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", note.c_str());
-            ImGui::PopFont();
-        }
+            ui::Text(ui::TextStyle::Caption, note.c_str(), ui::color::Dim);
         bool good = false;
-        std::string verdict = PortalVerdict(mode, result, good);
-        ImGui::TextColored(ImColor(Rgb(good ? Ok : TextSecondary)), "%s", verdict.c_str());
+        const std::string verdict = PortalVerdict(mode, result, good);
+        ui::StatusPill(good ? ui::Status::Success : ui::Status::Neutral, verdict.c_str());
     }
 
     void App::DrawLogs()
     {
-        std::filesystem::path folder = GameLogFolder();
+        const std::filesystem::path folder = GameLogFolder();
         std::error_code error;
-        bool any = std::filesystem::exists(RuntimeLogFolder() / RuntimeLogName, error) || std::filesystem::exists(folder / CaptureLogName, error);
-        if (PillButton(Tr("Report a problem"), true, 220, true))
+        const bool any = std::filesystem::exists(RuntimeLogFolder() / RuntimeLogName, error) || std::filesystem::exists(folder / CaptureLogName, error);
+        if (!ui::BeginSettings("##support"))
+            return;
+        ui::SettingRow(Tr("Problem report"), Tr("You see the report before saving it; nothing is sent."));
+        ui::ButtonOptions report;
+        report.kind = ui::ButtonKind::Primary;
+        report.width = -1;
+        if (ui::Button(Tr("Report a problem"), report))
             OpenProblemReport();
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!any);
-        if (PillButton(Tr("Copy game log"), false, 220))
+        ui::SettingRow(Tr("Game log"), any ? Tr("The game's last log, for a bug report.") : Tr("No game log yet."));
+        ui::ButtonOptions copy;
+        copy.width = -1;
+        copy.disabled = !any;
+        if (ui::Button(Tr("Copy game log"), copy))
         {
             SDL_SetClipboardText(GameLogText().c_str());
-            Toast(Tr("Game log copied"));
+            Toast(Tr("Game log copied"), ui::ToastKind::Success);
         }
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        if (PillButton(Tr("Open logs folder"), false, 220) && !OpenFolder(folder))
+        ui::SettingRow(Tr("Logs folder"), nullptr);
+        ui::ButtonOptions open;
+        open.icon = ui::Icon::Folder;
+        open.width = -1;
+        if (ui::Button(Tr("Open logs folder"), open) && !OpenFolder(folder))
             Toast(Tr("Couldn't open the folder"), true);
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", any ? Tr("The game's last log, for a bug report.")
-                                     : Tr("No game log yet."));
-        ImGui::TextWrapped("%s", Tr("You see the report before saving it; nothing is sent."));
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
+        ui::EndSettings();
     }
 }

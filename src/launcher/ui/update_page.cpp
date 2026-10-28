@@ -29,14 +29,6 @@ namespace launcher_ui
             return "Linux";
 #endif
         }
-
-        std::string AgoText(int64_t seconds)
-        {
-            if (seconds < 90) return Tr("just now");
-            if (seconds < 5400) return Tf("{} min ago", seconds / 60);
-            if (seconds < 36 * 3600) return Tf("{} h ago", seconds / 3600);
-            return Tf("{} days ago", seconds / 86400);
-        }
     }
 
     void App::StartUpdateCheck(bool manual)
@@ -267,59 +259,49 @@ namespace launcher_ui
     // Settings > Launcher: one check a day when it is on, nothing else is ever sent.
     void App::DrawUpdates()
     {
-        UpdateManager::State state = m_updates.Snapshot();
-        bool busy = m_updates.Busy();
-        ImGui::BeginDisabled(busy);
-        if (PillButton(state.phase == UpdateManager::Phase::Checking ? Tr("Checking...") : Tr("Check now"), false, 220))
-            StartUpdateCheck(true);
-        ImGui::EndDisabled();
-        ImGui::SameLine(0, 14);
-        ImGui::AlignTextToFramePadding();
+        const UpdateManager::State state = m_updates.Snapshot();
+        const bool checking = state.phase == UpdateManager::Phase::Checking;
+        if (!ui::BeginSettings("##updates"))
+            return;
+        std::string note;
         if (!m_updateDoneNote.empty())
-            ImGui::TextColored(ImColor(Rgb(state.checked && !state.launcherNewer ? Ok : TextSecondary)), "%s", m_updateDoneNote.c_str());
+            note = m_updateDoneNote;
         else if (int64_t last = SettingInt(m_config, "update", "last_check", 0); last > 0)
-            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Last checked {}", AgoText(Now() - last)).c_str());
-        ImGui::Dummy(ImVec2(0, 2));
+            note = Tf("Last checked {}", ui::FormatWhen(std::time_t(last), std::time_t(Now())));
+        ui::SettingRow(Tr("Check for updates"), note.empty() ? nullptr : note.c_str());
+        ui::ButtonOptions check;
+        check.width = -1;
+        check.loading = checking;
+        check.disabled = m_updates.Busy() && !checking;
+        if (ui::Button(checking ? Tr("Checking...") : Tr("Check now"), check) && !m_updates.Busy())
+            StartUpdateCheck(true);
+        ui::SettingRow(Tr("Check at startup"), Tr("Only contacts github.com."));
         bool automatic = ParseBool(SettingGet(m_config, "update", "auto_check", "1"));
-        if (Toggle("##autocheck", &automatic))
+        if (ui::Toggle("##autocheck", &automatic))
             Set("update", "auto_check", automatic ? "1" : "0");
-        ImGui::SameLine(0, 12);
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted(Tr("Check at startup"));
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
-        ImGui::TextWrapped("%s", Tr("Only contacts github.com."));
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
+        ui::EndSettings();
     }
 
     void App::DrawAbout()
     {
-        Title("Arkeyan Launcher", HeadlineSize);
-        ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tf("Version {}, {}", LauncherVersion(), PlatformName()).c_str());
-        ImGui::Dummy(ImVec2(0, 6));
-        ImGui::TextWrapped("%s", Tr("A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc."));
+        ui::Text(ui::TextStyle::Display, "Arkeyan Launcher", ui::color::AccentFill, -1);
+        ui::Text(ui::TextStyle::Body, Tf("Version {}, {}", LauncherVersion(), PlatformName()).c_str(), ui::color::InkSoft);
+        ui::Text(ui::TextStyle::Body, Tr("A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc."));
 
-        ImGui::Dummy(ImVec2(0, 14));
-        Title(Tr("Credits"), TitleSize, Text);
-        ImGui::TextWrapped("%s", Tr("Designed by dorydev."));
-        ImGui::Dummy(ImVec2(0, 4));
-        ImGui::TextWrapped("%s", Tr("Built with SDL 3, Dear ImGui, {fmt}, stb, miniz, XenonRecomp, Outfit and Bungee. MIT licensed."));
-        ImGui::Dummy(ImVec2(0, 6));
-        if (PillButton(Tr("Project page"), false, 180))
+        ui::SectionHeader(Tr("Credits"));
+        ui::Text(ui::TextStyle::Body, Tr("Designed by dorydev."), ui::color::InkSoft);
+        ui::Text(ui::TextStyle::Body, Tr("Built with SDL 3, Dear ImGui, {fmt}, stb, miniz, XenonRecomp, Outfit and Bungee. MIT licensed."), ui::color::InkSoft);
+        ImGui::Dummy(ImVec2(0, ui::space::XXS));
+        if (ui::Button(Tr("Project page")))
             SDL_OpenURL(Project);
         ImGui::SameLine();
-        if (PillButton(Tr("Licences"), false, 150))
+        if (ui::Button(Tr("Licences")))
             SDL_OpenURL((std::string(Project) + "/blob/main/THIRD_PARTY_NOTICES.md").c_str());
         ImGui::SameLine();
-        if (PillButton(Tr("Report a bug"), false, 180))
+        if (ui::Button(Tr("Report a bug")))
             SDL_OpenURL((std::string(Project) + "/issues/new").c_str());
-        ImGui::Dummy(ImVec2(0, 10));
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextWrapped("%s", Tr("Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision."));
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::Text(ui::TextStyle::Caption, Tr("Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision."), ui::color::Dim);
     }
 
     // The update screens (SKY_LAUNCHER_TEST_UPDATE, SKY_LAUNCHER_UPDATE_URL on a fake release): the banner, What's new, About
