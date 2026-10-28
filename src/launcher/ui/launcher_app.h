@@ -53,6 +53,8 @@ namespace launcher_ui
     inline constexpr Choice FpsChoices[] = { { "30", N_("30 (original)") }, { "60", N_("60 (experimental)"), "0 120 144 240" } };
     inline constexpr Choice VolumeChoices[] = { { "0", "0 %" }, { "10", "10 %" }, { "20", "20 %" }, { "30", "30 %" }, { "40", "40 %" },
         { "50", "50 %" }, { "60", "60 %" }, { "70", "70 %" }, { "80", "80 %" }, { "90", "90 %" }, { "100", "100 %" } };
+    inline constexpr Choice RumbleChoices[] = { { "off", N_("Off") }, { "low", N_("Low") }, { "normal", N_("Normal") }, { "strong", N_("Strong") } };
+
     inline constexpr Choice AspectChoices[] = { { "auto", N_("Auto (follows the window)") }, { "16:9", N_("16:9 (with bars)") } };
     inline constexpr Choice ScaleChoices[] = { { "auto", N_("Auto") }, { "1", "x1" }, { "2", "x2" }, { "3", "x3" }, { "4", "x4" },
         { "5", "x5" }, { "6", "x6" }, { "7", "x7" }, { "8", "x8" }, { "9", "x9" }, { "10", "x10" } };
@@ -168,7 +170,7 @@ namespace launcher_ui
     // page) opens that game's own settings.
     enum class Page { Home, Play, Collection, Settings, GameSettings };
     enum class SettingsTab { Controls, Launcher, Support, About };
-    enum class GameTab { Video, Keyboard, Language, Disc, Saves, Game };
+    enum class GameTab { Video, Keyboard, Controller, Language, Disc, Saves, Game };
     enum class DiscState { None, Verifying, Ready, Failed };
     // Everything a game can be in, read from its slot by App::SlotStatus: the one place that decides (docs/launcher_ui.md).
     enum class SlotState
@@ -317,6 +319,8 @@ namespace launcher_ui
         void RefreshSaveBackups();
         void RestoreSaveBackup(const std::string& stamp);
         void DrawGameTab();
+        void DrawGameController();
+        void DrawUpdateAll(ImVec2 right);
         void DrawDataActions();
         void CreateShortcut();
         void ForgetDisc();       // "Remove the disc": the game forgets its image; the built game and the files stay
@@ -439,6 +443,12 @@ namespace launcher_ui
         std::string GameVersion(const GameSlot& slot) const;         // "0.8.2": the built game's, else the kit's; "" when unknown
         void StartInstall();
         void PollInstall();
+        // "Update all" (Home): the games with an update, one after the other (docs/updates.md).
+        int GamesToUpdate() const;
+        void StartUpdateAll();
+        void CancelUpdateAll();
+        void PollUpdateAll();
+        bool UpdatingAll() const { return !m_updateAll.queue.empty() || !m_updateAll.current.empty(); }
         void DrawInstall(ImVec2 at, ImVec2 size);
         InstallProgress InstallSnapshot(size_t logTail = 0); // this session's install, else the one read back from its log
         InstallProgress InstallSnapshot(GameSlot& slot, size_t logTail = 0); // the same, for any game's slot
@@ -516,6 +526,12 @@ namespace launcher_ui
         bool m_updateLater = false;      // the player closed the banner for this session
         bool m_testPlayWithout = false;        // tests: press "Play without updating" on the next frame
         std::vector<GameUpdate> m_gameUpdates; // the games line of the last answered check
+        struct UpdateAllRun
+        {
+            std::vector<std::string> queue; // games still to start
+            std::string current;            // the game being updated
+            int total = 0, started = 0, failed = 0;
+        } m_updateAll;
         bool m_whatsNewOpen = false;
         bool m_updateWasBusy = false;
         std::string m_updateDoneNote;    // the last answer of a manual check, shown in About
@@ -548,6 +564,8 @@ namespace launcher_ui
         bool m_testUninstall = false;  // SKY_LAUNCHER_TEST_UNINSTALL: the uninstall screens
         bool m_testKeys = false;       // SKY_LAUNCHER_TEST_KEYS: each game's Keyboard tab, one shot each
         int m_testScreens = 0;         // SKY_LAUNCHER_TEST_SCREENS: Home, the game page and its Keyboard tab; 1 with the mouse, 2 with a pad
+        bool m_testPad = false;        // SKY_LAUNCHER_TEST_PAD: each game's Controller tab, and Swap Force's Game tab
+
         bool m_testLogo = false;       // SKY_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
         uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)

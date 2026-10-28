@@ -809,3 +809,34 @@ The wheel is full: take a figure off it first	La roue est pleine : retirez d’
 Your disc is read on this computer only.	Votre disque est lu sur cet ordinateur uniquement.
 Play	Jouer
 Sidebar	Barre latérale
+
+# Controller tab of a game: what each pad button does, and the rumble (docs/settings.md, "Per-game pad")
+Choose what each button does.	Choisissez ce que fait chaque bouton.
+Its own job	Son rôle habituel
+Nothing	Rien
+Rumble	Vibrations
+Player 1	Joueur 1
+Player 2	Joueur 2
+Off	Désactivées
+Low	Faibles
+Normal	Normales
+Strong	Fortes
+Controller buttons reset	Boutons de la manette réinitialisés
+Hold to give every button its own job back.	Maintenez pour rendre à chaque bouton son rôle habituel.
+D-pad up	Croix haut
+D-pad down	Croix bas
+D-pad left	Croix gauche
+D-pad right	Croix droite
+
+# Update all (Home)
+Update all	Tout mettre à jour
+Updates {} games, one after the other	Met à jour {} jeux, l'un après l'autre
+{}: {} ({} of {})	{} : {} ({} sur {})
+All games are updated	Tous les jeux sont à jour
+Games updated: {} of {}	Jeux mis à jour : {} sur {}
+
+# Difficulty (Swap Force's Game tab)
+Difficulty	Difficulté
+Nightmare from the start	Cauchemar dès le début
+Offered before you beat the game. Your save is not changed.	Proposé avant d'avoir fini le jeu. Votre sauvegarde n'est pas modifiée.
+

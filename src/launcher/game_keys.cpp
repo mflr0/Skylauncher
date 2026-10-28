@@ -125,7 +125,9 @@ PadFamily PadFamilyFor(std::string_view glyphs, PadFamily seen)
     return seen;
 }
 
-std::string PadButtonName(const GameKey& key, PadFamily family)
+std::string PadButtonName(const GameKey& key, PadFamily family) { return PadButtonName(std::string_view(key.pad), family); }
+
+std::string PadButtonName(std::string_view pad, PadFamily family)
 {
     // Per Xbox 360 name: Xbox One / Series, PlayStation 4 / 5, PlayStation 3, Nintendo Switch (by place: the 360's A is
     // the Switch's B). N_: the words are translated.
@@ -135,16 +137,17 @@ std::string PadButtonName(const GameKey& key, PadFamily family)
         { "Back", { "View", N_("Touchpad"), "Select", "-" } }, { "Start", { "Menu", "Options", "Start", "+" } },
         { "LB", { "LB", "L1", "L1", "L" } }, { "RB", { "RB", "R1", "R1", "R" } },
         { "LT", { "LT", "L2", "L2", "ZL" } }, { "RT", { "RT", "R2", "R2", "ZR" } },
+        { "LS", { "LS", "L3", "L3", "LS" } }, { "RS", { "RS", "R3", "R3", "RS" } },
     };
     if (family != PadFamily::Xbox360)
     {
         size_t column = family == PadFamily::XboxOne ? 0 : family == PadFamily::PlayStation ? 1 : family == PadFamily::PlayStation3 ? 2 : 3;
         for (const auto& [xbox360, names] : Names)
-            if (std::string_view(key.pad) == xbox360)
+            if (pad == xbox360)
                 return i18n::Tr(names[column]);
     }
     // The 360's names as printed on the pad (Back stays Back, not the B button's "Back" action); the sticks' are words.
-    return std::string_view(key.pad).find("stick") != std::string_view::npos ? i18n::Tr(key.pad) : std::string(key.pad);
+    return pad.find("stick") != std::string_view::npos || pad.starts_with("D-pad") ? i18n::Tr(std::string(pad).c_str()) : std::string(pad);
 }
 
 bool GameKeyConflict(const LauncherConfig& config, std::string_view gameId, const GameKey& key)
@@ -194,4 +197,76 @@ void ApplyGameInput(LauncherConfig& config, std::string_view gameId)
         else if (auto shared = config.find("input"); shared != config.end())
             shared->second.erase(line); // not one of this game's actions: the runtime's own default
     }
+}
+
+namespace
+{
+    // Display order = the runtime's g_padButtons; the 360's names, which the games' rows (GameKey::pad) use.
+    constexpr std::array<const char*, PadButtonTotal> PadNames = { "a", "b", "x", "y", "lb", "rb", "lt", "rt", "start", "back", "ls", "rs",
+        "dpad_up", "dpad_down", "dpad_left", "dpad_right" };
+    constexpr std::array<const char*, PadButtonTotal> PadXbox = { "A", "B", "X", "Y", "LB", "RB", "LT", "RT", "Start", "Back", "LS", "RS",
+        N_("D-pad up"), N_("D-pad down"), N_("D-pad left"), N_("D-pad right") };
+    constexpr std::array<const char*, 4> Rumble = { "off", "low", "normal", "strong" };
+
+    std::string PadLine(int button) { return std::string("pad_") + PadNames[size_t(button)]; }
+}
+
+std::span<const char* const> PadButtons() { return PadNames; }
+
+std::string PadButtonLabel(int button, PadFamily family)
+{
+    return button >= 0 && button < PadButtonTotal ? PadButtonName(PadXbox[size_t(button)], family) : std::string();
+}
+
+std::string PadActionName(std::string_view gameId, int button)
+{
+    if (button < 0 || button >= PadButtonTotal)
+        return {};
+    for (const GameKey& key : GameKeys(gameId))
+        if (std::string_view(key.pad) == PadXbox[size_t(button)])
+            return i18n::Tr(key.label);
+    return {};
+}
+
+int PadTarget(const LauncherConfig& config, std::string_view gameId, int button)
+{
+    const std::string* value = Find(config, GameInputSection(gameId), PadLine(button));
+    if (value == nullptr)
+        return button;
+    for (int i = 0; i < PadButtonTotal; i++)
+        if (*value == PadNames[size_t(i)])
+            return i;
+    return *value == "none" ? -1 : button;
+}
+
+void SetPadTarget(LauncherConfig& config, std::string_view gameId, int button, int target)
+{
+    const std::string section = GameInputSection(gameId);
+    if (target == button)
+    {
+        if (auto entry = config.find(section); entry != config.end())
+            entry->second.erase(PadLine(button));
+        return;
+    }
+    config[section][PadLine(button)] = target < 0 ? "none" : PadNames[size_t(target)];
+}
+
+void ResetPadMap(LauncherConfig& config, std::string_view gameId)
+{
+    auto section = config.find(GameInputSection(gameId));
+    if (section == config.end())
+        return;
+    for (int i = 0; i < PadButtonTotal; i++)
+        section->second.erase(PadLine(i));
+}
+
+std::span<const char* const> RumbleLevels() { return Rumble; }
+
+std::string RumbleLevel(const LauncherConfig& config, std::string_view gameId, int player)
+{
+    const std::string* value = Find(config, GameInputSection(gameId), player == 0 ? "rumble_p1" : "rumble_p2");
+    for (const char* level : Rumble)
+        if (value != nullptr && *value == level)
+            return level;
+    return "normal";
 }

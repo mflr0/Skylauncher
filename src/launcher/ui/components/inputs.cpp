@@ -247,7 +247,7 @@ namespace ui
         State state = ItemState(disabled);
         ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
         const float mid = std::round((min.y + max.y) / 2);
-        DrawText(draw, ImVec2(min.x + space::S, std::round(mid - CapMiddle(TextStyle::Body))), Col(disabled ? color::Dim : color::Ink), label);
+        DrawText(draw, ImVec2(min.x + space::S, std::round(mid - CapMiddle(TextStyle::Body))), Col(disabled ? color::Dim : color::Ink), label, LabelEnd(label));
         if (selected)
             DrawIcon(draw, Icon::Check, ImVec2(max.x - space::S - icon::Small / 2, mid), icon::Small, Col(Ctx().accent));
         draw->ChannelsSetCurrent(0);

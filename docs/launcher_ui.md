@@ -922,6 +922,8 @@ Swap Force not opened); with `pad` each page's first stop has its ring and the p
 `SKY_LAUNCHER_TEST_SIZE` and `SKY_LAUNCHER_TEST_SCALE=2` (a Retina screen's density, the same layout) set the rest
 (`docs/polish_audit.md`, "Model screens").
 `SKY_LAUNCHER_TEST_KEYS=1` shoots each game's Keyboard tab (`keys-ssa`, `keys-giants`, `keys-swapforce`; `SKY_LAUNCHER_LANGUAGE=fr` for the French ones).
+`SKY_LAUNCHER_TEST_PAD=1` shoots each game's Controller tab with a few buttons given other jobs (`pad-ssa`, `pad-giants`, `pad-swapforce`)
+and Swap Force's Game tab with Nightmare from the start on (`game-swapforce`).
 `SKY_LAUNCHER_TEST_LOGO=1` shoots each game's page (`logo-ssa`, `logo-giants`, `logo-swapforce`) from the art already cached in
 `SKYLANDERS_DATA`; `SKY_LAUNCHER_TEST_SIZE=<w>x<h>` sets the window (the default one, a large one).
 `SKY_LAUNCHER_TEST_UPDATE=1` with `SKY_LAUNCHER_UPDATE_URL=file://<fake latest.json>` shows the update screens (`20-` to `24-`).

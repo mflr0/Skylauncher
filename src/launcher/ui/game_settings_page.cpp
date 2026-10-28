@@ -31,6 +31,7 @@ namespace launcher_ui
             constexpr const char* OpenFigures = N_("Figures");
             constexpr const char* ResetKeys = N_("Reset to defaults");
             constexpr const char* ResetKeysHint = N_("Hold to reset every key of this game.");
+            constexpr const char* ResetPadHint = N_("Hold to give every button its own job back.");
         }
 
         // "12.3 GB" for what a button would free, nothing for less than a megabyte of noise.
@@ -65,7 +66,7 @@ namespace launcher_ui
         const char* title = GameName(m_s->game.id, GameNameForm::Full);
         BeginSettingsPage("##gamesettingscolumn", title != nullptr ? title : m_s->game.name, true);
 
-        static const char* const Tabs[] = { N_("Video"), N_("Keyboard"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
+        static const char* const Tabs[] = { N_("Video"), N_("Keyboard"), N_("Controller"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
         int tab = int(m_gameTab);
         DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
         m_gameTab = GameTab(tab);
@@ -74,6 +75,7 @@ namespace launcher_ui
         {
         case GameTab::Video: DrawGameVideo(); break;
         case GameTab::Keyboard: DrawGameKeyboard(); break;
+        case GameTab::Controller: DrawGameController(); break;
         case GameTab::Language: DrawGameLanguage(); break;
         case GameTab::Disc: DrawGameDisc(); break;
         case GameTab::Saves: DrawSaveBackups(); break;
@@ -278,6 +280,77 @@ namespace launcher_ui
             Set(section.c_str(), "seeded", "1");
             m_capturing = nullptr;
             Toast(Tr("Keyboard bindings reset"), ui::ToastKind::Success);
+        }
+    }
+
+    // The pad of this game: which button does the job of which, and the rumble. [<game>.input] holds them (pad_<button>,
+    // rumble_p1, rumble_p2); the runtime reads them from there at the game's start (game_keys.h). A settings row per button
+    // (its name, the game's word for its job after it, what it does now in the control column), the rumble, one Reset.
+    void App::DrawGameController()
+    {
+        const std::string& game = m_s->game.id;
+        const std::string section = GameInputSection(game);
+        const PadFamily family = PadFamilyNow();
+        ui::Text(ui::TextStyle::Body, Tr("Choose what each button does."), ui::color::Dim);
+        ImGui::Dummy(ImVec2(0, ui::space::XXS));
+
+        // "B (Attack 3 / Back)": a button as the pad prints it, then the game's word for its job.
+        auto describe = [&](int button) {
+            const std::string job = PadActionName(game, button), name = PadButtonLabel(button, family);
+            return job.empty() ? name : name + " (" + job + ")";
+        };
+        if (ui::BeginSettings("##padmap"))
+        {
+            for (int button = 0; button < PadButtonTotal; button++)
+            {
+                const std::string job = PadActionName(game, button);
+                const std::string note = job.empty() ? std::string() : "(" + job + ")";
+                const std::string name = PadButtonLabel(button, family);
+                ui::SettingRow(name.c_str(), nullptr, note.empty() ? nullptr : note.c_str());
+                const int target = PadTarget(m_config, game, button);
+                const std::string preview = target == button ? std::string(Tr("Its own job")) : target < 0 ? std::string(Tr("Nothing")) : describe(target);
+                ImGui::PushID(button);
+                if (ui::BeginSelect("##job", preview.c_str()))
+                {
+                    int chosen = -2;
+                    if (ui::SelectOption(Tr("Its own job"), target == button))
+                        chosen = button;
+                    for (int other = 0; other < PadButtonTotal; other++)
+                        if (other != button && ui::SelectOption((describe(other) + "##" + std::to_string(other)).c_str(), target == other))
+                            chosen = other;
+                    if (ui::SelectOption(Tr("Nothing"), target < 0))
+                        chosen = -1;
+                    ui::EndSelect();
+                    if (chosen != -2)
+                    {
+                        SetPadTarget(m_config, game, button, chosen);
+                        Set(section.c_str(), "seeded", "1");
+                    }
+                }
+                ImGui::PopID();
+            }
+            ui::EndSettings();
+        }
+
+        ui::SectionHeader(Tr("Rumble"));
+        if (ui::BeginSettings("##rumble"))
+        {
+            ui::SettingRow(Tr("Player 1"), nullptr);
+            SettingSelect("##rumble1", section.c_str(), "rumble_p1", RumbleChoices, 2);
+            ui::SettingRow(Tr("Player 2"), nullptr);
+            SettingSelect("##rumble2", section.c_str(), "rumble_p2", RumbleChoices, 2);
+            ui::EndSettings();
+        }
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::ButtonOptions reset;
+        reset.kind = ui::ButtonKind::Danger;
+        reset.hold = true;
+        reset.tooltip = Tr(strings::ResetPadHint);
+        if (ui::Button(Tr(strings::ResetKeys), reset))
+        {
+            ResetPadMap(m_config, game);
+            Set(section.c_str(), "seeded", "1");
+            Toast(Tr("Controller buttons reset"), ui::ToastKind::Success);
         }
     }
 
@@ -515,7 +588,22 @@ namespace launcher_ui
             return options;
         };
 
-        ui::SectionHeader(Tr("Desktop shortcut"), m_s->disc != DiscState::Ready ? Tr("Choose the disc image first.") : nullptr, false);
+        const bool swapForce = m_s->game.id == std::string_view("swapforce");
+        if (swapForce)
+        {
+            // The only game with a locked difficulty: Nightmare is offered at once, the save is not changed ([swapforce] in launcher.ini).
+            ui::SectionHeader(Tr("Difficulty"), nullptr, false);
+            if (ui::BeginSettings("##nightmare"))
+            {
+                ui::SettingRow(Tr("Nightmare from the start"), Tr("Offered before you beat the game. Your save is not changed."));
+                bool value = ParseBool(SettingGet(m_config, m_s->game.id, "nightmare_from_start", "0"));
+                if (ui::Toggle("##nightmarefromstart", &value))
+                    Set(m_s->game.id, "nightmare_from_start", value ? "1" : "0");
+                ui::EndSettings();
+            }
+        }
+
+        ui::SectionHeader(Tr("Desktop shortcut"), m_s->disc != DiscState::Ready ? Tr("Choose the disc image first.") : nullptr, swapForce);
         ui::ButtonOptions shortcut;
         shortcut.disabled = m_s->disc != DiscState::Ready;
         if (ui::Button(Tr("Create"), shortcut))
