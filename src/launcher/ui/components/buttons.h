@@ -55,6 +55,7 @@ namespace ui
         bool selected = false;
         bool disabled = false;
         bool overArt = false;
+        ImTextureRef image;       // a picture in place of the icon (a brand's mark), tinted with the ink
     };
     bool IconButton(const char* id, Icon icon, const char* tooltip, const IconButtonOptions& options = {});
 

@@ -51,6 +51,11 @@ namespace ui
             DrawIcon(draw, options.icon, ImVec2(x + type::Label / 2, mid), type::Label, Col(color::InkSoft));
             x += type::Label + space::S;
         }
+        if (options.image)
+        {
+            options.image(draw, ImVec2(x, min.y + space::XS), ImVec2(options.imageWidth, h - 2 * space::XS));
+            x += options.imageWidth + space::S;
+        }
         if (options.chevron)
         {
             DrawIcon(draw, Icon::ChevronRight, ImVec2(right - 5, mid), 12, Col(color::Dim));
@@ -66,22 +71,56 @@ namespace ui
         }
         // The title (and subtitle) cut with "..." before the trailing part, never under it.
         const float room = right - x;
+        const unsigned titleInk = options.dim ? color::Dim : color::Ink;
+        float noteW = 0;
+        if (options.note != nullptr)
+        {
+            PushText(TextStyle::Caption);
+            noteW = ImGui::CalcTextSize(options.note).x + space::XS;
+            PopText();
+            PushText(TextStyle::Body, options.subtitle != nullptr);
+            if (ImGui::CalcTextSize(title).x + noteW > room) // the name comes first: a note that would cut it is left out
+                noteW = 0;
+            PopText();
+        }
+        auto drawTitle = [&](float y, bool bold, TextStyle style) {
+            PushText(style, bold);
+            const std::string shown = Ellipsize(title, room - noteW);
+            DrawText(draw, ImVec2(x, y), Col(titleInk), shown.c_str());
+            const float end = x + ImGui::CalcTextSize(shown.c_str()).x;
+            PopText();
+            if (options.note != nullptr && noteW > 0)
+            {
+                PushText(TextStyle::Caption);
+                DrawText(draw, ImVec2(end + space::XS, y + (SizeOf(style) - ImGui::GetFontSize()) * 0.6f), Col(color::InkSoft), options.note);
+                PopText();
+            }
+        };
         if (options.subtitle != nullptr)
         {
             const float titleH = type::Body;
             const float subH = type::Caption, gap = space::XXS, top = std::round(mid - (titleH + gap + subH) / 2);
-            PushText(TextStyle::Body, true);
-            DrawText(draw, ImVec2(x, top), Col(color::Ink), Ellipsize(title, room).c_str());
-            PopText();
+            drawTitle(top, true, TextStyle::Body);
+            float subX = x;
+            if (options.status != nullptr)
+            {
+                DrawStatusIcon(draw, *options.status, ImVec2(x + subH / 2, top + titleH + gap + subH / 2 + 1), subH);
+                subX += subH + space::XXS;
+            }
             PushText(TextStyle::Caption);
-            DrawText(draw, ImVec2(x, top + titleH + gap), Col(color::Dim), Ellipsize(options.subtitle, room).c_str());
+            DrawText(draw, ImVec2(subX, top + titleH + gap), Col(color::Dim), Ellipsize(options.subtitle, room - (subX - x)).c_str());
             PopText();
         }
         else
+            drawTitle(mid - SizeOf(TextStyle::Body) / 2, false, TextStyle::Body);
+        if (options.progress >= 0)
         {
-            PushText(TextStyle::Body);
-            DrawText(draw, ImVec2(x, mid - ImGui::GetFontSize() / 2), Col(color::Ink), Ellipsize(title, room).c_str());
-            PopText();
+            const float barLeft = x, barRight = max.x - space::S, y = max.y - space::XS + 1;
+            draw->AddRectFilled(ImVec2(barLeft, y), ImVec2(barRight, y + stroke::Selection), Col(color::Hairline), stroke::Selection / 2);
+            const float fill = std::floor(barLeft + (barRight - barLeft) * std::min(options.progress, 1.0f));
+            if (fill > barLeft)
+                draw->AddRectFilled(ImVec2(barLeft, y), ImVec2(std::max(fill, barLeft + stroke::Selection), y + stroke::Selection),
+                    Col(options.progressColor != 0 ? options.progressColor : color::AccentFill), stroke::Selection / 2);
         }
         ImGui::EndDisabled();
         FocusRingIf(state, radius::Control);
@@ -270,16 +309,17 @@ namespace ui
 
     namespace
     {
-        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59; // "MENX", "MENY": where a menu opens, by its id
+        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59, AnchorAbove = 0x4D454E5A; // "MENX", "MENY", "MENZ": where a menu opens, by its id
         constexpr float IconSlot = space::L; // a menu row's room for its icon or check, kept when it has none (the labels align)
     }
 
-    void OpenMenu(const char* id)
+    void OpenMenu(const char* id, bool above)
     {
         ImGuiStorage* storage = ImGui::GetStateStorage();
         const ImGuiID key = ImGui::GetID(id);
         storage->SetFloat(key ^ AnchorX, ImGui::GetItemRectMin().x);
-        storage->SetFloat(key ^ AnchorY, ImGui::GetItemRectMax().y + space::XS);
+        storage->SetFloat(key ^ AnchorY, above ? ImGui::GetItemRectMin().y - space::XS : ImGui::GetItemRectMax().y + space::XS);
+        storage->SetBool(key ^ AnchorAbove, above);
         ImGui::OpenPopup(id);
     }
 
@@ -288,7 +328,8 @@ namespace ui
         ImGuiStorage* storage = ImGui::GetStateStorage();
         const ImGuiID key = ImGui::GetID(id);
         if (ImGui::IsPopupOpen(id))
-            ImGui::SetNextWindowPos(ImVec2(storage->GetFloat(key ^ AnchorX), storage->GetFloat(key ^ AnchorY)), ImGuiCond_Appearing);
+            ImGui::SetNextWindowPos(ImVec2(storage->GetFloat(key ^ AnchorX), storage->GetFloat(key ^ AnchorY)), ImGuiCond_Appearing,
+                ImVec2(0, storage->GetBool(key ^ AnchorAbove) ? 1.0f : 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(space::XS, space::XS));
         ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, radius::Control);
         ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, elevation::Raised.border);

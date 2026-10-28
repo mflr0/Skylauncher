@@ -206,7 +206,12 @@ namespace ui
         ImDrawList* draw = ImGui::GetWindowDrawList();
         DrawFace(draw, min, max, h / 2, paint);
         ImVec2 centre(std::round((min.x + max.x) / 2), std::round((min.y + max.y) / 2) + (state.pressed ? 1.0f : 0.0f));
-        DrawIcon(draw, icon, centre, std::round(h * 0.45f), Col(paint.ink), Col(paint.fill, paint.fillAlpha > 0 ? 1.0f : 0.0f));
+        const float mark = std::round(h * 0.45f);
+        if (options.image.GetTexID() != ImTextureID_Invalid)
+            draw->AddImage(options.image, ImVec2(centre.x - mark / 2, centre.y - mark / 2), ImVec2(centre.x + mark / 2, centre.y + mark / 2),
+                ImVec2(0, 0), ImVec2(1, 1), Col(paint.ink));
+        else
+            DrawIcon(draw, icon, centre, mark, Col(paint.ink), Col(paint.fill, paint.fillAlpha > 0 ? 1.0f : 0.0f));
         ImGui::EndDisabled();
         FocusRingIf(state, h / 2);
         if (tooltip != nullptr && WantsTooltip(state))

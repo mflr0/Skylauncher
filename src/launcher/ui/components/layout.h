@@ -3,6 +3,8 @@
 // What holds and arranges: Card, ListRow, SectionHeader, Modal (one dialog shell: title, body, actions), Menu (a popover),
 // Tooltip and EmptyState.
 #include "launcher/ui/components/core.h"
+#include "launcher/ui/components/feedback.h"
+#include <functional>
 
 namespace ui
 {
@@ -28,6 +30,15 @@ namespace ui
         bool selected = false;
         bool disabled = false;
         float width = -1;
+        // An image at the row's left (a game's logo, an initial): drawn by the caller in `imageWidth` points of the row's
+        // height, called with the box's top left and size. The sidebar's rows have one.
+        std::function<void(ImDrawList*, ImVec2 at, ImVec2 size)> image;
+        float imageWidth = 0;
+        const char* note = nullptr;     // a small word after the title (a version)
+        const Status* status = nullptr; // the shape of the subtitle's state, before it
+        float progress = -1;            // 0..1: a thin bar along the row's foot (an install running)
+        unsigned progressColor = 0;     // its fill; 0: the accent
+        bool dim = false;               // the title in the dim ink (a game not out yet)
     };
     bool ListRow(const char* title, const ListRowOptions& options = {});
 
@@ -57,7 +68,8 @@ namespace ui
         ModalKind kind = ModalKind::Normal);
 
     // ---- Menu: a popover under the item that opens it, with its rows. ----
-    void OpenMenu(const char* id); // after the item that opens it: the menu opens under that item
+    // After the item that opens it: the menu opens under that item, or above it (`above`: an item at the window's foot, a band).
+    void OpenMenu(const char* id, bool above = false);
     bool BeginMenu(const char* id);
     struct MenuItemOptions
     {
