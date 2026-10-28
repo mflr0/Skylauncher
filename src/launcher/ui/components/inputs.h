@@ -30,6 +30,7 @@ namespace ui
         bool disabled = false;
     };
     bool BeginSelect(const char* id, const char* preview, const SelectOptions& options = {});
+    float SelectWidth(const char* longest); // a select as narrow as can show `longest` uncut
     bool SelectOption(const char* label, bool selected, bool disabled = false);
     void EndSelect();
 

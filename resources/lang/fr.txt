@@ -468,7 +468,7 @@ Move to the trash	Mettre à la corbeille
 Move {} to the trash? It stays there for 30 days.	Mettre {} à la corbeille ? Elle y reste 30 jours.
 Name	Nom
 Name, element, game, level...	Nom, élément, jeu, niveau...
-Next start: {}	Prochain lancement : {}
+On the portal for	Sur le portail pour
 No figures yet. Add one, or drop your figure files on the window.	Aucune figurine. Ajoutez-en une, ou déposez vos fichiers de figurines sur la fenêtre.
 Reset	Réinitialiser
 Restore a backup...	Restaurer une copie de secours...

@@ -192,6 +192,11 @@ namespace ui
         constexpr int SelectVars = 3, SelectColors = 2; // pushed for the list while it is open
     }
 
+    float SelectWidth(const char* longest)
+    {
+        return std::ceil(TextSize(TextStyle::Body, longest).x + space::M + space::XS + icon::Small + space::S + 1);
+    }
+
     bool BeginSelect(const char* id, const char* preview, const SelectOptions& options)
     {
         ImDrawList* draw = ImGui::GetWindowDrawList(); // the box's window, not the list's

@@ -544,8 +544,10 @@ namespace launcher_ui
     {
         // The page's own parts, sized from the tokens.
         constexpr float PageMax = 1180;                    // the widest the page's column gets
-        constexpr float SeatHeight = ui::height::Main;
         constexpr float SeatPicture = ui::height::Normal;
+        constexpr float SeatPad = ui::space::M;                        // inside a seat, round its picture and its lines
+        constexpr float SeatHeight = SeatPicture + 2 * SeatPad;
+        constexpr float SeatGap = ui::space::M;                        // between the seats
         constexpr float ShelfCell = 2 * ui::height::Main;  // the narrowest a figure's card gets
         constexpr float ShelfGap = ui::space::XS;
         constexpr float FilterPanel = ui::height::SettingControl + 2 * ui::height::Main;
@@ -667,7 +669,15 @@ namespace launcher_ui
             }
             ui::EndMenu();
         }
-        ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + row + ui::space::XS));
+        // What the page holds, under the title.
+        ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + row + ui::space::XXS));
+        const int shown = int(m_model.figures.size()) - m_hiddenStarters;
+        const size_t favourites = std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return f.favourite; });
+        std::string summary = collection::FigureCount(shown, French());
+        if (favourites > 0)
+            summary += favourites == 1 ? Tf(" · {} favourite", favourites) : Tf(" · {} favourites", favourites);
+        ui::Text(ui::TextStyle::Caption, summary.c_str(), ui::color::InkSoft, -1);
+        ImGui::SetCursorScreenPos(ImVec2(top.x, ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y + ui::space::L));
     }
 
     void CollectionPage::DrawSeatMenu()
@@ -698,28 +708,18 @@ namespace launcher_ui
         const std::string live = m_model.RunningGame() == m_model.gameId ? m_model.gameId : std::string();
         const bool editable = m_model.CanEditSeats();
 
-        // What the page holds (or the game that is running), and the game the seats are for (the games that can start with
-        // prepared seats).
+        // Over the seats: the game they are for (the games that can start with prepared seats), and the game running, if it is
+        // that one (its Toy Box has the portal then).
         const ImVec2 line = ImGui::GetCursorScreenPos();
-        if (!live.empty())
-            ui::StatusPill(ui::Status::Info, Tf("{} is running: use its Toy Box", ShortGameName(live)).c_str());
-        else
-        {
-            const int shown = int(m_model.figures.size()) - m_hiddenStarters;
-            const size_t favourites = std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return f.favourite; });
-            std::string summary = collection::FigureCount(shown, French());
-            if (favourites > 0)
-                summary += favourites == 1 ? Tf(" · {} favourite", favourites) : Tf(" · {} favourites", favourites);
-            ImGui::SetCursorScreenPos(ImVec2(line.x, line.y + (ui::height::Normal - ui::type::Caption) / 2));
-            ui::Text(ui::TextStyle::Caption, summary.c_str(), ui::color::InkSoft, -1);
-        }
-        const std::string preview = Tf("Next start: {}", ShortGameName(m_model.gameId));
-        ui::PushText(ui::TextStyle::Body);
+        const float textY = std::round(line.y + ui::height::Normal / 2 - ui::CapMiddle(ui::TextStyle::Body));
+        ImGui::SetCursorScreenPos(ImVec2(line.x, textY));
+        ui::Text(ui::TextStyle::Body, Tr("On the portal for"), ui::color::InkSoft, -1);
         ui::SelectOptions selectOptions;
-        selectOptions.width = ImGui::CalcTextSize(preview.c_str()).x + ui::space::XXL;
-        ui::PopText();
-        ImGui::SetCursorScreenPos(ImVec2(line.x + width - selectOptions.width, line.y));
-        if (ui::BeginSelect("##portalgame", preview.c_str(), selectOptions))
+        for (const collection::Game& g : collection::Catalogue::Get().Games())
+            if (!SessionFile(g).empty())
+                selectOptions.width = std::max(selectOptions.width, ui::SelectWidth(ShortGameName(g.id).c_str()));
+        ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + ui::space::XS, line.y));
+        if (ui::BeginSelect("##portalgame", ShortGameName(m_model.gameId).c_str(), selectOptions))
         {
             for (const collection::Game& g : collection::Catalogue::Get().Games())
                 if (!SessionFile(g).empty() && ui::SelectOption(ShortGameName(g.id).c_str(), g.id == m_model.gameId))
@@ -728,23 +728,28 @@ namespace launcher_ui
         }
         else
             ui::Tooltip(Tr("The figures on the portal when the game starts"));
-        ImGui::SetCursorScreenPos(ImVec2(line.x, line.y + ui::height::Normal + ui::space::XS));
+        if (!live.empty())
+        {
+            ImGui::SetCursorScreenPos(ImVec2(ImGui::GetItemRectMax().x + ui::space::M, std::round(line.y + (ui::height::Normal - ui::PillHeight) / 2)));
+            ui::StatusPill(ui::Status::Info, Tf("{} is running: use its Toy Box", ShortGameName(live)).c_str());
+        }
+        ImGui::SetCursorScreenPos(ImVec2(line.x, line.y + ui::height::Normal + ui::space::S));
         if (game == nullptr)
             return;
 
         const size_t count = game->seats.size();
-        const float w = (width - ui::space::S * float(count - 1)) / float(count);
+        const float w = std::floor((width - SeatGap * float(count - 1)) / float(count));
         const ImVec2 row = ImGui::GetCursorScreenPos();
         m_navSeat = m_hoverSeat = -1;
         m_crossAt.assign(count, ImVec2(-1, -1));
         for (size_t i = 0; i < count; i++)
         {
-            const ImVec2 at(row.x + float(i) * (w + ui::space::S), row.y), end(at.x + w, at.y + SeatHeight);
+            const ImVec2 at(row.x + float(i) * (w + SeatGap), row.y), end(i + 1 == count ? row.x + width : at.x + w, at.y + SeatHeight);
             ImGui::SetCursorScreenPos(at);
             ImGui::PushID(int(i));
             // The X is submitted over the seat: without this the seat keeps the hover and the X never sees the pointer.
             ImGui::SetNextItemAllowOverlap();
-            if (ui::Hit("##seat", ImVec2(w, SeatHeight)))
+            if (ui::Hit("##seat", ImVec2(end.x - at.x, SeatHeight)))
                 Choose(m_choosing == int(i) ? -1 : int(i));
             if (m_focusSeat == int(i))
             {
@@ -786,9 +791,9 @@ namespace launcher_ui
             draw->AddRectFilled(at, end, CardFill(choosing || hovered || nav), ui::radius::Card);
             draw->AddRect(at, end, ui::Col(choosing ? ui::color::AccentFill : hovered ? ui::color::Edge : ui::color::Hairline), ui::radius::Card, 0,
                 choosing ? ui::stroke::Edge : ui::stroke::Hairline);
-            const ImVec2 picture(at.x + ui::space::S, at.y + (SeatHeight - SeatPicture) / 2);
+            const ImVec2 picture(at.x + SeatPad, at.y + SeatPad);
             // Three lines beside the picture: the seat (leaving room for the X at the corner), the figure's name, its level.
-            const float tx = picture.x + SeatPicture + ui::space::XS, room = end.x - tx - ui::space::S;
+            const float tx = picture.x + SeatPicture + ui::space::S, room = end.x - tx - SeatPad;
             const bool cross = occupied && editable && !(figure != nullptr && Busy(*figure));
             const float crossRoom = room - (cross ? ui::space::L : 0);
             const float top = at.y + std::round((SeatHeight - (2 * ui::type::Caption + ui::type::Body + 2 * ui::space::XXS)) / 2);

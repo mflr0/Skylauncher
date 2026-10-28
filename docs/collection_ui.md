@@ -88,7 +88,8 @@ At the first visit to the page (`CollectionPage::Open`):
   slot *i* (`WriteSeats`) and reads it back (`ReadSeats`): a figure goes to its slot's seat when it fits, else to the
   first seat that takes it (as the Toy Box does). The seats are per game (`catalogue.json` `games[].seats`). Swap Force's
   portal has six slots (see "Swappers"): `SeatFirstSlot` and `SlotSeat` map the seats to them.
-- **Which games**: the select above the seats ("Next start: Spyro's Adventure", with a tooltip) lists the games that can start with prepared seats,
+- **Which games**: over the seats, "On the portal for" and a Select ("Spyro's Adventure", as narrow as the longest name, with a
+  tooltip) lists the games that can start with prepared seats,
   those the launcher has a runtime for (`SessionFile` not empty): Spyro's Adventure, Giants (Player 1, Player 2, Item or
   adventure) and Swap Force (Player 1, Player 2, Magic item, Adventure). The page opens on the game chosen in the sidebar
   when it is one of them.
@@ -100,11 +101,11 @@ At the first visit to the page (`CollectionPage::Open`):
   where it is; `SKY_LAUNCHER_TEST_SEATX` checks all four seats by mouse, keyboard and pad), Delete or the pad's X on a
   focused tile (or Delete with the mouse over it), the tile's right-click menu ("Take it off", "Choose another", "Open its
   sheet"), or dragging the tile onto the shelf. A seat whose figure is gone shows "Missing figure" and can be emptied.
-- **A tile** (a card, `height::Main` high): the picture, then three lines: the seat's name (blue while choosing for it), the
+- **A tile** (a card, its picture with M round it: 72 points high; M between the tiles): the picture, then three lines: the seat's name (blue while choosing for it), the
   figure's name, its level for that game ("Level 10 (15)"); empty: a `+`, "Empty", "Choose". The X is an `IconButton`
   (`Icon::Cross`, tooltip "Take it off") at the corner.
 - **Live**: figures a game holds (JSON lock of a live process) read "Playing now"; while the shown game runs a status pill
-  "Spyro's Adventure is running: use its Toy Box" takes the place of the count above the seats, the seats are
+  "Spyro's Adventure is running: use its Toy Box" follows the game's Select above the seats, the seats are
   read-only and Edit, Reset, Delete are disabled for those figures (favourites and names stay editable). "Mark as not in
   use" (held) breaks a stale lock.
 - Refresh: every 1.5 s the model compares a signature of the folder (names, sizes, times of dumps, locks,
@@ -117,8 +118,9 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Header** (phase B, on the component library; `docs/launcher_ui.md`): the title "Collection" with the real portal's
   state ("Portal: not detected") beside it, `+ Add a figure` (Primary) and **Manage** (a Secondary button with a chevron,
   its menu right-aligned under it: Trash, Backups, Import and export, Unknown toys, Tidy the starters: Manage on that tab;
-  Show the collection folder). The line under it: "14 figures · 3 favourites" at the left, the game the seats are for at
-  the right, then the seats, then the bar: the shelf starts at about a third of a 720-point window.
+  Show the collection folder); the buttons have the line to themselves. Under the title, a Caption: "14 figures · 3
+  favourites". L below: "On the portal for [Spyro's Adventure]" (the game the seats are for), S below it the seats, then
+  the bar.
 - **The seats** (above).
 - **The bar** (2026-10-27, the Toy Box's too, same words and order; `docs/runtime/host/toybox_ux.md` of the game's repo
   holds the design): the **search field** first and wide ("Name, element, game, level..."), then the **order** (a Select,
