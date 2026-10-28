@@ -239,6 +239,7 @@ Play {}	Jouer à {}
 Play {} with Arkeyan Launcher	Jouer à {} avec Arkeyan Launcher
 Plug in the portal, then test it.	Branchez le portail, puis testez-le.
 Portal	Portail
+No portal	Sans portail
 Portal of Power	Portail des Pouvoirs
 Problem report	Rapport de problème
 Portal: not detected	Portail : non détecté
@@ -704,10 +705,8 @@ Couldn't change it: 	Impossible de le changer :
 Changed	Changé
 UPDATE	MISE À JOUR
 Play without updating	Jouer sans mettre à jour
-Update {} to {}: {}, up to about {} min.	Mise à jour de {} à {} : {}, jusqu'à environ {} min.
-Update to {}: {}, up to about {} min.	Mise à jour vers {} : {}, jusqu'à environ {} min.
-no download	aucun téléchargement
-{} download	{} à télécharger
+{} · {} · ~{} min	{} · {} · ~{} min
+{} · ~{} min	{} · ~{} min
 Remove Arkeyan Launcher	Retirer Arkeyan Launcher
 Uninstall everything...	Tout désinstaller...
 Uninstall everything	Tout désinstaller
@@ -842,7 +841,6 @@ Offered before you beat the game. Your save is not changed.	Proposé avant d'avo
 
 # Achievements and play time (the game page, Achievements)
 Achievements	Succès
-Achievements {}/{}	Succès {}/{}
 Hidden achievement	Succès caché
 The list comes from your disc: it appears once the game's disc image is checked.	La liste vient de votre disque : elle apparaît une fois l'image disque du jeu vérifiée.
 {} of {} unlocked · {} of {} G	{} sur {} débloqués · {} sur {} G

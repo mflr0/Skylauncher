@@ -1529,8 +1529,6 @@ namespace launcher_ui
             ImGui::PopFont();
         }
 
-        // The play time (kept by the game itself: collection/progress.h), in the disc block once the disc is read.
-        const std::string played = PlayTimeLine(m_progress.play, int64_t(std::time(nullptr)));
         const SlotLine state = SlotStatus(m_s);
         const bool ready = m_s->disc == DiscState::Ready, verifying = state.state == SlotState::Checking, installing = Installing();
         const bool install = ready && NeedsInstall();
@@ -1652,62 +1650,13 @@ namespace launcher_ui
                     ui::ProgressBar(m_s->verify.progress, -1, true);
                 break;
             case DiscState::Ready:
-            {
-                // The disc's state, and at the row's right the game's achievements (the list from the disc, once a disc check of
-                // this version read it): the row is the button's height, the pill centred on it.
-                const bool achievements = m_progress.hasList && !installing;
-                const ImVec2 row = ImGui::GetCursorScreenPos();
-                if (achievements)
-                {
-                    const std::string label = Tf("Achievements {}/{}", m_progress.unlocked, m_progress.rows.size());
-                    const ui::ButtonOptions options{ .size = ui::Size::Small, .icon = ui::Icon::Trophy };
-                    ImGui::SetCursorScreenPos(ImVec2(top.x + blockW - 2 * ui::space::M - ui::ButtonWidth(label.c_str(), options), row.y));
-                    if (ui::Button(label.c_str(), options))
-                        GoTo(Page::Achievements);
-                    ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + (ui::height::Small - ui::PillHeight) / 2));
-                }
                 ui::StatusPill(ui::Status::Success, (m_s->fromCopy ? Tf("Game data copied: {}", LauncherFormatSize(m_s->discSize))
                                                                    : Tf("Disc verified: {}", LauncherFormatSize(m_s->discSize))).c_str());
-                if (achievements) // the row ends under the button (an item ends a moved cursor)
-                {
-                    ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + ui::height::Small));
-                    ImGui::Dummy(ImVec2(0, 0));
-                }
-                if (!played.empty() && !m_s->installView)
-                    ui::Text(ui::TextStyle::Body, played.c_str(), ui::color::InkSoft);
                 if (!m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
                     ui::StatusPill(ui::Status::Error, Tr("Game data damaged: using the disc image."));
                 if (NeedsInstall())
-                {
                     ui::Text(ui::TextStyle::Body, Tf("Builds the game on your PC: about {} min, {} GB, internet needed once.", InstallMinutesFor(m_s->game.id), InstallGigabytes).c_str(), ui::color::InkSoft);
-                }
-                else if (UpdateAvailable())
-                {
-                    // What UPDATE does: from the built version to the published one, the download (the kit, if it is not here yet)
-                    // and the time, then a quiet button to play what is built (offline, in a hurry).
-                    const GameUpdate* pending = PendingUpdate(*m_s);
-                    std::string size = Tr("no download");
-                    if (KitNeedsFetch(*m_s))
-                    {
-                        const ReleaseInfo kit = m_updates.Snapshot().kit;
-                        if (const ReleaseAsset* asset = FindAsset(kit, KitAssetName()); asset != nullptr && asset->size > 0)
-                            size = Tf("{} download", LauncherFormatSize(asset->size));
-                    }
-                    ui::Text(ui::TextStyle::Body, (m_s->installed.gameVersion.empty()
-                            ? Tf("Update to {}: {}, up to about {} min.", pending->version, size, InstallMinutesFor(m_s->game.id))
-                            : Tf("Update {} to {}: {}, up to about {} min.", m_s->installed.gameVersion, pending->version, size, InstallMinutesFor(m_s->game.id))).c_str(),
-                        ui::color::InkSoft);
-                    if (!Installing())
-                    {
-                        if (ui::Button(Tr("Play without updating"), { .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small }) || m_testPlayWithout)
-                        {
-                            m_testPlayWithout = false;
-                            m_s->skipUpdate = true;
-                        }
-                    }
-                }
                 break;
-            }
             case DiscState::Failed:
                 if (m_s->check.message.empty())
                     ui::StatusPill(ui::Status::Error, state.text.c_str());
@@ -1726,18 +1675,82 @@ namespace launcher_ui
             ui::EndCard();
         }
 
-        // Bottom band: the controller and the main button in the middle.
+        // Over the art, top right: the play time and the achievements in one pill ("12 h 34 · trophy 6/38"), which opens the
+        // Achievements page once the disc check cached their list. The room on its left is kept for the sound's button.
+        if (!m_s->installView && m_progress.hasList)
+        {
+            const std::string count = fmt::format("{}/{}", m_progress.unlocked, m_progress.rows.size());
+            const bool played = m_progress.play.sessions > 0 || m_progress.play.totalSeconds > 0;
+            const std::string time = played ? FormatPlayTime(m_progress.play.totalSeconds) : std::string();
+            std::string tooltip = Tr("Achievements");
+            if (m_progress.play.lastEnd > 0)
+                tooltip += "\n" + Tf("Last played: {}", FormatLastPlayed(m_progress.play.lastEnd, int64_t(std::time(nullptr))));
+            ui::PillOptions progress;
+            progress.icon = ui::Icon::Trophy;
+            progress.prefix = played ? time.c_str() : nullptr;
+            progress.overArt = true;
+            progress.tooltip = tooltip.c_str();
+            const std::string id = count + "##progress";
+            ImGui::SetCursorScreenPos(ImVec2(end.x - ui::space::XL - ui::PillWidth(id.c_str(), progress), position.y + ui::space::XL));
+            if (ui::Pill(id.c_str(), progress))
+                GoTo(Page::Achievements);
+        }
+
+        // Bottom band: one row on the main action's middle line, centred in the band on whole points: the controller picker and
+        // the portal's state (two pills, as high), then the action button (the main action and the game's settings), S apart.
+        // While an update is offered, under the action: what it brings (the version, the download, the time), then Play without
+        // updating; the row and those lines are centred in the band together.
         const ImVec2 bar(position.x, end.y), barEnd(end.x, position.y + available.y);
         ui::GradientRect(draw, bar, barEnd, Rgb(BottomBarTop), Rgb(BottomBar), 0);
         draw->AddLine(bar, ImVec2(barEnd.x, bar.y), ui::Col(ui::color::Ink, 0.1f), ui::stroke::Hairline);
-        const float middle = bar.y + BottomBarH / 2;
 
-        const char* label = state.button;
-        // The band's group, centred in it on whole points (crisp edges at any scale): the controller picker, then the
-        // action button (the main action and the game's settings). The smallest window fits it.
-        const float groupW = ControllerW + ControllerGap + PlayButtonW + PlayGearW;
-        const float groupX = std::floor(bar.x + (barEnd.x - bar.x - groupW) / 2), buttonY = std::floor(middle - PlayButtonH / 2);
-        const float mainX = groupX + ControllerW + ControllerGap;
+        const GameUpdate* pending = update && !installing && state.buttonEnabled ? PendingUpdate(*m_s) : nullptr;
+        std::string offer;
+        if (pending != nullptr)
+        {
+            std::string size;
+            if (KitNeedsFetch(*m_s))
+            {
+                const ReleaseInfo kit = m_updates.Snapshot().kit;
+                if (const ReleaseAsset* asset = FindAsset(kit, KitAssetName()); asset != nullptr && asset->size > 0)
+                    size = LauncherFormatSize(asset->size);
+            }
+            offer = size.empty() ? Tf("{} \xC2\xB7 ~{} min", pending->version, InstallMinutesFor(m_s->game.id))
+                                 : Tf("{} \xC2\xB7 {} \xC2\xB7 ~{} min", pending->version, size, InstallMinutesFor(m_s->game.id));
+        }
+        const ui::ButtonOptions without{ .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small, .overArt = true };
+        const float offerH = pending != nullptr ? ui::space::XS + ui::type::Caption + ui::space::XXS + ui::height::Small : 0;
+        const float buttonY = std::floor(bar.y + (BottomBarH - PlayButtonH - offerH) / 2), middle = buttonY + PlayButtonH / 2;
+
+        // The two pills: the device (a menu of the others above it), the portal (Launcher settings > Controls).
+        const std::string device = CurrentDevice();
+        const std::string deviceName = device == "auto" ? Tr("Automatic") : device == "keyboard" ? Tr("Keyboard") : LauncherMiddleEllipsis(DeviceLabel(), 13);
+        const std::string pickerId = deviceName + "##controller";
+        const std::string pickerTip = Tf("Controller: {}", DeviceLabel());
+        ui::PillOptions picker;
+        picker.icon = ui::Icon::Gamepad;
+        picker.trailing = ui::Icon::ChevronDown;
+        picker.overArt = true;
+        picker.tooltip = pickerTip.c_str();
+        const float pickerW = std::min(ui::PillWidth(pickerId.c_str(), picker), ControllerW);
+        picker.width = pickerW;
+        const launcher_portal::Status portal = m_portal.Current();
+        const bool portalShown = !portal.Line().empty();
+        const std::string portalId = std::string(portal.connected ? Tr("Portal") : Tr("No portal")) + "##portal";
+        const std::string portalTip = portal.Line() + "\n" + Tr(strings::PortalTip);
+        ui::PillOptions portalPill;
+        portalPill.icon = portal.connected ? ui::IconOf(ui::Status::Success) : ui::IconOf(ui::Status::Neutral);
+        portalPill.iconColor = ui::ColorOf(portal.connected ? ui::Status::Success : ui::Status::Neutral);
+        portalPill.overArt = true;
+        portalPill.tooltip = portalTip.c_str();
+        // As wide in both states: the row doesn't move when a portal is plugged in.
+        portalPill.width = std::max(ui::PillWidth((std::string(Tr("Portal")) + "##w").c_str(), portalPill), ui::PillWidth((std::string(Tr("No portal")) + "##w").c_str(), portalPill));
+        const float gap = ui::space::S, portalW = portalShown ? portalPill.width + gap : 0;
+        const float groupW = pickerW + gap + portalW + PlayButtonW + PlayGearW;
+        const float groupX = std::floor(bar.x + (barEnd.x - bar.x - groupW) / 2);
+        const float mainX = groupX + pickerW + gap + portalW, pillY = std::floor(middle - ui::height::Small / 2);
+
+        const char* label = state.button.c_str();
         if (m_testSidebar)
             m_drawn["button"] = std::string(label) + (state.buttonEnabled ? "" : " (off)");
         MainAction action{ label, state.buttonEnabled && !m_testButtonsOff };
@@ -1765,45 +1778,56 @@ namespace launcher_ui
             break;
         }
 
-        // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
+        // The update on offer under the action, centred on it: what it brings, then the quiet way round it.
+        if (pending != nullptr)
         {
-            const std::string device = CurrentDevice();
-            const std::string deviceName = device == "auto" ? Tr("Automatic") : device == "keyboard" ? Tr("Keyboard") : LauncherMiddleEllipsis(DeviceLabel(), 13);
-            // On the main action's middle line; the pad icon says what it picks (the tooltip says it in words).
-            const float pillY = std::floor(middle - ui::HeightOf(ui::Size::Small) / 2);
-            ImGui::SetCursorScreenPos(ImVec2(groupX, pillY));
-            ui::PillOptions picker;
-            picker.icon = ui::Icon::Gamepad;
-            picker.trailing = ui::Icon::ChevronDown;
-            picker.overArt = true;
-            picker.width = ControllerW;
-            const std::string tooltip = Tf("Controller: {}", DeviceLabel());
-            picker.tooltip = tooltip.c_str();
-            if (ui::Pill((deviceName + "##controller").c_str(), picker) || m_testControllers)
+            const float actionW = PlayButtonW + PlayGearW, centre = mainX + actionW / 2;
+            float y = buttonY + PlayButtonH + ui::space::XS;
+            ui::PushText(ui::TextStyle::Caption);
+            ui::DrawText(draw, ImVec2(std::round(centre - ImGui::CalcTextSize(offer.c_str()).x / 2), y), ui::Col(ui::color::InkSoft), offer.c_str());
+            ui::PopText();
+            y += ui::type::Caption + ui::space::XXS;
+            ImGui::SetCursorScreenPos(ImVec2(std::round(centre - ui::ButtonWidth(Tr("Play without updating"), without) / 2), y));
+            if (ui::Button(Tr("Play without updating"), without) || m_testPlayWithout)
             {
-                m_testControllers = false;
-                RefreshGamepads();
-                ui::OpenMenu("##controllers", {.above = true});
-            }
-            // PLAY WITH: the choices, the one in use checked.
-            if (ui::BeginMenu("##controllers"))
-            {
-                ui::Text(ui::TextStyle::Caption, Tr(strings::PlayWith), ui::color::Dim, -1, true);
-                for (const auto& [value, name] : DeviceOptions())
-                {
-                    ui::PushText(ui::TextStyle::Body);
-                    const std::string shown = ui::Ellipsize(name.c_str(), ControllerW + ui::space::XXL);
-                    ui::PopText();
-                    if (ui::MenuItem((shown + "##" + value).c_str(), { .checked = value == device }))
-                        SetDevice(value);
-                }
-                ui::EndMenu();
+                m_testPlayWithout = false;
+                m_s->skipUpdate = true;
             }
         }
 
-        // The portal's state under the main button, in a word and a shape (above the band's foot, clear of the pad legend).
-        ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY + PlayButtonH + ui::space::S)); // clear of the focus ring
-        DrawPortalStatus();
+        // The controller picker: what the game listens to, a menu of the choices above it (the pad icon says what it picks, the
+        // tooltip says it in words).
+        ImGui::SetCursorScreenPos(ImVec2(groupX, pillY));
+        if (ui::Pill(pickerId.c_str(), picker) || m_testControllers)
+        {
+            m_testControllers = false;
+            RefreshGamepads();
+            ui::OpenMenu("##controllers", {.above = true});
+        }
+        // PLAY WITH: the choices, the one in use checked.
+        if (ui::BeginMenu("##controllers"))
+        {
+            ui::Text(ui::TextStyle::Caption, Tr(strings::PlayWith), ui::color::Dim, -1, true);
+            for (const auto& [value, name] : DeviceOptions())
+            {
+                ui::PushText(ui::TextStyle::Body);
+                const std::string shown = ui::Ellipsize(name.c_str(), ControllerW + ui::space::XXL);
+                ui::PopText();
+                if (ui::MenuItem((shown + "##" + value).c_str(), { .checked = value == device }))
+                    SetDevice(value);
+            }
+            ui::EndMenu();
+        }
+        // The portal's state, in a word and a shape: a real portal plugged in, or not (the game then has its virtual one).
+        if (portalShown)
+        {
+            ImGui::SetCursorScreenPos(ImVec2(groupX + pickerW + gap, pillY));
+            if (ui::Pill(portalId.c_str(), portalPill))
+            {
+                m_tab = SettingsTab::Controls;
+                GoTo(Page::Settings);
+            }
+        }
 
         // The pad's buttons for this page, when a pad is in use.
         if (ui::Ctx().glyphs != ui::Glyphs::Keyboard)

@@ -64,22 +64,31 @@ namespace ui
         }
 
         constexpr float IconSize = icon::Normal;    // an icon beside a label
+        constexpr const char* PrefixDot = "\xC2\xB7"; // between a pill's prefix and its icon
         constexpr float TrailingSize = icon::Small; // the chevron after a label
 
-        // The content of a button: [icon] label [trailing], centred in min..max, one point lower when pressed.
+        // The content of a button: [prefix] [icon] label [trailing], centred in min..max, one point lower when pressed.
         void DrawContent(ImDrawList* draw, ImVec2 min, ImVec2 max, const char* label, TextStyle style, Icon icon, bool spinner,
-            Icon trailing, unsigned ink, bool pressed)
+            Icon trailing, unsigned ink, bool pressed, const char* prefix = nullptr, unsigned iconInk = 0) // iconInk: an rgb, 0 the ink
         {
             const char* end = LabelEnd(label);
             PushText(style, true);
             ImVec2 text = ImGui::CalcTextSize(label, end);
+            const float prefixW = prefix != nullptr ? ImGui::CalcTextSize(prefix).x + ImGui::CalcTextSize(PrefixDot).x + 2 * space::XS : 0;
             bool hasText = end != label, lead = icon != Icon::None || spinner;
-            float width = text.x + (lead ? IconSize + (hasText ? space::XS : 0) : 0) + (trailing != Icon::None ? TrailingSize + space::XXS : 0);
+            float width = prefixW + text.x + (lead ? IconSize + (hasText ? space::XS : 0) : 0) + (trailing != Icon::None ? TrailingSize + space::XXS : 0);
             float x = std::round((min.x + max.x - width) / 2), mid = std::round((min.y + max.y) / 2) + (pressed ? 1.0f : 0.0f);
+            if (prefix != nullptr) // the words, then a dot XS apart from them and from the icon
+            {
+                const float y = std::round(mid - CapMiddle(style, true));
+                DrawText(draw, ImVec2(x, y), Col(ink), prefix);
+                DrawText(draw, ImVec2(x + ImGui::CalcTextSize(prefix).x + space::XS, y), Col(ink), PrefixDot);
+                x += prefixW;
+            }
             if (spinner)
                 DrawSpinner(draw, ImVec2(x + IconSize / 2, mid), IconSize, Col(ink));
             else if (icon != Icon::None)
-                DrawIcon(draw, icon, ImVec2(x + IconSize / 2, mid), IconSize, Col(ink));
+                DrawIcon(draw, icon, ImVec2(x + IconSize / 2, mid), IconSize, Col(iconInk != 0 ? iconInk : ink));
             if (lead)
                 x += IconSize + (hasText ? space::XS : 0);
             if (hasText) // the capitals' middle on the button's: the icons beside the label line up with it
@@ -174,13 +183,19 @@ namespace ui
         return options.hold ? done : clicked;
     }
 
-    bool Pill(const char* label, const PillOptions& options)
+    float PillWidth(const char* label, const PillOptions& options)
     {
-        const float h = height::Small;
         const char* end = LabelEnd(label);
         float text = TextSize(TextStyle::Body, label, end, true).x;
-        float content = text + (options.icon != Icon::None ? IconSize + space::XS : 0) + (options.trailing != Icon::None ? TrailingSize + space::XXS : 0);
-        float w = std::max(options.width, std::ceil(content + 2 * space::M));
+        float content = text + (options.icon != Icon::None ? IconSize + space::XS : 0) + (options.trailing != Icon::None ? TrailingSize + space::XXS : 0) +
+            (options.prefix != nullptr ? TextSize(TextStyle::Body, options.prefix, nullptr, true).x + TextSize(TextStyle::Body, PrefixDot, nullptr, true).x + 2 * space::XS : 0);
+        return std::max(options.width, std::ceil(content + 2 * space::M));
+    }
+
+    bool Pill(const char* label, const PillOptions& options)
+    {
+        const float h = height::Small, w = PillWidth(label, options);
+        SettingControl(w);
         const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + w, min.y + h);
         ImGui::BeginDisabled(options.disabled);
         bool clicked = Hit(label, ImVec2(w, h));
@@ -188,7 +203,7 @@ namespace ui
         Paint paint = PaintFor(ButtonKind::Secondary, state, options.overArt, options.selected);
         ImDrawList* draw = ImGui::GetWindowDrawList();
         DrawFace(draw, min, max, h / 2, paint);
-        DrawContent(draw, min, max, label, TextStyle::Body, options.icon, false, options.trailing, paint.ink, state.pressed);
+        DrawContent(draw, min, max, label, TextStyle::Body, options.icon, false, options.trailing, paint.ink, state.pressed, options.prefix, options.iconColor);
         ImGui::EndDisabled();
         FocusRingIf(state, h / 2);
         if (options.tooltip != nullptr && WantsTooltip(state))

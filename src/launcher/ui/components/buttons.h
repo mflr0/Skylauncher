@@ -39,6 +39,8 @@ namespace ui
     {
         Icon icon = Icon::None;
         Icon trailing = Icon::None;
+        const char* prefix = nullptr; // words before the icon, a dot between ("12 h 34", then "· trophy 6/38")
+        unsigned iconColor = 0;       // the icon in a state's colour (ColorOf); 0: the label's ink
         bool selected = false; // the accent fill: a pill that stands for a mode that is on
         bool disabled = false;
         bool overArt = false;
@@ -46,6 +48,7 @@ namespace ui
         const char* tooltip = nullptr;
     };
     bool Pill(const char* label, const PillOptions& options = {});
+    float PillWidth(const char* label, const PillOptions& options = {});
 
     // An icon alone, square: always with a tooltip (it is the icon's only words).
     struct IconButtonOptions

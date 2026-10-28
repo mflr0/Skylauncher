@@ -277,7 +277,7 @@ namespace launcher_ui
             unsigned dot;
             float progress = -1;
             SlotState state = SlotState::Closed;
-            const char* button = "";   // the game page's main button: its label
+            std::string button;        // the game page's main button: its label
             bool buttonEnabled = true; // and whether it can be pressed
         };
         SlotLine SlotStatus(GameSlot* slot);
