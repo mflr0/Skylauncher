@@ -1,6 +1,6 @@
 #pragma once
 
-// Updates from GitHub releases (docs/updates.md): the launcher itself (Skylauncher.exe, the .app, the AppImage) and, from
+// Updates from GitHub releases (docs/updates.md): the launcher itself (ArkeyanLauncher.exe, the .app, the AppImage) and, from
 // a configurable repository, the player kit. No telemetry: one request to api.github.com for the latest release, at most
 // once a day, then the asset. HTTPS is curl (curl.exe ships with Windows 10 and 11, as SSABuild already relies on).
 #include <atomic>
@@ -45,28 +45,22 @@ const ReleaseAsset* FindAsset(const ReleaseInfo& release, std::string_view name)
 // The expected hash of `name` in a SHA256SUMS file ("<64 hex>  <name>" or "<hex> *<name>" lines); empty when absent.
 std::string FindChecksum(const std::string& sums, std::string_view name);
 
-// A game's entry in the release's manifest asset `games.json` (docs/updates.md): {"games":[{"id","version","kit","notes"}]}. `kit` is the
-// tag of the release holding the kit that builds this version, `notes` what changed (plain text, may be empty).
+// A game's entry in the hidden line of a release's notes (docs/updates.md): <!-- games: ssa=0.9.1 giants=0.8.1 -->. `kit` is the
+// tag of that release, which holds the kit that builds this version.
 struct GameUpdate
 {
-    std::string id, version, kit, notes;
+    std::string id, version, kit;
 };
-// Entries without an id or a version are skipped. False and `error` when `json` is not a manifest.
-bool ParseGamesManifest(const std::string& json, std::vector<GameUpdate>& games, std::string* error = nullptr);
-inline constexpr char GamesManifestName[] = "games.json";
+// Reads the first `<!-- games: id=X.Y.Z ... -->` comment of `notes` into `games` (cleared first). Ids are [a-z0-9]+, versions X.Y.Z;
+// other entries are skipped. No such line: `games` stays empty.
+void ParseGamesLine(const std::string& notes, const std::string& tag, std::vector<GameUpdate>& games);
+// `text` without its HTML comments (the notes are shown to the player; the games line is not).
+std::string StripHtmlComments(std::string text);
 
 // The release asset for this OS: ArkeyanLauncher.exe, ArkeyanLauncher-macOS.zip, ArkeyanLauncher-x86_64.AppImage.
 std::string LauncherAssetName();
-// The names of releases before 0.6.0 (Skylauncher.exe, Skylauncher-macOS.zip, Skylauncher-x86_64.AppImage), still published
-// next to the new ones so that an older launcher can update itself.
-std::string OldLauncherAssetName();
-// The asset of `release` to download: the new name, else the old one (the new one when the release has neither).
-std::string LauncherAssetIn(const ReleaseInfo& release);
-// The kit's: skylanders-kit-windows-x64.zip, skylanders-kit-macos-arm64.zip, skylanders-kit-linux-x64.zip, and the older
-// ssa-kit-<platform>.zip (same file) of releases before 0.6.0.
+// The kit's: skylanders-kit-windows-x64.zip, skylanders-kit-macos-arm64.zip, skylanders-kit-linux-x64.zip.
 std::string KitAssetName();
-std::string OldKitAssetName();
-std::string KitAssetIn(const ReleaseInfo& release);
 
 // ---- Pieces (synchronous, tested on their own) ------------------------------------------------------------------------
 
@@ -160,7 +154,7 @@ public:
         bool launcherNewer = false;
         ReleaseInfo launcher;
         ReleaseInfo kit;                // the release that carries the games (its assets' sizes tell the download)
-        std::vector<GameUpdate> games;  // its games.json: what each game's latest version is (empty: none published)
+        std::vector<GameUpdate> games;  // its notes' games line: what each game's latest version is (empty: none published)
         std::string doing;              // "launcher" or "kit", what Downloading..Installing is for
         float progress = -1;            // 0..1 while downloading, -1 when unknown
         std::string error;              // why Failed

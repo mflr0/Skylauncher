@@ -36,7 +36,7 @@ The launcher finds the kit, runs it, shows its progress and then starts the game
      `install.log` ("Installation interrupted", **Resume**; Resume waits for an SkyBuild that is still running).
 4. `@done <path>` and exit code 0: the path is saved for that disc and PLAY appears. On Windows SDL cannot report the
    exit code of a process started without a console window, so there `@done` alone means success.
-5. When the release publishes a newer version of the game than the one built (`games.json`, `docs/updates.md`), the Play page's button is **UPDATE**, with a small link **Play without updating** under it; the game's settings
+5. When the release publishes a newer version of the game than the one built (the games line of its notes, `docs/updates.md`), the Play page's button is **UPDATE**, with a small link **Play without updating** under the update line in the game's info block; the game's settings
    (Settings button on its Play page) > Game has **Reinstall** (held a second), **Remove game** and
    **Game files**. SkyBuild is incremental, so a reinstall is quick when little changed.
 

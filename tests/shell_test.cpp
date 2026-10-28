@@ -192,10 +192,13 @@ namespace
 
     // A fake release in `folder`: latest.json, SHA256SUMS and the assets given as name -> content. `sumsFor` lists the hashes.
     void MakeRelease(const std::filesystem::path& folder, const std::string& tag, const std::map<std::string, std::string>& assets,
-        const std::map<std::string, std::string>& hashes, bool withSums = true)
+        const std::map<std::string, std::string>& hashes, bool withSums = true, const std::string& notes = "What\xE2\x80\x99s new\n- a thing")
     {
+        std::string body;
+        for (char c : notes)
+            body += c == '\n' ? std::string("\\n") : c == '"' ? std::string("\\\"") : std::string(1, c);
         std::filesystem::create_directories(folder);
-        std::string json = "{\"tag_name\":\"" + tag + "\",\"name\":\"Arkeyan Launcher " + tag + "\",\"body\":\"What\\u2019s new\\n- a thing\",\"html_url\":\"https://example.test/r\",\"prerelease\":false,\"assets\":[";
+        std::string json = "{\"tag_name\":\"" + tag + "\",\"name\":\"Arkeyan Launcher " + tag + "\",\"body\":\"" + body + "\",\"html_url\":\"https://example.test/r\",\"prerelease\":false,\"assets\":[";
         std::string sums;
         bool first = true;
         for (const auto& [name, content] : assets)
@@ -230,12 +233,16 @@ namespace
             SDL_Delay(20);
     }
 
-    void ParseGamesManifestChecks()
+    void ParseGamesLineChecks()
     {
         std::vector<GameUpdate> games;
-        SHELL_EXPECT(ParseGamesManifest(R"({"games":[{"id":"ssa","version":"0.9.0","kit":"v1","notes":"a"},{"id":"","version":"1.0.0"},{"id":"g","version":"x"}]})", games));
-        SHELL_EXPECT(games.size() == 1 && games[0].id == "ssa" && games[0].version == "0.9.0" && games[0].kit == "v1" && games[0].notes == "a");
-        SHELL_EXPECT(!ParseGamesManifest("not json", games) && !ParseGamesManifest("{}", games));
+        ParseGamesLine("Fixes.\n\n<!-- games: ssa=0.9.1 giants=0.8.1 swapforce=0.5.0 -->\n", "v1.2.3", games);
+        SHELL_EXPECT(games.size() == 3 && games[0].id == "ssa" && games[0].version == "0.9.1" && games[2].id == "swapforce" && games[2].kit == "v1.2.3");
+        ParseGamesLine("<!-- other --> <!--games:ssa=1.0.0 Bad=1.0.0 g=x h=1.0 =2.0.0 y=1.0.0-beta k=-->", "v1", games);
+        SHELL_EXPECT(games.size() == 2 && games[0].id == "ssa" && games[1].id == "h"); // bad ids, versions and empty entries are skipped
+        ParseGamesLine("no line here, <!-- a comment --> <!-- games: ssa=1.0.0", "v1", games);
+        SHELL_EXPECT(games.empty()); // none, or never closed
+        SHELL_EXPECT(StripHtmlComments("a<!-- x -->b\n<!-- games: ssa=1.0.0 -->\nc<!-- open") == "ab\n\nc");
     }
 
     void UpdaterChecks(const std::filesystem::path& scratch)
@@ -259,14 +266,14 @@ namespace
         SHELL_EXPECT(!ParseRelease("<html>rate limited</html>", release, &error) && error.find("JSON") != std::string::npos);
         SHELL_EXPECT(!ParseRelease("{\"message\":\"Not Found\"}", release, &error) && error.find("Not Found") != std::string::npos);
         std::filesystem::path updates = scratch / "updates";
-        MakeRelease(updates / "r1", "v99.0.0", { { "ArkeyanLauncher.exe", "exe bytes" }, { "ssa-kit-test.zip", "zip" } }, {});
+        MakeRelease(updates / "r1", "v99.0.0", { { "ArkeyanLauncher.exe", "exe bytes" }, { "skylanders-kit-test.zip", "zip" } }, {});
         SHELL_EXPECT(ParseRelease(ReadBytes(updates / "r1" / "latest.json"), release) && release.tag == "v99.0.0");
         SHELL_EXPECT(release.notes.find("What\xE2\x80\x99s new") == 0 && release.assets.size() == 3 && FindAsset(release, "ArkeyanLauncher.exe")->size == 9);
         std::string sums = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad  a b.txt\n"
                            "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855 *empty.bin\r\nshort  x\n";
         SHELL_EXPECT(FindChecksum(sums, "a b.txt").starts_with("ba7816bf") && FindChecksum(sums, "empty.bin").starts_with("e3b0c442"));
         SHELL_EXPECT(FindChecksum(sums, "x").empty() && FindChecksum(sums, "nothing").empty());
-        SHELL_EXPECT(LauncherAssetName().starts_with("ArkeyanLauncher") && OldLauncherAssetName().starts_with("Skylauncher") && KitAssetName().starts_with("skylanders-kit-") && OldKitAssetName().starts_with("ssa-kit-"));
+        SHELL_EXPECT(LauncherAssetName().starts_with("ArkeyanLauncher") && KitAssetName().starts_with("skylanders-kit-"));
 
         // Downloads: good, damaged, and a release without SHA256SUMS.
         std::string downloadError;
@@ -311,18 +318,8 @@ namespace
         MakeZip(zip, { { "SSABuild", "first install" }, { "SSABuild.exe", "first install" } });
         SHELL_EXPECT(InstallKitZip(zip, updates / "fresh" / "ssa-kit", error) && ReadBytes(updates / "fresh" / "ssa-kit" / "SSABuild") == "first install");
 
-        // The two name sets: a release carries the new ones, the old ones or both (0.6.0 publishes both); the new come first.
+        // The kit zip: SkyBuild at the root, or SSABuild (a kit for 0.4.x launchers), wrapped or not.
         {
-            ReleaseInfo both, oldOnly, newOnly, neither;
-            both.assets = { { OldLauncherAssetName(), "u", 1 }, { LauncherAssetName(), "u", 1 }, { OldKitAssetName(), "u", 1 }, { KitAssetName(), "u", 1 } };
-            oldOnly.assets = { { OldLauncherAssetName(), "u", 1 }, { OldKitAssetName(), "u", 1 } };
-            newOnly.assets = { { LauncherAssetName(), "u", 1 }, { KitAssetName(), "u", 1 } };
-            SHELL_EXPECT(LauncherAssetIn(both) == LauncherAssetName() && KitAssetIn(both) == KitAssetName());
-            SHELL_EXPECT(LauncherAssetIn(oldOnly) == OldLauncherAssetName() && KitAssetIn(oldOnly) == OldKitAssetName());
-            SHELL_EXPECT(LauncherAssetIn(newOnly) == LauncherAssetName() && KitAssetIn(newOnly) == KitAssetName());
-            SHELL_EXPECT(LauncherAssetIn(neither) == LauncherAssetName() && KitAssetIn(neither) == KitAssetName()); // the message names the new one
-            SHELL_EXPECT(LauncherAssetName() != OldLauncherAssetName() && KitAssetName() != OldKitAssetName());
-            // The kit zip is the same file under both names: SkyBuild at the root, or SSABuild (a kit for 0.4.x launchers), wrapped or not.
             MakeZip(zip, { { "skylanders-kit-test/SkyBuild", "new builder" }, { "skylanders-kit-test/SkyBuild.exe", "new builder" } });
             SHELL_EXPECT(InstallKitZip(zip, updates / "fresh" / "skybuild-kit", error) && ReadBytes(updates / "fresh" / "skybuild-kit" / "SkyBuild") == "new builder");
             MakeZip(zip, { { "SkyBuild", "root" }, { "SkyBuild.exe", "root" }, { "SSABuild", "copy" }, { "SSABuild.exe", "copy" } });
@@ -358,28 +355,23 @@ namespace
         WaitFor(manager);
         SHELL_EXPECT(!manager.Snapshot().checked && !manager.Snapshot().checkError.empty());
 
-        // Game updates: a release whose games.json lists each game's version (here Giants alone is ahead of what is built);
-        // read like the other assets (SHA256SUMS), refused if its hash is wrong, absent: no game updates and no complaint.
-        ParseGamesManifestChecks();
-        std::string manifest = R"({"games":[{"id":"ssa","version":"0.9.0","kit":"v2.0.0","notes":""},{"id":"giants","version":"0.8.2","kit":"v2.0.0","notes":"Fixes a thing."},{"id":"x","version":"?"}]})";
-        MakeRelease(updates / "r5", "v2.0.0", { { GamesManifestName, manifest }, { "ArkeyanLauncher.exe", "x" } }, {});
+        // Game updates: the hidden line of a release's notes lists each game's version (here Giants alone is ahead of what is built);
+        // a body without the line: no game updates and no complaint.
+        ParseGamesLineChecks();
+        const std::string withLine = "Notes.\n\n<!-- games: ssa=0.9.0 giants=0.8.2 x=? -->";
+        MakeRelease(updates / "r5", "v2.0.0", { { "ArkeyanLauncher.exe", "x" } }, {}, true, withLine);
         SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5" / "latest.json").c_str(), true);
         settings.kitRepo = "someone/kit";
         manager.Check(settings);
         WaitFor(manager);
         state = manager.Snapshot();
         SHELL_EXPECT(state.checked && state.games.size() == 2 && state.games[1].id == "giants" && state.games[1].version == "0.8.2" &&
-            state.games[1].kit == "v2.0.0" && state.games[1].notes == "Fixes a thing.");
-        MakeRelease(updates / "r5b", "v2.0.0", { { GamesManifestName, manifest } }, { { GamesManifestName, std::string(64, 'c') } });
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5b" / "latest.json").c_str(), true);
-        manager.Check(settings);
-        WaitFor(manager);
-        SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a wrong hash: no updates offered
+            state.games[1].kit == "v2.0.0");
         MakeRelease(updates / "r5c", "v2.0.0", { { "ArkeyanLauncher.exe", "x" } }, {});
         SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5c" / "latest.json").c_str(), true);
         manager.Check(settings);
         WaitFor(manager);
-        SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a release without the manifest
+        SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a body without the line
         // The kit download INSTALL starts with: the release of this launcher's tag, else the latest, verified, then found.
         auto setEnv = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
@@ -648,10 +640,10 @@ namespace
 
 // The kit of a fake release for ArkeyanLauncherTest's launcher checks (tests/launcher_test.cpp): `kitFolder`'s files in a zip, as the kit
 // asset of a release for each of `tags`, the last one the latest; `<tag>.json` is the release of that tag, as the launcher asks for
-// its own; `gamesJson` (when not empty) is the release's games.json. `folder` is what SKY_LAUNCHER_UPDATE_URL points into. Where `zip` exists the Unix modes are kept (so the kit's SSABuild
+// its own; `gamesLine` (when not empty) is the release's hidden games line, "ssa=0.9.0 giants=0.8.1". `folder` is what SKY_LAUNCHER_UPDATE_URL points into. Where `zip` exists the Unix modes are kept (so the kit's SSABuild
 // runs once unpacked).
 void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder,
-    const std::string& gamesJson)
+    const std::string& gamesLine)
 {
     std::filesystem::create_directories(folder);
     std::filesystem::path zip = folder / KitAssetName();
@@ -677,9 +669,8 @@ void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::
     for (const std::string& tag : tags)
     {
         std::map<std::string, std::string> assets{ { KitAssetName(), bytes } };
-        if (!gamesJson.empty())
-            assets[GamesManifestName] = gamesJson;
-        MakeRelease(folder, tag, assets, {});
+        MakeRelease(folder, tag, assets, {}, true,
+            "What\xE2\x80\x99s new\n- a thing" + (gamesLine.empty() ? std::string() : "\n\n<!-- games: " + gamesLine + " -->"));
         std::filesystem::copy_file(folder / "latest.json", folder / (tag + ".json"), std::filesystem::copy_options::overwrite_existing);
     }
 }

@@ -133,13 +133,14 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 | the install was interrupted | Interrupted | blue | INSTALL, or PLAY if built |
 | the copied game data is damaged, and no disc image to fall back on | Game data damaged | red | CHOOSE DISC |
 | a verified disc, no build yet | Ready to install | blue | INSTALL |
-| the release has a newer version of the game than the one built (`games.json`), not set aside with "Play without updating" | Update available | blue | UPDATE |
+| the release has a newer version of the game than the one built (the release's games line), not set aside with "Play without updating" | Update available | blue | UPDATE |
 | verified disc and built (or an own runtime) | Ready to play | green | PLAY |
 
 **UPDATE** (`docs/updates.md`): the page says the version built and the one on offer ("Update 0.8.0 to 0.8.1: no download, up to
-about 15 min.", the release's notes for the game under it) and the main button reads UPDATE; one click fetches the kit if it is
-needed, rebuilds the game (SkyBuild is incremental) and PLAY is back. Under the button a small link, **Play without updating**,
-plays what is built (offline, in a hurry): it sets the offer aside until the launcher is closed. The game's version is small, in the
+about 15 min.") and the main button reads UPDATE; one click fetches the kit if it is
+needed, rebuilds the game (SkyBuild is incremental) and PLAY is back. Under that line, left-aligned with it, a small link,
+**Play without updating**, plays what is built (offline, in a hurry): it sets the offer aside until the launcher is closed. The bottom
+band holds only the portal line under the button, as for PLAY. The game's version is small, in the
 secondary text colour, after its name in the sidebar ("Giants · 0.8.2"); nothing on the page moves for it. While UPDATE runs the progress card is titled
 "UPDATING THE GAME" ("INSTALLING THE GAME" for a first install). No tools are ever downloaded without a click on INSTALL or UPDATE.
 

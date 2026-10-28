@@ -1661,13 +1661,13 @@ namespace launcher_ui
                 else if (UpdateAvailable())
                 {
                     // What UPDATE does: from the built version to the published one, the download (the kit, if it is not here yet)
-                    // and the time, then the release's notes for the game.
+                    // and the time, then a small link to play what is built (offline, in a hurry).
                     const GameUpdate* pending = PendingUpdate(*m_s);
                     std::string size = Tr("no download");
                     if (KitNeedsFetch(*m_s))
                     {
                         const ReleaseInfo kit = m_updates.Snapshot().kit;
-                        if (const ReleaseAsset* asset = FindAsset(kit, KitAssetIn(kit)); asset != nullptr && asset->size > 0)
+                        if (const ReleaseAsset* asset = FindAsset(kit, KitAssetName()); asset != nullptr && asset->size > 0)
                             size = Tf("{} download", LauncherFormatSize(asset->size));
                     }
                     ImGui::PushTextWrapPos(available.x - 40); // window coordinates
@@ -1675,10 +1675,31 @@ namespace launcher_ui
                     ImGui::TextWrapped("%s", (m_s->installed.gameVersion.empty()
                             ? Tf("Update to {}: {}, up to about {} min.", pending->version, size, InstallMinutesFor(m_s->game.id))
                             : Tf("Update {} to {}: {}, up to about {} min.", m_s->installed.gameVersion, pending->version, size, InstallMinutesFor(m_s->game.id))).c_str());
-                    if (!pending->notes.empty())
-                        ImGui::TextWrapped("%s", pending->notes.c_str());
                     ImGui::PopStyleColor();
                     ImGui::PopTextWrapPos();
+                    if (!Installing())
+                    {
+                        ImGui::PushFont(nullptr, SmallSize);
+                        const char* text = Tr("Play without updating");
+                        ImVec2 extent = ImGui::CalcTextSize(text);
+                        ImVec2 linkAt = ImGui::GetCursorScreenPos();
+                        linkAt.y += 4;
+                        ImGui::SetCursorScreenPos(linkAt);
+                        ImGui::InvisibleButton("##playwithout", ImVec2(extent.x, extent.y + 4), ImGuiButtonFlags_EnableNav);
+                        bool hovered = ImGui::IsItemHovered();
+                        if (hovered)
+                            ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
+                        FocusRing(4);
+                        unsigned ink = hovered ? Text : TextSecondary;
+                        AddBoldText(draw, linkAt, Rgb(ink), text);
+                        draw->AddLine(ImVec2(linkAt.x, linkAt.y + extent.y + 1), ImVec2(linkAt.x + extent.x, linkAt.y + extent.y + 1), Rgb(ink), 1.0f);
+                        if (ImGui::IsItemClicked() || m_testPlayWithout)
+                        {
+                            m_testPlayWithout = false;
+                            m_s->skipUpdate = true;
+                        }
+                        ImGui::PopFont();
+                    }
                 }
                 break;
             case DiscState::Failed:
@@ -1737,32 +1758,6 @@ namespace launcher_ui
             break;
         case MainActionHit::None:
             break;
-        }
-
-        // Under UPDATE, a small link to play what is built (offline, in a hurry).
-        if (update && !installing)
-        {
-            ImGui::PushFont(nullptr, SmallSize);
-            const char* text = Tr("Play without updating");
-            ImVec2 extent = ImGui::CalcTextSize(text);
-            // Under the portal's line (which is under the button), centred as it is.
-            float below = m_portal.Current().Line().empty() ? 6.0f : 22.0f;
-            ImVec2 linkAt(std::floor(mainX + (PlayButtonW - extent.x) / 2), buttonY + PlayButtonH + below);
-            ImGui::SetCursorScreenPos(linkAt);
-            ImGui::InvisibleButton("##playwithout", ImVec2(extent.x, extent.y + 4), ImGuiButtonFlags_EnableNav);
-            bool hovered = ImGui::IsItemHovered();
-            if (hovered)
-                ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            FocusRing(4);
-            unsigned ink = hovered ? Text : TextSecondary;
-            AddBoldText(draw, linkAt, Rgb(ink), text);
-            draw->AddLine(ImVec2(linkAt.x, linkAt.y + extent.y + 1), ImVec2(linkAt.x + extent.x, linkAt.y + extent.y + 1), Rgb(ink), 1.0f);
-            if (ImGui::IsItemClicked() || m_testPlayWithout)
-            {
-                m_testPlayWithout = false;
-                m_s->skipUpdate = true;
-            }
-            ImGui::PopFont();
         }
 
         // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
@@ -2487,7 +2482,7 @@ namespace launcher_ui
     }
 
     // The game updates (SKY_LAUNCHER_TEST_KIT=updates, SKY_LAUNCHER_BASE_PATH holding a kit that builds both games at SSA 0.9.0 and
-    // Giants 0.8.0, SKY_LAUNCHER_UPDATE_URL a fake release whose games.json bumps Giants to 0.8.1 only, its kit being "kit-new"):
+    // Giants 0.8.0, SKY_LAUNCHER_UPDATE_URL a fake release whose notes bump Giants to 0.8.1 only, its kit being "kit-new"):
     // both games built from the kit at hand, then the check as made at every start: SSA stays PLAY, Giants shows UPDATE, nothing
     // is downloaded meanwhile, "Play without updating" gives PLAY back, UPDATE fetches the kit and rebuilds Giants only.
     // "offline" has no release to reach: the check fails without a word.
@@ -2570,7 +2565,7 @@ namespace launcher_ui
         case 5:
             if (m_updates.Busy() || m_updateWasBusy)
                 return;
-            expect(m_gameUpdates.size() == 2, "the release's games.json was read");
+            expect(m_gameUpdates.size() == 2, "the release's games line was read");
             expect(UpdateAvailable(g) && !UpdateAvailable(a), "Giants only has an update");
             expect(SlotStatus(&g).button == std::string("UPDATE") && SlotStatus(&a).button == std::string("PLAY"), "UPDATE for Giants, PLAY for the other");
             expect(!toolsLine(g) && !toolsLine(a) && !std::filesystem::exists(DownloadedKitsFolder()), "no kit is downloaded in the background");
@@ -2710,7 +2705,7 @@ namespace launcher_ui
             break;
         case 6: // the release publishes a newer version of the game than the one built: an update
             m_config["install." + m_testSha]["version"] = "0.0.1";
-            m_gameUpdates = { { a.game.id, "99.0.0", "v99.0.0", "" } };
+            m_gameUpdates = { { a.game.id, "99.0.0", "v99.0.0" } };
             RefreshInstall();
             expect(line() == "Update available", "Update available");
             shoot("update-available", 400);
@@ -2771,7 +2766,7 @@ namespace launcher_ui
                     a.installed.runtime = m_testBuilt;
                     a.installed.kitVersion = a.kit ? a.kit->version : "";
                     // The release publishes version 99 of the game: only the state that built an older one is offered it.
-                    m_gameUpdates = { { a.game.id, "99.0.0", "v99.0.0", "" } };
+                    m_gameUpdates = { { a.game.id, "99.0.0", "v99.0.0" } };
                     a.installed.gameVersion = "99.0.0";
                     state.setup(a);
                     m_page = Page::Play;

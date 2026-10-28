@@ -166,15 +166,6 @@ namespace
         return fs::exists(folder / "SkyBuild", error) || fs::exists(folder / "SSABuild", error);
 #endif
     }
-
-    // The first of `names` that the release carries; the first one when none is (the message then names it).
-    std::string FirstOffered(const ReleaseInfo& release, std::initializer_list<std::string> names)
-    {
-        for (const std::string& name : names)
-            if (FindAsset(release, name) != nullptr)
-                return name;
-        return *names.begin();
-    }
 }
 
 // ---- Versions -----------------------------------------------------------------------------------------------------
@@ -256,25 +247,56 @@ bool ParseRelease(const std::string& json, ReleaseInfo& release, std::string* er
     return true;
 }
 
-bool ParseGamesManifest(const std::string& json, std::vector<GameUpdate>& games, std::string* error)
+std::string StripHtmlComments(std::string text)
 {
-    JsonValue root;
-    std::string parseError;
-    if (!ParseJson(json, root, &parseError) || !root["games"].IsArray())
+    for (size_t begin = text.find("<!--"); begin != std::string::npos; begin = text.find("<!--", begin))
     {
-        if (error != nullptr)
-            *error = parseError.empty() ? std::string("no games") : parseError;
-        return false;
+        size_t end = text.find("-->", begin + 4);
+        if (end == std::string::npos)
+        {
+            text.erase(begin);
+            break;
+        }
+        text.erase(begin, end + 3 - begin);
     }
+    return text;
+}
+
+void ParseGamesLine(const std::string& notes, const std::string& tag, std::vector<GameUpdate>& games)
+{
     games.clear();
-    const JsonValue& list = root["games"];
-    for (size_t i = 0; i < list.array.size(); i++)
+    size_t begin = notes.find("<!--");
+    while (begin != std::string::npos)
     {
-        GameUpdate game{ list[i]["id"].Str(), list[i]["version"].Str(), list[i]["kit"].Str(), list[i]["notes"].Str() };
-        if (!game.id.empty() && ParseSemVer(game.version).valid)
-            games.push_back(std::move(game));
+        size_t end = notes.find("-->", begin + 4);
+        if (end == std::string::npos)
+            return;
+        std::string body = Trimmed(notes.substr(begin + 4, end - begin - 4));
+        if (body.starts_with("games:"))
+        {
+            std::string rest = body.substr(6);
+            size_t pos = 0;
+            while (pos < rest.size())
+            {
+                size_t stop = rest.find_first_of(" \t\r\n", pos);
+                if (stop == std::string::npos)
+                    stop = rest.size();
+                std::string item = rest.substr(pos, stop - pos);
+                pos = stop + 1;
+                size_t eq = item.find('=');
+                if (eq == std::string::npos || eq == 0)
+                    continue;
+                GameUpdate game{ item.substr(0, eq), item.substr(eq + 1), tag };
+                bool idOk = std::all_of(game.id.begin(), game.id.end(), [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'); });
+                SemVer version = ParseSemVer(game.version);
+                bool plain = !game.version.empty() && std::all_of(game.version.begin(), game.version.end(), [](char c) { return (c >= '0' && c <= '9') || c == '.'; });
+                if (idOk && plain && version.valid)
+                    games.push_back(std::move(game));
+            }
+            return; // the first games line counts
+        }
+        begin = notes.find("<!--", end + 3);
     }
-    return true;
 }
 
 const ReleaseAsset* FindAsset(const ReleaseInfo& release, std::string_view name)
@@ -323,19 +345,6 @@ std::string LauncherAssetName()
 #endif
 }
 
-std::string OldLauncherAssetName()
-{
-#if defined(_WIN32)
-    return "Skylauncher.exe";
-#elif defined(__APPLE__)
-    return "Skylauncher-macOS.zip";
-#else
-    return "Skylauncher-x86_64.AppImage";
-#endif
-}
-
-std::string LauncherAssetIn(const ReleaseInfo& release) { return FirstOffered(release, { LauncherAssetName(), OldLauncherAssetName() }); }
-
 std::string KitPlatform()
 {
 #if defined(_WIN32)
@@ -352,10 +361,6 @@ std::string KitPlatform()
 }
 
 std::string KitAssetName() { return "skylanders-kit-" + KitPlatform() + ".zip"; }
-
-std::string OldKitAssetName() { return "ssa-kit-" + KitPlatform() + ".zip"; }
-
-std::string KitAssetIn(const ReleaseInfo& release) { return FirstOffered(release, { KitAssetName(), OldKitAssetName() }); }
 
 std::string LatestReleaseUrl(const std::string& repo)
 {
@@ -681,7 +686,7 @@ fs::path DownloadKit(const std::string& repo, const std::string& tag, const fs::
             return {};
         }
     }
-    const std::string kitAsset = KitAssetIn(release); // the new name, else the one 0.4.x releases carry
+    const std::string kitAsset = KitAssetName();
     const ReleaseAsset* asset = FindAsset(release, kitAsset);
     if (asset == nullptr)
     {
@@ -816,14 +821,9 @@ void UpdateManager::Check(const Settings& settings)
         {
             // The kit has its own releases: the same file name would be overwritten by the first fetch, so each is read at once.
             kitOk = fetch(m_settings.kitRepo, kit, kitError);
-            // The manifest: a small asset, verified like the rest; a release without one has no game updates.
-            if (kitOk && FindAsset(kit, GamesManifestName) != nullptr)
-            {
-                std::string manifestError;
-                fs::path file = DownloadVerified(kit, GamesManifestName, temp / "games", {}, &m_cancel, manifestError);
-                if (!file.empty() && !ParseGamesManifest(ReadText(file), games, &manifestError))
-                    games.clear();
-            }
+            // The games' versions: one hidden line of the release's notes; none: no game updates.
+            if (kitOk)
+                ParseGamesLine(kit.notes, kit.tag, games);
         }
         std::error_code fsError;
         fs::remove_all(temp, fsError);
@@ -853,7 +853,7 @@ void UpdateManager::UpdateLauncher()
     m_thread = std::thread([this] {
         ReleaseInfo release;
         { std::lock_guard lock(m_mutex); release = m_state.launcher; m_state.error.clear(); m_state.note.clear(); }
-        const std::string assetName = LauncherAssetIn(release); // the new name, else the one 0.4.x releases carry
+        const std::string assetName = LauncherAssetName();
         auto progress = [&](uint64_t bytes) {
             const ReleaseAsset* asset = FindAsset(release, assetName);
             std::lock_guard lock(m_mutex);
@@ -868,7 +868,7 @@ void UpdateManager::UpdateLauncher()
             // The app can't be replaced where it is: the disk image, opened for the player to drag from.
             std::string error;
             fs::path folder = fs::temp_directory_path() / "skylauncher-update";
-            fs::path dmg = DownloadVerified(release, FirstOffered(release, { "ArkeyanLauncher-macOS.dmg", "Skylauncher-macOS.dmg" }), folder, progress, &m_cancel, error);
+            fs::path dmg = DownloadVerified(release, "ArkeyanLauncher-macOS.dmg", folder, progress, &m_cancel, error);
             if (dmg.empty())
                 Fail(error);
             else

@@ -790,7 +790,7 @@ void EditChecks()
 
 int ShellChecks(const std::filesystem::path& scratch); // tests/shell_test.cpp
 void MakeKitRelease(const std::filesystem::path& folder, const std::vector<std::string>& tags, const std::filesystem::path& kitFolder,
-    const std::string& gamesJson = {}); // tests/shell_test.cpp
+    const std::string& gamesLine = {}); // tests/shell_test.cpp
 int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test.cpp
 int I18nChecks(); // tests/i18n_test.cpp
 int UninstallChecks(const std::filesystem::path& scratch); // tests/uninstall_test.cpp
@@ -877,13 +877,12 @@ static void KitFlowChecks(const std::filesystem::path& scratch, const std::strin
     std::string nextVersion = nextTag.substr(1);
     std::ofstream(newKit / "kit.txt") << "version=0.5.0\nbuild=kit-new\ngames=ssa,giants\ngame_version.ssa=0.9.0\ngame_version.giants=0.8.0\n";
     MakeKitRelease(scratch / "kitflow" / "release", { "v" + LauncherVersion(), nextTag }, newKit);
-    // A release that bumps Giants only: its kit says Giants 0.8.1, its games.json too, and Spyro's Adventure stays at 0.9.0.
+    // A release that bumps Giants only: its kit says Giants 0.8.1, its notes say so, and Spyro's Adventure stays at 0.9.0.
     fs::path newerKit = scratch / "kitflow" / "kit-newer";
     fs::copy(SKYLAUNCHER_FAKE_KIT, newerKit, fs::copy_options::recursive);
     std::ofstream(newerKit / "kit.txt") << "version=" << nextVersion << "\nbuild=kit-new\ngames=ssa,giants\ngame_version.ssa=0.9.0\ngame_version.giants=0.8.1\n";
     MakeKitRelease(scratch / "kitflow" / "release-updates", { nextTag }, newerKit,
-        R"({"games":[{"id":"ssa","version":"0.9.0","kit":")" + nextTag + R"(","notes":""},{"id":"giants","version":"0.8.1","kit":")" + nextTag +
-            R"(","notes":"Fixes a crash in the Toy Box."}]})");
+        "ssa=0.9.0 giants=0.8.1");
 
     struct Case { const char* mode; const char* kitText; };
     const Case cases[] = {

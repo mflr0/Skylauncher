@@ -430,7 +430,7 @@ namespace launcher_ui
         bool UpdateAvailable() const;                   // the release has a newer version of this game than the one built (docs/updates.md)
         bool UpdateAvailable(const GameSlot& slot) const;
         bool AnyGameUpdate() const;
-        const GameUpdate* PendingUpdate(const GameSlot& slot) const; // the game's entry in the release's games.json, if any
+        const GameUpdate* PendingUpdate(const GameSlot& slot) const; // the game's entry in the release's games line, if any
         std::string WantedKitTag(const GameSlot& slot) const;        // the release whose kit INSTALL / UPDATE must be using
         std::string GameVersion(const GameSlot& slot) const;         // "0.8.2": the built game's, else the kit's; "" when unknown
         void StartInstall();
@@ -508,7 +508,7 @@ namespace launcher_ui
         bool m_updateManual = false;     // the running check was asked for: say the answer, even "up to date"
         bool m_updateLater = false;      // the player closed the banner for this session
         bool m_testPlayWithout = false;        // tests: press "Play without updating" on the next frame
-        std::vector<GameUpdate> m_gameUpdates; // the games.json of the last answered check
+        std::vector<GameUpdate> m_gameUpdates; // the games line of the last answered check
         bool m_whatsNewOpen = false;
         bool m_updateWasBusy = false;
         std::string m_updateDoneNote;    // the last answer of a manual check, shown in About
