@@ -171,6 +171,11 @@ namespace launcher_ui
     {
         if (!DiscStillThere())
             return;
+        if (m_session.Running() == m_s->game.id) // its build can't be replaced while it runs
+        {
+            Toast(Tf("{} is running", GameName(m_s->game.id, GameNameForm::Short)), ui::ToastKind::Error);
+            return;
+        }
         RefreshInstall();
         if (m_s->kit && m_s->kit->chosen && !m_s->kit->Builds(m_s->game.id))
         {
@@ -257,7 +262,7 @@ namespace launcher_ui
             for (const auto& opened : m_slots)
                 if (std::string_view(opened->game.id) == id)
                     slot = opened.get();
-            if (slot == nullptr || !UpdateAvailable(*slot))
+            if (slot == nullptr || !UpdateAvailable(*slot) || m_session.Running() == id) // a running game keeps its build
                 continue;
             GameSlot* shown = m_s;
             const Page page = m_page;

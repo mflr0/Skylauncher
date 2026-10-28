@@ -28,3 +28,9 @@ SavedReport SaveProblemReport(const std::string& configPath, const LauncherConfi
 
 // Saves a report already built (the Support page shows it before it is saved).
 SavedReport SaveProblemReportText(const std::string& text, bool show = true);
+
+// "The game stopped unexpectedly" (the crash dialog): Report (writes the same report file as Settings > Support, shows it in the
+// file manager and opens a GitHub issue to attach it to), Copy log (the dialog stays), Close. Over `parent` when given.
+struct SDL_Window;
+void ShowGameStopped(const GameInfo& game, int exitCode, const std::string& configPath, const LauncherConfig& config,
+    const std::string& iso, SDL_Window* parent = nullptr);

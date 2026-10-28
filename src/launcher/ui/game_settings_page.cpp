@@ -481,7 +481,7 @@ namespace launcher_ui
     {
         if (!m_s->saveBackupsLoaded)
             RefreshSaveBackups();
-        const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id));
+        const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id)) || m_session.Running() == m_s->game.id;
         ui::SectionHeader(Tr("Save backups"), running ? Tr("The game is running: quit it to restore a backup.") : Tr("Earlier versions of your saves."), false);
         ui::ButtonOptions folder;
         folder.icon = ui::Icon::Folder;
@@ -577,7 +577,7 @@ namespace launcher_ui
         if (!m_s->dataSizesLoaded)
             RefreshDataSizes();
         const GameFolders folders = FoldersOf(m_s->game.id);
-        const bool busy = Installing(), running = GameIsRunning(folders);
+        const bool busy = Installing(), running = GameIsRunning(folders) || m_session.Running() == m_s->game.id;
         auto hold = [](const char* tooltip, bool disabled = false) {
             ui::ButtonOptions options;
             options.kind = ui::ButtonKind::Danger;

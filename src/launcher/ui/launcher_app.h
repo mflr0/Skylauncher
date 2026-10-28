@@ -175,7 +175,7 @@ namespace launcher_ui
     enum class SlotState
     {
         Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame, DataDamaged,
-        DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready
+        DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready, Running
     };
     // The shape and colour that say a game's state: never the colour alone (the sidebar, Home's cards, the page). IconOf: the
     // state's own icon (a disc, an update, a download...), else the status's.
@@ -281,6 +281,7 @@ namespace launcher_ui
             bool buttonEnabled = true; // and whether it can be pressed
         };
         SlotLine SlotStatus(GameSlot* slot);
+        SlotLine SlotLineOf(GameSlot* slot); // the same, as if no game were running
         float PlayBandH() const; // the game page's band under the art: the main action, and the pad legend when a pad is in use
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
 
@@ -471,8 +472,10 @@ namespace launcher_ui
         void TestUpdatesScript(uint64_t now);
         void TestSeatXScript(uint64_t now);
         void TestButtonsScript(uint64_t now);
-        void PlayNow(); // PLAY on the shown game: its disc and built game are what the launcher returns
+        void TestRunningScript(uint64_t now);
+        void PlayNow(); // PLAY on the shown game: starts it beside the window (m_startGames), else returns its disc and build
         void AutoPlay(); // --play: PLAY as soon as the shown game's disc is checked, if it can
+        void PollGame(); // the game running: its end (a crash is told), or one found running
 
         std::string m_configPath;
         LauncherConfig& m_config;
@@ -498,6 +501,9 @@ namespace launcher_ui
         SettingsTab m_tab = SettingsTab::Controls;
         GameTab m_gameTab = GameTab::Video;
         bool m_autoPlay = false; // --play: start the game as soon as it is ready (a desktop shortcut)
+        bool m_startGames = false; // PLAY starts the game and the window stays (LauncherOptions)
+        GameSession m_session;     // the game running: one at a time (game_run.h)
+        std::string m_sessionIso;  // the disc image it was started with (the crash report names it)
         ProbeJob m_probe;
         launcher_portal::Watcher m_portal;
         bool m_reportOpen = false;      // "Report a problem" shown (support_page.cpp)
@@ -550,6 +556,7 @@ namespace launcher_ui
         bool m_testPadInput = false;   // SKY_LAUNCHER_TEST_INPUT=pad (or SCREENS=pad): any script's shots as with a pad (its legends, the ring)
         int m_testFocusView = -1;      // the page and tab the last pad focus was given on
         bool m_testPad = false;        // SKY_LAUNCHER_TEST_PAD: each game's Controller tab, and Swap Force's Game tab
+        bool m_testRunning = false;      // SKY_LAUNCHER_TEST_RUNNING: one game at a time (TestRunningScript)
         bool m_testAchievements = false; // SKY_LAUNCHER_TEST_ACHIEVEMENTS: the shown game's page with its play time, then its achievements
         bool m_testLogo = false;       // SKY_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end

@@ -17,6 +17,7 @@
 #endif
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <fstream>
 #include <string>
 
@@ -169,6 +170,90 @@ namespace
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR");
 #endif
         printf("Game run: capture of stdout and stderr, exit code, logs text and portal probe checked\n");
+    }
+
+    // One game at a time (GameSession): a game started here is watched to its exit (its code: a crash); a second start, of it or
+    // of another game, is refused while it runs; a game found by its marker (one started by hand) counts too; and one left
+    // running when the launcher closed is found by the next launcher by the marker the game keeps (save_backup.h).
+    void GameSessionChecks(const std::filesystem::path& scratch)
+    {
+#if !defined(_WIN32)
+        namespace fs = std::filesystem;
+        const fs::path root = scratch / "session";
+        fs::create_directories(root / "logs");
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR", (root / "logs").string().c_str(), true);
+        auto script = [&](const char* name, const std::string& body) {
+            const fs::path path = root / name;
+            std::ofstream(path) << "#!/bin/sh\n" << body;
+            fs::permissions(path, fs::perms::owner_all);
+            return path.string();
+        };
+        // Polls as the window does until the game stops (at most 10 s).
+        auto waitEnd = [](GameSession& session) {
+            for (const uint64_t start = SDL_GetTicks(); SDL_GetTicks() - start < 10000; SDL_Delay(20))
+                if (std::optional<GameSession::Ended> ended = session.Poll(SDL_GetTicks()))
+                    return ended;
+            return std::optional<GameSession::Ended>();
+        };
+        std::map<std::string, bool> marked; // the games' markers, as this test sets them
+        GameSession session({ "ssa", "giants" }, [&](const std::string& game) { return marked[game]; });
+        GameLaunch launch;
+        launch.runtime = script("quits.sh", "echo \"language $SKY_LANGUAGE\"\nsleep 1\nexit 0\n");
+        launch.variables = { { "SKY_LANGUAGE", "fr" } };
+        std::string error;
+        SHELL_EXPECT(session.Running().empty() && session.Start("ssa", launch, "disc.iso", error));
+        SHELL_EXPECT(session.Running() == "ssa" && session.Ours());
+        SHELL_EXPECT(!session.Start("ssa", launch, "disc.iso", error) && error == "Spyro's Adventure is running"); // a double click
+        SHELL_EXPECT(!session.Start("giants", launch, "disc.iso", error) && session.Running() == "ssa");        // another game
+        std::optional<GameSession::Ended> ended = waitEnd(session);
+        SHELL_EXPECT(ended && ended->game == "ssa" && ended->ours && ended->exitCode == 0);
+        SHELL_EXPECT(session.Running().empty() && !session.Ours());
+        const std::string capture = ReadLogTail(root / "logs" / CaptureLogName);
+        SHELL_EXPECT(capture.find("language fr") != std::string::npos && capture.find("# exit code 0") != std::string::npos);
+        // A crash: its exit code, and the next game can start.
+        launch.runtime = script("crashes.sh", "exit 7\n");
+        SHELL_EXPECT(session.Start("giants", launch, "disc.iso", error));
+        ended = waitEnd(session);
+        SHELL_EXPECT(ended && ended->game == "giants" && ended->ours && ended->exitCode == 7 && session.Running().empty());
+        // A game found by its marker: nothing starts until it is gone.
+        marked["giants"] = true;
+        SHELL_EXPECT(!session.Poll(SDL_GetTicks()) && session.Running() == "giants" && !session.Ours());
+        SHELL_EXPECT(!session.Start("ssa", launch, "disc.iso", error) && error == "Giants is running");
+        marked["giants"] = false;
+        ended = session.Poll(SDL_GetTicks() + 2 * GameSession::MarkerMs);
+        SHELL_EXPECT(ended && ended->game == "giants" && !ended->ours && session.Running().empty());
+        // Started by hand a moment ago (the next look at the markers not due yet): Start sees it at once.
+        marked["ssa"] = true;
+        SHELL_EXPECT(!session.Start("giants", launch, "disc.iso", error) && session.Running() == "ssa");
+        marked["ssa"] = false;
+        ended = session.Poll(SDL_GetTicks() + 4 * GameSession::MarkerMs);
+        SHELL_EXPECT(ended && session.Running().empty());
+        // A runtime that isn't there: refused, nothing runs.
+        launch.runtime = (root / "nowhere").string();
+        SHELL_EXPECT(!session.Start("ssa", launch, "disc.iso", error) && session.Running().empty() && !session.Ours());
+
+        // The launcher closed while its game runs, then opened again: the game runs on, and the next launcher finds it by its
+        // marker (written and removed by the stand-in as the runtime does), and starts nothing until it is gone.
+        const fs::path saves = root / "saves", lock = savebackup::LockFile(saves);
+        launch.runtime = script("stays.sh", "mkdir -p '" + lock.parent_path().string() + "'\necho $$ > '" + lock.string() +
+            "'\nsleep 2\nrm -f '" + lock.string() + "'\n");
+        auto marker = [&](const std::string&) { return savebackup::GameRunning(saves); };
+        {
+            GameSession first({ "ssa" }, marker);
+            SHELL_EXPECT(first.Start("ssa", launch, "disc.iso", error));
+            for (const uint64_t start = SDL_GetTicks(); !savebackup::GameRunning(saves) && SDL_GetTicks() - start < 5000;)
+                SDL_Delay(20);
+        }
+        GameSession second({ "ssa" }, marker);
+        SHELL_EXPECT(!second.Poll(SDL_GetTicks()) && second.Running() == "ssa" && !second.Ours());
+        SHELL_EXPECT(!second.Start("ssa", launch, "disc.iso", error));
+        ended = waitEnd(second);
+        SHELL_EXPECT(ended && ended->game == "ssa" && !ended->ours && second.Running().empty());
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR");
+        printf("One game at a time: start, refusals, exit codes, markers and a launcher restarted while its game runs checked\n");
+#else
+        (void)scratch;
+#endif
     }
 }
 
@@ -698,6 +783,7 @@ int ShellChecks(const std::filesystem::path& scratch)
 {
     ChecklistChecks(scratch);
     GameRunChecks(scratch);
+    GameSessionChecks(scratch);
     UpdaterChecks(scratch);
     DirectoryListChecks(scratch);
     KitFollowChecks(scratch);

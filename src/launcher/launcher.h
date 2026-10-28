@@ -6,6 +6,7 @@
 #include <map>
 #include <span>
 #include <string>
+#include <utility>
 #include <string_view>
 #include <vector>
 
@@ -84,8 +85,9 @@ void FreezeLauncherConfig();
 // its names also under the others (SKY_X, SSA_X; SKY_LAUNCHER_X, SKYLAUNCHER_X, SSA_LAUNCHER_X), without replacing one already set. A
 // game built by an older kit reads only the SSA_ names, a newer one the SKY_ names (shared/env.h). The launcher's own environment is
 // not changed. The caller passes it as SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER and destroys it (SDL_DestroyEnvironment).
+// `set`: variables given on top (a game's settings: GameLaunch), each under all its names, replacing what they held.
 struct SDL_Environment;
-SDL_Environment* CreateGameEnvironment();
+SDL_Environment* CreateGameEnvironment(const std::vector<std::pair<std::string, std::string>>& set = {});
 // Sets a variable under all its names, replacing what they held.
 void SetGameVariable(const char* currentName, const char* value);
 // Removes a variable under all its names ("SKY_LAUNCHER_SHOTS" also removes SKYLAUNCHER_SHOTS and SSA_LAUNCHER_SHOTS).

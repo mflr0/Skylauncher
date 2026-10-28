@@ -1,12 +1,19 @@
 #pragma once
 
 // Running the game and what it leaves behind for support (docs/support.md): the launcher starts the runtime with its output
-// piped into skylauncher-game.log, waits for it, and reports an unexpected exit. SSARecomp.log, written by the runtime
-// itself, sits in the same folder. "Test the portal" runs the runtime's --portal-probe.
+// in skylauncher-game.log, watches it while the window stays open (GameSession: one game at a time), and reports an unexpected
+// exit. SSARecomp.log, written by the runtime itself, sits in the same folder. "Test the portal" runs the runtime's --portal-probe.
+#include "launcher/launcher.h"
 #include <cstdint>
 #include <filesystem>
+#include <functional>
+#include <optional>
 #include <string>
+#include <utility>
 #include <vector>
+
+struct SDL_IOStream;
+struct SDL_Process;
 
 // The launcher's logs folder: skylauncher-game.log, migration.log (<data root>/logs).
 std::filesystem::path GameLogFolder();
@@ -26,6 +33,59 @@ struct GameRunResult
 // Starts `runtime` with the disc image and waits until it exits. Its stdout and stderr go to skylauncher-game.log (the
 // previous one is kept as skylauncher-game.prev.log). `extraArguments` follow the disc image.
 GameRunResult RunGame(const std::string& runtime, const std::string& iso, const std::vector<std::string>& extraArguments = {});
+
+// What PLAY starts: the runtime, and the variables it gets on top of the launcher's own environment (each under all its names:
+// launcher.h, CreateGameEnvironment).
+struct GameLaunch
+{
+    std::string runtime;
+    std::vector<std::pair<std::string, std::string>> variables;
+    std::string error; // no runtime: what to tell the player
+};
+// Puts the game's own video settings and keys into [video] and [input] and saves the settings file, then finds the runtime
+// (SKY_LAUNCHER_RUNTIME, else `installed`: the game the launcher built, else the player's own) and the variables: the portal,
+// the languages the disc holds, an older build's folders (docs/settings.md).
+GameLaunch PrepareGameLaunch(const GameInfo& game, LauncherConfig& config, const std::string& configPath, const std::string& installed);
+
+// One game at a time (docs/launcher_ui.md, "A game running"). PLAY starts the game without waiting for it: its output goes
+// straight into skylauncher-game.log, so it runs on if the launcher is closed. The game started here is watched until it
+// exits (its exit code tells a crash); one this launcher did not start (an earlier launcher's, one started by hand) is seen
+// by the marker each game keeps while it runs (save_backup.h, GameRunning), looked at every MarkerMs.
+class GameSession
+{
+public:
+    using Marker = std::function<bool(const std::string& game)>; // true while that game's marker says it runs
+    static constexpr uint64_t MarkerMs = 1000;
+    // `games`: the ids whose markers are looked at; `marker`: the game's own by default (GameIsRunning).
+    explicit GameSession(std::vector<std::string> games, Marker marker = {});
+    ~GameSession(); // the game runs on: only the watch ends
+    GameSession(const GameSession&) = delete;
+    GameSession& operator=(const GameSession&) = delete;
+
+    // Starts `launch.runtime` with the disc image for `game`. False, with `error`, when a game runs already (this one or
+    // another, started here or not) or the runtime can't start.
+    bool Start(const std::string& game, const GameLaunch& launch, const std::string& iso, std::string& error);
+    struct Ended
+    {
+        std::string game;
+        bool ours = false; // started here: its exit code is known
+        int exitCode = 0;
+    };
+    // Sees the game's exit, and the markers (`nowMs`: SDL_GetTicks). The game that stopped since the last call, if any.
+    std::optional<Ended> Poll(uint64_t nowMs);
+    const std::string& Running() const { return m_game; } // the game that runs, "" for none
+    bool Ours() const { return m_process != nullptr; }
+
+private:
+    std::string Marked() const; // the first game whose marker is up
+    std::vector<std::string> m_games;
+    Marker m_marker;
+    std::string m_game;
+    SDL_Process* m_process = nullptr;
+    SDL_IOStream* m_log = nullptr;
+    uint64_t m_nextLook = 0;
+    void* m_handle = nullptr; // Windows: our own handle on the process, for its exit code
+};
 
 // The last `maxBytes` of a file, from the start of a line; empty when missing.
 std::string ReadLogTail(const std::filesystem::path& file, size_t maxBytes = 256 * 1024);

@@ -1,8 +1,4 @@
-// Arkeyan Launcher: shows the launcher, then starts the game runtime with the disc image the player chose.
-#include "launcher/game_install.h"
-#include "launcher/game_keys.h"
-#include "launcher/game_settings.h"
-#include "launcher/i18n.h"
+// Arkeyan Launcher: shows the launcher; PLAY starts the game runtime from the window, which stays open (game_run.h, GameSession).
 #include "shared/collection/datadir.h"
 #include "launcher/game_run.h"
 #include "launcher/launcher.h"
@@ -11,53 +7,8 @@
 #include "launcher/ui/launcher_ui.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
-#include <algorithm>
 #include <cstdio>
-#include <fmt/format.h>
 #include <string>
-
-namespace
-{
-    std::string UrlEncode(const std::string& text)
-    {
-        std::string out;
-        for (unsigned char c : text)
-            if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
-                out += char(c);
-            else
-                out += fmt::format("%{:02X}", c);
-        return out;
-    }
-
-    // "The game stopped unexpectedly": Report (writes the same report file as Settings > Support, shows it in the file manager and
-    // opens a GitHub issue to attach it to), Copy log (the dialog stays), Close.
-    void ShowGameStopped(const GameInfo& game, int exitCode, const std::string& configPath, const LauncherConfig& config,
-        const std::string& iso)
-    {
-        SDL_InitSubSystem(SDL_INIT_VIDEO);
-        std::string message = Tf("{} stopped unexpectedly (exit code {}).\n\nPress Report to save a report file with the log and where the game stopped.", game.name, exitCode);
-        const SDL_MessageBoxButtonData buttons[] = { { SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT, 2, Tr("Report") }, { 0, 1, Tr("Copy log") },
-            { SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT, 0, Tr("Close") } };
-        SDL_MessageBoxData box{ SDL_MESSAGEBOX_ERROR, nullptr, Tr("The game stopped unexpectedly"), message.c_str(), 3, buttons, nullptr };
-        for (;;)
-        {
-            int pressed = 0;
-            if (!SDL_ShowMessageBox(&box, &pressed) || pressed == 0)
-                return;
-            if (pressed == 1)
-            {
-                SDL_SetClipboardText(GameLogText().c_str());
-                continue;
-            }
-            SavedReport saved = SaveProblemReport(configPath, config, game.id, iso);
-            std::string title = fmt::format("The game stopped unexpectedly (exit code {})", exitCode);
-            std::string body = "What I was doing:\n\n\n" + (saved.file.empty() ? std::string("The report file could not be saved; the log is below.\n")
-                : "The report file is " + saved.file.filename().string() + " (on my Desktop or in the logs folder); I attach it here:\n\n");
-            SDL_OpenURL(("https://github.com/mflr0/Skylauncher/issues/new?title=" + UrlEncode(title) + "&body=" + UrlEncode(body)).c_str());
-            return;
-        }
-    }
-}
 
 int main(int argc, char** argv)
 {
@@ -99,75 +50,22 @@ int main(int argc, char** argv)
     LauncherOptions options;
     options.openGame = !arguments.game.empty() && FindGame(arguments.game) != nullptr;
     options.play = arguments.play;
+    options.startGames = true;
     std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed, &game, options);
     if (chosen.empty())
         return 0;
 
-    // SKY_LAUNCHER_RUNTIME, else the game built for this disc, else the player's own runtime.
-    std::string runtime = FindRuntime(*game, config, true);
-    if (runtime.empty())
-        runtime = !installed.empty() ? installed : FindRuntime(*game, config);
-    if (runtime.empty())
+    // A screenshot script that plays (SKY_LAUNCHER_TEST_PLAY) returns its choice: the game runs here, the window closed. PLAY
+    // itself starts the game from the window, which stays (GameSession).
+    GameLaunch launch = PrepareGameLaunch(*game, config, configPath, installed);
+    if (launch.runtime.empty())
     {
-        std::string message = Tf("The game ({}) wasn't found next to Arkeyan Launcher.\n\nPut it in the same folder.", game->runtime);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, message.c_str(), nullptr);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, game->name, launch.error.c_str(), nullptr);
         return 1;
     }
-
-    // Settings the runtime already takes from its environment (the rest it reads from launcher.ini; docs/settings.md).
-    auto pass = [&](const char* variable, const char* section, const char* key) {
-        auto entry = config.find(section);
-        if (entry == config.end())
-            return;
-        auto value = entry->second.find(key);
-        if (value != entry->second.end() && !value->second.empty())
-            SetGameVariable(variable, value->second.c_str());
-    };
-    // The video settings of this game are what the runtime reads from [video] (game_settings.h).
-    ApplyGameVideo(config, game->id);
-    ApplyGameInput(config, game->id); // and its keys, in [input]
-    SaveLauncherConfig(configPath, config);
-    pass("SKY_PORTAL", "portal", "mode");
-    // [portal] place is the older list of figures to start on the portal; once the seats moved to the session file
-    // ([collection] moved) a left-over one would put its figures back over the seats the player chose.
-    if (config["collection"]["moved"] != "1")
-        pass("SKY_PORTAL_PLACE", "portal", "place");
-    // A language the disc does not hold is not passed as is: the text takes the disc's first language and the voices
-    // follow the text, which is what the Language tab shows then. Nothing known about the disc: passed as saved.
-    const art::DiscLanguages onDisc = StoredDiscLanguages(config, game->id);
-    auto passLanguage = [&](const char* variable, const char* key, const std::vector<std::string>& held, bool firstHeld) {
-        auto entry = config.find(game->id);
-        if (entry == config.end())
-            return;
-        auto value = entry->second.find(key);
-        if (value == entry->second.end() || value->second.empty())
-            return;
-        if (held.empty() || std::find(held.begin(), held.end(), value->second) != held.end())
-            SetGameVariable(variable, value->second.c_str());
-        else if (firstHeld)
-            SetGameVariable(variable, held.front().c_str());
-    };
-    passLanguage("SKY_LANGUAGE", "language", onDisc.text, true);
-    passLanguage("SKY_VOICE_LANGUAGE", "voice_language", onDisc.voice, false);
-
-    // A game built before the one data folder would look for its saves and settings in the older folders, which the
-    // migration emptied: point it at the new ones until "Update the game" rebuilds it (docs/install.md, "Older builds").
-    std::filesystem::path gameFolder = GameInstallFolder({});
-    if (IsOlderLayoutBuild(std::filesystem::path(std::u8string(runtime.begin(), runtime.end())), gameFolder))
-    {
-        auto set = [](const char* variable, const std::filesystem::path& path) {
-            std::u8string text = path.u8string();
-            SetGameVariable(variable, std::string(text.begin(), text.end()).c_str());
-        };
-        set("SKY_LAUNCHER_INI", std::filesystem::path(std::u8string(configPath.begin(), configPath.end())));
-        set("SKY_SAVE_DIR", gameFolder / "saves");
-        set("SKY_LOG", gameFolder / "SSARecomp.log");
-        set("SKY_PORTRAITS", gameFolder / "portraits");
-    }
-
-    // The launcher stays until the game ends: it keeps the game's output in skylauncher-game.log, and says so if the game
-    // stops with an error (docs/support.md).
-    GameRunResult run = RunGame(runtime, chosen);
+    for (const auto& [name, value] : launch.variables)
+        SetGameVariable(name.c_str(), value.c_str());
+    GameRunResult run = RunGame(launch.runtime, chosen);
     // The game's own menu (F3) writes [<game>.video] and [<game>.audio] itself, and they win over [video]: nothing is copied back.
     if (!run.started)
     {

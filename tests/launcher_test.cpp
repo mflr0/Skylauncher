@@ -1002,6 +1002,49 @@ static void NavChecks(const std::filesystem::path& scratch, const std::string& i
     printf("Pad navigation: %d of 14 steps\n", shots);
 }
 
+// One game at a time in the window (App::TestRunningScript): PLAY starts a stand-in game (a script that runs two seconds and exits
+// with 3) and the window stays; its button says Running, a second PLAY starts nothing, another game's button waits; once it stops
+// its crash is told and PLAY is back. A child process, as NavChecks; scratch folders only.
+static void RunningChecks(const std::filesystem::path& scratch, const std::string& iso)
+{
+#if !defined(_WIN32)
+    std::filesystem::path root = scratch / "running";
+    std::filesystem::create_directories(root / "shots");
+    std::filesystem::create_directories(root / "home");
+    const std::filesystem::path game = root / "fake_game.sh";
+    std::ofstream(game) << "#!/bin/sh\necho started with \"$1\"\nsleep 2\nexit 3\n";
+    std::filesystem::permissions(game, std::filesystem::perms::owner_all);
+    std::string quoted;
+    for (char c : iso)
+        quoted += c == '\'' ? std::string("'\\''") : std::string(1, c);
+    std::string command = "env -u SKY_MIGRATE_FROM -u SKY_FIGURES -u SKY_SETTINGS -u SSA_MIGRATE_FROM -u SSA_FIGURES -u SSA_SETTINGS SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy HOME='" + (root / "home").string() +
+        "' SKYLANDERS_DATA='" + (root / "data").string() + "' SKY_LAUNCHER_DATA='" + (root / "launcher").string() +
+        "' SKY_COLLECTION='" + (root / "collection").string() + "' SKY_SAVE_DIR='" + (root / "saves").string() +
+        "' SKY_LAUNCHER_LOG_DIR='" + (root / "logs").string() + "' SKY_LAUNCHER_RUNTIME='" + game.string() +
+        "' SKY_LAUNCHER_INI='" + (root / "x.ini").string() + "' SKY_LAUNCHER_NO_UPDATE_CHECK=1 SKY_LAUNCHER_SHOTS='" + (root / "shots").string() +
+        "' SKY_LAUNCHER_TEST_DROP='" + quoted + "' SKY_LAUNCHER_TEST_RUNNING=1 '" + SKYLAUNCHER_TEST_EXE + "' > '" + (root / "out.txt").string() + "' 2>&1";
+    EXPECT(std::system(command.c_str()) == 0);
+    std::ifstream in(root / "out.txt");
+    std::string line;
+    int shots = 0;
+    while (std::getline(in, line))
+    {
+        if (line.find("FAIL") != std::string::npos)
+            fprintf(stderr, "%s\n", line.c_str());
+        EXPECT(line.find("FAIL") == std::string::npos);
+        shots += line.find("launcher: shot") != std::string::npos;
+    }
+    EXPECT(shots == 3);
+    // The game's output went straight into its log, with the exit code after it.
+    const std::string capture = ReadLogTail(root / "logs" / CaptureLogName);
+    EXPECT(capture.find("started with") != std::string::npos && capture.find("exit code 3") != std::string::npos);
+    printf("One game at a time: %d of 3 steps\n", shots);
+#else
+    (void)scratch;
+    (void)iso;
+#endif
+}
+
 // The achievements and the play time as the game page shows them (game_progress.h): rows from a list and the unlocks, the hidden
 // ones, the texts of the play time line. No disc: the disc's list is checked with each game's pictures below.
 int AchievementChecks()
@@ -1311,6 +1354,7 @@ int main(int argc, char** argv)
     printf("The seats' X in the window:\n");
     SeatXChecks(scratch);
     NavChecks(scratch, iso.string());
+    RunningChecks(scratch, iso.string());
     printf("Command line without UI:\n");
     EXPECT(ResolveHeadless({ iso.string() }) == iso.string());
     EXPECT(ResolveHeadless({ "--select-iso", iso.string() }) == iso.string());

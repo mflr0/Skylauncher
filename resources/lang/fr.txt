@@ -839,6 +839,10 @@ Difficulty	Difficulté
 Nightmare from the start	Cauchemar dès le début
 Offered before you beat the game. Your save is not changed.	Proposé avant d'avoir fini le jeu. Votre sauvegarde n'est pas modifiée.
 
+# One game at a time (the game page, the sidebar)
+Running	En cours
+{} is running	{} est en cours
+
 # Achievements and play time (the game page, Achievements)
 Achievements	Succès
 Hidden achievement	Succès caché

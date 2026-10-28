@@ -5,6 +5,7 @@
 #include "launcher/env.h"
 #include "launcher/ui/text_fit.h"
 #include "launcher/install_checklist.h"
+#include "launcher/problem_report.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/collection/datadir.h"
 #include "shared/embedded_fonts.h"
@@ -394,6 +395,7 @@ namespace launcher_ui
             m_testGallery = LauncherEnv("SKY_LAUNCHER_TEST_GALLERY") != nullptr;
             m_testPad = LauncherEnv("SKY_LAUNCHER_TEST_PAD") != nullptr;
             m_testAchievements = LauncherEnv("SKY_LAUNCHER_TEST_ACHIEVEMENTS") != nullptr;
+            m_testRunning = LauncherEnv("SKY_LAUNCHER_TEST_RUNNING") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -401,12 +403,24 @@ namespace launcher_ui
         return true;
     }
 
+    namespace
+    {
+        std::vector<std::string> GameIds()
+        {
+            std::vector<std::string> ids;
+            for (const GameInfo& each : g_games)
+                ids.emplace_back(each.id);
+            return ids;
+        }
+    }
+
     App::App(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const LauncherOptions& options)
-        : m_configPath(configPath), m_config(config)
+        : m_configPath(configPath), m_config(config), m_session(GameIds())
     {
         m_s = &SlotFor(game);
         SetActiveGame(game.id);
         m_autoPlay = options.play;
+        m_startGames = options.startGames;
         if (options.openGame)
             m_page = Page::Play; // a shortcut opens on the game, not on the launcher's menu
         for (const GameInfo& each : g_games)
@@ -564,6 +578,7 @@ namespace launcher_ui
             while (SDL_PollEvent(&event))
                 HandleEvent(event);
             PollSlots();
+            PollGame();
             CheckQueuedDiscs();
             PollUpdateAll();
             PollUpdates();
@@ -834,11 +849,41 @@ namespace launcher_ui
     {
         if (!DiscStillThere())
             return;
+        if (m_startGames)
+        {
+            // The game starts beside the window, which stays: one game at a time (GameSession refuses a second one).
+            if (!m_s->fromCopy)
+                Set(m_s->game.id, "iso", m_s->discPath);
+            const GameLaunch launch = PrepareGameLaunch(m_s->game, m_config, m_configPath, m_s->installed.runtime);
+            std::string error;
+            if (launch.runtime.empty())
+                Toast(Tr("Couldn't start the game: the file is missing"), ui::ToastKind::Error);
+            else if (!m_session.Start(m_s->game.id, launch, m_s->discPath, error))
+                Toast(error, ui::ToastKind::Error);
+            else
+                m_sessionIso = m_s->discPath;
+            return;
+        }
         m_s->chosen = m_s->discPath;
         m_s->chosenRuntime = m_s->installed.runtime;
         if (!m_s->fromCopy)
             Set(m_s->game.id, "iso", m_s->chosen);
         m_running = false;
+    }
+
+    void App::PollGame()
+    {
+        const std::optional<GameSession::Ended> ended = m_session.Poll(SDL_GetTicks());
+        if (!ended)
+            return;
+        m_progressAt = 0; // its play time and unlocks are read again
+        const GameInfo* game = FindGame(ended->game);
+        if (!ended->ours || ended->exitCode == 0 || game == nullptr)
+            return;
+        if (!m_shots.empty()) // a screenshot script: no dialog that waits for a click
+            m_drawn["stopped"] = fmt::format("{} {}", ended->game, ended->exitCode);
+        else
+            ShowGameStopped(*game, ended->exitCode, m_configPath, m_config, m_sessionIso, m_window);
     }
 
     // --play (a desktop shortcut): PLAY as soon as the shown game's disc is checked and the game is built. If it can't
@@ -1022,6 +1067,26 @@ namespace launcher_ui
         };
         if (slot == nullptr)
             return line(S::Closed, Tr("Open"), Accent, Tr(strings::ChooseDisc));
+        // One game at a time: the one running says so; the others' buttons wait for it (Running, after the rest).
+        const std::string& running = m_session.Running();
+        if (running == slot->game.id)
+            return line(S::Running, Tr("Running"), Ready, Tr("Running"), false);
+        SlotLine result = SlotLineOf(slot);
+        if (!running.empty() && result.buttonEnabled)
+        {
+            result.button = Tf("{} is running", GameName(running, GameNameForm::Short));
+            result.buttonEnabled = false;
+        }
+        return result;
+    }
+
+    // A game's state as if none were running (SlotStatus).
+    App::SlotLine App::SlotLineOf(GameSlot* slot)
+    {
+        using S = SlotState;
+        auto line = [](S state, const char* text, unsigned dot, const char* button, bool enabled = true, float progress = -1) {
+            return SlotLine{ text, dot, progress, state, button, enabled };
+        };
         const bool built = !slot->installed.runtime.empty();
         if (slot->installer.Running() || slot->kitDownload.Running())
         {
@@ -1081,7 +1146,7 @@ namespace launcher_ui
         case S::Closed: return ui::Status::Neutral;
         case S::Checking: case S::DownloadingTools: case S::Installing: case S::Updating: case S::Finishing: return ui::Status::Busy;
         case S::NoDisc: case S::Interrupted: case S::ReadyToInstall: case S::UpdateAvailable: return ui::Status::Info;
-        case S::Ready: return ui::Status::Success;
+        case S::Ready: case S::Running: return ui::Status::Success;
         default: return ui::Status::Error; // the disc's problems, a damaged copy, a failed build
         }
     }
@@ -1095,6 +1160,7 @@ namespace launcher_ui
         case S::ReadyToInstall: return ui::Icon::Download;
         case S::UpdateAvailable: return ui::Icon::Update;
         case S::Interrupted: return ui::Icon::Pause;
+        case S::Running: return ui::Icon::Play;
         default: return ui::IconOf(StatusOf(state));
         }
     }
@@ -1317,6 +1383,7 @@ namespace launcher_ui
             options.icon = ui::Icon::Download;
             const std::string tooltip = Tf("Updates {} games, one after the other", GamesToUpdate());
             options.tooltip = tooltip.c_str();
+            options.disabled = !m_session.Running().empty(); // a game is running: its build can't be replaced
             ImGui::SetCursorScreenPos(ImVec2(right.x - ui::ButtonWidth(Tr("Update all"), options), y));
             if (ui::Button(Tr("Update all"), options))
                 StartUpdateAll();
@@ -1613,7 +1680,7 @@ namespace launcher_ui
             // the copy replaces the disc image.
             const std::string file = m_s->fromCopy ? Tr("Copied game data")
                 : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 64);
-            const bool changeDisc = ready && !installing && !m_s->fromCopy;
+            const bool changeDisc = ready && !installing && !m_s->fromCopy && m_session.Running() != m_s->game.id;
             const ui::ButtonOptions change{ .size = ui::Size::Small };
             const float changeW = changeDisc ? ui::ButtonWidth(Tr("Change disc..."), change) : 0;
             // The head: the overline and the file name (XXS between them), the button centred on the two; the body S below,
@@ -2327,7 +2394,8 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || m_testAchievements || m_testScreens != 0 || !m_testKit.empty())
+            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || m_testAchievements || m_testRunning ||
+                m_testScreens != 0 || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
                 Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
@@ -3244,6 +3312,84 @@ namespace launcher_ui
         }
     }
 
+    // One game at a time (SKY_LAUNCHER_TEST_RUNNING, with SKY_LAUNCHER_RUNTIME a stand-in game that runs a few seconds and exits
+    // with 3, and SKY_LAUNCHER_TEST_DROP Spyro's Adventure's disc): PLAY starts it and the window stays; its button says Running,
+    // a second PLAY starts nothing, another game's button waits for it; once it stops (a crash: its exit code is told) PLAY is
+    // back. Shots: running-1-game, running-2-other, running-3-ended.
+    void App::TestRunningScript(uint64_t now)
+    {
+        GameSlot& ssa = SlotFor(*FindGame("ssa"));
+        GameSlot& giants = SlotFor(*FindGame("giants"));
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL running step %d: %s (running \"%s\")\n", m_testStep, what, m_session.Running().c_str());
+                m_testFailures++;
+            }
+        };
+        auto shoot = [&](const char* name) {
+            m_page = Page::Play;
+            m_testShot = fmt::format("running-{}", name);
+            m_testAt = now + 600;
+        };
+        switch (m_testStep)
+        {
+        case 0:
+            m_startGames = true;
+            SelectGame(*FindGame("giants"));
+            SelectGame(*FindGame("ssa"));
+            if (ssa.disc == DiscState::None && !m_testDrop.empty())
+                StartVerify(m_testDrop);
+            m_page = Page::Play;
+            m_testBegan = now;
+            m_testStep = 1;
+            return;
+        case 1:
+        {
+            if (ssa.disc == DiscState::Verifying)
+                return;
+            expect(ssa.disc == DiscState::Ready, "the disc is checked");
+            ssa.installed.runtime = "test-built"; // built by hand: SKY_LAUNCHER_RUNTIME is what runs
+            PlayNow();
+            PlayNow(); // a double click: still one game
+            const SlotLine line = SlotStatus(&ssa);
+            expect(m_session.Running() == "ssa" && m_session.Ours(), "PLAY starts the game, the window stays");
+            expect(line.state == SlotState::Running && line.button == "Running" && !line.buttonEnabled && line.text == "Running", "its button says Running, off");
+            expect(!m_toasts.Items().empty() && m_toasts.Items().back().text == "Spyro's Adventure is running", "the second PLAY is refused");
+            m_toasts.Clear();
+            shoot("1-game");
+            return;
+        }
+        case 2:
+        {
+            SelectGame(*FindGame("giants"));
+            const SlotLine line = SlotStatus(&giants);
+            expect(line.button == "Spyro's Adventure is running" && !line.buttonEnabled, "another game waits for it");
+            shoot("2-other");
+            return;
+        }
+        case 3:
+            if (m_session.Ours())
+            {
+                if (now - m_testBegan > 30000)
+                {
+                    expect(false, "the stand-in game stops");
+                    m_running = false;
+                }
+                return;
+            }
+            expect(m_session.Running().empty(), "nothing runs once it stopped");
+            expect(m_drawn["stopped"] == "ssa 3", "its crash is told");
+            SelectGame(*FindGame("ssa"));
+            expect(SlotStatus(&ssa).button == "PLAY" && SlotStatus(&ssa).buttonEnabled && SlotStatus(&giants).buttonEnabled, "PLAY is back");
+            shoot("3-ended");
+            return;
+        default:
+            m_running = false;
+            return;
+        }
+    }
+
     void App::TestScript()
     {
         if (m_shots.empty() || m_testAt != 0)
@@ -3267,6 +3413,11 @@ namespace launcher_ui
         if (m_testScreens != 0)
         {
             TestScreensScript(now);
+            return;
+        }
+        if (m_testRunning)
+        {
+            TestRunningScript(now);
             return;
         }
         if (m_testPad)
