@@ -106,7 +106,7 @@ namespace launcher_ui
         // The best picture of a toy (its variant's artwork when the game has one, else a portrait), fitted into the square
         // `box` at `at` and centred; the drawn icon when there is none.
         void DrawPicture(ImDrawList* draw, const collection::Toy* toy, collection::VariantKind kind, uint16_t variant, ImVec2 at, float box);
-        // A swapper's picture, its two halves stacked as the game's swap screen shows them (shared/collection/icons.h,
+        // A swapper's picture, its two halves joined as the game's swap screen shows them (shared/collection/icons.h,
         // SwapperPicture), fitted into the square `box` at `at` and centred. False when a half has no such picture from
         // a disc: the caller draws the top's picture with the bottom small in a corner (DrawBottom).
         bool DrawSwapper(ImDrawList* draw, const collection::Toy* top, uint16_t topVariant, const collection::Toy* bottom, uint16_t bottomVariant, ImVec2 at, float box);

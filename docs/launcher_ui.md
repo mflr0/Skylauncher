@@ -313,7 +313,7 @@ differs per game is the provider's table.
 - **A logo is never drawn above its own pixels** (`App::DrawLogo`: one texel per device pixel at most, with the display's
   scale taken in): a picture stretched past its size only blurs, and a game whose disc has a smaller logo (Swap Force's is
   872 px wide, SSA's 1024 and Giants' 1033) is not enlarged to match the others. In a large window the logo stops growing.
-- Swapper cards show the swap screen's pictures of both halves, stacked (`docs/collection_ui.md`); they are read from the
+- Swapper cards show the swap screen's pictures of both halves, joined at the waist (`docs/collection_ui.md`); they are read from the
   disc with the other artworks (`artworks/`, the `halves` of the catalogue).
 - The toys' pictures follow one rule (`collection::PortraitPath`): the shown game's, else the other game's, else the
   toy's family picture, else the generated icon (see `docs/collection_ui.md`).
