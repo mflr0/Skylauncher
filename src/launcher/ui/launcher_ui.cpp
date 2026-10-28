@@ -381,6 +381,7 @@ namespace launcher_ui
             m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
             m_testLogo = LauncherEnv("SKY_LAUNCHER_TEST_LOGO") != nullptr;
             m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
+            m_testGallery = LauncherEnv("SKY_LAUNCHER_TEST_GALLERY") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -2228,6 +2229,24 @@ namespace launcher_ui
             ui::Ctx().glyphs = family == PadFamily::PlayStation || family == PadFamily::PlayStation3 ? ui::Glyphs::PlayStation
                 : family == PadFamily::Nintendo ? ui::Glyphs::Nintendo : ui::Glyphs::Xbox;
         }
+        if (m_testGallery)
+        {
+            DrawGallery();
+            ImGui::Render();
+            ImGuiIO& galleryIo = ImGui::GetIO();
+            SDL_SetRenderScale(m_renderer, galleryIo.DisplayFramebufferScale.x, galleryIo.DisplayFramebufferScale.y);
+            SDL_SetRenderDrawColor(m_renderer, 30, 30, 36, 255);
+            SDL_RenderClear(m_renderer);
+            ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+            if (!m_shots.empty() && m_testAt != 0 && SDL_GetTicks() >= m_testAt)
+            {
+                Screenshot(m_testShot.c_str());
+                m_testAt = 0;
+                m_testStep++;
+            }
+            SDL_RenderPresent(m_renderer);
+            return;
+        }
         if (!m_backTaken && (ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false)))
             Back();
         DrawBackdrop();
@@ -3128,6 +3147,11 @@ namespace launcher_ui
         if (m_testButtons)
         {
             TestButtonsScript(now);
+            return;
+        }
+        if (m_testGallery)
+        {
+            TestGalleryScript(now);
             return;
         }
         if (m_testNav)

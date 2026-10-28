@@ -341,6 +341,9 @@ namespace launcher_ui
         void DrawProblemReport();
         void DrawToast();
         void DrawQuitPrompt();
+        // SKY_LAUNCHER_TEST_GALLERY (gallery.cpp): every component in every state, page by page, in place of the window's pages.
+        void DrawGallery();
+        void TestGalleryScript(uint64_t now);
 
         // Pages and focus. The sidebar and the page are separate windows, which the D-pad doesn't cross: B / Escape
         // moves the focus to the sidebar (or leaves Settings and Collection), A on a row moves it into the page.
@@ -571,6 +574,8 @@ namespace launcher_ui
         bool m_testControllers = false; // open the controller menu (its screenshot)
         bool m_testButtons = false;     // SKY_LAUNCHER_TEST_BUTTONS: the action button's states, both games
         bool m_testButtonsOff = false;  // its "disabled" shot: the main button drawn disabled
+        bool m_testGallery = false;     // SKY_LAUNCHER_TEST_GALLERY: the component gallery (gallery.cpp)
+        int m_galleryPage = 0;          // the gallery's page shown
         std::string m_testShot;         // the next shot's name, for scripts that name their own
         float m_testUiScale = 0;        // > 0: the UI scale, whatever the display (the button test)
         ImVec2 m_testMainAt, m_testGearAt; // the action button's two halves' centres, last drawn (where the script points)
