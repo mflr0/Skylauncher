@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fmt/format.h>
 #include <map>
@@ -45,6 +46,33 @@ namespace launcher_ui
         return slot < 4 ? slot / 2 : slot - 2;
     }
 
+    // The collection's own spelling of a dump's path (a portal.txt line may use another: backslashes, "//", a symlink), so the
+    // seats, the shelf and the sheets all name a figure the same way. Anything else is left as it is.
+    static std::string Canonical(const std::string& path)
+    {
+        std::string normal = path;
+        std::replace(normal.begin(), normal.end(), '\\', '/');
+        std::error_code error;
+        fs::path file(normal);
+        if (file.has_filename() && fs::equivalent(file.parent_path(), fs::path(collection::Folder()), error) && !error)
+            return collection::PathOf(file.filename().string());
+        return path;
+    }
+
+    // The dump's first four bytes (its serial): 0 when unreadable. Two files with one serial are one toy.
+    static uint32_t SerialOf(const std::string& path)
+    {
+        size_t size = 0;
+        void* data = SDL_LoadFile(path.c_str(), &size);
+        if (data == nullptr)
+            return 0;
+        uint32_t serial = 0;
+        if (size >= 4)
+            memcpy(&serial, data, 4);
+        SDL_free(data);
+        return serial;
+    }
+
     bool SeatAccepts(const collection::Seat& seat, const collection::Figure& figure)
     {
         return figure.toy == nullptr || std::find(seat.accepts.begin(), seat.accepts.end(), figure.toy->category) != seat.accepts.end();
@@ -72,9 +100,16 @@ namespace launcher_ui
             size_t space = line.find(' ');
             if (space == std::string::npos)
                 continue;
-            Placed p{ atoi(line.c_str()), collection::MigratedPath(line.substr(space + 1)), {} };
-            if (collection::Read(p.path, p.figure))
-                placed.push_back(std::move(p));
+            Placed p{ atoi(line.c_str()), Canonical(collection::MigratedPath(line.substr(space + 1))), {} };
+            // One toy sits once: the same file on two lines (a hand edit), or two files of one serial, count for the first.
+            bool again = std::any_of(placed.begin(), placed.end(), [&](const Placed& other) { return other.path == p.path; });
+            if (!again && collection::Read(p.path, p.figure))
+            {
+                uint32_t serial = SerialOf(p.path);
+                again = serial != 0 && std::any_of(placed.begin(), placed.end(), [&](const Placed& other) { return SerialOf(other.path) == serial; });
+                if (!again)
+                    placed.push_back(std::move(p));
+            }
         }
         // A swapper is one seat: its bottom (the top's partner, when the top is placed too) is not a seat of its own.
         for (size_t i = 0; i < placed.size();)
@@ -135,7 +170,17 @@ namespace launcher_ui
         }
         std::error_code error;
         fs::create_directories(fs::path(file).parent_path(), error);
-        return SDL_SaveFile(file.c_str(), text.data(), text.size());
+        // Written beside, then renamed over: a crash leaves the old seats or the new ones, never half a file.
+        std::string temporary = file + ".tmp";
+        if (!SDL_SaveFile(temporary.c_str(), text.data(), text.size()))
+            return false;
+        fs::rename(temporary, file, error);
+        if (error)
+        {
+            fs::remove(temporary, error);
+            return false;
+        }
+        return true;
     }
 
     std::string ShortGameName(const std::string& game)
@@ -282,15 +327,26 @@ namespace launcher_ui
         for (const collection::Figure& figure : figures)
             if (figure.path == path)
                 return &figure;
+        const std::string canonical = Canonical(path);
+        for (const collection::Figure& figure : figures)
+            if (figure.path == canonical)
+                return &figure;
         return nullptr;
     }
 
     std::string CollectionModel::RunningGame() const
     {
+        // This game first: another game's busy figure must not hide it (and the other way round, the first one found is named).
+        std::string other;
         for (const collection::Figure& figure : figures)
             if (figure.lock.Busy() && figure.lock.game != "launcher")
-                return figure.lock.game;
-        return {};
+            {
+                if (figure.lock.game == gameId)
+                    return gameId;
+                if (other.empty())
+                    other = figure.lock.game;
+            }
+        return other;
     }
 
     bool CollectionModel::CanEditSeats() const
@@ -303,11 +359,16 @@ namespace launcher_ui
     {
         if (!CanEditSeats() || seat >= seats.size())
             return false;
-        if (!path.empty())
+        const std::string spelled = Canonical(path);
+        if (!spelled.empty())
+        {
+            // A figure sits on one seat, and so does a toy: another file of the same serial leaves its seat too.
+            const uint32_t serial = SerialOf(spelled);
             for (std::string& other : seats)
-                if (other == path)
+                if (other == spelled || (serial != 0 && !other.empty() && SerialOf(other) == serial))
                     other.clear();
-        seats[seat] = path;
+        }
+        seats[seat] = spelled;
         if (!WriteSeats(*Game(), SessionFile(*Game()), seats))
             return false;
         m_signature = Signature();
@@ -317,7 +378,7 @@ namespace launcher_ui
     int CollectionModel::SeatOf(const std::string& path) const
     {
         for (size_t i = 0; i < seats.size(); i++)
-            if (!path.empty() && seats[i] == path)
+            if (!path.empty() && (seats[i] == path || seats[i] == Canonical(path)))
                 return int(i);
         return -1;
     }
@@ -407,6 +468,18 @@ namespace launcher_ui
     {
         size_t first = text.find_first_not_of(" \t"), last = text.find_last_not_of(" \t");
         return first == std::string_view::npos ? std::string() : std::string(text.substr(first, last - first + 1));
+    }
+
+    uint16_t GoldFromText(std::string_view text)
+    {
+        unsigned long gold = 0;
+        for (char c : text)
+        {
+            if (c < '0' || c > '9')
+                break;
+            gold = std::min<unsigned long>(gold * 10 + unsigned(c - '0'), figures::MaxGold);
+        }
+        return uint16_t(gold);
     }
 
     figures::FigureStats MergeEditedStats(const figures::FigureStats& now, const figures::FigureStats& base, const figures::FigureStats& edited,

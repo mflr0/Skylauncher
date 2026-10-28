@@ -350,6 +350,8 @@ LauncherConfig LoadLauncherConfig(const std::string& path)
         return config;
 
     std::string_view text(data, size);
+    if (text.substr(0, 3) == "\xEF\xBB\xBF") // a UTF-8 byte order mark (Notepad): it would hide the first [section]
+        text.remove_prefix(3);
     std::string section;
     while (!text.empty())
     {
@@ -390,7 +392,18 @@ bool SaveLauncherConfig(const std::string& path, const LauncherConfig& config)
         for (const auto& [key, value] : values)
             text += key + "=" + value + "\n";
     }
-    return SDL_SaveFile(path.c_str(), text.data(), text.size());
+    // Beside, then renamed over: launcher.ini also holds the install records, a half-written file would lose them.
+    std::string temporary = path + ".tmp";
+    if (!SDL_SaveFile(temporary.c_str(), text.data(), text.size()))
+        return false;
+    std::error_code error;
+    std::filesystem::rename(temporary, path, error);
+    if (error)
+    {
+        std::filesystem::remove(temporary, error);
+        return false;
+    }
+    return true;
 }
 
 namespace

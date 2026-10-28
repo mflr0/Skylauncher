@@ -364,6 +364,29 @@ namespace
         EXPECT(launcher_ui::ReadSeats(ssa, session) == std::vector<std::string>(4)); // the file names nothing
         EXPECT(model.SetSeat(0, spyro) && model.SetSeat(2, anvil)); // as before, for the checks below
         EXPECT(model.Poll(1000000, 0) == false); // nothing changed since Load (SetSeat's own write is not a change)
+        // Edit stats' gold: digits only, never above the game's limit (issue #9).
+        EXPECT(launcher_ui::GoldFromText("1234") == 1234 && launcher_ui::GoldFromText("99999999") == figures::MaxGold &&
+            launcher_ui::GoldFromText("") == 0 && launcher_ui::GoldFromText("5+5") == 5 && launcher_ui::GoldFromText("abc") == 0 &&
+            launcher_ui::GoldFromText("-7") == 0 && launcher_ui::GoldFromText("65000") == 65000 && launcher_ui::GoldFromText("65001") == figures::MaxGold);
+        // A seat line spelled another way still names the figure: "//" or backslashes, the same file twice (issue #9).
+        {
+            std::string folderPath = collection::Folder();
+            std::string odd = folderPath + "//" + std::filesystem::path(gill).filename().string();
+            { std::ofstream(session) << "0 " << odd << "\n1 " << gill << "\n2 " << anvil << "\n"; }
+            seats = launcher_ui::ReadSeats(ssa, session);
+            EXPECT(seats[0] == gill && seats[1].empty() && seats[2] == anvil); // once, in the collection's spelling
+            model.Load();
+            EXPECT(model.SeatOf(odd) == 0 && model.Find(odd) != nullptr && model.Find(odd)->path == gill);
+            // Two files with one serial are one toy: the second leaves the first's seat. No temp file stays beside the seats.
+            std::string twin = collection::PathOf("901 Gill Twin.sky");
+            std::filesystem::copy_file(gill, twin, std::filesystem::copy_options::overwrite_existing);
+            model.Load();
+            EXPECT(model.SetSeat(0, gill) && model.SetSeat(1, twin) && model.seats[0].empty() && model.seats[1] == twin);
+            EXPECT(!std::filesystem::exists(session + ".tmp"));
+            EXPECT(model.SetSeat(1, "") && model.SetSeat(0, spyro) && model.SetSeat(2, anvil));
+            std::filesystem::remove(twin);
+            model.Load();
+        }
         // While a game holds a figure: the seats are read-only. When its dump changes the model reloads.
         if (otherPid > 0)
         {
@@ -1275,6 +1298,8 @@ int main(int argc, char** argv)
     LauncherConfig edited = LoadLauncherConfig((scratch / "edited.ini").string());
     EXPECT(edited.size() == 1 && edited["ssa"].size() == 1 && edited["ssa"]["iso"] == "/a b/c.iso");
     EXPECT(LoadLauncherConfig((scratch / "missing.ini").string()).empty());
+    { std::ofstream((scratch / "bom.ini").string(), std::ios::binary) << "\xEF\xBB\xBF[launcher]\nlanguage=fr\n"; }
+    EXPECT(LoadLauncherConfig((scratch / "bom.ini").string())["launcher"]["language"] == "fr"); // a byte order mark hides nothing
 
     LauncherConfig video;
     video["video"]["aspect"] = "16:9";

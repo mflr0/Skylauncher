@@ -731,7 +731,7 @@ namespace launcher_ui
             if (ImGui::SliderInt("##level", &level, 1, cap, "%d", ImGuiSliderFlags_AlwaysClamp))
                 figures::SetExperienceFor(m_edit, cap, figures::LevelExperience[std::clamp(level, 1, cap) - 1]);
             int experience = int(figures::ExperienceFor(m_edit, cap));
-            label(Tr("Experience"));
+            label(Tf("Experience (0 to {})", figures::LevelExperience[cap - 1]).c_str());
             ImGui::SetNextItemWidth(FieldW);
             if (ImGui::InputInt("##xp", &experience, 100, 1000))
                 figures::SetExperienceFor(m_edit, cap, uint32_t(std::clamp(experience, 0, int(figures::LevelExperience[cap - 1]))));
@@ -757,18 +757,19 @@ namespace launcher_ui
         {
             ImGui::SameLine(0, ColumnGap);
             ImGui::BeginGroup();
-            label(Tr("Gold"));
+            label(Tf("Gold (0 to {})", figures::MaxGold).c_str());
             ImGui::SetNextItemWidth(FieldW);
             char gold[8];
             snprintf(gold, sizeof gold, "%u", unsigned(m_edit.gold));
             auto digitsOnly = [](ImGuiInputTextCallbackData* data) { return data->EventChar >= '0' && data->EventChar <= '9' ? 0 : 1; };
             if (ImGui::InputText("##gold", gold, sizeof gold, ImGuiInputTextFlags_CallbackCharFilter, digitsOnly))
-                m_edit.gold = uint16_t(std::min(strtol(gold, nullptr, 10), long(figures::MaxGold)));
+                m_edit.gold = GoldFromText(gold);
+            constexpr int MaxHeroPoints = 100;
             int hero = m_edit.heroPoints;
-            label(Tr("Hero points"));
+            label(Tf("Hero points (0 to {})", MaxHeroPoints).c_str());
             ImGui::SetNextItemWidth(FieldW);
             if (ImGui::InputInt("##hero", &hero, 1, 10))
-                m_edit.heroPoints = uint16_t(std::clamp(hero, 0, 100));
+                m_edit.heroPoints = uint16_t(std::clamp(hero, 0, MaxHeroPoints));
             label(Tr("Nickname (16 max)"));
             ImGui::SetNextItemWidth(FieldW);
             ImGui::InputText("##nick", m_nickname, sizeof(m_nickname));
