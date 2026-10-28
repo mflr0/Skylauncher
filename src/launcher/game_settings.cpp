@@ -15,7 +15,8 @@ namespace
         "anisotropy", "aspect", "texture_packs", "texture_dump", "original_resolution" };
 
     // Top-level names in the game's folder (docs/install.md has the table).
-    constexpr std::array<const char*, 3> SaveNames = { "saves", "saves-backup", "portal.txt" };
+    // The achievements and the play time (collection/progress.h) go with the saves: kept when the game is removed, deleted with them.
+    constexpr std::array<const char*, 5> SaveNames = { "saves", "saves-backup", "portal.txt", "achievements.txt", "playtime.txt" };
     constexpr std::array<const char*, 3> CacheNames = { "pipelines.bin", "launcher-cache", "portraits" };
     // Never removed by uninstalling: the player's data, and what comes from the disc and is cheap to keep.
     // "gamedata" is the copied game data (game_copy.h): like the disc image it came from, it is only removed from the Disc tab.
@@ -82,6 +83,8 @@ namespace
             paths.push_back(savebackup::BackupRoot(folders.saves));
         }
         paths.push_back(folders.game / "portal.txt");
+        paths.push_back(folders.game / "achievements.txt");
+        paths.push_back(folders.game / "playtime.txt");
         return paths;
     }
 

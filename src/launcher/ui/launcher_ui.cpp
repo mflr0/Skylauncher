@@ -242,7 +242,12 @@ namespace launcher_ui
                 if (disc.Open(image.c_str()))
                 {
                     if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
+                    {
                         metadata = ReadTitleMetadata(xex);
+                        // The achievements: the list, its texts and pictures, cached once for this default.xex (game_progress.h).
+                        if (std::filesystem::path folder = AchievementCacheFolder(game.id); !folder.empty() && !achievements::CacheIsCurrent(folder, result.xexSha256))
+                            achievements::WriteCache(folder, result.xexSha256, xex);
+                    }
                     // The game's own art and its toys' portraits, decoded from the player's disc into the game's data
                     // folder (never shipped); a second time, only what is missing.
                     report(0.98f, Tr("Reading the game's pictures"));
@@ -380,6 +385,7 @@ namespace launcher_ui
             m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
             m_testLogo = LauncherEnv("SKY_LAUNCHER_TEST_LOGO") != nullptr;
             m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
+            m_testAchievements = LauncherEnv("SKY_LAUNCHER_TEST_ACHIEVEMENTS") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -1414,14 +1420,14 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             // Selected only once the player has picked it: Play is that game's page.
-            bool selected = (m_page == Page::Play || m_page == Page::GameSettings) && std::string_view(entry.id) == m_s->game.id;
+            bool selected = (m_page == Page::Play || m_page == Page::GameSettings || m_page == Page::Achievements) && std::string_view(entry.id) == m_s->game.id;
             if (row("game", GameRowH, selected, entry.enabled && !m_uninstalled, position))
             {
                 if (std::string_view(entry.id) != m_s->game.id)
                     SelectGame(*FindGame(entry.id));
                 GoTo(Page::Play);
             }
-            if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings))
+            if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings || m_page == Page::Achievements))
                 TakeFocus(FocusTo::Sidebar);
             // The game's logo (with "Skylanders" on it) once its disc has been read, here or in an earlier session; a game
             // that isn't out yet keeps its neutral badge: its initial on its colour.
@@ -1696,6 +1702,7 @@ namespace launcher_ui
 
     void App::DrawPlay()
     {
+        RefreshProgress();
         // Edge to edge: the game's logo on top, a band with the main button below it.
         ImVec2 position = ImGui::GetCursorScreenPos();
         ImVec2 available = ImGui::GetContentRegionAvail();
@@ -1732,8 +1739,11 @@ namespace launcher_ui
             ImGui::PopFont();
         }
 
-        // The disc, bottom left of the hero: the image's file name, its status under it ("Change disc..." on the right).
-        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 116));
+        // The disc, bottom left of the hero: the image's file name, its status under it ("Change disc..." on the right), and the play
+        // time (kept by the game itself: collection/progress.h), which lifts the group by its line.
+        const std::string played = PlayTimeLine(m_progress.play, int64_t(std::time(nullptr)));
+        const bool showPlayed = !played.empty() && m_s->disc != DiscState::Verifying && m_s->disc != DiscState::Failed && !m_s->installView;
+        ImGui::SetCursorScreenPos(ImVec2(position.x + 40, end.y - 116 - (showPlayed ? 26 : 0)));
         ImGui::BeginGroup();
         if (!m_s->installView) // the progress card takes the whole hero
         {
@@ -1832,6 +1842,8 @@ namespace launcher_ui
                 }
                 break;
         }
+        if (showPlayed)
+            ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", played.c_str());
         ImGui::EndGroup();
         }
         ImGui::EndGroup();
@@ -1969,6 +1981,18 @@ namespace launcher_ui
             ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
             if (PillButton(Tr("Change disc..."), false, ChangeDiscW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
                 Browse();
+            ImGui::PopStyleVar();
+        }
+
+        // The achievements, under it: the list from the disc, once it was read (a disc check of this version).
+        if (m_progress.hasList && !installing && !m_s->installView)
+        {
+            const std::string label = Tf("Achievements {}/{}", m_progress.unlocked, m_progress.rows.size());
+            const float achievementsW = PillWidth(label.c_str(), 160, true);
+            ImGui::SetCursorScreenPos(ImVec2(mainX + PlayButtonW + PlayGearW - achievementsW, end.y - 64));
+            ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, Radius);
+            if (PillButton(label.c_str(), false, achievementsW, true, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+                GoTo(Page::Achievements);
             ImGui::PopStyleVar();
         }
     }
@@ -2221,11 +2245,11 @@ namespace launcher_ui
             return; // nothing else to do in a launcher that has removed itself (and nothing to write back)
         if ((page == Page::Settings || page == Page::Collection) && (m_page == Page::Home || m_page == Page::Play))
             m_backPage = m_page;
-        else if (page == Page::GameSettings)
-            m_backPage = Page::Play; // a game's settings are opened from its page, and close back to it
-        else if (page == Page::Settings && m_page == Page::GameSettings)
+        else if (page == Page::GameSettings || page == Page::Achievements)
+            m_backPage = Page::Play; // a game's settings and achievements are opened from its page, and close back to it
+        else if (page == Page::Settings && (m_page == Page::GameSettings || m_page == Page::Achievements))
             m_backPage = Page::Play;
-        else if (page == Page::Collection && m_page == Page::GameSettings)
+        else if (page == Page::Collection && (m_page == Page::GameSettings || m_page == Page::Achievements))
             m_backPage = Page::Play;
         m_page = page;
         m_capturing = nullptr;
@@ -2235,7 +2259,7 @@ namespace launcher_ui
     // B / Escape when nothing else took it: out of Settings and Collection, else to the sidebar.
     void App::Back()
     {
-        if (m_page == Page::Settings || m_page == Page::Collection || m_page == Page::GameSettings)
+        if (m_page == Page::Settings || m_page == Page::Collection || m_page == Page::GameSettings || m_page == Page::Achievements)
             GoTo(m_backPage);
         else
             RequestFocus(FocusTo::Sidebar);
@@ -2399,6 +2423,7 @@ namespace launcher_ui
         case Page::Collection: m_s->collection->Draw(); break;
         case Page::Settings: DrawSettings(); break;
         case Page::GameSettings: DrawGameSettings(); break;
+        case Page::Achievements: DrawAchievements(); break;
         }
         ImGui::End();
         ImGui::PopStyleVar();
@@ -2431,7 +2456,7 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || !m_testKit.empty())
+            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testAchievements || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
                 Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
@@ -3257,6 +3282,47 @@ namespace launcher_ui
             m_gameTab = GameTab::Keyboard;
             m_testShot = fmt::format("keys-{}", Games[m_testStep]);
             m_testAt = now + 600;
+            return;
+        }
+        if (m_testAchievements)
+        {
+            // The shown game's page with its disc verified and some progress, then its achievements (SKY_LAUNCHER_TEST_DROP names the disc;
+            // SKYLANDERS_DATA a scratch folder: the progress is written there).
+            switch (m_testStep)
+            {
+            case 0:
+                m_page = Page::Play;
+                m_testShot = "achievements-0-checking";
+                m_testAt = now + 300;
+                break;
+            case 1:
+                if (m_s->disc == DiscState::None && !m_testDrop.empty())
+                    StartVerify(m_testDrop);
+                if (m_s->disc == DiscState::Ready || m_s->disc == DiscState::Failed || m_testDrop.empty())
+                {
+                    // Six unlocks on different days, 12 h 34 of play, last played a moment ago.
+                    achievements::List list = achievements::ReadCache(AchievementCacheFolder(m_s->game.id), "en");
+                    const int64_t nowTime = int64_t(std::time(nullptr));
+                    for (size_t i = 0; i < list.items.size() && i < 6; i++)
+                        progress::WriteUnlock(progress::Folder(m_s->game.id), list.items[i * 2 % list.items.size()].id, nowTime - int64_t(i) * 86400 * 3 - 600);
+                    progress::WritePlayTime(progress::Folder(m_s->game.id), { 12 * 3600 + 34 * 60 + 20, nowTime - 90, 9 });
+                    RefreshProgress(true);
+                    m_testShot = "achievements-1-game";
+                    m_testAt = now + 1500;
+                }
+                break;
+            case 2:
+                GoTo(Page::Achievements);
+                m_testShot = "achievements-2-list";
+                m_testAt = now + 900;
+                break;
+            case 3:
+                m_testShot = "achievements-3-end";
+                m_testAt = now + 700;
+                break;
+            default:
+                m_running = false;
+            }
             return;
         }
         if (m_testLogo)

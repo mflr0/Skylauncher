@@ -115,6 +115,7 @@ add_library(ArkeyanLauncherCore STATIC
     src/launcher/launcher_games.cpp
     src/launcher/i18n.cpp
     src/launcher/game_install.cpp
+    src/launcher/game_progress.cpp
     src/launcher/ui/launcher_ui.cpp
     src/launcher/ui/collection_page.cpp
     src/launcher/ui/collection_figure.cpp
@@ -122,18 +123,21 @@ add_library(ArkeyanLauncherCore STATIC
     src/launcher/ui/collection_manage.cpp
     src/launcher/ui/collection_model.cpp
     src/launcher/ui/game_look.cpp
+    src/launcher/ui/achievements_page.cpp
     src/assets/launcher_assets.cpp
     src/shared/figures/figure_catalog.cpp
     src/shared/figures/figure_crypto.cpp
     src/shared/figures/figure_data.cpp
     src/shared/figures/figure_tag.cpp
     src/shared/figures/figure_icons.cpp
+    src/shared/collection/achievements.cpp
     src/shared/collection/catalogue.cpp
     src/shared/collection/collection.cpp
     src/shared/collection/datadir.cpp
     src/shared/collection/game_data.cpp
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
+    src/shared/collection/progress.cpp
     src/shared/collection/save_backup.cpp
     src/shared/collection/search.cpp
     src/shared/collection/upgrades.cpp

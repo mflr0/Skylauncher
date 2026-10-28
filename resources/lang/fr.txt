@@ -771,3 +771,13 @@ plays as {}	joue comme {}
 On the wheel	Sur la roue
 On the wheel: {}	Sur la roue : {}
 The wheel is full: take a figure off it first	La roue est pleine : retirez d’abord une figurine
+Achievements	Succès
+Achievements {}/{}	Succès {}/{}
+Hidden achievement	Succès caché
+The list comes from your disc: it appears once the game's disc image is checked.	La liste vient de votre disque : elle apparaît une fois l'image disque du jeu vérifiée.
+{} of {} unlocked · {} of {} G	{} sur {} débloqués · {} sur {} G
+Play time: {}	Temps de jeu : {}
+Last played: {}	Dernière partie : {}
+less than a minute	moins d'une minute
+today	aujourd'hui
+yesterday	hier
