@@ -200,7 +200,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 | | |
 |---|---|
 | When | One choice among many (languages, controllers, scale). |
-| API | `if (ui::BeginSelect(id, preview, SelectOptions{width, disabled})) { ui::SelectOption(label, selected, disabled)...; ui::EndSelect(); }` |
+| API | `if (ui::BeginSelect(id, preview, SelectOptions{width, disabled})) { ui::SelectOption(label, selected, disabled)...; ui::EndSelect(); }`; the value is cut with "..." before the chevron; an option's "label##id" shows its label only. |
 | States | Closed: the inset box with the value and a chevron; hover, focus ring, disabled. Open: the accent edge, the chevron up, a list of `Small` rows, a check on the chosen row (not colour alone), the keyboard and pad start on it. |
 
 ### Toggle
@@ -256,7 +256,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 | | |
 |---|---|
 | When | Every setting: the one settings idiom (Video, Controls, Launcher, the game tabs). |
-| API | `if (ui::BeginSettings(id)) { ui::SettingRow(label, hint, note); <its control>; ...; ui::EndSettings(); }`; the control column is `SettingControl` (320) wide, rows at least `Large`, a hairline between them. The label is drawn once the control is, centred on it (one line: its capitals on the control's middle; with a hint: the two as a block); a hint on two lines moves the control down to the block's middle. `note`: a small word after the label, on its baseline (a key's pad button). |
+| API | `if (ui::BeginSettings(id)) { ui::SettingRow(label, hint, note); <its control>; ...; ui::EndSettings(); }`; the control column is `SettingControl` (320) wide, rows at least `Large`, a hairline between them. The label is drawn once the control is, centred on it (one line: its capitals on the control's middle; with a hint: the two as a block); a hint on two lines moves the control down to the block's middle. `note`: a small word after the label, on its baseline (a key's pad button). The hint is drawn, not an item (a table lowers a row's text items to its fields' baseline). `ui::AlignRight(width)` ends a control or a group of buttons on the column's right edge. |
 | States | Those of its controls. |
 
 ### SectionHeader
@@ -406,8 +406,8 @@ only what each line says was not possible: see "Done" at the end of this part.
   `ModalActions`.
 - Quit prompt (`BeginPopupModal` 520): `ui::BeginModal(Small)` + `ModalActions(&open, "Quit", "Keep installing",
   ModalKind::Danger)`: the focus starts on Keep installing, B / Escape keep installing.
-- Toasts: switched; every success passes `ToastKind::Success`, every error `ToastKind::Error`, then the "Couldn't" guess in
-  `App::Toast` goes.
+- Toasts: switched; every success passes `ToastKind::Success`, every error `ToastKind::Error`; the "Couldn't" guess in
+  `App::Toast` is gone (2026-10-28).
 
 **Done (part 1).** Sidebar rows are `ui::ListRow`s (`ListRowOptions` gained `image`, `note`, `status`, `progress`, `dim`): the game's
 logo or initial in the image slot, its version as the note (left out when it would cut the name), `ui::DrawStatusIcon` through
@@ -426,7 +426,7 @@ percentage (the percentage is said once in the card), status icons per step, Ret
 (`Icon::Folder`), Show details (Ghost); Cancel stays Secondary (it keeps the install going on a tap, no hold). Update banner:
 Buttons (`overArt`), `ProgressBar` or `IndeterminateBar`; What's new `BeginModal(Large)` + `ModalActions`; quit prompt
 `BeginModal(Small)` + `ModalActions(Danger)`. Install and update toasts are typed. The sidebar's percentage is `FormatPercent`.
-`App::Toast(text, bool)`'s "Couldn't" guess stays until parts 2 and 3 (their call sites) are migrated: it goes with the last of them.
+`App::Toast(text, bool)` and its "Couldn't" guess are gone: every call says its `ToastKind` (2026-10-28).
 
 **2. All settings pages: done in phase B** (`launcher_ui.cpp` DrawSettings, DrawControls, DrawLauncherTab, DrawLauncherLanguage; `game_settings_page.cpp`;
 `game_data_page.cpp`; `support_page.cpp`; `uninstall_page.cpp`; `update_page.cpp` About and Updates)
@@ -520,6 +520,7 @@ shells, the toast kinds.)
 13. Two settings idioms (rows on Video, stacks elsewhere) and two toggle layouts (label after it, label in the row).
 14. `BigButton` is no longer drawn anywhere (the main action is `ui::MainAction`): delete it with the wrappers.
 15. Toast kinds: only "Game installed" is a success yet; the collection's errors are still found by their "Couldn't" prefix.
+    (Done: every toast says its kind.)
 
 ## Layout
 The launcher opens on Home, the menu page (the ARKEYAN LAUNCHER title goes back to it): empty for now, with "Report a bug" (a new
@@ -527,7 +528,7 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
 (`docs/translations.md`); the game's text and voice languages are in that game's settings (Language tab). The game shown last is selected in the sidebar (`[launcher] game=`); the other is one click away.
 1. Left sidebar (grey, fixed width) - the seven games as full-width rows (Spyro's Adventure, Giants and Swap Force enabled, the others "Coming later",
    SuperChargers Racing included), then Collection and Settings at the bottom. Each enabled row shows its game's icon
-   and its live state ("Open" until the game is first shown, then the states in "A game's states"); the
+   and its live state (every game's disc is checked at start-up, one after the other: "A game's states"); the
    selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
 2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
    (current device, PLAY WITH: a menu of the others), the main button (CHOOSE DISC, INSTALL, then PLAY) with the portal's
@@ -572,7 +573,9 @@ playable game (its painting from the disc behind its logo, its name and state; t
 ever read), then the games **coming later** as quiet chips in their colours; "Report a bug" (a new GitHub issue) and the
 GitHub link bottom right. A card opens its game's page. The launcher's own language is in Settings > Launcher > Language
 (`docs/translations.md`); the game's text and voice languages are in that game's settings ("Game text", "Game voices"). The game shown last is selected
-in the sidebar (`[launcher] game=`); the other is one click away.
+in the sidebar (`[launcher] game=`); the other is one click away. At start-up its disc is checked first, then the other games'
+discs, one after the other in the background (`App::CheckQueuedDiscs`: each as its first visit would, never two at once), so
+every game shows its real state and art at once ("Update all" on Home's title line when two or more have an update).
 1. **Left sidebar** (grey, fixed width).
    - The title, **ARKEYAN LAUNCHER**, with the launcher's version beside it on its baseline, small and dim (`v0.6.0`, from
      `LAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" (XXS under it) and, L below, YOUR GAMES; all on the
@@ -615,7 +618,7 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 `DiscState` / install state. In this order (the first that applies):
 | State | Sidebar and Home line | Icon | Main button |
 |---|---|---|---|
-| never shown this session | Open | a dashed circle, grey | CHOOSE DISC |
+| not checked yet (its turn in the start-up checks has not come; a screenshot script's games) | Open | a dashed circle, grey | CHOOSE DISC |
 | the kit being downloaded (the first step of an install or an update) | `Downloading tools 42 %` | the turning loader, blue | INSTALLING... (off) |
 | installing; its last step | `Installing 42 %`; `Finishing 97 %` | the turning loader, blue | INSTALLING... (off) |
 | updating a build; its last step | `Updating 42 %`; `Finishing 97 %` | the turning loader, blue | UPDATING... (off) |
@@ -669,14 +672,17 @@ read from the player's own disc.
   `docs/settings.md`, "Progress files"). `src/launcher/game_progress.{h,cpp}` joins them with the cached list in the launcher's language (English
   where a language has no text) and formats the play time line. The page reads them again every 1.5 s, so a game running beside the launcher shows
   its new unlocks.
-- **The game page** (Play) shows under the disc's lines "Play time: 12 h 34 · Last played: today" (`Last played`: today, yesterday, "3 days ago",
-  then the date); nothing for a game never played. An **Achievements 6/38** button, under "Change disc...", opens the page once the list is cached.
+- **The game page** (Play) shows in the disc block, under the disc's state, "Play time: 12 h 34 · Last played: today" (`Last played`: today,
+  yesterday, "3 days ago", then the date); nothing for a game never played. An **Achievements 6/38** button (a Small Button with Lucide's
+  trophy) at the right of the disc's state, on its line, opens the page once the list is cached.
 - **The Achievements page** (`ui/achievements_page.cpp`; `Page::Achievements`, which the sidebar and Back treat like the game's settings: B or Back
-  returns to the game page): the game's name, the totals ("6 of 38 unlocked · 180 of 1000 G"), the play time, a bar, then one row per
-  achievement in the game's order: its picture, name, description, gamerscore, and for an unlocked one the date (accent colour, full picture).
+  returns to the game page): a settings page's frame (`BeginSettingsPage`: the game's name, Back), one card: "Achievements" with the totals
+  ("6 of 38 unlocked · 180 of 1000 G") under it, a ProgressBar, the play time, then one row per achievement in the game's order: its picture
+  (48 points, `radius::Control`), its name over its description (the two centred on the row), its gamerscore on the name's baseline and, for
+  an unlocked one, the date under it (accent colour, full picture).
   A locked one is greyed and shows the game's own text for it (the locked description, else the unlocked one); a hidden one still locked shows
   "Hidden achievement" and the game's locked text, as the game shows it (none of the three discs has one: `BuildProgress` is checked on
-  made-up data). Rows take the keyboard and pad focus, which scrolls the list.
+  made-up data). The rows are not pressed (no ring on them): up and down on the keyboard or the pad scroll the page.
 - **Screenshots**: `SKY_LAUNCHER_TEST_ACHIEVEMENTS=1` (with `SKY_LAUNCHER_SHOTS`, `SKY_LAUNCHER_TEST_DROP=<disc>`, a scratch `SKYLANDERS_DATA`, `--game <id>`,
   `SKY_LAUNCHER_LANGUAGE=en|fr`) verifies the disc, writes six unlocks and 12 h 34 of play in the scratch folder, and shoots
   `achievements-1-game`, `achievements-2-list` and `achievements-3-end`.
@@ -785,7 +791,7 @@ always animates (`docs/settings.md`).
 - **Toasts.** `ui::Toasts` (`App::Toast(text, ui::ToastKind)`): bottom right, stacked upwards (newest at the bottom, at most
   4), above the game page's band and Home's buttons, each at most 420 points of text wide. Info and Success go by themselves
   after 2.5 s, longer for a long message (up to 6 s); the same message again refreshes the one shown. An Error
-  (`Toast(text, true)`, `ToastKind::Error`, or a text starting "Couldn't", as the collection's English toasts still are)
+  (`ToastKind::Error`; every call says its kind)
   stays until it is closed: a click, or, with the keyboard or pad in use, it takes the focus and A, B, Enter or Escape close it
   (the focus goes back to the page). Each kind has its icon and ring colour (an i, a check, a crossed circle). Texts are short,
   sober, no full stop; they are English in the code and go through the string table (`docs/translations.md`).
@@ -938,9 +944,10 @@ game's Video tab, `04-` the launcher's Controls) (it creates a few figures in `S
 
 `07-figure-sheet.png`, `08-new-figure.png`, `09-play-with.png` (the controller menu), `10-language.png`, `11-disc-gone.png`
 (INSTALL on an image that moved) and `12-logo-drop.png` (the logo early in its fall) (it creates a few figures in `SKY_COLLECTION` first: set it to a scratch folder). With `SKY_LAUNCHER_TEST_COLLECTION=1` it shows the collection's screens instead (`docs/collection_ui.md`).
-With `SKY_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `53-`): B to the sidebar, A into Collection, Y for
-the search, the D-pad to a seat, A to choose for it, down and A to put the first card there, X for a card's sheet, B back,
-RB in Settings.
+With `SKY_LAUNCHER_TEST_NAV=1` it sends keys as a player would (`40-` to `53-`): B to the sidebar, down past the three games and
+Coming later, A into Collection, Y for the search, the D-pad to a seat, A to choose for it, down and A to put the first card there,
+X for a card's sheet, B back, then down to Settings, A, RB to its Launcher tab, Escape. Each step's page is checked ("FAIL nav step";
+a timeout stops a run that went astray); `ArkeyanLauncherTest` runs it (`NavChecks`).
 With `SKY_LAUNCHER_TEST_INSTALL=1` and `SKY_LAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
 (`docs/install.md`). With `SKY_LAUNCHER_TEST_GALLERY=1` it shoots the component gallery ("Gallery").
 
@@ -950,6 +957,8 @@ With `SKY_LAUNCHER_TEST_INSTALL=1` and `SKY_LAUNCHER_KIT=$PWD/build/fake-kit` it
 Swap Force not opened); with `pad` each page's first stop has its ring and the pad legend shows. `SKY_LAUNCHER_LANGUAGE`,
 `SKY_LAUNCHER_TEST_SIZE` and `SKY_LAUNCHER_TEST_SCALE=2` (a Retina screen's density, the same layout) set the rest
 (`docs/polish_audit.md`, "Model screens").
+`SKY_LAUNCHER_TEST_INPUT=pad` shoots any script as a pad player sees it: the pad's glyphs and legends, the focus on each page's (or tab's)
+first stop with its ring.
 `SKY_LAUNCHER_TEST_KEYS=1` shoots each game's Keyboard tab (`keys-ssa`, `keys-giants`, `keys-swapforce`; `SKY_LAUNCHER_LANGUAGE=fr` for the French ones).
 `SKY_LAUNCHER_TEST_PAD=1` shoots each game's Controller tab with a few buttons given other jobs (`pad-ssa`, `pad-giants`, `pad-swapforce`)
 and Swap Force's Game tab with Nightmare from the start on (`game-swapforce`).
