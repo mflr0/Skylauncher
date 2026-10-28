@@ -600,6 +600,10 @@ namespace launcher_ui
             scaled.motion.y /= m_uiScale;
         }
         ImGui_ImplSDL3_ProcessEvent(&scaled);
+        // The focus ring is the keyboard's and the pad's: the pointer moving, pressing or scrolling hides it (ImGui shows it
+        // again on the next key or button that moves the focus).
+        if (event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_WHEEL)
+            ImGui::SetNavCursorVisible(false);
         switch (event.type)
         {
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
@@ -1398,7 +1402,7 @@ namespace launcher_ui
                     SelectGame(*FindGame(entry.id));
                 GoTo(Page::Play);
             }
-            if (i == 0)
+            if (std::string_view(entry.id) == m_s->game.id) // the page's first focus: the game shown last
                 TakeFocus(FocusTo::Page);
             if (hovered)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);

@@ -122,7 +122,8 @@ namespace ui
                 draw->AddRectFilled(ImVec2(at.x, at.y + rowH - stroke::Selection), ImVec2(at.x + text.x, at.y + rowH), Col(color::AccentFillPressed));
             else if (state.hovered)
                 draw->AddRectFilled(ImVec2(at.x, at.y + rowH - 1), ImVec2(at.x + text.x, at.y + rowH), Col(color::Hairline));
-            FocusRingIf(state, radius::Control);
+            if (state.focused) // the label's row with S of air at its sides: the ring is not drawn on the letters
+                FocusRing(ImVec2(at.x - space::S, at.y), ImVec2(at.x + text.x + space::S, at.y + rowH), radius::Control);
             ImGui::SameLine(0, space::XL);
         }
         PopText();
