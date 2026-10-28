@@ -9,7 +9,7 @@
 #include "shared/collection/datadir.h"
 #include "shared/embedded_fonts.h"
 #include "assets/launcher_assets.h"
-#include "launcher/theme/launcher_theme.h"
+#include "launcher/ui/theme/launcher_theme.h"
 #include "shared/vfs.h"
 #include <SDL3/SDL.h>
 #include <algorithm>

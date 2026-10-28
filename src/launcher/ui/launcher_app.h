@@ -15,7 +15,7 @@
 #include "launcher/ui/launcher_ui.h"
 #include "launcher/portal_status.h"
 #include "launcher/uninstall.h"
-#include "launcher/theme/launcher_theme.h"
+#include "launcher/ui/theme/launcher_theme.h"
 #include "launcher/ui/collection_page.h"
 #include "launcher/ui/hold_confirm.h"
 #include "shared/collection/save_backup.h"
