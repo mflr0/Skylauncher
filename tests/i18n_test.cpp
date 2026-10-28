@@ -277,6 +277,9 @@ int I18nChecks()
     i18n::SetLanguage("fr");
     I18N_EXPECT(i18n::Current() == "fr" && std::string(i18n::Tr("Cancel")) != "Cancel");
     I18N_EXPECT(std::string(i18n::Tr("A string no language has")) == "A string no language has");
+    // A failure toast is known in any language (it gets the red ring and the cross).
+    I18N_EXPECT(i18n::StartsLike(i18n::Tr("Couldn't save the settings"), "Couldn't"));
+    I18N_EXPECT(i18n::StartsLike("Couldn't do it", "Couldn't") && !i18n::StartsLike(i18n::Tr("Log copied"), "Couldn't"));
     I18N_EXPECT(i18n::Tf("{} min ago", 5) != "5 min ago");
     i18n::SetLanguage("zz"); // a language without a file: English
     I18N_EXPECT(i18n::Current() == "en" && std::string(i18n::Tr("Cancel")) == "Cancel");

@@ -2269,17 +2269,19 @@ namespace launcher_ui
 
     void App::Toast(std::string text, bool error)
     {
-        // Long enough to read: 2.5 s, and more for a long message, up to 6 s. A failure ("Couldn't ...") stays until closed.
-        error = error || text.rfind("Couldn't", 0) == 0;
+        // Long enough to read: 2.5 s, and more for a long message, up to 6 s. A failure ("Couldn't ...", in any language) stays
+        // 12 s: long enough to read without a mouse (a pad cannot reach the cross), and the cross closes it sooner.
+        error = error || i18n::StartsLike(text, "Couldn't");
         uint64_t readMs = std::clamp<uint64_t>(2500 + 45 * (text.size() > 40 ? text.size() - 40 : 0), 2500, 6000);
-        uint64_t until = error ? 0 : SDL_GetTicks() + readMs;
+        uint64_t until = SDL_GetTicks() + (error ? std::max<uint64_t>(readMs, 12000) : readMs);
         for (ToastItem& item : m_toasts)
             if (item.text == text) // the same words again: the one already shown, kept longer
             {
                 item.until = until;
+                item.error = item.error || error;
                 return;
             }
-        m_toasts.push_back({ std::move(text), until });
+        m_toasts.push_back({ std::move(text), until, error });
         if (m_toasts.size() > MaxToasts)
             m_toasts.erase(m_toasts.begin());
     }
@@ -2287,7 +2289,7 @@ namespace launcher_ui
     void App::DrawToast()
     {
         uint64_t now = SDL_GetTicks();
-        std::erase_if(m_toasts, [&](const ToastItem& item) { return item.until != 0 && now > item.until; });
+        std::erase_if(m_toasts, [&](const ToastItem& item) { return now > item.until; });
         if (m_toasts.empty())
             return;
         // Bottom right, stacked upwards, newest at the bottom, above the game page's band and Home's buttons so no control is
@@ -2300,7 +2302,7 @@ namespace launcher_ui
         for (size_t i = m_toasts.size(); i-- > 0;)
         {
             const ToastItem& item = m_toasts[i];
-            bool error = item.until == 0;
+            const bool error = item.error;
             ImVec2 text = ImGui::CalcTextSize(item.text.c_str(), nullptr, false, wrap);
             float width = text.x + 40 + (error ? 28 : 0);
             // Whole points, so the 2-point ring covers whole pixels at 1x and 2x.
@@ -2892,14 +2894,14 @@ namespace launcher_ui
             }
             if (m_testStep == Toasts + 1)
             {
-                expect(m_toasts.size() == 4 && m_toasts[2].until == 0, "four messages, the error kept");
+                expect(m_toasts.size() == 4 && m_toasts[2].error, "four messages, one an error");
                 m_testAt = now + 3500; // the others have gone by themselves
                 m_testShot = fmt::format("{:02}-toasts-error-kept", m_testStep);
                 break;
             }
             if (m_testStep == Toasts + 2)
             {
-                expect(m_toasts.size() == 1 && m_toasts[0].until == 0, "only the error is left");
+                expect(m_toasts.size() == 1 && m_toasts[0].error, "only the error is left (it stays 12 s)");
                 m_toasts.clear();
             }
             SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");

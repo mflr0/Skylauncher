@@ -138,6 +138,25 @@ namespace i18n
         return it == table->end() || it->second.empty() ? english : it->second.c_str();
     }
 
+    bool StartsLike(std::string_view text, std::string_view englishPrefix)
+    {
+        if (text.substr(0, englishPrefix.size()) == englishPrefix)
+            return true;
+        const State::Table* table = Get().table;
+        if (table == nullptr)
+            return false;
+        for (const auto& [english, translation] : *table)
+        {
+            if (english.compare(0, englishPrefix.size(), englishPrefix) != 0 || translation.empty())
+                continue;
+            std::string_view head(translation);
+            head = head.substr(0, head.find('{'));
+            if (head.size() >= 4 && text.substr(0, head.size()) == head)
+                return true;
+        }
+        return false;
+    }
+
     std::string Resolve(std::string_view setting, const std::vector<std::string>& system)
     {
         if (!setting.empty())

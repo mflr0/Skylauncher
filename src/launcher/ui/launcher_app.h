@@ -551,7 +551,8 @@ namespace launcher_ui
         struct ToastItem
         {
             std::string text;
-            uint64_t until; // 0: an error, kept until closed
+            uint64_t until; // when it goes
+            bool error = false; // a failure: red ring and a cross, kept longer
         };
         std::vector<ToastItem> m_toasts; // newest last; drawn from the top right, down
         std::vector<ImVec4> m_stars; // x, y (0..1), radius, phase

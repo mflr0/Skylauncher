@@ -48,6 +48,9 @@ namespace i18n
     // codes in order of preference. Returns a code of Languages(), "en" when none fits.
     std::string Resolve(std::string_view setting, const std::vector<std::string>& system);
     bool Has(std::string_view code);
+    // Whether `text` begins like an English string that starts with `englishPrefix`, in English or in the current
+    // language (a format's fixed start, before its first "{}"): e.g. a failure message, "Couldn't ...", in any language.
+    bool StartsLike(std::string_view text, std::string_view englishPrefix);
 
     // The language files: for the tests, which read the files of a source tree.
     struct Catalog
