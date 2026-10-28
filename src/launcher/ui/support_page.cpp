@@ -199,12 +199,10 @@ namespace launcher_ui
         ui::SettingRow(Tr("Problem report"), Tr("You see the report before saving it; nothing is sent."));
         ui::ButtonOptions report;
         report.kind = ui::ButtonKind::Primary;
-        report.width = -1;
         if (ui::Button(Tr("Report a problem"), report))
             OpenProblemReport();
         ui::SettingRow(Tr("Game log"), any ? Tr("The game's last log, for a bug report.") : Tr("No game log yet."));
         ui::ButtonOptions copy;
-        copy.width = -1;
         copy.disabled = !any;
         if (ui::Button(Tr("Copy game log"), copy))
         {
@@ -214,7 +212,6 @@ namespace launcher_ui
         ui::SettingRow(Tr("Logs folder"), nullptr);
         ui::ButtonOptions open;
         open.icon = ui::Icon::Folder;
-        open.width = -1;
         if (ui::Button(Tr("Open logs folder"), open) && !OpenFolder(folder))
             Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         ui::EndSettings();

@@ -402,12 +402,14 @@ namespace ui
 
     void KeyCap(PadButton button, Glyphs glyphs)
     {
+        SettingControl(KeyCapWidth(button, glyphs));
         const ImVec2 at = ImGui::GetCursorScreenPos();
         ImGui::Dummy(DrawKeyCap(ImGui::GetWindowDrawList(), ImVec2(at.x, at.y + CapH / 2), button, glyphs));
     }
 
     void KeyCap(const char* key)
     {
+        SettingControl(KeyCapWidth(key));
         const ImVec2 at = ImGui::GetCursorScreenPos();
         ImGui::Dummy(DrawKeyCap(ImGui::GetWindowDrawList(), ImVec2(at.x, at.y + CapH / 2), key));
     }

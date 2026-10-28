@@ -209,6 +209,8 @@ namespace ui
             bool open = false;
             std::string label, hint, note;
             float controlTop = 0;
+            float controlX = 0; // the control column's left edge
+            bool grouped = false; // AlignRight placed a group: its controls stay where they are put
         };
         PendingLabel g_row;
 
@@ -273,12 +275,28 @@ namespace ui
         const float lower = std::max(0.0f, std::round((block - height::Normal) / 2));
         if (lower > 0)
             ImGui::SetCursorPosY(ImGui::GetCursorPosY() + lower);
-        g_row = { true, label, hint != nullptr ? hint : "", note != nullptr ? note : "", ImGui::GetCursorScreenPos().y };
+        g_row = { true, label, hint != nullptr ? hint : "", note != nullptr ? note : "", ImGui::GetCursorScreenPos().y, ImGui::GetCursorScreenPos().x };
+    }
+
+    namespace
+    {
+        void MoveRight(float width)
+        {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - width));
+        }
+    }
+
+    void SettingControl(float width)
+    {
+        if (g_row.open && !g_row.grouped && ImGui::TableGetColumnIndex() == 1 && std::abs(ImGui::GetCursorScreenPos().x - g_row.controlX) < 0.5f)
+            MoveRight(width);
     }
 
     void AlignRight(float width)
     {
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - width));
+        if (g_row.open)
+            g_row.grouped = true; // a group as wide as the column starts on its left edge: its first button must not move again
+        MoveRight(width);
     }
 
     void EndSettings()

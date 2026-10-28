@@ -110,6 +110,7 @@ namespace ui
     {
         Context& context = Ctx();
         const float h = HeightOf(options.size), w = ButtonWidth(label, options), rounding = radius::Control;
+        SettingControl(w);
         const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + w, min.y + h);
         ImGui::BeginDisabled(options.disabled);
         bool clicked = Hit(label, ImVec2(w, h));
@@ -214,6 +215,7 @@ namespace ui
     {
         const char* shown = KeyShown(key, options);
         const float w = KeyButtonWidth(key, options), h = height::Normal;
+        SettingControl(w);
         const ImVec2 at = ImGui::GetCursorScreenPos();
         const bool clicked = Hit(id, ImVec2(w, h));
         const State state = ItemState();
@@ -251,6 +253,7 @@ namespace ui
     bool IconButton(const char* id, Icon icon, const char* tooltip, const IconButtonOptions& options)
     {
         const float h = HeightOf(options.size);
+        SettingControl(h);
         const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + h, min.y + h);
         ImGui::BeginDisabled(options.disabled);
         bool clicked = Hit(id, ImVec2(h, h));

@@ -313,7 +313,6 @@ namespace launcher_ui
             note = Tf("Last checked {}", ui::FormatWhen(std::time_t(last), std::time_t(Now())));
         ui::SettingRow(Tr("Check for updates"), note.empty() ? nullptr : note.c_str());
         ui::ButtonOptions check;
-        check.width = -1;
         check.loading = checking;
         check.disabled = m_updates.Busy() && !checking;
         if (ui::Button(checking ? Tr("Checking...") : Tr("Check now"), check) && !m_updates.Busy())

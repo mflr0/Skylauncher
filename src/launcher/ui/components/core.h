@@ -95,6 +95,11 @@ namespace ui
     // The pressable area of a component (an InvisibleButton in the keyboard and pad navigation). ImGui's own square focus
     // cursor is left out: the component draws the ring. True when pressed.
     bool Hit(const char* id, ImVec2 size);
+    // A settings row's one alignment rule: every control ends on the control column's right edge. A control `width` wide that
+    // starts the column's line moves there (Button, Pill, IconButton, Toggle, Checkbox, Segmented, KeyButton and KeyCap call
+    // it); one that fills the column is already there, and the controls of a row placed with AlignRight stay where they are
+    // put. Nothing outside a settings row (layout.cpp).
+    void SettingControl(float width);
 
     // ---- Drawing. ----
     // The keyboard and pad focus ring around min..max (focus::Width, focus::Offset, Context::accent).

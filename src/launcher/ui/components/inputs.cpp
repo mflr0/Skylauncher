@@ -59,6 +59,7 @@ namespace ui
             Marked item;
             const char* end = LabelEnd(label);
             float text = end != label ? TextSize(TextStyle::Body, label, end).x + space::S : 0;
+            SettingControl(height::Mark + text);
             item.min = ImGui::GetCursorScreenPos();
             item.max = ImVec2(item.min.x + height::Mark + text, item.min.y + height::Small);
             item.mark = ImVec2(item.min.x, std::round(item.min.y + (height::Small - height::Mark) / 2));
@@ -147,6 +148,7 @@ namespace ui
             widest = std::max(widest, TextSize(TextStyle::Body, label, nullptr, true).x);
         const float h = height::Normal, inset = space::XXS;
         float segment = width > 0 ? std::floor((width - 2 * inset) / float(count)) : std::ceil(widest + 2 * space::M);
+        SettingControl(segment * float(count) + 2 * inset);
         ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + segment * float(count) + 2 * inset, min.y + h);
         ImDrawList* draw = ImGui::GetWindowDrawList();
         ImGui::PushID(id);
@@ -276,6 +278,7 @@ namespace ui
         const float h = height::Small, w = std::round(h * 1.75f);
         const char* end = LabelEnd(label);
         const float text = end != label ? TextSize(TextStyle::Body, label, end).x + space::S : 0;
+        SettingControl(w + text);
         const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + w, min.y + h);
         ImGui::BeginDisabled(disabled);
         const bool pressed = Hit(label, ImVec2(w + text, h));

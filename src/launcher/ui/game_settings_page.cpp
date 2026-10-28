@@ -143,7 +143,6 @@ namespace launcher_ui
         ui::SettingRow(Tr("Texture pack folder"), nullptr);
         ui::ButtonOptions folder;
         folder.icon = ui::Icon::Folder;
-        folder.width = -1;
         if (ui::Button(Tr("Show in folder"), folder))
         {
             std::error_code error;
