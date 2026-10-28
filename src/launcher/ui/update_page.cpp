@@ -9,7 +9,7 @@ namespace launcher_ui
 {
     namespace
     {
-        constexpr float BannerH = 56;
+        constexpr float BannerH = ui::height::Large;
         constexpr char Project[] = "https://github.com/mflr0/Skylauncher";
 
         int64_t Now() { return int64_t(std::time(nullptr)); }
@@ -96,15 +96,15 @@ namespace launcher_ui
         ImGui::SetNextWindowPos(ImVec2(SidebarW, 0));
         ImGui::SetNextWindowSize(ImVec2(display.x - SidebarW, height));
         ImGui::PushStyleColor(ImGuiCol_WindowBg, Rgb(BottomBar));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, 8));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ui::space::L, ui::space::XS));
         ImGui::Begin("##updatebanner", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
         ImDrawList* draw = ImGui::GetWindowDrawList();
         ImVec2 at = ImGui::GetWindowPos();
-        draw->AddRectFilled(ImVec2(at.x, at.y + height - 2), ImVec2(at.x + display.x - SidebarW, at.y + height), Rgb(AccentDark));
+        draw->AddRectFilled(ImVec2(at.x, at.y + height - ui::stroke::Selection), ImVec2(at.x + display.x - SidebarW, at.y + height), Rgb(ui::color::AccentFillPressed));
 
         // Buttons are laid out from the right; the text takes what is left.
-        struct Button { const char* label; bool primary; float width; int action; };
+        struct Button { const char* label; bool primary; int action; };
         std::vector<Button> buttons;
         std::string text;
         float barFraction = -1;
@@ -113,7 +113,7 @@ namespace launcher_ui
         if (state.restartNeeded)
         {
             text = Tf("Arkeyan Launcher {} is installed. Restart to use it.", state.launcher.tag);
-            buttons = { { Tr("Restart now"), true, 150, Restart } };
+            buttons = { { Tr("Restart now"), true, Restart } };
         }
         else if (progress)
         {
@@ -122,65 +122,68 @@ namespace launcher_ui
                                                      : Tr("Installing Arkeyan Launcher");
             barFraction = state.phase == Phase::Downloading ? state.progress : -1;
             if (state.phase == Phase::Downloading)
-                buttons = { { Tr("Cancel"), false, 120, Cancel } };
+                buttons = { { Tr("Cancel"), false, Cancel } };
         }
         else if (state.phase == Phase::Failed)
         {
             text = Tf("The update failed: {}", state.error);
-            buttons = { { Tr("Retry"), true, 110, Retry }, { Tr("Close"), false, 110, Dismiss } };
+            buttons = { { Tr("Retry"), true, Retry }, { Tr("Close"), false, Dismiss } };
         }
         else if (state.phase == Phase::Done && !state.note.empty())
         {
             text = state.note;
-            buttons = { { Tr("OK"), false, 90, Dismiss } };
+            buttons = { { Tr("OK"), false, Dismiss } };
         }
         else if (state.launcherNewer && !m_updateLater)
         {
             text = Tf("Update available: {}", state.launcher.tag);
-            buttons = { { Tr("Update now"), true, 140, UpdateLauncher }, { Tr("What's new"), false, 130, WhatsNew }, { Tr("Later"), false, 100, Later } };
+            buttons = { { Tr("Update now"), true, UpdateLauncher }, { Tr("What's new"), false, WhatsNew }, { Tr("Later"), false, Later } };
         }
         // else: BannerHeight said there is nothing to show, and the banner is not drawn
 
-        float gap = 10, buttonsW = 0;
-        for (Button& button : buttons)
-            button.width = PillWidth(button.label, button.width, button.primary);
+        auto optionsOf = [](const Button& button) {
+            ui::ButtonOptions options;
+            options.kind = button.primary ? ui::ButtonKind::Primary : ui::ButtonKind::Secondary;
+            options.overArt = !button.primary;
+            return options;
+        };
+        float buttonsW = 0;
         for (const Button& button : buttons)
-            buttonsW += button.width + gap;
-        float contentW = display.x - SidebarW - 2 * Pad;
-        float textW = contentW - buttonsW - 16;
-        ImGui::SetCursorPos(ImVec2(Pad, (height - 2 - ImGui::GetTextLineHeight()) / 2));
-        std::string shown = Fit(text, textW);
-        if (barFraction >= 0 || progress)
-        {
-            float labelW = ImGui::CalcTextSize(shown.c_str()).x;
-            BoldText(shown.c_str(), Text);
-            ImVec2 barAt(ImGui::GetWindowPos().x + Pad + labelW + 18, at.y + (height - 2) / 2 - 4);
-            float barW = std::max(0.0f, textW - labelW - 18);
-            draw->AddRectFilled(barAt, ImVec2(barAt.x + barW, barAt.y + 8), Rgb(Field), 4);
-            float fraction = barFraction >= 0 ? barFraction : float(std::fmod(SDL_GetTicks() / 1200.0, 1.0));
-            if (barFraction >= 0)
-                draw->AddRectFilled(barAt, ImVec2(barAt.x + std::max(8.0f, barW * fraction), barAt.y + 8), Rgb(Accent), 4);
-            else
-            {
-                float w = barW * 0.25f, x = barAt.x + (barW - w) * fraction;
-                draw->AddRectFilled(ImVec2(x, barAt.y), ImVec2(x + w, barAt.y + 8), Rgb(Accent), 4);
-            }
-        }
-        else
-            BoldText(shown.c_str(), Text);
+            buttonsW += ui::ButtonWidth(button.label, optionsOf(button)) + ui::space::S;
+        const float contentW = display.x - SidebarW - 2 * ui::space::L;
+        const float textW = contentW - buttonsW - ui::space::M;
+        const float middle = (height - ui::stroke::Selection) / 2;
+        ImGui::SetCursorPos(ImVec2(ui::space::L, std::round(middle - ui::SizeOf(ui::TextStyle::Body) / 2)));
+        std::string shown = ui::Ellipsize(text.c_str(), progress ? std::min(textW, ui::TextSize(ui::TextStyle::Body, text.c_str(), nullptr, true).x) : textW);
+        ui::Text(ui::TextStyle::Body, shown.c_str(), ui::color::Ink, -1, true);
         if (shown != text && ImGui::IsItemHovered()) // cut to fit: the whole message under the pointer
             ImGui::SetTooltip("%s", text.c_str());
+        if (progress) // the wait after the words: a bar with its percentage, or a sweep when no end is known
+        {
+            const float labelW = ui::TextSize(ui::TextStyle::Body, shown.c_str(), nullptr, true).x;
+            const float barW = textW - labelW - ui::space::M;
+            if (barW > 0)
+            {
+                ImGui::SameLine(0, ui::space::M);
+                ImGui::SetCursorPosY(middle - ui::space::XS / 2);
+                if (barFraction >= 0)
+                    ui::ProgressBar(barFraction, barW, true);
+                else
+                    ui::IndeterminateBar(barW);
+            }
+        }
 
-        float x = Pad + contentW - buttonsW + gap;
+        float x = ui::space::L + contentW - buttonsW + ui::space::S;
         int pressed = None;
         for (const Button& button : buttons)
         {
-            ImGui::SetCursorPos(ImVec2(x, (height - 2 - 40) / 2));
+            ui::ButtonOptions options = optionsOf(button);
+            ImGui::SetCursorPos(ImVec2(x, middle - ui::HeightOf(ui::Size::Normal) / 2));
             ImGui::PushID(button.action);
-            if (PillButton(button.label, button.primary, button.width, button.primary, BottomBarRaised, BottomBarRaisedHover, BottomBarRaisedActive))
+            if (ui::Button(button.label, options))
                 pressed = button.action;
             ImGui::PopID();
-            x += button.width + gap;
+            x += ui::ButtonWidth(button.label, options) + ui::space::S;
         }
         ImGui::End();
         ImGui::PopStyleVar();
@@ -210,7 +213,7 @@ namespace launcher_ui
                 m_running = false;
             }
             else
-                Toast(Tr("Couldn't restart: start Arkeyan Launcher again"), true);
+                Toast(Tr("Couldn't restart: start Arkeyan Launcher again"), ui::ToastKind::Error);
             break;
         }
         }
@@ -219,49 +222,34 @@ namespace launcher_ui
     // The release notes of the update on offer.
     void App::DrawWhatsNew()
     {
-        if (m_whatsNewOpen && !ImGui::IsPopupOpen("##whatsnew"))
-            ImGui::OpenPopup("##whatsnew");
-        ImVec2 display = ImGui::GetIO().DisplaySize;
-        ImGui::SetNextWindowSize(ImVec2(std::min(680.0f, display.x - 80), std::min(520.0f, display.y - 60)));
-        ImGui::SetNextWindowPos(ImVec2(display.x / 2, display.y / 2), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_PopupBg, Rgb(Panel, 250));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Pad, Pad));
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, RadiusLarge);
-        if (ImGui::BeginPopupModal("##whatsnew", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove))
+        if (!m_whatsNewOpen)
+            return;
+        UpdateManager::State state = m_updates.Snapshot();
+        bool open = true;
+        if (ui::BeginModal("##whatsnew", Tf("What's new in {}", state.launcher.tag).c_str(), &open, ui::ModalSize::Large))
         {
-            if (!m_whatsNewOpen)
-                ImGui::CloseCurrentPopup();
-            UpdateManager::State state = m_updates.Snapshot();
-            Title(Tf("What's new in {}", state.launcher.tag).c_str(), TitleSize, Text);
-            ImGui::BeginChild("##notes", ImVec2(0, -52), ImGuiChildFlags_None);
+            ImGui::BeginChild("##notes", ImVec2(0, -(2 * ui::height::Normal + ui::space::L)), ImGuiChildFlags_None);
             ImGui::SetScrollX(0.0f);
             std::string notes = Trimmed(StripHtmlComments(state.launcher.notes));
             if (notes.empty())
                 notes = Tr("No notes were published with this version.");
-            ImGui::PushTextWrapPos(0);
-            ImGui::TextUnformatted(notes.c_str()); // plain text: the release's Markdown as written
-            ImGui::PopTextWrapPos();
+            ui::Text(ui::TextStyle::Body, notes.c_str(), ui::color::Ink); // plain text: the release's Markdown as written
             ImGui::EndChild();
-            if (PillButton(Tr("Release page"), false, 160) && !state.launcher.pageUrl.empty())
+            if (ui::Button(Tr("Release page"), { .kind = ui::ButtonKind::Ghost, .disabled = state.launcher.pageUrl.empty() }))
                 SDL_OpenURL(state.launcher.pageUrl.c_str());
-            ImGui::SameLine(ImGui::GetWindowWidth() - Pad - PillWidth(Tr("Close"), 140) - PillWidth(Tr("Update now"), 140, true) - ImGui::GetStyle().ItemSpacing.x);
-            if (PillButton(Tr("Close"), false, 140) || ImGui::IsKeyPressed(ImGuiKey_Escape, false) || ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false))
+            switch (ui::ModalActions(&open, Tr("Update now"), Tr("Close")))
             {
-                m_whatsNewOpen = false;
-                ImGui::CloseCurrentPopup();
-            }
-            ImGui::SameLine();
-            if (PillButton(Tr("Update now"), true, 140, true))
-            {
-                m_whatsNewOpen = false;
-                ImGui::CloseCurrentPopup();
+            case ui::ModalResult::Confirm:
                 m_updates.UpdateLauncher();
                 m_updateWasBusy = true;
+                break;
+            default:
+                break;
             }
-            ImGui::EndPopup();
+            ui::EndModal();
         }
-        ImGui::PopStyleVar(2);
-        ImGui::PopStyleColor();
+        if (!open)
+            m_whatsNewOpen = false;
     }
 
     // Settings > Launcher: one check a day when it is on, nothing else is ever sent.
