@@ -599,8 +599,7 @@ namespace launcher_ui
         float available = ImGui::GetContentRegionAvail().x;
         float width = std::min(available, 1180.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        ImGui::BeginChild("##collectioncolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
-        ImGui::SetScrollX(0.0f);
+        m_app.BeginPageColumn("##collectioncolumn", width);
         DrawHeader(width);
         DrawSeats(width);
         DrawBar();
@@ -1168,7 +1167,7 @@ namespace launcher_ui
             m_app.Title(title, TitleSize, Text);
             ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextSecondary));
             if (none)
-                ImGui::TextWrapped("%s", Tr("Add a figure, or import your own."));
+                ImGui::TextWrapped("%s", Tr("Add a figure or import yours."));
             ImGui::PopStyleColor();
             ImGui::Dummy(ImVec2(0, 6));
             if (none && m_app.PillButton(Tr("Start with Spyro, Gill Grunt, Trigger Happy"), true, 380, true))
@@ -1177,7 +1176,7 @@ namespace launcher_ui
                     collection::Create(type);
                 Reload();
             }
-            else if (!none && filtered && m_app.PillButton(Tr("Clear the search and the filters"), false, 300, true))
+            else if (!none && filtered && m_app.PillButton(Tr("Clear search and filters"), false, 300, true))
                 ClearFilters();
             else if (!none && !filtered && m_app.PillButton((std::string(Tr("+  Add a figure")) + "##empty").c_str(), true, 200, true))
             {

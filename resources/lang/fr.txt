@@ -15,9 +15,9 @@ Not an Xbox 360 disc image, or the file is incomplete.	Ce n'est pas une image di
 16:9 (with bars)	16:9 (avec bandes)
 30 (original)	30 (d'origine)
 60 (experimental)	60 (expérimental)
-Only asks github.com for the latest version. Nothing else is sent.	Interroge seulement github.com pour connaître la dernière version. Rien d'autre n'est envoyé.
+Only contacts github.com.	Contacte seulement github.com.
 Couldn't write to the game folder.	Impossible d'écrire dans le dossier du jeu.
-A launcher for the native PC ports of Skylanders. It has no game code or art: all of it comes from your own disc.	Un lanceur pour les portages PC natifs de Skylanders. Il ne contient ni code ni images du jeu : tout vient de votre propre disque.
+A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc.	Un lanceur pour les portages PC natifs de Skylanders. Aucun code ni image du jeu : tout vient de votre disque.
 About	À propos
 Adding the movie shaders	Ajout des shaders des vidéos
 Advanced	Avancé
@@ -70,7 +70,7 @@ Controls	Commandes
 Copied game data	Données du jeu copiées
 Copied: {}, 1 file	Copié : {}, 1 fichier
 Copied: {}, {} files	Copié : {}, {} fichiers
-Copies the disc's files ({}) so the disc image is no longer needed.	Copie les fichiers du disque ({}) : l'image disque ne sera plus nécessaire.
+Copies the disc's files ({}). No image needed after.	Copie les fichiers du disque ({}). Plus d'image nécessaire ensuite.
 Copy	Copier
 Copy game log	Copier le journal du jeu
 Copy log	Copier le journal
@@ -121,7 +121,6 @@ Finding default.xex	Recherche de default.xex
 Fingerprinting default.xex (SHA-256)	Calcul de l'empreinte de default.xex (SHA-256)
 Finishing	Finalisation
 Folders	Dossiers
-For Arkeyan Launcher and all games.	Pour Arkeyan Launcher et tous les jeux.
 Found	Détecté
 Found, not usable	Détecté, inutilisable
 Frame rate limit	Limite d'images par seconde
@@ -177,10 +176,10 @@ Log copied	Journal copié
 Looking for the disc image	Recherche de l'image disque
 Built with SDL 3, Dear ImGui, {fmt}, stb, miniz, XenonRecomp, Outfit and Bungee. MIT licensed.	Construit avec SDL 3, Dear ImGui, {fmt}, stb, miniz, XenonRecomp, Outfit et Bungee. Licence MIT.
 Model: {} (id {})	Modèle : {} (id {})
-Move down	Déplacement bas
-Move left	Déplacement gauche
-Move right	Déplacement droite
-Move up	Déplacement haut
+Move down	Bas
+Move left	Gauche
+Move right	Droite
+Move up	Haut
 Native PC ports	Portages PC natifs
 Needs your disc	Disque requis
 No backups yet.	Aucune copie de secours pour l'instant.
@@ -206,7 +205,7 @@ Game files	Fichiers du jeu
 Opening the disc image	Ouverture de l'image disque
 Opens a new issue on GitHub	Ouvre un nouveau ticket sur GitHub
 Original resolution	Résolution d'origine
-The 3D image at the console's size, stretched to the screen.	L'image 3D à la taille de la console, étirée à l'écran.
+The 3D scene at the console's size.	La scène 3D à la taille de la console.
 PLAY	JOUER
 PLAY WITH	JOUER AVEC
 Play {}	Jouer à {}
@@ -234,7 +233,7 @@ Reinstall	Réinstaller
 Release page	Page de la version
 Remove	Retirer
 Remove the copy	Supprimer la copie
-Forgets the disc; the file stays where it is.	Oublie le disque ; le fichier reste en place.
+The file stays where it is.	Le fichier reste en place.
 Repair the copy	Réparer la copie
 Replaces the game's textures with your pack.	Remplace les textures du jeu par celles de votre pack.
 Report	Signaler
@@ -257,13 +256,11 @@ Saved gamepad (not connected)	Manette enregistrée (non connectée)
 Saves	Sauvegardes
 Saves and data deleted	Sauvegardes et données supprimées
 Saves restored from {}	Sauvegardes restaurées : copie du {}
-For this game only.	Pour ce jeu seulement.
-Settings, saves, figures and builds, shared by all games.	Réglages, sauvegardes, figurines et jeux construits, communs à tous les jeux.
+Settings, saves, figures and builds.	Réglages, sauvegardes, figurines et jeux construits.
 Shortcut added to the Desktop	Raccourci ajouté au bureau
 Show details	Détails
 Show in folder	Afficher dans le dossier
 Skip intro movies	Passer les vidéos d'intro
-Skips the start-up logos.	Passe les logos de démarrage.
 Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision.	Skylanders est une marque d'Activision. Ce projet n'est ni affilié à Activision ni approuvé par Activision.
 Arkeyan Launcher couldn't find its own file.	Arkeyan Launcher n'a pas trouvé son propre fichier.
 Arkeyan Launcher is up to date.	Arkeyan Launcher est à jour.
@@ -322,7 +319,7 @@ The earlier install is still stopping. Resume in a moment.	L'installation préc�
 The installer stopped before the game was built.	L'installateur s'est arrêté avant la fin de la construction du jeu.
 The installer stopped with exit code {}.	L'installateur s'est arrêté avec le code de sortie {}.
 Drag Arkeyan Launcher to Applications, replacing the old one.	Glissez Arkeyan Launcher dans Applications, en remplaçant l'ancien.
-Arkeyan Launcher's own language. "System default" follows the system's language.	La langue d'Arkeyan Launcher. « Langue du système » suit celle du système.
+"System default" follows your system.	« Langue du système » suit votre système.
 Designed by dorydev.	Conçu par dorydev.
 The game's last log, for a bug report.	Le dernier journal du jeu, pour un rapport de bug.
 The portal can't be opened: using the virtual portal.	Le portail ne s'ouvre pas : le portail virtuel est utilisé.
@@ -428,7 +425,7 @@ nothing yet	0 octet
  · {} unknown toys (Manage)	 · {} jouets inconnus (Gérer)
 +  Add a figure	+  Ajouter une figurine
 ADD A FIGURE	AJOUTER UNE FIGURINE
-Add a figure, or import your own.	Ajoutez une figurine, ou importez les vôtres.
+Add a figure or import yours.	Ajoutez une figurine ou importez les vôtres.
 Add to favourites	Ajouter aux favoris
 Adventure	Aventure
 Adventure Packs	Packs d'aventure
@@ -447,7 +444,7 @@ Choose a figure for {}	Choisir une figurine pour {}
 Pick a figure.	Choisissez une figurine.
 Choose another	En choisir une autre
 Chrome	Chrome
-Clear the search and the filters	Effacer la recherche et les filtres
+Clear search and filters	Effacer recherche et filtres
 Click a seat, then a figure	Cliquez sur une place, puis sur une figurine
 Click: sheet · drag to a seat	Clic : fiche · glisser vers une place
 Click: put it on {}	Clic : la mettre sur {}
@@ -554,7 +551,7 @@ None yet	Aucune pour l'instant
 Not for {}	Pas pour {}
 Nothing for this seat yet	Rien pour cette place pour l'instant
 ON THE PORTAL NOW	SUR LE PORTAIL MAINTENANT
-Blank figures made by old game versions. Tidy moves them to the trash.	Figurines vierges créées par d'anciennes versions du jeu. Ranger les met à la corbeille.
+Blank figures from old versions. Tidy trashes them.	Figurines vierges d'anciennes versions. Ranger les met à la corbeille.
 On	Sur
 On the portal in {}: read-only	Sur le portail dans {} : lecture seule
 On {} at the next start of {}	Sur {} au prochain lancement de {}
@@ -598,7 +595,7 @@ Tidy  {}	Ranger  {}
 Tidy the starters	Ranger les figurines de départ
 Toy	Jouet
 Toy type {}	Jouet de type {}
-Toys missing from the catalogue. Name one to show it.	Jouets absents du catalogue. Nommez-en un pour l'afficher.
+Not in the catalogue. Name one to show it.	Absents du catalogue. Nommez-en un pour l'afficher.
 Trap	Piège
 Trap Masters	Maîtres des pièges
 Trap shape	Forme de piège
@@ -657,7 +654,7 @@ Sort: {}	Tri : {}
 Clear all	Tout effacer
 Versions	Versions
 Change...	Changer...
-Copies the disc's files so the disc image is no longer needed.	Copie les fichiers du disque : l'image disque ne sera plus nécessaire.
+Copies the disc's files. No image needed after.	Copie les fichiers du disque. Plus d'image nécessaire ensuite.
 Upgrades	Améliorations
 All	Tout
 Basic	De base
@@ -687,7 +684,6 @@ no download	aucun téléchargement
 Remove Arkeyan Launcher	Retirer Arkeyan Launcher
 Uninstall everything...	Tout désinstaller...
 Uninstall everything	Tout désinstaller
-Removes the games, their files and Arkeyan Launcher.	Retire les jeux, leurs fichiers et Arkeyan Launcher.
 Wait for the game to finish.	Attendez que le jeu ait fini.
 Hold to delete all of this.	Maintenez pour tout supprimer.
 What goes	Ce qui sera supprimé
@@ -740,14 +736,15 @@ Pause	Pause
 Hold to reset every key of this game.	Maintenez pour réinitialiser toutes les touches de ce jeu.
 2nd Power	2e pouvoir
 Special Power / Back	Pouvoir spécial / Retour
+Shake / Insert / Swing	Agiter / Insérer / Balancer
+Same	Idem
 Action	Action
 Interact	Interagir
-Shake / Insert / Swing up	Agiter / Insérer / Balancer haut
-Shake / Insert / Swing down	Agiter / Insérer / Balancer bas
-Shake / Insert / Swing left	Agiter / Insérer / Balancer gauche
-Shake / Insert / Swing right	Agiter / Insérer / Balancer droite
 L stick	stick gauche
-R stick	stick droit
+R stick up	stick droit haut
+R stick down	stick droit bas
+R stick left	stick droit gauche
+R stick right	stick droit droite
 Space	Espace
 Return	Entrée
 Backspace	Retour arrière

@@ -43,18 +43,12 @@ namespace launcher_ui
         float available = ImGui::GetContentRegionAvail().x;
         float width = std::min(available, 940.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        ImGui::BeginChild("##gamesettingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
-        ImGui::SetScrollX(0.0f);
+        BeginPageColumn("##gamesettingscolumn", width);
 
         Title(m_s->game.name, HeadlineSize, Text);
         ImGui::SameLine(width - PillWidth(Tr("Back"), 120) - 30);
         if (PillButton(Tr("Back"), false, 120))
             GoTo(Page::Play);
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("For this game only."));
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
 
         static const char* const Tabs[] = { N_("Video"), N_("Keyboard"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
@@ -72,7 +66,7 @@ namespace launcher_ui
         case GameTab::Game: DrawGameTab(); break;
         }
         EndCard();
-        ImGui::EndChild();
+        EndPageColumn();
     }
 
     // ---- Video and language ------------------------------------------------------------------------------------------
@@ -104,12 +98,12 @@ namespace launcher_ui
         SettingRow(Tr("Frame rate limit"), Tr("The game was made for 30 FPS; 60 is experimental."));
         Combo("##fps", video, "fps_limit", FpsChoices, 0);
 
-        SettingRow(Tr("Skip intro movies"), Tr("Skips the start-up logos."));
+        SettingRow(Tr("Skip intro movies"), nullptr);
         toggle("##skipintromovies", "skip_intro_movies", "0");
 
         if (m_s->game.id == std::string_view("swapforce"))
         {
-            SettingRow(Tr("Original resolution"), Tr("The 3D image at the console's size, stretched to the screen."));
+            SettingRow(Tr("Original resolution"), Tr("The 3D scene at the console's size."));
             toggle("##originalresolution", "original_resolution", "0");
         }
 
@@ -164,10 +158,10 @@ namespace launcher_ui
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(6, 4));
         if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingFixedFit))
         {
-            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 184);
-            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 112);
-            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 184);
-            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 112);
+            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthFixed, 172);
+            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthFixed, 124);
+            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthFixed, 172);
+            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthFixed, 124);
             for (size_t i = 0; i < keys.size(); i++)
             {
                 const GameKey& action = keys[i];
@@ -176,7 +170,7 @@ namespace launcher_ui
                 ImGui::TableNextColumn();
                 ImGui::AlignTextToFramePadding();
                 // The pad's buttons keep the names printed on the controller (A, Back, Start...); only the sticks are translated.
-                const bool stick = std::string_view(action.pad).ends_with("stick");
+                const bool stick = std::string_view(action.pad).substr(1, 6) == " stick";
                 ImGui::TextWrapped("%s", fmt::format("{} ({})", Tr(action.label), stick ? Tr(action.pad) : action.pad).c_str()); // a long French name takes two lines
                 ImGui::TableNextColumn();
                 const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
@@ -184,7 +178,7 @@ namespace launcher_ui
                 ImGui::PushID(action.action);
                 ImGui::PushStyleColor(ImGuiCol_Button, Rgb(m_capturing == &action ? Accent : Field));
                 ImGui::PushStyleColor(ImGuiCol_Text, Rgb(m_capturing == &action ? AccentInk : duplicate ? Danger : Text));
-                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(106, 32)))
+                if (ImGui::Button(m_capturing == &action ? "..." : key.c_str(), ImVec2(118, 32)))
                     m_capturing = &action;
                 ImGui::PopStyleColor(2);
                 if (duplicate && ImGui::IsItemHovered())
@@ -284,7 +278,7 @@ namespace launcher_ui
             }
             ImGui::EndDisabled();
             ImGui::EndDisabled();
-            note(Tr("Forgets the disc; the file stays where it is."));
+            note(Tr("The file stays where it is."));
         }
         ImGui::Dummy(ImVec2(0, 16));
         DrawGameData();

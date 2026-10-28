@@ -186,8 +186,8 @@ namespace launcher_ui
                 if (!OpenFolder(gamedata::Folder(m_s->game.id).parent_path()))
                     Toast(Tr("Couldn't open the folder"), true);
             note(!ready ? Tr("Choose the disc image first.")
-                : m_s->discSize > 0 ? Tf("Copies the disc's files ({}) so the disc image is no longer needed.", LauncherFormatSize(m_s->discSize))
-                                    : Tr("Copies the disc's files so the disc image is no longer needed."));
+                : m_s->discSize > 0 ? Tf("Copies the disc's files ({}). No image needed after.", LauncherFormatSize(m_s->discSize))
+                                    : Tr("Copies the disc's files. No image needed after."));
             break;
         }
         if (!m_s->copyMessage.empty())

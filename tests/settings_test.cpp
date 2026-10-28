@@ -130,9 +130,9 @@ namespace
     {
         // Each game lists the actions it uses, named as it names them; a button it ignores has no row.
         SETTINGS_EXPECT(HasRow("ssa", "a", "1st Power / Accept") && HasRow("ssa", "x", "2nd Power") && HasRow("ssa", "y", "Use / Talk"));
-        SETTINGS_EXPECT(HasRow("ssa", "b", "Special Power / Back") && HasRow("ssa", "start", "Pause") && HasRow("ssa", "right_up", "Shake / Insert / Swing up"));
+        SETTINGS_EXPECT(HasRow("ssa", "b", "Special Power / Back") && HasRow("ssa", "start", "Pause") && HasRow("ssa", "right_up", "Shake / Insert / Swing"));
         SETTINGS_EXPECT(HasRow("giants", "a", "Attack 1 / Accept") && HasRow("giants", "x", "Attack 2") && HasRow("giants", "y", "Action"));
-        SETTINGS_EXPECT(HasRow("giants", "b", "Attack 3 / Back") && !HasRow("giants", "right_up", "Shake / Insert / Swing up"));
+        SETTINGS_EXPECT(HasRow("giants", "b", "Attack 3 / Back") && !HasRow("giants", "right_up", "Shake / Insert / Swing"));
         SETTINGS_EXPECT(HasRow("swapforce", "a", "Jump") && HasRow("swapforce", "x", "Attack 1") && HasRow("swapforce", "back", "Skylanders Stats"));
         SETTINGS_EXPECT(HasRow("swapforce", "b", "Attack 2") && HasRow("swapforce", "y", "Attack 3") && HasRow("swapforce", "lt", "Interact"));
         SETTINGS_EXPECT(GameKeys("giants").size() == 10 && GameKeys("ssa").size() == 14 && GameKeys("swapforce").size() == 14 && GameKeys("nothing").empty());
@@ -148,7 +148,7 @@ namespace
         // A key name is shown in the player's language; the stored value stays SDL's English name.
         i18n::SetLanguage("fr");
         SETTINGS_EXPECT(KeyDisplayName("Space") == "Espace" && KeyDisplayName("Backspace") == "Retour arrière" && KeyDisplayName("W") == "W");
-        SETTINGS_EXPECT(std::string(i18n::Tr("L stick")) == "stick gauche" && std::string(i18n::Tr("R stick")) == "stick droit");
+        SETTINGS_EXPECT(std::string(i18n::Tr("L stick")) == "stick gauche" && std::string(i18n::Tr("R stick up")) == "stick droit haut");
         i18n::SetLanguage("en");
         SETTINGS_EXPECT(KeyDisplayName("Space") == "Space");
 

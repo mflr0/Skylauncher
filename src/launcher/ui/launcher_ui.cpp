@@ -45,8 +45,8 @@ namespace launcher_ui
             constexpr const char* ChooseDisc = N_("Choose disc");
             constexpr const char* PlayWith = N_("PLAY WITH");
             constexpr const char* DiscGone = N_("The disc image isn't there. Choose it again.");
-            constexpr const char* LauncherLanguageHint = N_("Arkeyan Launcher's own language. \"System default\" follows the system's language.");
-            constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds, shared by all games.");
+            constexpr const char* LauncherLanguageHint = N_("\"System default\" follows your system.");
+            constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds.");
             constexpr const char* GameSettings = N_("Game settings");
             constexpr const char* NoGamepad = N_("No gamepad connected.");
             constexpr const char* OneGamepad = N_("1 gamepad connected.");
@@ -954,12 +954,13 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Rgb(primary ? AccentHover : fillHover));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, Rgb(primary ? AccentDark : fillActive));
         ImGui::PushStyleColor(ImGuiCol_Text, chevron != 0 ? IM_COL32(0, 0, 0, 0) : Rgb(ink));
+        ImGui::PushStyleColor(ImGuiCol_Border, primary ? ImVec4(0, 0, 0, 0) : ImGui::GetStyleColorVec4(ImGuiCol_Border)); // the grey frame shows as a dark ring round the light fill
         if (bold)
             ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
         bool pressed = ImGui::Button(label, ImVec2(PillWidth(label, width, bold, chevron), 40));
         if (bold)
             ImGui::PopFont();
-        ImGui::PopStyleColor(4);
+        ImGui::PopStyleColor(5);
         if (chevron != 0)
             DrawLabelChevron(label, ink, chevron, bold);
         return pressed;
@@ -1024,6 +1025,25 @@ namespace launcher_ui
         ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
         ImGui::GetWindowDrawList()->AddRect(ImVec2(min.x - gap, min.y - gap), ImVec2(max.x + gap, max.y + gap), Rgb(Accent),
             std::max(0.0f, rounding + gap), flags, 2.0f);
+    }
+
+    void App::BeginPageColumn(const char* id, float width)
+    {
+        constexpr float Bleed = 4;
+        float below = ImGui::GetStyle().WindowPadding.y;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() - Bleed);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Bleed, 0));
+        ImGui::BeginChild(id, ImVec2(width + 2 * Bleed, ImGui::GetContentRegionAvail().y + below),
+            ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoBackground);
+        ImGui::PopStyleVar();
+        ImGui::SetScrollX(0.0f);
+        m_columnBelow = below;
+    }
+
+    void App::EndPageColumn()
+    {
+        ImGui::Dummy(ImVec2(0, m_columnBelow));
+        ImGui::EndChild();
     }
 
     bool App::HoldButton(const char* label, float width, const char* hint)
@@ -1968,16 +1988,10 @@ namespace launcher_ui
         float available = ImGui::GetContentRegionAvail().x;
         float width = std::min(available, 940.0f);
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (available - width) / 2);
-        ImGui::BeginChild("##settingscolumn", ImVec2(width, 0), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
-        ImGui::SetScrollX(0.0f);
+        BeginPageColumn("##settingscolumn", width);
 
         static const char* const Tabs[] = { N_("Controls"), N_("Launcher"), N_("Support"), N_("About") };
         Title(Tr("LAUNCHER SETTINGS"), HeadlineSize, Text);
-        ImGui::PushFont(nullptr, SmallSize);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(TextDim));
-        ImGui::TextUnformatted(Tr("For Arkeyan Launcher and all games."));
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
         ImGui::Dummy(ImVec2(0, 4));
         int tab = int(m_tab);
         DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
@@ -1993,7 +2007,7 @@ namespace launcher_ui
         EndCard();
         if (m_testUninstall && m_testScrollEnd)
             ImGui::SetScrollHereY(1.0f); // the screenshot test shows the bottom of the tab
-        ImGui::EndChild();
+        EndPageColumn();
     }
 
     void App::DrawLauncherTab()
