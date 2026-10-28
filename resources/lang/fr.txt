@@ -748,6 +748,11 @@ Shake / Insert / Swing left	Agiter / Insérer / Balancer gauche
 Shake / Insert / Swing right	Agiter / Insérer / Balancer droite
 L stick	stick gauche
 R stick	stick droit
+Cross	Croix
+Circle	Rond
+Square	Carré
+Triangle	Triangle
+Touchpad	Pavé tactile
 Space	Espace
 Return	Entrée
 Backspace	Retour arrière

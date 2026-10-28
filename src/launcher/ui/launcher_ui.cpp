@@ -570,7 +570,8 @@ namespace launcher_ui
         if (m_capturing != nullptr && event.type == SDL_EVENT_KEY_DOWN)
         {
             if (event.key.key != SDLK_ESCAPE)
-                Set(GameInputSection(m_s->game.id).c_str(), (std::string("key_") + m_capturing->action).c_str(), SDL_GetKeyName(event.key.key));
+                Set(GameInputSection(m_s->game.id).c_str(), (std::string("key_") + m_capturing->action).c_str(),
+                    CapturedKeyName(event.key.scancode).c_str()); // the key's place: the game reads a scancode
             m_capturing = nullptr;
             return;
         }
@@ -631,6 +632,9 @@ namespace launcher_ui
             }
             break;
         case SDL_EVENT_GAMEPAD_ADDED:
+            m_lastPadType = SDL_GetGamepadTypeForID(event.gdevice.which);
+            RefreshGamepads();
+            break;
         case SDL_EVENT_GAMEPAD_REMOVED:
             RefreshGamepads();
             break;
@@ -822,6 +826,27 @@ namespace launcher_ui
             m_gamepads.assign(ids, ids + count);
             SDL_free(ids);
         }
+    }
+
+    // The pad whose button names the Keyboard tab shows: a fixed glyph style, else the chosen pad when it is connected,
+    // else the last one connected, else the first one there, else an Xbox 360 pad (the games' own names).
+    PadFamily App::PadFamilyNow() const
+    {
+        SDL_GamepadType type = m_lastPadType;
+        std::string chosen = SettingGet(m_config, "input", "device") == "gamepad" ? SettingGet(m_config, "input", "gamepad") : "";
+        for (SDL_JoystickID id : m_gamepads)
+        {
+            char text[64];
+            SDL_GUIDToString(SDL_GetGamepadGUIDForID(id), text, sizeof(text));
+            if (!chosen.empty() && chosen == text)
+            {
+                type = SDL_GetGamepadTypeForID(id);
+                break;
+            }
+            if (type == SDL_GAMEPAD_TYPE_UNKNOWN)
+                type = SDL_GetGamepadTypeForID(id);
+        }
+        return PadFamilyFor(SettingGet(m_config, "input", "glyphs", "auto"), PadFamilyOf(type));
     }
 
     // The device the game listens to: "auto", "keyboard" or "gamepad:<SDL GUID>" ([input] device= and gamepad=).
