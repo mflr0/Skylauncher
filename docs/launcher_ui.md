@@ -256,7 +256,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 | | |
 |---|---|
 | When | Every setting: the one settings idiom (Video, Controls, Launcher, the game tabs). |
-| API | `if (ui::BeginSettings(id)) { ui::SettingRow(label, hint, note); <its control>; ...; ui::EndSettings(); }`; the control column is `SettingControl` (320) wide, rows at least `Large`, a hairline between them. The label is drawn once the control is, centred on it (one line: its capitals on the control's middle; with a hint: the two as a block); a hint on two lines moves the control down to the block's middle. `note`: a small word after the label, on its baseline (a key's pad button). The hint is drawn, not an item (a table lowers a row's text items to its fields' baseline). `ui::AlignRight(width)` ends a control or a group of buttons on the column's right edge. |
+| API | `if (ui::BeginSettings(id)) { ui::SettingRow(label, hint, note); <its control>; ...; ui::EndSettings(); }`; the control column is `SettingControl` (320) wide, rows at least `Large`, a hairline between them. The label is drawn once the control is, centred on it (one line: its capitals on the control's middle; with a hint: the two as a block); a hint on two lines moves the control down to the block's middle. `note`: a small word after the label, on its baseline (a key's pad button). The hint is drawn, not an item (a table lowers a row's text items to its fields' baseline). `ui::AlignRight(width)` ends a control or a group of buttons on the column's right edge; `BeginSettings(id, controlWidth)` widens the control column for a row of buttons that needs it (never narrower than 320). |
 | States | Those of its controls. |
 
 ### SectionHeader
@@ -271,7 +271,7 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 |---|---|
 | When | Every dialog: a question, a sheet, What's new, the problem report. One shell; nothing draws its own. |
 | API | `if (ui::BeginModal(id, title, &open, ModalSize::{Small 480, Medium 680, Large 880})) { body; ui::ModalActions(&open, confirm, cancel, ModalKind::{Normal, Danger}); ui::EndModal(); }`; `ui::ConfirmDialog(id, title, body, confirm, cancel, &open, kind)` for a whole question. |
-| States | The scrim; the title with a close cross (IconButton, "Close"); actions bottom right, Cancel then the confirm button (Primary, or Danger); the focus starts on the confirm button, on Cancel in a danger dialog; B and Escape close it (= Cancel) unless a field or list inside answers first. |
+| States | The scrim; the title with a close cross (IconButton, "Close"); actions bottom right, Cancel then the confirm button (Primary, or Danger); the focus starts on the confirm button, on Cancel in a danger dialog; B and Escape close it (= Cancel) unless a field or list inside answers first. | The close cross sits on the title's capitals and is the pointer's only: B and Escape close a dialog, so the keyboard's and the pad's first stop is its content or its action.
 
 ### Menu (popover)
 | | |

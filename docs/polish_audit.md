@@ -93,9 +93,41 @@ zoomed checks; edges and centres measured on the 2x shots (pixel rows and the in
 | 11 | Fewer elements | Pass: the CONTROLLER caption is a pad icon in the picker; the Keyboard tab's repeated KEYBOARD title is gone (the tab says it); the four movement and four right-stick rows are two crosses |
 | 12 | Text and states read the same in English and French | Pass |
 
-**Left for the owner** (decisions, not defects): a game not opened yet this session shows "Open" with a dashed circle (its
-disc is only checked when it is first shown; checking every disc at start would say more). The pad navigation script
-(`SKY_LAUNCHER_TEST_NAV`) still counts two games in the sidebar (Swap Force's row came later): "down, down" lands on Swap
-Force instead of Collection, and the run stops at its step 49, A on CHOOSE DISC opening the file chooser; to update with the
-Collection's pass.
+**Left for the owner** (decisions, not defects), both settled in the next pass: a game not opened yet this session showed
+"Open" (every disc is now checked at start-up); the pad navigation script counted two games in the sidebar (fixed, and run by
+`ArkeyanLauncherTest`).
+
+## Every other screen (2026-10-28, the owner's "apply everywhere")
+
+The same finish on the rest: the Collection (shelf, sheet, Add, Edit, Manage, filters, menus, dialogs), every settings page and
+tab (the new Controller tab too), Achievements, the install and update pages, the update banner, What's new, the problem report,
+the quit prompt, every modal and toast. Shots: every screenshot script (`default`, `COLLECTION`, `INSTALL` with the fake kit,
+`UPDATE` with a fake release, `PAD`, `ACHIEVEMENTS`, `UNINSTALL`), each in English and French, 1024x720 and 1600x1000, with the
+mouse and as a pad player sees it (`SKY_LAUNCHER_TEST_INPUT=pad`): eight runs of about 95 shots, looked at on contact sheets,
+then zoomed where something looked off. The checklist is the model screens' (above), item for item.
+
+| Where | Defect (before) | Fix |
+|---|---|---|
+| What's new | The notes' body was empty: their first line, "## What's new", read as an ImGui ID ("##"), so nothing showed; the notes' child was as tall as the dialog left | The notes in an inset card as tall as the window allows, their Markdown read simply (headings bold, "- " bullets); never through `ui::Text` |
+| What's new, problem report | The left buttons (Release page; Save as..., Copy) sat a few points above the actions' row | On the actions' row (`ModalActions`' own y) |
+| Settings rows with a field (Edit, Video...) | The hint sat about 10 points below its label: an ImGui table lowers a row's text items to its fields' text baseline | The hint is drawn, not an item; label and hint centred on the field as one block |
+| Game page, installed | An ImGui assertion box ("SetCursorScreenPos to extend window boundaries") over the disc block | The achievements row ends with an item |
+| Select (Portal: "Auto: a real portal if plugged in, else virtual", in French) | The value ran under the chevron to the edge | Cut with "..." before the chevron |
+| Quit prompt, French | Its title wrapped on two lines in the Small dialog | Medium |
+| Collection's title line | "Portal: not detected" a caption off the title's line; the buttons centred on the line box, not the capitals | The portal's state the game page's StatusPill, centred on the title's capitals; the buttons too (and every settings page's Back) |
+| Figure sheet's facts | The Caption names sat 2 points above their Body values' baseline | On the values' baseline |
+| Manage > Trash, Backups | Put back / Delete for good and Restore ended 40 points short of the rows' right edge; the copies' labels 8 points left of the figures' names | `ui::AlignRight`: on the rows' trailing edge; the copies' table indented to the names' edge |
+| Controller tab (merged) | A hand-made grid of 84 + 196-point columns, a title with a hold button beside it | A settings row per button (the game's word for its job as the row's note, a Select), Rumble rows, one Reset at the foot like the Keyboard tab |
+| Achievements (merged) | Its own title, Back pill, hand-drawn bar and rows; rows took the focus ring though nothing happens on them | A settings page's frame and card, ProgressBar, rows on the tokens (score on the name's baseline); up and down scroll the page, no ring |
+| Achievements x/y (merged) | A pill floating over the hero, right of the band | A Small Button with the trophy icon on the disc state's line, in the disc block |
+| Update all (merged) | A pill and a hand-drawn bar right of Home's title | A Primary Button (download icon) on the title's line; while it runs, its Caption over a ProgressBar, then Cancel |
+| Toasts | "Couldn't ..." guessed to be errors; successes shown as Info | Every call says Success, Info or Error; the guess is gone |
+| Sidebar, Home | Games not opened this session said "Open" | Every disc checked at start-up, one after the other, in the background |
+| Every dialog, with a pad | The first stop was the close cross (a ring and its "Close" bubble in the corner) | The cross is the pointer's only; the first stop is the content (the sheet's Put on the portal, the dialog's action) |
+| Manage > Trash, French | "Supprimer pour de bon" cut at the column's edge (the two buttons wider than the 320-point control column) | The table's control column as wide as the two buttons |
+
+**Result**: every item of the checklist passes on the eight runs (87 shots each: en and fr, 1024x720 and 1600x1000, mouse and
+pad), after the fixes above. `ArkeyanLauncherTest` with the three discs: all pass but the known `uninstall_test.cpp` line 213;
+the pad navigation (14 of 14 steps) and the seat X (12 of 12) runs included.
+
 
