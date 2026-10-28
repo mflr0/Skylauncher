@@ -47,8 +47,23 @@ switch, copy, seat X) in its scratch folder.
 | Keyboard tab | A long label wrapped inside its brackets; the heading sat 8 points above the Reset button | The brackets go on a second line; the heading is centred on the button |
 | Misc | "..." 4 points past the seats' edge; Auto-open Toy Box cramped; Video "Show in folder" narrower than the dropdowns; French "Fonctionne dans" cut; edit fields narrower than the upgrade cards | Each aligned or spaced |
 
+## Fixed in the fourth round
+
+| Where | Defect (before) | Fix |
+|---|---|---|
+| Add a figure | The catalogue grid ran under the footer strip, its scrollbar sat in the gutter; nothing said when a search found nothing | The grid ends 8 points above the strip; the cards share the column's width, the scrollbar sits against the last card; "No figure matches" when nothing matches |
+| Hold-to-confirm fill | Ended square at the leading edge | Rounded like the button, at least two radii wide (`App::HoldButton`) |
+| Disc check and game data copy bars | ImGui's square fill, a dark stub for the track's end | `App::ProgressBar`: pill track and fill, a whole cap even when nearly empty |
+| Toasts | The 2-point ring blurred at 1x | Whole-point box, ring inset so it covers whole pixels at 1x and 2x |
+| "Dark" badge | The dark purple badge vanished on the dark card | A light hairline on badges darker than the cards (`App::Badge`) |
+| Collection cards | The portrait ended flat at the bottom of some arts | The foot fades into the card |
+| Tooltips and popups | Stuck to the window's right edge | `DisplaySafeAreaPadding` 12 points |
+| Interrupted install page | A toast from the page before stayed over the card | Toasts are cleared when the page comes back |
+| Install details | The kit's long English lines ran past the box (sideways scroll) | They wrap inside the box; the text is untouched |
+| Figure sheet, Details | "created" shown in English in French | Translated (`created`, `imported`, `portal`) |
+| Filters panel | The label column could touch the boxes in a longer language | The column fits the widest label |
+| Screenshot test | "polar" search found nothing for Spyro's Adventure | It is run for Giants, where Polar Whirlwind exists; `56-add-no-match` shows the empty search |
+
 ## Left
 
-- Text that is not ours: the kit's log and error lines (English), its "compile: file 20 of 80" caption.
-- Add a figure: the catalogue grid is cut by the footer strip and its scrollbar sits in the gutter; no "no match" text in the grid.
-- The hold-to-confirm fill and the disc check's thin progress bar end square; toasts' 2-point rings are not smoothed at 1x.
+Nothing in the launcher. The kit's own English log and error lines are shown as it writes them (wrapped, readable); their wording is the kit's, not ours.

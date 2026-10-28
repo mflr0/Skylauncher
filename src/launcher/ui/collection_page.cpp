@@ -151,11 +151,18 @@ namespace launcher_ui
         return pressed;
     }
 
+    unsigned KindInk(uint32_t rgb)
+    {
+        return ((rgb >> 16 & 0xFF) * 3 + (rgb >> 8 & 0xFF) * 6 + (rgb & 0xFF)) / 10 > 120 ? AccentInk : Text;
+    }
+
     void App::Badge(ImDrawList* draw, ImVec2 at, const char* text, unsigned fill, unsigned ink)
     {
         ImGui::PushFont(nullptr, SmallSize - 1);
         ImVec2 size = ImGui::CalcTextSize(text);
         draw->AddRectFilled(at, ImVec2(at.x + size.x + 12, at.y + size.y + 4), Rgb(fill), (size.y + 4) / 2);
+        if (((fill >> 16 & 0xFF) * 3 + (fill >> 8 & 0xFF) * 6 + (fill & 0xFF)) / 10 < 70) // a very dark badge (Dark) gets a light edge on the dark cards
+            draw->AddRect(at, ImVec2(at.x + size.x + 12, at.y + size.y + 4), Rgb(TextDim), (size.y + 4) / 2);
         AddBoldText(draw, ImVec2(at.x + 6, at.y + 2), Rgb(ink), text);
         ImGui::PopFont();
     }
@@ -927,11 +934,15 @@ namespace launcher_ui
             if (m_closeFilters)
                 ImGui::CloseCurrentPopup();
             m_closeFilters = false;
+            // The labels' column fits the widest one (a longer translation never touches its box).
+            float column = 132;
+            for (const char* label : { N_("Element"), N_("Works in"), N_("Type"), N_("Sort by") })
+                column = std::max(column, ImGui::GetStyle().WindowPadding.x + ImGui::CalcTextSize(Tr(label)).x + 14);
             auto row = [&](const char* label, const char* id, const std::string& value, const std::function<void()>& items) {
                 ImGui::AlignTextToFramePadding();
                 ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr(label));
-                ImGui::SameLine(132);
-                ImGui::SetNextItemWidth(PanelW - 132 - 16);
+                ImGui::SameLine(column);
+                ImGui::SetNextItemWidth(PanelW - column - 16);
                 if (m_app.BeginCombo(id, value.c_str()))
                 {
                     items();
@@ -1110,6 +1121,11 @@ namespace launcher_ui
         if (collection::Card card = CardOf(figure); !DrawSwapper(draw, card, ImVec2(at.x + 14, at.y + 10), icon))
         {
             DrawIcon(draw, figure.toy, figure.Kind(), ImVec2(at.x + 14, at.y + 10), icon, false);
+            { // the busts end flat: fade their foot into the card
+                ImVec2 top(at.x + 14, at.y + 10 + icon - 22), foot(at.x + 14 + icon, at.y + 10 + icon + 1);
+                ImU32 clear = Rgb(hovered ? PanelRaised : Panel, 0), solid = Rgb(hovered ? PanelRaised : Panel, 240);
+                draw->AddRectFilledMultiColor(top, foot, clear, clear, solid, solid);
+            }
             if (card.Swapper())
                 DrawBottom(draw, *card.second, ImVec2(at.x + 14 + icon - icon * 0.38f, at.y + 10 + icon - icon * 0.38f), icon * 0.38f);
         }
@@ -1135,8 +1151,7 @@ namespace launcher_ui
         if (kind != collection::VariantKind::Base)
         {
             uint32_t rgb = collection::VariantKindRgb(kind);
-            bool light = ((rgb >> 16 & 0xFF) * 3 + (rgb >> 8 & 0xFF) * 6 + (rgb & 0xFF)) / 10 > 120;
-            m_app.Badge(draw, ImVec2(at.x + 6, at.y + 6), KindLabel(kind).c_str(), rgb, light ? AccentInk : Text);
+            m_app.Badge(draw, ImVec2(at.x + 6, at.y + 6), KindLabel(kind).c_str(), rgb, KindInk(rgb));
         }
         if (figure.favourite)
             DrawStar(draw, ImVec2(end.x - 15, at.y + 16), 9, Rgb(0xFFD54A));

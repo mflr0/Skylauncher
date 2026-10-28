@@ -305,7 +305,7 @@ namespace launcher_ui
             "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet", "42-swapforce-portal", "43-swapper-sheet",
             "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-versions", "47-search-element", "48-search-level",
             "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name", "53-all-swappers", "54-mixed-swapper-sheet",
-            "55-add-swapper-versions" };
+            "55-add-swapper-versions", "56-add-no-match" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -573,10 +573,10 @@ namespace launcher_ui
             Reload();
             Choose(3);
             break;
-        case 20: // Add a figure: "polar" finds Polar Whirlwind (a version of Whirlwind), already chosen
+        case 20: // Add a figure for Giants: "polar" finds Polar Whirlwind (a version of Whirlwind), already chosen
         {
             m_overlay = Overlay::Add;
-            m_addGame = "ssa";
+            m_addGame = "giants";
             m_addCategory = -1;
             m_addToy = 0xFFFF;
             m_addVersion = 0;
@@ -678,6 +678,14 @@ namespace launcher_ui
             m_addToy = 2001;
             m_addCategory = int(collection::Category::SwapTop);
             m_addVersion = 0;
+            break;
+        case 36: // Add a figure: a search that finds nothing
+            m_overlay = Overlay::Add;
+            m_addGame = "ssa";
+            m_addToy = 0xFFFF;
+            m_addCategory = -1;
+            m_addVersion = 0;
+            snprintf(m_addSearch, sizeof(m_addSearch), "%s", "zzz");
             break;
         default: break;
         }

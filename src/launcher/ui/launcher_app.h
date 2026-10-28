@@ -388,6 +388,7 @@ namespace launcher_ui
         bool Toggle(const char* id, bool* value);
         // Acts once held for a second (HoldConfirm); `hint` is its tooltip, which says so. Red: for what deletes or overwrites.
         bool HoldButton(const char* label, float width, const char* hint);
+        void ProgressBar(float fraction, ImVec2 size); // a rounded bar, the fill drawn with the cap of the track
         // The keyboard and pad focus around the last item, for the widgets drawn over an InvisibleButton; `gap` < 0 draws
         // it inside (rows that touch the window's edges).
         void FocusRing(float rounding, float gap = 4, ImDrawFlags flags = 0);

@@ -75,6 +75,7 @@ namespace launcher_ui
         m_s->installSha = m_s->check.xexSha256;
         m_s->installView = true;
         m_s->installLog = false;
+        m_toasts.clear(); // the page comes back with the card's own buttons at the toasts' corner: nothing stale over them
         if (m_shots.empty())
             m_page = Page::Play;
     }
@@ -521,9 +522,8 @@ namespace launcher_ui
             ImGui::PushStyleColor(ImGuiCol_ChildBg, Rgb(Field));
             ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, RadiusSmall);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12, 8));
-            ImGui::BeginChild("##installlog", ImVec2(0, logH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding,
-                ImGuiWindowFlags_HorizontalScrollbar);
-            ImGui::SetScrollX(0.0f);
+            ImGui::BeginChild("##installlog", ImVec2(0, logH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+            ImGui::PushTextWrapPos(0.0f); // the kit's lines are long and not ours: they wrap inside the box, nothing scrolls sideways
             bool atBottom = ImGui::GetScrollY() >= ImGui::GetScrollMaxY() - 4;
             ImGui::PushFont(m_monoFont, SmallSize);
             ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 2));
@@ -535,6 +535,7 @@ namespace launcher_ui
                 bool heading = line.starts_with("== ");
                 ImGui::TextColored(ImColor(Rgb(error ? Danger : heading ? Text : TextSecondary)), "%s", line.c_str());
             }
+            ImGui::PopTextWrapPos();
             ImGui::PopStyleVar();
             ImGui::PopFont();
             if (atBottom)

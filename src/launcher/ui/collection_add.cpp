@@ -114,11 +114,18 @@ namespace launcher_ui
         };
 
         constexpr float PanelW = 270;
-        float listH = size.y - ImGui::GetCursorPosY() - Pad - 56;
-        ImGui::BeginChild("##addtoys", ImVec2(size.x - 2 * Pad - PanelW - 14, listH), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
+        // The grid ends above the bar's strip with a gap; its scrollbar (always there, so nothing shifts) sits against the
+        // last column, and the cards share the width left, so the grid fills its column.
+        float listH = size.y - ImGui::GetCursorPosY() - Pad - 56 - 8;
+        float gridW = size.x - 2 * Pad - PanelW - 14;
+        const bool found = std::any_of(catalogue.Toys().begin(), catalogue.Toys().end(), matches);
+        ImGui::BeginChild("##addtoys", ImVec2(gridW, listH), ImGuiChildFlags_NavFlattened,
+            ImGuiWindowFlags_NoBackground | (found ? ImGuiWindowFlags_AlwaysVerticalScrollbar : 0));
         ImGui::SetScrollX(0.0f);
-        constexpr float Cell = 104, Gap = 10;
-        int columns = std::max(1, int((ImGui::GetContentRegionAvail().x + Gap) / (Cell + Gap)));
+        constexpr float MinCell = 104, Gap = 10, CardPad = 8, Art = 72, CardH = 142;
+        const float usable = ImGui::GetContentRegionAvail().x - CardPad;
+        const int columns = std::max(1, int((usable + Gap) / (MinCell + Gap)));
+        const float Cell = std::floor((usable + Gap) / columns - Gap);
         const Toy* chosen = nullptr;
         for (int pass = 0; pass < 2; pass++) // the game's own toys, then the later games'
         {
@@ -138,7 +145,7 @@ namespace launcher_ui
                     ImGui::SameLine(0, Gap);
                 ImVec2 at = ImGui::GetCursorScreenPos();
                 ImGui::PushID(toy.type);
-                if (ImGui::InvisibleButton("##toy", ImVec2(Cell, Cell + 38), ImGuiButtonFlags_EnableNav))
+                if (ImGui::InvisibleButton("##toy", ImVec2(Cell, CardH), ImGuiButtonFlags_EnableNav))
                 {
                     m_addToy = toy.type;
                     m_addVersion = firstMatchingVersion(toy);
@@ -152,20 +159,20 @@ namespace launcher_ui
                 if (selected)
                     chosen = &toy;
                 ImDrawList* draw = ImGui::GetWindowDrawList();
-                draw->AddRectFilled(at, ImVec2(at.x + Cell, at.y + Cell + 38), Rgb(selected ? PanelRaisedActive : hovered ? PanelRaised : Field), Radius);
+                draw->AddRectFilled(at, ImVec2(at.x + Cell, at.y + CardH), Rgb(selected ? PanelRaisedActive : hovered ? PanelRaised : Field), Radius);
                 if (selected)
-                    draw->AddRect(at, ImVec2(at.x + Cell, at.y + Cell + 38), Rgb(Accent), Radius, 0, 2.5f);
+                    draw->AddRect(at, ImVec2(at.x + Cell, at.y + CardH), Rgb(Accent), Radius, 0, 2.5f);
                 uint16_t bottomVariant = 0;
-                if (!IsSwapper(toy) || !DrawSwapper(draw, &toy, 0, BottomOf(toy, 0, bottomVariant), bottomVariant, ImVec2(at.x + 16, at.y + 6), Cell - 32))
-                    DrawIcon(draw, &toy, collection::VariantKind::Base, ImVec2(at.x + 16, at.y + 6), Cell - 32, false);
+                if (!IsSwapper(toy) || !DrawSwapper(draw, &toy, 0, BottomOf(toy, 0, bottomVariant), bottomVariant, ImVec2(at.x + (Cell - Art) / 2, at.y + 6), Art))
+                    DrawIcon(draw, &toy, collection::VariantKind::Base, ImVec2(at.x + (Cell - Art) / 2, at.y + 6), Art, false);
                 ImGui::PushFont(nullptr, SmallSize);
                 std::string name = LauncherMiddleEllipsis(IsSwapper(toy) ? WithoutHalf(toy.name) : toy.name, 14);
                 ImVec2 nameSize = ImGui::CalcTextSize(name.c_str());
-                draw->AddText(ImVec2(at.x + (Cell - nameSize.x) / 2, at.y + Cell - 18), Rgb(Text), name.c_str());
+                draw->AddText(ImVec2(at.x + (Cell - nameSize.x) / 2, at.y + CardH - 56), Rgb(Text), name.c_str());
                 int count = owned(toy.type, -1, {});
                 std::string note = pass == 1 ? Tf("needs {}", ShortGameName(toy.game)) : count > 0 ? Tf("owned x{}", count) : std::string();
                 ImVec2 noteSize = ImGui::CalcTextSize(note.c_str());
-                draw->AddText(ImVec2(at.x + (Cell - noteSize.x) / 2, at.y + Cell), Rgb(pass == 1 ? TextDim : Ok), note.c_str());
+                draw->AddText(ImVec2(at.x + (Cell - noteSize.x) / 2, at.y + CardH - 38), Rgb(pass == 1 ? TextDim : Ok), note.c_str());
                 ImGui::PopFont();
                 if (CountVersions(ViewGame(m_addGame, toy), toy) > 0) // it has versions: a small badge, the count
                 {
@@ -178,6 +185,8 @@ namespace launcher_ui
             }
             ImGui::Dummy(ImVec2(0, 10));
         }
+        if (!found)
+            ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", Tr("No figure matches"));
         ImGui::EndChild();
 
         // The versions of the chosen toy, then Create.
