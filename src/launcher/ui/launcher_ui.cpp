@@ -1641,7 +1641,7 @@ namespace launcher_ui
             // The file name on top (the whole path under the pointer), "Change disc..." at its right once a disc is verified;
             // the copy replaces the disc image.
             const std::string file = m_s->fromCopy ? Tr("Copied game data")
-                : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 40);
+                : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 64);
             const bool changeDisc = ready && !installing && !m_s->fromCopy;
             const ui::ButtonOptions change{ .size = ui::Size::Small };
             const float changeW = changeDisc ? ui::ButtonWidth(Tr("Change disc..."), change) : 0;
@@ -1653,10 +1653,11 @@ namespace launcher_ui
             ImGui::Dummy(ImVec2(0, ui::space::XXS));
             if (changeDisc)
             {
+                const float below = ImGui::GetCursorScreenPos().y; // under the file name
                 ImGui::SetCursorScreenPos(ImVec2(top.x + blockW - 2 * ui::space::M - changeW, top.y));
                 if (ui::Button(Tr("Change disc..."), change))
                     Browse();
-                ImGui::SetCursorScreenPos(ImVec2(top.x, ImGui::GetItemRectMax().y + ui::space::XS));
+                ImGui::SetCursorScreenPos(ImVec2(top.x, std::max(below, ImGui::GetItemRectMax().y + ui::space::XS)));
             }
             switch (m_s->disc)
             {
