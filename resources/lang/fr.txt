@@ -195,7 +195,7 @@ Interrupted: {} of {} copied	Interrompue : {} sur {} copiés
 Keep installing	Continuer l'installation
 Keyboard	Clavier
 Keyboard bindings reset	Touches du clavier réinitialisées
-LIBRARY	BIBLIOTHÈQUE
+Library	Bibliothèque
 Language	Langue
 Last checked {}	Dernière vérification : {}
 Later	Plus tard
@@ -436,7 +436,6 @@ nothing yet	0 octet
 {} settings	Réglages de {}
 {} stopped unexpectedly (exit code {}).\n\nPress Copy log, then Report.	{} s'est arrêté de façon inattendue (code {}).\n\nAppuyez sur « Copier le journal », puis sur « Signaler ».
 {} x {} for the 3D scene	{} x {} pour la scène 3D
-{} {} %	{} {} %
 {}: game data copied	{} : données du jeu copiées
 {}: {} freed	{} : {} libérés
 
@@ -803,3 +802,11 @@ plays as {}	joue comme {}
 On the wheel	Sur la roue
 On the wheel: {}	Sur la roue : {}
 The wheel is full: take a figure off it first	La roue est pleine : retirez d’abord une figurine
+
+# Game page (phase B)
+1. Choose your disc	1. Choisir votre disque
+2. Install	2. Installer
+3. Play	3. Jouer
+Your disc is read on this computer only.	Votre disque est lu sur cet ordinateur uniquement.
+Play	Jouer
+Sidebar	Barre latérale

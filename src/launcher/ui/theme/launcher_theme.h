@@ -21,10 +21,7 @@ namespace LauncherTheme
 
     // The sidebar: a cool dark grey (a touch of blue), light ink. The bottom band and its buttons are shades of the same grey.
     inline constexpr unsigned Sidebar = 0x26262C; // Sidebar background color
-    inline constexpr unsigned SidebarHover = 0x47474F;    // a game row under the mouse
-    inline constexpr unsigned SidebarSelected = 0x55555E; // the selected row, with an orange bar on its left
     inline constexpr unsigned SidebarInk = 0xF2F2F2;   // light text on the dark sidebar
-    inline constexpr unsigned SidebarInkDim = 0xFFFFFF;
     inline constexpr unsigned Ready = 0x2EEA8F;     // green dot: the disc is verified
     // The band under the game art, one step lighter than the sidebar; its buttons sit a step darker than the band, lighten
     // under the mouse and darken when pressed. Every shade keeps the sidebar's hue (blue a little above red and green).
@@ -68,15 +65,11 @@ namespace LauncherTheme
     inline constexpr float Radius = 14, RadiusSmall = 10, RadiusLarge = 22;
     inline constexpr float PlayButtonW = 300, PlayButtonH = 64, PlayGearW = 64; // the action button: its main half, height, gear half
     inline constexpr float BottomBarH = 150; // the band with the main button, under the game art
-    inline constexpr float GameRowH = 56, SidebarBarW = 5; // sidebar rows and the bar marking the selected one
     inline constexpr float TabUnderlineH = 3, TabGap = 34; // settings tabs: the line under the selected one, the space between them
     inline constexpr float ControllerW = 190, ControllerGap = 40; // the controller picker, and its space before the main button
-    inline constexpr float GameBadgeR = 17;     // the game's icon (or initial) in a sidebar row
-    inline constexpr float GearButton = 30;  // the settings icon at the bottom of the sidebar
 
     // Fonts: Outfit for text, Bungee for titles and buttons (both SIL OFL 1.1, resources/fonts).
     inline constexpr float TextSize = 17, SmallSize = 14, TitleSize = 22, HeadlineSize = 34, HeroSize = 48;
-    inline constexpr float SidebarTextSize = 20, SidebarSmallSize = 16; // game names and their status in the sidebar
     inline constexpr float CaptionSize = 12;  // the smallest text there is, at 1x
     inline constexpr float BoldOffset = 0.6f; // extra copies of SemiBold text, this far apart, for what must read heavier (the chosen controller)
     inline constexpr int BolderPasses = 2;
@@ -101,8 +94,7 @@ namespace LauncherTheme
     inline constexpr unsigned BackdropTopShade = 120, BackdropBottomShade = 235; // alpha of SkyTop over the game's painting
     inline constexpr int BackdropArtW = 1024; // the painting's width as a texture (Giants' is 1600 px)
     // The sidebar's game rows: the logo's box on the left, the name and status beside it.
-    inline constexpr float GameLogoW = 72, GameLogoH = 38, GameTextX = 98;
-    inline constexpr float VersionSize = 13; // "v0.4.3" beside the SKYLAUNCHER title
+    inline constexpr float GameLogoW = 72, GameLogoH = 38;
 
     // ImGui widget colours and shapes for the whole window.
     void Apply(ImGuiStyle& style);

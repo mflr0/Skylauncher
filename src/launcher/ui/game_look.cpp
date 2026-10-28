@@ -203,6 +203,7 @@ namespace launcher_ui
         options.label = action.label;
         options.enabled = action.enabled;
         options.progress = action.progress;
+        options.indeterminate = action.indeterminate;
         options.style = &StyleOf(m_s->game.id);
         const std::string tooltip = Tf("{} settings", m_s->game.name);
         options.gearTooltip = tooltip.c_str();

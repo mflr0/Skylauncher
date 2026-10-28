@@ -360,8 +360,9 @@ Three parts, each one piece of work. For each screen: replace the hand-drawn wid
 colours by tokens, then delete the App wrapper or the old theme constant once nothing uses it. Check with the gallery, the
 screen's own screenshot test (en and fr, 1024x680 and 1600x1000) and `ArkeyanLauncherTest`.
 
-**1. Home, the game page, the sidebar, install and update** (`launcher_ui.cpp` DrawSidebar, DrawHome, DrawPlay, DrawToast,
-DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner and What's new)
+**1. Home, the game page, the sidebar, install and update: DONE** (`launcher_ui.cpp` DrawSidebar, DrawHome, DrawPlay, DrawToast,
+DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner and What's new). What is left of the list below is
+only what each line says was not possible: see "Done" at the end of this part.
 - Sidebar: the rows (hand-drawn, `GameRowH`, `SidebarBarW`) become ListRows (`selected`: the orange bar), which needs an image
   slot for the game's logo or initial (`ListRowOptions` gains one); the status dot becomes `ui::DrawStatusIcon` with a
   `ui::Status` per `SlotState` (in `SlotStatus`); the title's sizes (`TitleSize + 4`, `VersionSize`, `SidebarSmallSize - 2`)
@@ -382,6 +383,25 @@ DrawQuitPrompt; `game_look.cpp`; `install_page.cpp`; `update_page.cpp` banner an
   ModalKind::Danger)`: the focus starts on Keep installing, B / Escape keep installing.
 - Toasts: switched; every success passes `ToastKind::Success`, every error `ToastKind::Error`, then the "Couldn't" guess in
   `App::Toast` goes.
+
+**Done (part 1).** Sidebar rows are `ui::ListRow`s (`ListRowOptions` gained `image`, `note`, `status`, `progress`, `dim`): the game's
+logo or initial in the image slot, its version as the note (left out when it would cut the name), `ui::DrawStatusIcon` through
+`StatusOf(SlotState)` (Info: needs a disc, ready to install, update, interrupted; Busy: checking and every build step; Success:
+ready; Error: every disc problem and a failed build; Neutral: not opened yet), the install's thin bar on the row's foot; the four
+games not out yet are one "Coming later" row with their number (a click lists them, dim and not pressable); Collection and Settings are
+rows with icons; the title is Title-size, fitted, and Caption beside it. Home: "Library" Display, cards on `radius::Panel` with the
+elevation shadow and the Scrim fade, the status a `StatusPill`, "Coming later" Badges, "Report a bug" a Button and the GitHub mark an
+`IconButton` with an `image`. Game page: one **disc block** card (file, "Change disc..." Button, a StatusPill for the disc, the
+install or update note, "Play without updating" a Ghost Button, "Use it for {}" a Primary Button); the disc check's bar is an
+`IndeterminateBar` once it passes 97 % (the main action sweeps too: `MainAction::indeterminate`); **first run** (no disc): a dashed
+drop zone with the three steps and "Your disc is read on this computer only." (a click chooses, a drop reads); the controller is a
+`Pill` opening a `Menu` above it (`OpenMenu(id, above)`); the portal line a `StatusPill`; a `PadLegend` (Play, Game settings, Sidebar)
+in a strip under the band while a pad is in use (`App::PlayBandH`). Install card: `BeginCard`, one `ProgressBar` with its
+percentage (the percentage is said once in the card), status icons per step, Retry (Primary) first then Copy log, Open logs folder
+(`Icon::Folder`), Show details (Ghost); Cancel stays Secondary (it keeps the install going on a tap, no hold). Update banner:
+Buttons (`overArt`), `ProgressBar` or `IndeterminateBar`; What's new `BeginModal(Large)` + `ModalActions`; quit prompt
+`BeginModal(Small)` + `ModalActions(Danger)`. Install and update toasts are typed. The sidebar's percentage is `FormatPercent`.
+`App::Toast(text, bool)`'s "Couldn't" guess stays until parts 2 and 3 (their call sites) are migrated: it goes with the last of them.
 
 **2. All settings pages: done in phase B** (`launcher_ui.cpp` DrawSettings, DrawControls, DrawLauncherTab, DrawLauncherLanguage; `game_settings_page.cpp`;
 `game_data_page.cpp`; `support_page.cpp`; `uninstall_page.cpp`; `update_page.cpp` About and Updates)
@@ -518,13 +538,12 @@ in the sidebar (`[launcher] game=`); the other is one click away.
 1. **Left sidebar** (grey, fixed width).
    - The title, **ARKEYAN LAUNCHER**, with the launcher's version beside it, small and dim (`v0.6.0`, from
      `LAUNCHER_VERSION`: `LauncherVersion()`), then "Native PC ports" and YOUR GAMES.
-   - The seven games as full-width rows (Spyro's Adventure, Giants and Swap Force enabled, the others "Coming later", SuperChargers
-     Racing included). An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
+   - The three playable games as rows (Spyro's Adventure, Giants and Swap Force), then one "Coming later" row for the four others. An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
      art with "Skylanders" on it, in the row's left column (`GameLogoW` x `GameLogoH`); before that, and for the games
      coming later (no disc, so never any game art), a neutral badge: the initial on the game's colour.
    - The name (shrunk to fit), then the game's state with a dot ("A game's states", below). The selected game's row has
      the orange bar while its Play page is open.
-   - COLLECTION and the Settings gear at the bottom, their icons in the logos' column and their labels in the names'.
+   - COLLECTION and SETTINGS at the bottom, rows with an icon.
    - Rows are reachable with the keyboard and the pad like the others.
 2. **Play** (the game page, no tabs).
    - The backdrop is the game's own painting from the disc (SSA: the painted Skylands sky; Giants: the main menu's sky; Swap Force: the main menu's painted sky),
