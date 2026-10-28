@@ -4,6 +4,25 @@
 @code fr
 @name Français
 
+# Components (ui/components): the hold hint, numbers ("." is the decimal mark, "," the thousands separator), dates.
+{}%	{} %
+.	,
+,	 
+{0} {1} {2}	{0} {1} {2}
+Today {}	Aujourd'hui {}
+Yesterday {}	Hier {}
+Jan	janv.
+Feb	févr.
+Mar	mars
+Apr	avr.
+May	mai
+Jun	juin
+Jul	juil.
+Aug	août
+Sep	sept.
+Oct	oct.
+Nov	nov.
+Dec	déc.
 \n\nAllow access in System Settings > Privacy & Security > Files and Folders.	\n\nAutorisez l'accès dans Réglages Système > Confidentialité et sécurité > Fichiers et dossiers.
 \n- {} (media ID {:08X}, version {})	\n- {} (ID du média {:08X}, version {})
 Can't read the disc image ({}).{}	Impossible de lire l'image disque ({}).{}
@@ -389,8 +408,11 @@ less than a minute left	moins d'une minute restante
 no answer	aucune réponse
 nothing yet	0 octet
 {:.0f} KB	{:.0f} Ko
+{} KB	{} Ko
 {:.0f} MB	{:.0f} Mo
+{} MB	{} Mo
 {:.1f} GB	{:.1f} Go
+{} GB	{} Go
 {} Xbox, PlayStation and Switch pads work.	{} Les manettes Xbox, PlayStation et Switch fonctionnent.
 {} already plays from its copied game data	{} fonctionne déjà avec ses données copiées
 {} bytes	{} octets
