@@ -51,6 +51,9 @@ namespace launcher_ui
     figures::FigureStats MergeEditedStats(const figures::FigureStats& now, const figures::FigureStats& base, const figures::FigureStats& edited,
         const std::string& baseNickname, const std::string& nickname);
 
+    // Edit stats' gold from what was typed: the digits at the start (none: 0), never above figures::MaxGold.
+    uint16_t GoldFromText(std::string_view text);
+
     // The bar's filters on the shelf (docs/collection_ui.md); -1 or empty: all.
     struct ShelfFilter
     {

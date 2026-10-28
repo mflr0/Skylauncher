@@ -502,7 +502,7 @@ Eon's Elite	Élite d'Eon
 Event and exclusive	Événement et exclusif
 The latest 10 backups are kept.	Les 10 dernières copies sont gardées.
 No unknown toys.	Aucun jouet inconnu.
-Experience	Expérience
+Experience (0 to {})	Expérience (0 à {})
 Export everything...	Tout exporter...
 Export the figures to	Exporter les figurines vers
 Exported {} figure to {}	{} figurine exportée vers {}
@@ -516,8 +516,10 @@ For {}	Pour {}
 Giants	Géants
 Glow in the Dark	Phosphorescent
 Gold	Or
+Gold (0 to {})	Or (0 à {})
 Hat	Chapeau
 Hero points	Points de héros
+Hero points (0 to {})	Points de héros (0 à {})
 Hold if its game has quit.	Maintenez si son jeu est fermé.
 Hold to delete	Maintenir pour supprimer
 Hold to delete it for good.	Maintenez pour la supprimer pour de bon.

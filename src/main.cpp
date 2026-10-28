@@ -121,7 +121,10 @@ int main(int argc, char** argv)
     ApplyGameVideo(config, game->id);
     SaveLauncherConfig(configPath, config);
     pass("SKY_PORTAL", "portal", "mode");
-    pass("SKY_PORTAL_PLACE", "portal", "place");
+    // [portal] place is the older list of figures to start on the portal; once the seats moved to the session file
+    // ([collection] moved) a left-over one would put its figures back over the seats the player chose.
+    if (config["collection"]["moved"] != "1")
+        pass("SKY_PORTAL_PLACE", "portal", "place");
     // A language the disc does not hold is not passed as is: the text takes the disc's first language and the voices
     // follow the text, which is what the Language tab shows then. Nothing known about the disc: passed as saved.
     const art::DiscLanguages onDisc = StoredDiscLanguages(config, game->id);
