@@ -332,11 +332,23 @@ namespace ui
 
     void DrawSpinner(ImDrawList* draw, ImVec2 centre, float size, ImU32 color)
     {
-        // Lucide's loader turning about its centre (its vertices rotated); still when motion is reduced.
+        // Lucide's loader turning about its own centre (its vertices rotated); still when motion is reduced. The pivot is the
+        // middle of the glyph's quad as drawn, not the point asked for: the icon font's glyphs sit up to a point and a half off
+        // their em square's middle (its ascent, ImGui's whole points), which made the ring wobble. The loader's arc spans its
+        // whole circle, so its quad is centred on the ring; the ring stays where the still icon would be.
         const int first = draw->VtxBuffer.Size;
         DrawIcon(draw, Icon::Loader, centre, size, color);
+        if (draw->VtxBuffer.Size == first)
+            return;
+        ImVec2 low = draw->VtxBuffer[first].pos, high = low;
+        for (int i = first + 1; i < draw->VtxBuffer.Size; i++)
+        {
+            const ImVec2& pos = draw->VtxBuffer[i].pos;
+            low = ImVec2(std::min(low.x, pos.x), std::min(low.y, pos.y));
+            high = ImVec2(std::max(high.x, pos.x), std::max(high.y, pos.y));
+        }
         const float angle = Phase(motion::Spin) * Tau, cosA = std::cos(angle), sinA = std::sin(angle);
-        const ImVec2 pivot(Snap(centre.x - size / 2) + size / 2, Snap(centre.y - size / 2) + size / 2);
+        const ImVec2 pivot((low.x + high.x) / 2, (low.y + high.y) / 2);
         for (int i = first; i < draw->VtxBuffer.Size; i++)
         {
             ImVec2& pos = draw->VtxBuffer[i].pos;
