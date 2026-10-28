@@ -1,6 +1,7 @@
 // Support in Settings: the game's logs (Copy game log, Open logs folder), "Report a problem" (one text file with the
 // logs and the player's versions, shown before anything is saved or copied; nothing is uploaded) and "Test the portal"
 // (docs/support.md).
+#include "launcher/problem_report.h"
 #include "launcher/report.h"
 #include "launcher/ui/launcher_app.h"
 #include <fmt/format.h>
@@ -61,20 +62,9 @@ namespace launcher_ui
     // One text file with the last logs, the settings and the versions; it is shown before it can be saved or copied.
     void App::OpenProblemReport()
     {
-        launcher_report::Sources sources;
-        sources.runtimeFolder = RuntimeLogFolder();
-        sources.logFolder = GameLogFolder();
-        sources.settingsFile = std::filesystem::path(std::u8string(m_configPath.begin(), m_configPath.end()));
-        sources.iso = m_s->discPath;
-        std::string kit = m_s->installed.kitVersion;
-        if (kit.empty())
-            if (std::optional<InstallKit> found = FindInstallKit(m_config))
-                kit = found->version;
-        sources.versions = launcher_report::ReadVersions(LauncherVersion(), kit, sources.runtimeFolder);
-        launcher_report::Identity identity = launcher_report::CurrentIdentity(sources.iso);
-        sources.userName = identity.userName;
-        sources.computerName = identity.computerName;
-        sources.homeFolder = identity.homeFolder;
+        launcher_report::Sources sources = CurrentReportSources(m_configPath, m_config, m_s->game.id, m_s->discPath);
+        if (!m_s->installed.kitVersion.empty())
+            sources.versions.kit = m_s->installed.kitVersion;
         m_reportText = launcher_report::BuildReport(sources);
         m_reportOpen = true;
     }
@@ -130,7 +120,17 @@ namespace launcher_ui
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
             ImGui::PopStyleColor();
-            if (PillButton(Tr("Save as..."), true, 160, true))
+            if (PillButton(Tr("Save to Desktop"), true, 200, true))
+            {
+                // The same file the game's menu writes: on the Desktop (else in the logs folder), shown in the file manager.
+                SavedReport saved = SaveProblemReportText(m_reportText);
+                if (saved.file.empty())
+                    Toast(Tr("Couldn't save the report"), true);
+                else
+                    Toast(Tf("Report saved: {}", saved.file.filename().string()));
+            }
+            ImGui::SameLine();
+            if (PillButton(Tr("Save as..."), false, 160))
             {
                 std::filesystem::path folder = GameLogFolder();
                 std::string name = launcher_report::FileName();

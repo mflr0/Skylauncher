@@ -33,6 +33,8 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes (the key is per game: see "Per-game video" below) |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
 | `video` | `fps_limit` | `30`, `60` | Frame rate cap (the game is made for 30; 60 is experimental; a computer that cannot hold 60 gets a steady 30). Other values the runtime reads as 60 | yes |
+| `video` | `show_fps` | `0` (default), `1` | The FPS counter: a small frame rate readout in a corner of the game (<game> settings > Video > FPS counter; the game's F3 menu writes it too) | yes |
+| `audio` | `volume` | `0` to `100` (default `100`) | The game's master volume, in `[<game>.audio]` (<game> settings > Video > Volume; the game's F3 menu writes it too). The runtime reads `[audio]`, then the game's own section | no: the game reads `launcher.ini` itself |
 | `video` | `skip_intro_movies` | `0`, `1` | Skip the start-up logos (legal, ATVI, XPEC, Toys for Bob); the story movies still play | yes |
 | `video` | `vsync` | `0`, `1` | Wait for the display's refresh | yes |
 | `video` | `anisotropy` | `1`, `2`, `4`, `8`, `16` | Texture filtering | yes |
@@ -56,12 +58,12 @@ the launcher then writes no settings until it is started again.
 ## Per-game video
 
 The runtime reads one `[video]` section, but the games do not have to share it. Each game keeps its own copy of the
-ten keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
-`anisotropy`, `aspect`, `texture_packs`, `texture_dump`, `original_resolution`) in **`[ssa.video]`**, **`[giants.video]`** and **`[swapforce.video]`**:
+eleven keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
+`anisotropy`, `aspect`, `texture_packs`, `texture_dump`, `original_resolution`, `show_fps`) in **`[ssa.video]`**, **`[giants.video]`** and **`[swapforce.video]`**:
 
 | Section | Key | Meaning |
 | --- | --- | --- |
-| `<game>.video` | the ten `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
+| `<game>.video` | the eleven `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
 
 - The first time, a game's copy starts from the `[video]` the player already had (`SeedGameVideo`).
 - **PLAY** puts the copy of the game that starts into `[video]` (keys it lacks are dropped, so the runtime's defaults apply):
@@ -73,8 +75,9 @@ ten keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `
   per run) and goes back to 60 when it holds.
 - A game's copy that is still empty (a page only looked at it) is seeded from the `[video]` the player already had, like a
   missing one (`SeedGameVideo`).
-- When the game ends, what is in `[video]` (the player may have changed it in the game's own Settings menu) becomes that
-  game's copy again (`StoreGameVideo`), so the other game never sees it.
+- Since 0.6.2 the launcher does not copy `[video]` back when the game ends: the game's own menu (F3: volume, FPS counter,
+  fullscreen, frame rate, and the settings that apply at its next start) writes `[<game>.video]` and `[<game>.audio]` itself,
+  and those win over `[video]`, so a copy-back would only undo them. (`StoreGameVideo` stays for the tests.)
 - What the games share stays in its own section: `[input]` (device, glyphs), `[portal]`, and the launcher's
   `[launcher]` and `[update]`. They are in the gear's Settings, not on a game page. The keyboard keys are per game, below.
 

@@ -96,7 +96,7 @@ namespace
         config["video"]["resolution_scale"] = "3";
         StoreGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["ssa.video"]["resolution_scale"] == "3" && config["giants.video"].count("resolution_scale") == 0);
-        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 10);
+        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 11);
 
         // Original resolution (Swap Force): kept in [swapforce.video], put in [video] when it plays, absent for the other games.
         config["swapforce.video"]["original_resolution"] = "1";

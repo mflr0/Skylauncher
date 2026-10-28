@@ -98,6 +98,15 @@ namespace launcher_ui
         SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 is experimental."));
         Combo("##fps", video, "fps_limit", FpsChoices, 0);
 
+        SettingRow(Tr("FPS counter"), Tr("A small frame rate readout in the game (F3 in the game turns it on too)."));
+        toggle("##showfps", "show_fps", "0");
+
+        SettingRow(Tr("Volume"), Tr("The game's master volume (F3 in the game changes it too)."));
+        {
+            const std::string audioSection = std::string(m_s->game.id) + ".audio";
+            Combo("##volume", audioSection.c_str(), "volume", VolumeChoices, 10);
+        }
+
         SettingRow(Tr("Skip intro movies"), nullptr);
         toggle("##skipintromovies", "skip_intro_movies", "0");
 

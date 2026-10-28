@@ -241,6 +241,12 @@ Report a problem	Signaler un problème
 You see the report before saving it; nothing is sent.	Vous voyez le rapport avant de l'enregistrer ; rien n'est envoyé.
 Report copied	Rapport copié
 Report saved	Rapport enregistré
+Report saved: {}	Rapport enregistré : {}
+Save to Desktop	Enregistrer sur le Bureau
+FPS counter	Compteur d'images
+A small frame rate readout in the game (F3 in the game turns it on too).	Un petit compteur d'images par seconde dans le jeu (F3 dans le jeu l'active aussi).
+Volume	Volume
+The game's master volume (F3 in the game changes it too).	Le volume général du jeu (F3 dans le jeu le change aussi).
 Reset to defaults	Valeurs par défaut
 Resolution scale	Échelle de résolution
 Restart now	Redémarrer maintenant
@@ -405,7 +411,7 @@ nothing yet	0 octet
 {} of {}	{} sur {}
 {} of {} steps done	{} étapes sur {} terminées
 {} settings	Réglages de {}
-{} stopped unexpectedly (exit code {}).\n\nPress Copy log, then Report.	{} s'est arrêté de façon inattendue (code {}).\n\nAppuyez sur « Copier le journal », puis sur « Signaler ».
+{} stopped unexpectedly (exit code {}).\n\nPress Report to save a report file with the log and where the game stopped.	{} s'est arrêté de façon inattendue (code {}).\n\nAppuyez sur « Signaler » pour enregistrer un fichier de rapport avec le journal et l'endroit où le jeu s'est arrêté.
 {} x {} for the 3D scene	{} x {} pour la scène 3D
 {} {} %	{} {} %
 {}: game data copied	{} : données du jeu copiées

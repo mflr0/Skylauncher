@@ -231,13 +231,13 @@ std::string launcher_report::Redact(const std::string& text, const Identity& ide
         AddPathRules(rules, identity.isoFolder, "<iso folder>");
 
     if (!identity.homeFolder.empty())
-        AddPathRules(rules, identity.homeFolder, "<home>");
+        AddPathRules(rules, identity.homeFolder, "~");
     if (!identity.userName.empty())
     {
-        AddPathRules(rules, "/Users/" + identity.userName, "<home>");
-        AddPathRules(rules, "/home/" + identity.userName, "<home>");
-        AddPathRules(rules, "C:\\Users\\" + identity.userName, "<home>");
-        AddPathRules(rules, "C:/Users/" + identity.userName, "<home>");
+        AddPathRules(rules, "/Users/" + identity.userName, "~");
+        AddPathRules(rules, "/home/" + identity.userName, "~");
+        AddPathRules(rules, "C:\\Users\\" + identity.userName, "~");
+        AddPathRules(rules, "C:/Users/" + identity.userName, "~");
     }
     if (!identity.computerName.empty())
     {
@@ -305,6 +305,7 @@ launcher_report::Versions launcher_report::ReadVersions(const std::string& launc
     versions.gameBuild = FindLogLine(log, "[version] ");
     if (versions.gameBuild.empty())
         versions.gameBuild = "(no game log yet)";
+    versions.cpu = FindLogLine(log, "[system] CPU ");
     versions.gpu = FindLogLine(log, "[gpu] adapter ");
     if (versions.gpu.empty())
         versions.gpu = FindLogLine(log, "[gpu] ");
@@ -322,10 +323,21 @@ std::string launcher_report::BuildReport(const Sources& sources)
     report += "Kit: " + (sources.versions.kit.empty() ? "(no kit)" : sources.versions.kit) + "\n";
     report += "Game build: " + (sources.versions.gameBuild.empty() ? "(unknown)" : sources.versions.gameBuild) + "\n";
     report += "OS: " + (sources.versions.os.empty() ? "(unknown)" : sources.versions.os) + "\n";
+    report += "CPU: " + (sources.versions.cpu.empty() ? "(unknown)" : sources.versions.cpu) + "\n";
     report += "GPU: " + (sources.versions.gpu.empty() ? "(unknown)" : sources.versions.gpu) + "\n";
     if (!sources.iso.empty())
         report += "Disc image: " + sources.iso + "\n";
-    report += "\n";
+
+    // The last crash: the fault block of this run's log, else of the run before (the next start moves a crashed log aside).
+    std::string crash = launcher_report::CrashDetails(ReadFile(sources.runtimeFolder / "SSARecomp.log"));
+    std::string crashFrom = "this run";
+    if (crash.empty())
+    {
+        crash = launcher_report::CrashDetails(ReadFile(sources.runtimeFolder / "SSARecomp.prev.log"));
+        crashFrom = "the previous run";
+    }
+    report += crash.empty() ? "Last crash: none in the logs\n\n" : "Last crash: yes (" + crashFrom + "), see below\n\n";
+    report += crash.empty() ? "===== last crash =====\n(no crash in the logs)\n\n" : "===== last crash (" + crashFrom + ") =====\n" + crash + "\n\n";
 
     Section(report, "launcher.ini", sources.settingsFile);
     Section(report, "migration.log", sources.logFolder / "migration.log");
@@ -356,6 +368,32 @@ std::string launcher_report::BuildReport(const Sources& sources)
             identity.isoFolder = datadir::Text(folder);
     }
     return Redact(Sanitise(report), identity) + "\n";
+}
+
+std::string launcher_report::CrashDetails(const std::string& log)
+{
+    size_t at = std::string::npos;
+    for (size_t found = log.find("Fault ("); found != std::string::npos; found = log.find("Fault (", found + 1))
+        at = found;
+    return at == std::string::npos ? std::string() : log.substr(at);
+}
+
+fs::path launcher_report::SaveToFirstFolder(const std::string& text, const std::string& name, const std::vector<fs::path>& folders)
+{
+    for (const fs::path& folder : folders)
+    {
+        if (folder.empty())
+            continue;
+        std::error_code error;
+        fs::create_directories(folder, error);
+        fs::path file = folder / name;
+        std::ofstream out(file, std::ios::binary | std::ios::trunc);
+        out.write(text.data(), std::streamsize(text.size()));
+        out.close();
+        if (out)
+            return file;
+    }
+    return {};
 }
 
 std::string launcher_report::FileName()

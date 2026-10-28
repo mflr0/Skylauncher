@@ -51,6 +51,8 @@ namespace launcher_ui
 
     // The runtime runs at 30 or 60: any other limit it is given means 60 (docs/settings.md).
     inline constexpr Choice FpsChoices[] = { { "30", N_("30 (original)") }, { "60", N_("60 (experimental)"), "0 120 144 240" } };
+    inline constexpr Choice VolumeChoices[] = { { "0", "0 %" }, { "10", "10 %" }, { "20", "20 %" }, { "30", "30 %" }, { "40", "40 %" },
+        { "50", "50 %" }, { "60", "60 %" }, { "70", "70 %" }, { "80", "80 %" }, { "90", "90 %" }, { "100", "100 %" } };
     inline constexpr Choice AspectChoices[] = { { "auto", N_("Auto (follows the window)") }, { "16:9", N_("16:9 (with bars)") } };
     inline constexpr Choice ScaleChoices[] = { { "auto", N_("Auto") }, { "1", "x1" }, { "2", "x2" }, { "3", "x3" }, { "4", "x4" },
         { "5", "x5" }, { "6", "x6" }, { "7", "x7" }, { "8", "x8" }, { "9", "x9" }, { "10", "x10" } };

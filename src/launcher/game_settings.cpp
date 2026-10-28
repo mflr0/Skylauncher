@@ -11,8 +11,8 @@ namespace fs = std::filesystem;
 
 namespace
 {
-    constexpr std::array<const char*, 10> VideoKeys = { "fullscreen", "resolution_scale", "fps_limit", "skip_intro_movies", "vsync",
-        "anisotropy", "aspect", "texture_packs", "texture_dump", "original_resolution" };
+    constexpr std::array<const char*, 11> VideoKeys = { "fullscreen", "resolution_scale", "fps_limit", "skip_intro_movies", "vsync",
+        "anisotropy", "aspect", "texture_packs", "texture_dump", "original_resolution", "show_fps" };
 
     // Top-level names in the game's folder (docs/install.md has the table).
     constexpr std::array<const char*, 3> SaveNames = { "saves", "saves-backup", "portal.txt" };
