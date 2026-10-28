@@ -388,21 +388,10 @@ namespace ui
         const bool face = button <= PadButton::North;
         if (!face || glyphs != Glyphs::PlayStation)
             return DrawCapBox(draw, at, PadButtonLabel(button, glyphs), face);
-        // PlayStation's face buttons are shapes.
+        // PlayStation's face buttons are shapes: Lucide's, in the cap.
         ImVec2 size = DrawCapBox(draw, at, "", true);
-        const ImVec2 c(at.x + CapH / 2, std::round(at.y - CapH / 2) + CapH / 2);
-        const float r = CapH * 0.24f, w = 1.6f;
-        const ImU32 ink = Col(color::Ink);
-        switch (button)
-        {
-        case PadButton::South:
-            draw->AddLine(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), ink, w);
-            draw->AddLine(ImVec2(c.x - r, c.y + r), ImVec2(c.x + r, c.y - r), ink, w);
-            break;
-        case PadButton::East: draw->AddCircle(c, r, ink, 16, w); break;
-        case PadButton::West: draw->AddRect(ImVec2(c.x - r, c.y - r), ImVec2(c.x + r, c.y + r), ink, 0, 0, w); break;
-        default: draw->AddTriangle(ImVec2(c.x, c.y - r * 1.1f), ImVec2(c.x + r * 1.1f, c.y + r * 0.8f), ImVec2(c.x - r * 1.1f, c.y + r * 0.8f), ink, w); break;
-        }
+        static const Icon Shapes[] = { Icon::Cross, Icon::Circle, Icon::Square, Icon::Triangle };
+        DrawIcon(draw, Shapes[int(button)], ImVec2(at.x + CapH / 2, std::round(at.y - CapH / 2) + CapH / 2), icon::Small, Col(color::Ink));
         return size;
     }
 

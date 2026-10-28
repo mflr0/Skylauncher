@@ -33,4 +33,7 @@ namespace ui::lucide
     constexpr unsigned CircleDashed = 0xE4B0; // circle-dashed
     constexpr unsigned LoaderCircle = 0xE10A; // loader-circle
     constexpr unsigned Gamepad2 = 0xE0DF; // gamepad-2
+    constexpr unsigned Circle = 0xE076; // circle
+    constexpr unsigned Square = 0xE167; // square
+    constexpr unsigned Triangle = 0xE192; // triangle
 }

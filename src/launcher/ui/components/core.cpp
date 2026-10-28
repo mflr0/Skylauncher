@@ -94,6 +94,13 @@ namespace ui
         return glyph != nullptr ? (glyph->Y0 + glyph->Y1) / 2 : baked->Ascent / 2;
     }
 
+    float CapTop(TextStyle style, bool bold, float size)
+    {
+        ImFontBaked* baked = FontOf(style, bold)->GetFontBaked(size > 0 ? size : SizeOf(style));
+        const ImFontGlyph* glyph = baked->FindGlyph('H');
+        return glyph != nullptr ? glyph->Y0 : 0;
+    }
+
     float Baseline(TextStyle style, bool bold, float size)
     {
         return FontOf(style, bold)->GetFontBaked(size > 0 ? size : SizeOf(style))->Ascent;
@@ -303,6 +310,9 @@ namespace ui
             case Icon::Unknown: return lucide::CircleDashed;
             case Icon::Loader: return lucide::LoaderCircle;
             case Icon::Gamepad: return lucide::Gamepad2;
+            case Icon::Circle: return lucide::Circle;
+            case Icon::Square: return lucide::Square;
+            case Icon::Triangle: return lucide::Triangle;
             }
             return 0;
         }

@@ -71,8 +71,9 @@ namespace ui
         const TextStyle titleStyle = TextStyle::Body;
         const bool titleBold = options.subtitle != nullptr;
         const float gap = space::XXS;
-        const float titleTop = options.subtitle != nullptr ? std::round(mid - (SizeOf(TextStyle::Body) + gap + SizeOf(TextStyle::Caption)) / 2)
-                                                           : std::round(mid - CapMiddle(titleStyle, titleBold));
+        const float titleTop = options.subtitle != nullptr
+            ? std::round(mid - (CapTop(titleStyle, titleBold) + SizeOf(titleStyle) + gap + Baseline(TextStyle::Caption)) / 2)
+            : std::round(mid - CapMiddle(titleStyle, titleBold));
         const float baseline = titleTop + Baseline(titleStyle, titleBold);
         if (options.trailing != nullptr)
         {
@@ -172,6 +173,12 @@ namespace ui
             return SizeOf(TextStyle::Body) + (hint != nullptr ? space::XXS + TextSize(TextStyle::Caption, hint, nullptr, false, width).y : 0);
         }
 
+        // From the label's capitals to the hint's last baseline: what is centred.
+        float LabelInk(const char* hint, float width)
+        {
+            return LabelBlockHeight(hint, width) - CapTop(TextStyle::Body) - (SizeOf(TextStyle::Caption) - Baseline(TextStyle::Caption));
+        }
+
         // The label (and its note, its hint) in the first column, centred on what the second column holds: one line's
         // capitals on its middle, a label and its hint as a block.
         void FlushSettingRow()
@@ -185,7 +192,7 @@ namespace ui
             const ImVec2 at = ImGui::GetCursorScreenPos();
             const float width = ImGui::GetContentRegionAvail().x;
             const char* hint = g_row.hint.empty() ? nullptr : g_row.hint.c_str();
-            const float top = hint != nullptr ? std::round(centre - LabelBlockHeight(hint, width) / 2) : std::round(centre - CapMiddle(TextStyle::Body));
+            const float top = hint != nullptr ? std::round(centre - LabelInk(hint, width) / 2 - CapTop(TextStyle::Body)) : std::round(centre - CapMiddle(TextStyle::Body));
             ImDrawList* draw = ImGui::GetWindowDrawList();
             PushText(TextStyle::Body);
             const std::string label = Ellipsize(g_row.label.c_str(), width);

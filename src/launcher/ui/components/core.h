@@ -65,8 +65,10 @@ namespace ui
     void PushText(TextStyle style, bool bold = false);
     void PopText();
     // Where a line of text drawn at y lies: the middle of its capitals (an icon beside it is centred there, a row's centre
-    // line goes through it) and its baseline (two sizes on one line share it), as offsets from y. `size` 0: the style's.
+    // line goes through it), their top, and its baseline (two sizes on one line share it), as offsets from y. Lines stacked
+    // in a row are centred from the first one's capitals to the last one's baseline. `size` 0: the style's.
     float CapMiddle(TextStyle style, bool bold = false, float size = 0);
+    float CapTop(TextStyle style, bool bold = false, float size = 0);
     float Baseline(TextStyle style, bool bold = false, float size = 0);
     ImVec2 TextSize(TextStyle style, const char* text, const char* end = nullptr, bool bold = false, float wrap = -1);
     // A text item at the cursor, wrapped at `wrap` points (0: the available width; < 0: no wrap).
@@ -117,7 +119,7 @@ namespace ui
         None, Check, Cross, Plus, Minus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ArrowUp, ArrowDown,
         Search, Gear, Info, Warning, Error, Download, Trash, Folder, Disc, Play, Hold, More, Star,
         Success, Update, Pause, Unknown, Loader, // a state: done, an update, stopped, not known yet; the spinner's
-        Gamepad
+        Gamepad, Circle, Square, Triangle // with Cross: PlayStation's face buttons
     };
     void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 centre, float size, ImU32 color);
     // The loader icon turning (an indeterminate wait); still when motion is reduced.

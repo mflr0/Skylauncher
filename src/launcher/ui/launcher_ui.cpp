@@ -1838,7 +1838,7 @@ namespace launcher_ui
         // The portal's state under the main button, in a word and a shape (above the band's foot, clear of the pad legend).
         if (const std::string line = m_portal.Current().Line(); !line.empty())
         {
-            ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY + PlayButtonH + ui::space::XS));
+            ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY + PlayButtonH + ui::space::S)); // clear of the focus ring
             ui::StatusPill(m_portal.Current().connected ? ui::Status::Success : ui::Status::Neutral, line.c_str());
             ui::Tooltip(Tr(strings::PortalTip));
         }

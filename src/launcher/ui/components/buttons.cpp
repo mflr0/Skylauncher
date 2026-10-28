@@ -218,10 +218,11 @@ namespace ui
         const bool clicked = Hit(id, ImVec2(w, h));
         const State state = ItemState();
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        // The face sits on its side (KeyDepth under it) and goes down onto it while pressed.
+        // The face is the item (what lines up with a row); its side shows KeyDepth under it, and the face goes down onto it
+        // while pressed.
         const float down = state.pressed ? KeyDepth - 1 : 0;
-        const ImVec2 min(at.x, at.y + down), max(at.x + w, at.y + h + down - KeyDepth);
-        draw->AddRectFilled(ImVec2(at.x, at.y + KeyDepth), ImVec2(at.x + w, at.y + h), Col(0x000000, 0.35f), radius::Control);
+        const ImVec2 min(at.x, at.y + down), max(at.x + w, at.y + h + down);
+        draw->AddRectFilled(ImVec2(at.x, at.y + KeyDepth), ImVec2(at.x + w, at.y + h + KeyDepth), Col(0x000000, 0.35f), radius::Control);
         const unsigned fill = options.capturing ? color::AccentFill : state.pressed ? color::RaisedPressed : state.hovered ? color::RaisedHover : color::Raised;
         draw->AddRectFilled(min, max, Col(fill), radius::Control);
         const bool warns = KeyWarns(options);
@@ -240,9 +241,10 @@ namespace ui
         }
         DrawText(draw, ImVec2(x, std::round(mid - CapMiddle(TextStyle::Body, true))), Col(options.capturing ? color::OnAccent : color::Ink), shown);
         PopText();
-        FocusRingIf(state, radius::Control);
+        if (state.focused) // around the face and its side
+            FocusRing(at, ImVec2(at.x + w, at.y + h + KeyDepth), radius::Control);
         if (options.tooltip != nullptr && WantsTooltip(state))
-            Bubble(options.tooltip, at, ImVec2(at.x + w, at.y + h));
+            Bubble(options.tooltip, at, ImVec2(at.x + w, at.y + h + KeyDepth));
         return clicked;
     }
 
