@@ -14,7 +14,7 @@ namespace launcher_ui
         // A swapper is added whole: the catalogue lists its tops only, named without the "(top)", and creating one makes both halves.
         bool IsSwapper(const Toy& toy) { return toy.category == Category::SwapTop; }
 
-        // The bottom that goes with a swapper's top (the same version's when it has one), for its stacked picture.
+        // The bottom that goes with a swapper's top (the same version's when it has one), for its joined picture.
         const Toy* BottomOf(const Toy& top, uint16_t variant, uint16_t& bottomVariant)
         {
             bottomVariant = 0;

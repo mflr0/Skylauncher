@@ -44,11 +44,11 @@ A Swap Force swapper is two toys, a top and a bottom, each its own dump. The lib
   swappers, as the game names them: `collection::CardName`, or the label the player gave), the top's level and favourite
   star, one seat badge. A half on its own (no partner) is a card of its own. A search or a filter that lets one half
   through brings the whole card.
-- **The picture** is the game's swap screen: the top's artwork above, the bottom's artwork below, meeting at the waist, the
-  same on the shelf, the seats, the sheet and Add a figure (and in the game's Toy Box). Each half's picture from the Swap
-  Force disc is cut to its visible pixels, both are brought to the same width (the narrower grows) and stacked, centred
-  (`collection::SwapperPicture`, `StackHalves`, shared with the game, with a unit test on synthetic images); the result is
-  fitted into the card's square. A matched or a mixed swapper, and each version (Dark, Legendary...), has its own halves.
+- **The picture** is the game's swap screen: the top's artwork joined to the bottom's at the waist, the
+  same on the shelf, the seats, the sheet and Add a figure (and in the game's Toy Box). The game draws each half in place
+  on one shared square frame, so each half's picture from the Swap Force disc is brought to the larger frame's size, the
+  top is laid over the bottom and the result is cut to its visible pixels (`collection::SwapperPicture`, `JoinHalves`,
+  shared with the game, with a unit test on synthetic images); the result is fitted into the card's square. A matched or a mixed swapper, and each version (Dark, Legendary...), has its own halves.
   When a half has no such picture (the pictures are read from the player's disc, so before the first disc check), the card
   shows the top's picture with the bottom small at its corner, as before.
 - **Putting it on the portal**: a click on a seat, a drag, or the sheet's "Put on the portal" places **both halves**. The seat
