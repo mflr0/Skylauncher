@@ -67,3 +67,35 @@ switch, copy, seat X) in its scratch folder.
 ## Left
 
 Nothing in the launcher. The kit's own English log and error lines are shown as it writes them (wrapped, readable); their wording is the kit's, not ours.
+
+## Model screens (2026-10-28): Home, the game page, the Keyboard tab
+
+The owner's design review asked for "as clean as possible, at a professional level": dorydev's style on a strict grid. Three
+screens were brought there first, for the owner to review before the rest: Home, the game page (with the sidebar and the
+band) and a game's Keyboard tab. Shots: `SKY_LAUNCHER_TEST_SCREENS=mouse|pad` ("Screenshot test" in `launcher_ui.md`), in
+English and French, 1024x720 and 1600x1000, with the mouse and with a pad, and at 2x (`SKY_LAUNCHER_TEST_SCALE=2`) for the
+zoomed checks; edges and centres measured on the 2x shots (pixel rows and the ink's bounding boxes).
+
+**Checklist** (each shot of the three screens, each item):
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Spacing on the 4-point steps, from the tokens (no literal gaps) | Pass: sidebar header (XXS, L, XS), Home (XS under the title, L to the cards, XL to Coming later, XS to its badges), the disc block (XXS head, S to the body, XS lines), the Keyboard tab (S under a cross's title, XS between keys, M to the hairline) |
+| 2 | Even margins: a card's padding the same on its sides and foot | Pass: Home's cards L at the left and the foot (was M at the foot); the disc block M all round, centred in the page (was pinned left) |
+| 3 | One left edge per list | Pass: every sidebar row's title at the same x (a `GameLogoW` leading column for logos, initials, the chevron and the icons); the header on the rows' content edge (was 4 points left of it) |
+| 4 | Each row's content centred on one line | Pass: list rows' title and state as one block centred on the row (cap top to baseline, within half a point at 2x); settings rows' labels on their control's middle (they sat at the cell's top); key caps' letters on their face |
+| 5 | Baselines shared on a line | Pass: the version after the title, a list row's note and trailing text, a settings row's note (the pad button) |
+| 6 | An icon on its text's line | Pass: the state's icon centred on the capitals of its words (measured: same centre at 2x); pills, buttons, chips, menus the same |
+| 7 | Nothing wraps inside a grid | Pass in both languages and sizes ("Agiter / Insérer / Balancer (stick droit)", "Retour arrière", "Changer de disque...") |
+| 8 | One icon family, one look | Pass: Lucide everywhere (sizes 16, 20, 32); the hand-drawn icons and PlayStation's drawn shapes are gone; the GitHub mark stays (no Lucide brand marks) |
+| 9 | Focus ring with a pad only, never on what is not pressed | Pass: none in the mouse shots; with a pad on Home's shown card, the game page's main action, the settings' selected tab; the sidebar title is no longer a stop (it had a ring drawn always) |
+| 10 | The ring clear of its neighbours | Pass: a tab's ring keeps S of air at its sides (it touched the letters); the portal pill S under the main action (the ring touched it); Home's ring around the card (it was drawn around the card's state pill) |
+| 11 | Fewer elements | Pass: the CONTROLLER caption is a pad icon in the picker; the Keyboard tab's repeated KEYBOARD title is gone (the tab says it); the four movement and four right-stick rows are two crosses |
+| 12 | Text and states read the same in English and French | Pass |
+
+**Left for the owner** (decisions, not defects): a game not opened yet this session shows "Open" with a dashed circle (its
+disc is only checked when it is first shown; checking every disc at start would say more). The pad navigation script
+(`SKY_LAUNCHER_TEST_NAV`) still counts two games in the sidebar (Swap Force's row came later): "down, down" lands on Swap
+Force instead of Collection, and the run stops at its step 49, A on CHOOSE DISC opening the file chooser; to update with the
+Collection's pass.
+
