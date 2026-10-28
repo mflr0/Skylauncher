@@ -389,6 +389,8 @@ namespace launcher_ui
             m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
             if (const char* screens = LauncherEnv("SKY_LAUNCHER_TEST_SCREENS"))
                 m_testScreens = std::string_view(screens) == "pad" ? 2 : 1;
+            const char* input = LauncherEnv("SKY_LAUNCHER_TEST_INPUT");
+            m_testPadInput = m_testScreens == 2 || (input != nullptr && std::string_view(input) == "pad");
             m_testGallery = LauncherEnv("SKY_LAUNCHER_TEST_GALLERY") != nullptr;
             m_testPad = LauncherEnv("SKY_LAUNCHER_TEST_PAD") != nullptr;
             m_testAchievements = LauncherEnv("SKY_LAUNCHER_TEST_ACHIEVEMENTS") != nullptr;
@@ -2146,14 +2148,23 @@ namespace launcher_ui
         frameIo.DisplayFramebufferScale = ImVec2(frameIo.DisplayFramebufferScale.x * m_uiScale, frameIo.DisplayFramebufferScale.y * m_uiScale);
         if (SDL_GetMouseFocus() == nullptr && !m_testSeatX) // the backend's outside-the-window position is in unscaled window units
             frameIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-        if (m_testNav || m_testSeatX || m_testScreens == 2)
+        if (m_testNav || m_testSeatX || m_testPadInput)
             frameIo.BackendFlags |= ImGuiBackendFlags_HasGamepad; // the test's pad keys count with no pad plugged in
         ImGui::NewFrame();
         // The components' context: the time, the focus ring in the shown game's colour on its pages, the pad family in use.
         ui::NewFrame(SDL_GetTicks());
         ui::Ctx().accent = m_page == Page::Play || m_page == Page::GameSettings ? StyleOf(m_s->game.id).glow : Accent;
         ui::Ctx().reduceMotion = ReduceMotion();
-        if (m_gamepads.empty() && !m_testNav && m_testScreens != 2 && !CollectionPage::TestPad())
+        if (const int view = int(m_page) * 100 + (m_page == Page::GameSettings ? int(m_gameTab) : m_page == Page::Settings ? int(m_tab) : 0);
+            m_testPadInput && m_testScreens == 0 && view != m_testFocusView)
+        {
+            // A script's page (or tab) shown as a pad player arrives there: the focus on its first stop, the ring shown.
+            m_testFocusView = view;
+            m_focusTo = FocusTo::Page;
+            m_focusShow = true;
+            ImGui::SetNavCursorVisible(true);
+        }
+        if (m_gamepads.empty() && !m_testNav && !m_testPadInput && !CollectionPage::TestPad())
             ui::Ctx().glyphs = ui::Glyphs::Keyboard;
         else
         {
