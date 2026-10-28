@@ -418,13 +418,13 @@ namespace launcher_ui
                     if (const Figure* held = m_model.Find(m_model.seats[i]))
                         text += Tf("  (replaces {})", Name(*held));
                 bool fits = SeatAccepts(game->seats[i], f) && (f.toy == nullptr || collection::Catalogue::Get().Accepts(m_model.gameId, f.type));
-                if (ImGui::Selectable((text + "##seat" + std::to_string(i)).c_str(), seated == int(i), fits ? 0 : ImGuiSelectableFlags_Disabled))
+                if (m_app.Option((text + "##seat" + std::to_string(i)).c_str(), seated == int(i), fits ? 0 : ImGuiSelectableFlags_Disabled))
                     PutOn(i, path);
             }
             if (seated >= 0)
             {
                 ImGui::Separator();
-                if (ImGui::Selectable(Tr("Take it off")))
+                if (m_app.Option(Tr("Take it off")))
                     TakeOff(size_t(seated));
             }
             ImGui::EndPopup();
@@ -613,7 +613,7 @@ namespace launcher_ui
         {
             ImVec2 at = ImGui::GetCursorScreenPos();
             ImGui::PushID(half->path.c_str());
-            if (ImGui::Selectable("##half", false, 0, ImVec2(0, Row)))
+            if (m_app.Option("##half", false, 0, ImVec2(0, Row)))
                 chosen = half;
             ImGui::PopID();
             ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -748,7 +748,7 @@ namespace launcher_ui
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", text);
         };
         // Two columns: who it is (name, level, experience, hat), then what it carries (gold, hero points, nickname).
-        constexpr float FieldW = 380, ColumnGap = 36;
+        constexpr float FieldW = 390, ColumnGap = 36;
         const float columnsTop = ImGui::GetCursorPosY();
         ImGui::BeginGroup();
         label(Tr("Name (empty: the toy's name)"));
@@ -762,8 +762,7 @@ namespace launcher_ui
             int level = figures::LevelForExperience(figures::ExperienceFor(m_edit, cap), cap);
             label(Tf("Level in {}", ShortGameName(m_model.gameId)).c_str());
             // The value beside the slider, not on it: the grab would run over a centred one.
-            ImGui::SetNextItemWidth(FieldW - 44);
-            if (ImGui::SliderInt("##level", &level, 1, cap, "", ImGuiSliderFlags_AlwaysClamp))
+            if (m_app.LevelSlider("##level", &level, 1, cap, FieldW - 44))
                 figures::SetExperienceFor(m_edit, cap, figures::LevelExperience[std::clamp(level, 1, cap) - 1]);
             ImGui::SameLine(0, 12);
             ImGui::AlignTextToFramePadding();
@@ -779,12 +778,12 @@ namespace launcher_ui
             {
                 label(Tr("Hat"));
                 ImGui::SetNextItemWidth(FieldW);
-                if (ImGui::BeginCombo("##hat", m_edit.hat == 0 ? Tr("No hat") : HatText(m_edit.hat).c_str()))
+                if (m_app.BeginCombo("##hat", m_edit.hat == 0 ? Tr("No hat") : HatText(m_edit.hat).c_str()))
                 {
-                    if (ImGui::Selectable(Tr("No hat"), m_edit.hat == 0))
+                    if (m_app.Option(Tr("No hat"), m_edit.hat == 0))
                         m_edit.hat = 0;
                     for (const auto& [number, name] : game->hats)
-                        if (ImGui::Selectable(fmt::format("{}##hat{}", name, number).c_str(), m_edit.hat == number))
+                        if (m_app.Option(fmt::format("{}##hat{}", name, number).c_str(), m_edit.hat == number))
                             m_edit.hat = number;
                     ImGui::EndCombo();
                 }

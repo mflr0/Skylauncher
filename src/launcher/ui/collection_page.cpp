@@ -640,7 +640,7 @@ namespace launcher_ui
 
         // Add a figure, and the rest of the collection's work behind "...".
         constexpr float AddW = 190, MoreW = 52;
-        ImGui::SetCursorScreenPos(ImVec2(top.x + width - m_app.PillWidth(Tr("+  Add a figure"), AddW, true) - 10 - MoreW, top.y + 4));
+        ImGui::SetCursorScreenPos(ImVec2(top.x + width - 4 - m_app.PillWidth(Tr("+  Add a figure"), AddW, true) - 10 - MoreW, top.y + 4));
         if (m_app.PillButton(Tr("+  Add a figure"), true, AddW, true))
         {
             m_overlay = Overlay::Add;
@@ -716,10 +716,10 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, line.y - 6));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(10, 5));
         ImGui::SetNextItemWidth(210);
-        if (ImGui::BeginCombo("##portalgame", ShortGameName(m_model.gameId).c_str()))
+        if (m_app.BeginCombo("##portalgame", ShortGameName(m_model.gameId).c_str()))
         {
             for (const collection::Game& g : collection::Catalogue::Get().Games())
-                if (!SessionFile(g).empty() && ImGui::Selectable(ShortGameName(g.id).c_str(), g.id == m_model.gameId))
+                if (!SessionFile(g).empty() && m_app.Option(ShortGameName(g.id).c_str(), g.id == m_model.gameId))
                     SelectPortalGame(g.id);
             ImGui::EndCombo();
         }
@@ -930,40 +930,40 @@ namespace launcher_ui
             auto row = [&](const char* label, const char* id, const std::string& value, const std::function<void()>& items) {
                 ImGui::AlignTextToFramePadding();
                 ImGui::TextColored(ImColor(Rgb(TextSecondary)), "%s", Tr(label));
-                ImGui::SameLine(110);
-                ImGui::SetNextItemWidth(PanelW - 110 - 16);
-                if (ImGui::BeginCombo(id, value.c_str()))
+                ImGui::SameLine(132);
+                ImGui::SetNextItemWidth(PanelW - 132 - 16);
+                if (m_app.BeginCombo(id, value.c_str()))
                 {
                     items();
                     ImGui::EndCombo();
                 }
             };
             row(N_("Element"), "##element", m_filter.element >= 0 ? ElementName(collection::Element(m_filter.element)) : Tr("All elements"), [&] {
-                if (ImGui::Selectable(Tr("All elements"), m_filter.element < 0))
+                if (m_app.Option(Tr("All elements"), m_filter.element < 0))
                     m_filter.element = -1;
                 for (collection::Element element : MenuElements)
-                    if (ImGui::Selectable(ElementName(element).c_str(), m_filter.element == int(element)))
+                    if (m_app.Option(ElementName(element).c_str(), m_filter.element == int(element)))
                         m_filter.element = int(element);
             });
             row(N_("Works in"), "##game", m_filter.game.empty() ? Tr("All games") : ShortGameName(m_filter.game), [&] {
-                if (ImGui::Selectable(Tr("All games"), m_filter.game.empty()))
+                if (m_app.Option(Tr("All games"), m_filter.game.empty()))
                     m_filter.game.clear();
                 for (const collection::Game& g : collection::Catalogue::Get().Games())
-                    if (ImGui::Selectable(ShortGameName(g.id).c_str(), m_filter.game == g.id))
+                    if (m_app.Option(ShortGameName(g.id).c_str(), m_filter.game == g.id))
                         m_filter.game = g.id;
             });
             row(N_("Type"), "##type", m_filter.category >= 0 ? CategoryLabel(Category(m_filter.category)) : Tr("All types"), [&] {
-                if (ImGui::Selectable(Tr("All types"), m_filter.category < 0))
+                if (m_app.Option(Tr("All types"), m_filter.category < 0))
                     m_filter.category = -1;
                 // The types the collection has.
                 for (int category = 0; category < int(Category::Count); category++)
                     if (std::any_of(m_model.figures.begin(), m_model.figures.end(), [&](const Figure& f) { return f.toy != nullptr && int(f.toy->category) == category; }))
-                        if (ImGui::Selectable(CategoryLabel(Category(category)).c_str(), m_filter.category == category))
+                        if (m_app.Option(CategoryLabel(Category(category)).c_str(), m_filter.category == category))
                             m_filter.category = category;
             });
             row(N_("Sort by"), "##sort", collection::SortLabel(m_filter.sort, French()), [&] {
                 for (int sort = 0; sort < int(collection::Sort::Count); sort++)
-                    if (ImGui::Selectable(collection::SortLabel(collection::Sort(sort), French()).c_str(), m_filter.sort == collection::Sort(sort)))
+                    if (m_app.Option(collection::SortLabel(collection::Sort(sort), French()).c_str(), m_filter.sort == collection::Sort(sort)))
                         m_filter.sort = collection::Sort(sort);
             });
             ImGui::Dummy(ImVec2(0, 2));

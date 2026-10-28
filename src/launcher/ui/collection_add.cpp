@@ -56,10 +56,10 @@ namespace launcher_ui
         // Game, search, category.
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(12, 8));
         ImGui::SetNextItemWidth(260);
-        if (ImGui::BeginCombo("##addgame", Tf("For {}", ShortGameName(m_addGame)).c_str()))
+        if (m_app.BeginCombo("##addgame", Tf("For {}", ShortGameName(m_addGame)).c_str()))
         {
             for (const collection::Game& game : catalogue.Games())
-                if (ImGui::Selectable(ShortGameName(game.id).c_str(), game.id == m_addGame))
+                if (m_app.Option(ShortGameName(game.id).c_str(), game.id == m_addGame))
                 {
                     m_addGame = game.id;
                     m_addToy = 0xFFFF;
@@ -72,13 +72,13 @@ namespace launcher_ui
         // Type: the same menu as the shelf's bar.
         ImGui::SameLine(0, 10);
         ImGui::SetNextItemWidth(220);
-        if (ImGui::BeginCombo("##addtype", m_addCategory < 0 ? Tr("All types") : CategoryLabel(Category(m_addCategory)).c_str()))
+        if (m_app.BeginCombo("##addtype", m_addCategory < 0 ? Tr("All types") : CategoryLabel(Category(m_addCategory)).c_str()))
         {
-            if (ImGui::Selectable(Tr("All types"), m_addCategory < 0))
+            if (m_app.Option(Tr("All types"), m_addCategory < 0))
                 m_addCategory = -1;
             for (int category = 0; category < int(Category::Count); category++)
                 if (std::any_of(catalogue.Toys().begin(), catalogue.Toys().end(), [&](const Toy& toy) { return int(toy.category) == category; }))
-                    if (ImGui::Selectable(CategoryLabel(Category(category)).c_str(), m_addCategory == category))
+                    if (m_app.Option(CategoryLabel(Category(category)).c_str(), m_addCategory == category))
                         m_addCategory = category;
             ImGui::EndCombo();
         }
@@ -206,7 +206,7 @@ namespace launcher_ui
                 // A row: the version's picture (the toy's own when it has none), its name, its kind and how many are owned.
                 constexpr float Row = 50;
                 ImVec2 at = ImGui::GetCursorScreenPos();
-                if (ImGui::Selectable((std::string("##v") + std::to_string(i)).c_str(), m_addVersion == int(i), 0, ImVec2(0, Row)))
+                if (m_app.Option((std::string("##v") + std::to_string(i)).c_str(), m_addVersion == int(i), 0, ImVec2(0, Row)))
                     m_addVersion = int(i);
                 ImDrawList* draw = ImGui::GetWindowDrawList();
                 const uint16_t versionId = i == 0 || chosen->variants[i - 1].sameTag ? uint16_t(0) : chosen->variants[i - 1].id;
