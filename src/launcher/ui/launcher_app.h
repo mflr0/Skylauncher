@@ -315,7 +315,7 @@ namespace launcher_ui
         void DrawControls();
         void DrawLauncherTab();
         void DrawLauncherLanguage(); // Settings > Launcher > Language
-        void UpdateLanguage();       // each frame: the text follows [launcher] language, or the game's language
+        void UpdateLanguage();       // each frame: the text follows [launcher] language, never the shown game's
         void DrawSupport();      // support_page.cpp: logs and the problem report
         // A game's own settings (game_settings_page.cpp), opened from the Settings button on its Play page.
         void DrawGameSettings();

@@ -266,7 +266,6 @@ Right bumper	Bouton d'épaule droit
 Right trigger	Gâchette droite
 SETTINGS	RÉGLAGES
 {} can't be verified, so it wasn't installed	{} ne peut pas être vérifié : rien n'a été installé
-Same as the game	Identique au jeu
 Save as...	Enregistrer sous...
 Save backups	Copies de secours des sauvegardes
 Saved gamepad (not connected)	Manette enregistrée (non connectée)
@@ -296,6 +295,7 @@ Starting the installer	Démarrage de l'installateur
 Step {} of {}	Étape {} sur {}
 Stop	Arrêter
 Support	Assistance
+System default	Langue du système
 Test the portal	Tester le portail
 Testing...	Test en cours...
 Texture filtering	Filtrage des textures
@@ -338,7 +338,7 @@ The earlier install is still stopping. Resume in a moment.	L'installation préc�
 The installer stopped before the game was built.	L'installateur s'est arrêté avant la fin de la construction du jeu.
 The installer stopped with exit code {}.	L'installateur s'est arrêté avec le code de sortie {}.
 Drag Arkeyan Launcher to Applications, replacing the old one.	Glissez Arkeyan Launcher dans Applications, en remplaçant l'ancien.
-Arkeyan Launcher's own language. "Same as the game" follows its text language.	La langue d'Arkeyan Launcher. « Identique au jeu » suit la langue des textes du jeu.
+Arkeyan Launcher's own language. "System default" follows the system's language.	La langue d'Arkeyan Launcher. « Langue du système » suit celle du système.
 Designed by dorydev.	Conçu par dorydev.
 The game's last log, for a bug report.	Le dernier journal du jeu, pour un rapport de bug.
 The portal can't be opened: using the virtual portal.	Le portail ne s'ouvre pas : le portail virtuel est utilisé.

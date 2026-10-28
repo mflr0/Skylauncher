@@ -44,10 +44,9 @@ namespace i18n
         }
     }
 
-    // Which language to show: `setting` is [launcher] language ("game": the game's text language; a code; empty: the
-    // system's), `gameLanguage` the game's text language code (empty: none chosen), `system` the system's language codes in
-    // order of preference. Returns a code of Languages(), "en" when none fits.
-    std::string Resolve(std::string_view setting, std::string_view gameLanguage, const std::vector<std::string>& system);
+    // Which language to show: `setting` is [launcher] language (a code; empty: the system's), `system` the system's language
+    // codes in order of preference. Returns a code of Languages(), "en" when none fits.
+    std::string Resolve(std::string_view setting, const std::vector<std::string>& system);
     bool Has(std::string_view code);
 
     // The language files: for the tests, which read the files of a source tree.

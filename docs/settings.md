@@ -10,7 +10,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | --- | --- | --- | --- | --- |
 | `launcher` | `fullscreen` | `0`, `1` | The launcher window itself | n/a |
 | `launcher` | `ui_scale` | `auto`, `0.75` to `3` | The launcher's size: `auto` follows the display's scale (Windows 150 %, 200 %...); Ctrl + / Ctrl - / Ctrl 0 change it | n/a |
-| `launcher` | `language` | empty (the system's language), `game`, or a code (`en`, `fr`...) | The language of the launcher's own text (`docs/translations.md`): `game` follows the shown game's `language`; a code that has no file in `resources/lang` shows English. The environment variable `SKY_LAUNCHER_LANGUAGE` overrides it (tests, screenshots) | n/a |
+| `launcher` | `language` | empty (the system's language), or a code (`en`, `fr`...) | The language of the launcher's own text, never the game's (`docs/translations.md`): a code that has no file in `resources/lang` shows English. An old `game` (follow the shown game) is read as empty and erased at the next save. The environment variable `SKY_LAUNCHER_LANGUAGE` overrides it (tests, screenshots) | n/a |
 | `launcher` | `reduce_motion` | `auto`, `0`, `1` | The logo's fall on the game page (`docs/launcher_ui.md`): `auto` follows the system (macOS Reduce motion, Windows animation effects), `1` never animates, `0` always does | n/a |
 | `launcher` | `runtime` | path | The game runtime to start, if not next to the launcher | n/a |
 | `launcher` | `kit` | folder | The player kit that installs the game, if not next to the launcher (`docs/install.md`) | n/a |

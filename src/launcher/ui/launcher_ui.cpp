@@ -45,7 +45,7 @@ namespace launcher_ui
             constexpr const char* ChooseDisc = N_("Choose disc");
             constexpr const char* PlayWith = N_("PLAY WITH");
             constexpr const char* DiscGone = N_("The disc image isn't there. Choose it again.");
-            constexpr const char* LauncherLanguageHint = N_("Arkeyan Launcher's own language. \"Same as the game\" follows its text language.");
+            constexpr const char* LauncherLanguageHint = N_("Arkeyan Launcher's own language. \"System default\" follows the system's language.");
             constexpr const char* DataFolderHint = N_("Settings, saves, figures and builds, shared by all games.");
             constexpr const char* GameSettings = N_("Game settings");
             constexpr const char* ResetKeys = N_("Reset to defaults");
@@ -2091,33 +2091,33 @@ namespace launcher_ui
         }
     }
 
-    // The language of the launcher's text: SKY_LAUNCHER_LANGUAGE (tests, screenshots), else [launcher] language: "game" follows
-    // the shown game's text language, a code is that language, and nothing (the default) is the system's.
+    // The language of the launcher's text: SKY_LAUNCHER_LANGUAGE (tests, screenshots), else [launcher] language: a code is that
+    // language, and nothing (the default) is the system's. Never the shown game's.
     void App::UpdateLanguage()
     {
         static const std::vector<std::string> system = SystemLanguages();
         const char* forced = LauncherEnv("SKY_LAUNCHER_LANGUAGE");
         std::string setting = forced != nullptr && *forced != 0 ? forced : SettingGet(m_config, "launcher", "language");
-        std::string gameLanguage = SettingGet(m_config, m_s->game.id, "language");
-        i18n::SetLanguage(i18n::Resolve(setting, gameLanguage.empty() ? "en" : gameLanguage, system));
+        i18n::SetLanguage(i18n::Resolve(setting, system));
     }
 
     void App::DrawLauncherLanguage()
     {
         Title(Tr("Language"), TitleSize, Text);
         const std::string setting = SettingGet(m_config, "launcher", "language");
-        const bool follows = setting == "game";
-        std::string shown = follows ? std::string(Tr("Same as the game")) : i18n::Current();
+        std::string shown = i18n::Current();
         for (const i18n::Language& language : i18n::Languages())
-            if (!follows && language.code == i18n::Current())
+            if (language.code == i18n::Current())
                 shown = language.name;
+        if (setting.empty())
+            shown = Tr("System default");
         ImGui::SetNextItemWidth(440);
         if (ImGui::BeginCombo("##launcherlanguage", shown.c_str()))
         {
-            if (ImGui::Selectable(Tr("Same as the game"), follows))
-                Set("launcher", "language", "game");
+            if (ImGui::Selectable(Tr("System default"), setting.empty()))
+                Set("launcher", "language", "");
             for (const i18n::Language& language : i18n::Languages())
-                if (ImGui::Selectable(language.name.c_str(), !follows && language.code == i18n::Current()))
+                if (ImGui::Selectable(language.name.c_str(), language.code == setting))
                     Set("launcher", "language", language.code);
             ImGui::EndCombo();
         }

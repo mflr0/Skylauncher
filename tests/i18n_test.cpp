@@ -283,16 +283,13 @@ int I18nChecks()
     I18N_EXPECT(i18n::Tf("about {} min left", 3) == "about 3 min left");
     i18n::SetLanguage("en");
 
-    // The choice: "game" follows the game's text language, a code is that language, nothing is the system's.
+    // The choice: a code is that language, nothing is the system's.
     const std::vector<std::string> system = { "ja", "fr", "en" };
-    I18N_EXPECT(i18n::Resolve("game", "fr", system) == "fr");
-    I18N_EXPECT(i18n::Resolve("game", "ja", system) == "en"); // a language the launcher hasn't
-    I18N_EXPECT(i18n::Resolve("game", "", system) == "en");
-    I18N_EXPECT(i18n::Resolve("fr", "en", system) == "fr");
-    I18N_EXPECT(i18n::Resolve("en", "fr", system) == "en");
-    I18N_EXPECT(i18n::Resolve("", "en", system) == "fr"); // the first system language the launcher has
-    I18N_EXPECT(i18n::Resolve("", "en", { "ja" }) == "en");
-    I18N_EXPECT(i18n::Resolve("xx", "fr", system) == "en");
+    I18N_EXPECT(i18n::Resolve("fr", system) == "fr");
+    I18N_EXPECT(i18n::Resolve("en", system) == "en");
+    I18N_EXPECT(i18n::Resolve("", system) == "fr"); // the first system language the launcher has
+    I18N_EXPECT(i18n::Resolve("", { "ja" }) == "en");
+    I18N_EXPECT(i18n::Resolve("xx", system) == "en");
 
     // The catalog format: escapes, comments, the header.
     i18n::Catalog catalog;

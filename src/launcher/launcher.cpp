@@ -371,6 +371,11 @@ LauncherConfig LoadLauncherConfig(const std::string& path)
             config[section][std::string(Trim(line.substr(0, equals)))] = Trim(line.substr(equals + 1));
     }
     SDL_free(data);
+    // Older versions had "[launcher] language=game" (follow the shown game's language): it is the system's language now, and the
+    // key goes at the next save.
+    if (auto launcher = config.find("launcher"); launcher != config.end())
+        if (auto language = launcher->second.find("language"); language != launcher->second.end() && language->second == "game")
+            launcher->second.erase(language);
     return config;
 }
 

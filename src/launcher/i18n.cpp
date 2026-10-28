@@ -138,10 +138,8 @@ namespace i18n
         return it == table->end() || it->second.empty() ? english : it->second.c_str();
     }
 
-    std::string Resolve(std::string_view setting, std::string_view gameLanguage, const std::vector<std::string>& system)
+    std::string Resolve(std::string_view setting, const std::vector<std::string>& system)
     {
-        if (setting == "game")
-            return Has(gameLanguage) ? std::string(gameLanguage) : "en";
         if (!setting.empty())
             return Has(setting) ? std::string(setting) : "en";
         for (const std::string& code : system)
