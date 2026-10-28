@@ -17,7 +17,7 @@ Not an Xbox 360 disc image, or the file is incomplete.	Ce n'est pas une image di
 60 (experimental)	60 (expérimental)
 Only contacts github.com.	Contacte seulement github.com.
 Couldn't write to the game folder.	Impossible d'écrire dans le dossier du jeu.
-A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc.	Un lanceur pour les portages PC natifs de Skylanders. Aucun code ni image du jeu : tout vient de votre disque.
+A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc.	Un launcher pour les portages PC natifs de Skylanders. Aucun code ni image du jeu : tout vient de votre disque.
 About	À propos
 Adding the movie shaders	Ajout des shaders des vidéos
 Advanced	Avancé
@@ -163,12 +163,12 @@ Interrupted: {} of {} copied	Interrompue : {} sur {} copiés
 Keep installing	Continuer l'installation
 Keyboard	Clavier
 Keyboard bindings reset	Touches du clavier réinitialisées
-LAUNCHER SETTINGS	RÉGLAGES DU LANCEUR
+LAUNCHER SETTINGS	RÉGLAGES DU LAUNCHER
 LIBRARY	BIBLIOTHÈQUE
 Language	Langue
 Last checked {}	Dernière vérification : {}
 Later	Plus tard
-Launcher	Lanceur
+Launcher	Launcher
 Licences	Licences
 Linking the game	Assemblage du jeu
 Log copied	Journal copié
@@ -290,7 +290,7 @@ Game data damaged: {}	Données du jeu endommagées : {}
 Copy stopped: {}. Press the button to carry on.	Copie arrêtée : {}. Appuyez sur le bouton pour reprendre.
 Couldn't read the disc image. Check that it's complete.	Lecture de l'image disque impossible. Vérifiez qu'elle est complète.
 The download failed: {}	Le téléchargement a échoué : {}
-The download holds no launcher app	Le téléchargement ne contient aucune application du lanceur
+The download holds no launcher app	Le téléchargement ne contient aucune application du launcher
 The download is damaged: nothing was installed	Le téléchargement est endommagé : rien n'a été installé
 The download isn't a game kit	Le téléchargement n'est pas un kit de jeu
 The download isn't a zip file	Le téléchargement n'est pas un fichier zip
@@ -543,7 +543,7 @@ Nickname	Surnom
 Nickname (16 max)	Surnom (16 max)
 No element	Aucun élément
 No figure matches	Aucune figurine ne correspond
-No game this launcher knows	Aucun jeu connu de ce lanceur
+No game this launcher knows	Aucun jeu connu de ce launcher
 No hat	Sans chapeau
 None	Aucun
 None yet	Aucune pour l'instant
