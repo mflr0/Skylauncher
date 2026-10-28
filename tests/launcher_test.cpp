@@ -462,9 +462,13 @@ namespace
                             names.push_back(collection::Fold(collection::CardName(collection::CardOf(shown, i))));
                 EXPECT(names.size() > 2 && std::is_sorted(names.begin(), names.end()));
             }
+            // "Works in": Giants reads every toy of the Spyro's Adventure shelf, so its filter drops none of them.
             launcher_ui::ShelfFilter later;
+            model.Shelf(later, shown);
+            const size_t everything = shown.size();
             later.game = "giants";
-            EXPECT(model.Shelf(later, shown).empty() && shown.empty()); // no Giants toy here
+            model.Shelf(later, shown);
+            EXPECT(everything > 0 && shown.size() == everything);
             EXPECT(collection::LevelText(*model.Find(gill), "ssa") == "Level 10" && collection::LevelText(*model.Find(anvil), "ssa").empty());
             // Giants starts with prepared seats too; the games with no runtime yet have none.
             EXPECT(!launcher_ui::SessionFile(*catalogue.FindGame("giants")).empty() && launcher_ui::SessionFile(*catalogue.FindGame("swapforce")) == (save / "portal.txt").string() &&

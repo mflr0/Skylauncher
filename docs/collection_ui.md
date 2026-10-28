@@ -118,8 +118,8 @@ At the first visit to the page (`CollectionPage::Open`):
 - **The seats** (above).
 - **The bar** (2026-10-27, the Toy Box's too, same words and order; `docs/runtime/host/toybox_ux.md` of the game's repo
   holds the design): the **search field** first and wide ("Name, element, game, level..."), then one **Filters** button
-  ("Filters · 2" when two are on) opening a small panel of four drop-downs, **Element**, **Game** (the game a toy came
-  with), **Type** (the types the collection has) and **Sort by** (Recent, Name, Level, Element, Game), and **Clear all**.
+  ("Filters · 2" when two are on) opening a small panel of four drop-downs, **Element**, **Works in** (the toys a game
+  reads: Giants reads every Spyro's Adventure toy, Spyro's Adventure no Giants toy), **Type** (the types the collection has) and **Sort by** (Recent, Name, Level, Element, Game), and **Clear all**.
   Under the bar, only when something is on, the **tags**: one per filter with an x ("Water x", "Sort: Level x"), **Clear
   all**, and the count at the right ("12 figures", "1 figure"; French "12 figurines"). Nothing matches: "No figure
   matches" and "Clear the search and the filters". The designer's look is untouched: the field, the pill button and the
@@ -152,7 +152,8 @@ At the first visit to the page (`CollectionPage::Open`):
   writes no stats (and makes no backup).
 - **Add a figure**: a game selector (the six games), search, a **Type** menu (as the bar's), one card per character,
   "owned x2"; the toys the game reads first, then "Later games" labelled "needs Giants". A side panel lists the versions
-  (Standard, variants, same-tag editions); Standard makes the figure under the id the toy is sold with, and the
+  (the plain toy under its own name, then the variants the chosen game tells apart and the same-tag editions: a variant the game plays
+  as the plain toy is not a row, `Catalogue::Read`); the plain toy makes the figure under the id the toy is sold with, and the
   toy's own entry in the catalogue (its `base` kind) is never a second row; name (optional) and Create; "Put it on Player 1" afterwards. A toy with
   versions has a "+3" badge on its card; the panel is titled "Versions", each row with its picture (the toy's own when
   it has none) and its kind (an unknown kind from a newer `catalogue.json` shows as "Other"); the search also matches
@@ -207,7 +208,7 @@ At the first visit to the page (`CollectionPage::Open`):
   item, the Water filter, the sheet, its Details, the delete bar, Edit, Add a figure (a later game), Manage (trash,
   backups), the live portal (`SKY_LAUNCHER_TEST_FAKE_LOCKS=1`), after a delete, Giants' portal, a level-15 Eruptor and
   its Edit with the hat picker, Add a LightCore, a search with no match, a seat nothing goes on, Swap Force's portal with a
-  swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (Standard and the others, no
+  swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (the plain toy, then the versions Giants tells apart, no
   second row with the toy's own name), then the smart search (an element, a level, a typo: `47-` to `49-`), the Filters panel
   (`50-`), the tags with a count (`51-`) and a sort (`52-`). With `SKY_LAUNCHER_TEST_SWAPPERS=1` the collection also holds all
   16 swappers matched and four mixed ones, and `53-all-swappers` (Swap Force's swapper cards; use `SKY_LAUNCHER_TEST_SIZE=1700x1500`
@@ -240,3 +241,11 @@ Now: the index is written first and the move undone if it fails, so a refusal ch
 toast with its reason. A hold button acts once per press. After a delete the page returns to the shelf, the focus on the
 next figure (`CollectionPage::DeleteFigure`, `CollectionModel::Delete`). Tested by `CollectionChecks` and screenshots
 `26-figure-delete` (the hold bar) and `33-after-delete`.
+
+## What a game makes of a figure; the wheel (2026-10-28)
+The collection keeps every figure; the library (`src/shared/collection/`, synced) tells what each game reads
+(`Catalogue::Read`, `VersionsFor`: the table is in the game's repo, `docs/runtime/host/collection.md` "What each game reads"). The sheet adds a
+row "In Giants: plays as Series 2 Eruptor" when the chosen game does not tell the figure's variant apart. The sheet's `...` menu has
+**On the wheel: <game>** for each game with a runtime that reads the figure (a toggle, `SetOnWheel`): the figure goes on the wheel of
+every player seat of that game (the in-game quick swap wheel, hold Tab or View) and a fact row lists the games. Stored in `collection.json`
+(`views.<game>.wheel`, `wheel_skipped`). The screenshot test's `46-` is now `46-add-versions`.

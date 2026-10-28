@@ -763,3 +763,10 @@ Right Ctrl	Ctrl droite
 Left Alt	Alt gauche
 Right Alt	Alt droite
 Caps Lock	Verr. maj
+Works in	Fonctionne dans
+Works in {}	Fonctionne dans {}
+In {}	Dans {}
+plays as {}	joue comme {}
+On the wheel	Sur la roue
+On the wheel: {}	Sur la roue : {}
+The wheel is full: take a figure off it first	La roue est pleine : retirez d’abord une figurine

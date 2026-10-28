@@ -26,12 +26,24 @@ namespace launcher_ui
             return bottom;
         }
 
-        // A toy's "base" entry is its "Standard" (made under the id the toy is sold with): its own row would say the same twice.
-        bool PlainDuplicate(const Toy&, const collection::Variant& variant) { return variant.kind == collection::VariantKind::Base; }
-
-        size_t CountVersions(const Toy& toy)
+        // The game a toy's versions are told apart in: the chosen game when it reads the toy, else the game the toy came with.
+        std::string ViewGame(const std::string& chosen, const Toy& toy)
         {
-            return size_t(std::count_if(toy.variants.begin(), toy.variants.end(), [&](const collection::Variant& v) { return !PlainDuplicate(toy, v); }));
+            return collection::Catalogue::Get().Accepts(chosen, toy.type) ? chosen : toy.game;
+        }
+
+        // A row of its own only for the plain toy (made under the id it is sold with: its "base" entry is never a second row)
+        // and the versions the game tells apart; the others play as the plain toy in it.
+        bool PlainDuplicate(const std::string& game, const Toy& toy, const collection::Variant& variant)
+        {
+            if (variant.kind == collection::VariantKind::Base)
+                return true;
+            return !variant.sameTag && !collection::Catalogue::Get().Read(game, &toy, variant.id).exact;
+        }
+
+        size_t CountVersions(const std::string& game, const Toy& toy)
+        {
+            return size_t(std::count_if(toy.variants.begin(), toy.variants.end(), [&](const collection::Variant& v) { return !PlainDuplicate(game, toy, v); }));
         }
     }
 
@@ -79,7 +91,7 @@ namespace launcher_ui
             if (search.empty())
                 return 0;
             for (size_t i = 0; i < toy.variants.size(); i++)
-                if (!PlainDuplicate(toy, toy.variants[i]) && Lower(toy.variants[i].name).find(search) != std::string::npos)
+                if (!PlainDuplicate(ViewGame(m_addGame, toy), toy, toy.variants[i]) && Lower(toy.variants[i].name).find(search) != std::string::npos)
                     return int(i) + 1;
             return 0;
         };
@@ -155,9 +167,9 @@ namespace launcher_ui
                 ImVec2 noteSize = ImGui::CalcTextSize(note.c_str());
                 draw->AddText(ImVec2(at.x + (Cell - noteSize.x) / 2, at.y + Cell), Rgb(pass == 1 ? TextDim : Ok), note.c_str());
                 ImGui::PopFont();
-                if (CountVersions(toy) > 0) // it has versions: a small badge, the count
+                if (CountVersions(ViewGame(m_addGame, toy), toy) > 0) // it has versions: a small badge, the count
                 {
-                    std::string more = "+" + std::to_string(CountVersions(toy));
+                    std::string more = "+" + std::to_string(CountVersions(ViewGame(m_addGame, toy), toy));
                     ImGui::PushFont(nullptr, SmallSize - 1);
                     float moreW = ImGui::CalcTextSize(more.c_str()).x + 12;
                     ImGui::PopFont();
@@ -180,15 +192,14 @@ namespace launcher_ui
             ImGui::TextColored(ImColor(Rgb(TextDim)), "%s · %s", ElementName(chosen->element).c_str(),
                 (IsSwapper(*chosen) ? std::string(Tr("Swapper")) : CategoryLabel(chosen->category)).c_str());
             ImGui::Dummy(ImVec2(0, 4));
-            std::vector<std::pair<std::string, collection::VariantKind>> versions{ { chosen->edition != collection::VariantKind::Base ? chosen->name : std::string(Tr("Standard")),
-                chosen->edition } };
+            std::vector<std::pair<std::string, collection::VariantKind>> versions{ { IsSwapper(*chosen) ? WithoutHalf(chosen->name) : chosen->name, chosen->edition } };
             for (const collection::Variant& variant : chosen->variants)
                 versions.push_back({ variant.name, variant.kind });
             m_addVersion = std::clamp(m_addVersion, 0, int(versions.size()) - 1);
             m_app.BoldText(Tr("Versions"), TextSecondary);
             for (size_t i = 0; i < versions.size(); i++)
             {
-                if (i > 0 && PlainDuplicate(*chosen, chosen->variants[i - 1]))
+                if (i > 0 && PlainDuplicate(ViewGame(m_addGame, *chosen), *chosen, chosen->variants[i - 1]))
                     continue;
                 int count = i == 0 ? owned(chosen->type, 0, {}) + (collection::StandardVariant(*chosen) != 0 ? owned(chosen->type, collection::StandardVariant(*chosen), {}) : 0)
                     : chosen->variants[i - 1].sameTag ? owned(chosen->type, -1, chosen->variants[i - 1].name) : owned(chosen->type, chosen->variants[i - 1].id, {});

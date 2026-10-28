@@ -433,7 +433,7 @@ namespace launcher_ui
             }
             if ((filter.element >= 0 && (toy == nullptr || int(toy->element) != filter.element)) ||
                 (filter.category >= 0 && (toy == nullptr || int(toy->category) != filter.category)) ||
-                (!filter.game.empty() && (toy == nullptr || toy->game != filter.game)))
+                (!filter.game.empty() && (toy == nullptr || !catalogue.Accepts(filter.game, figure.type))))
                 continue;
             if (!text.empty() && !collection::SearchMatches(text, collection::CardOf(figures, i), gameId))
                 continue;
