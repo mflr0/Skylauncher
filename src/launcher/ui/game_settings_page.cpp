@@ -31,6 +31,7 @@ namespace launcher_ui
             constexpr const char* OpenFigures = N_("Figures");
             constexpr const char* ResetKeys = N_("Reset to defaults");
             constexpr const char* ResetKeysHint = N_("Hold to reset every key of this game.");
+            constexpr const char* ResetPadHint = N_("Hold to give every button its own job back.");
         }
 
         // "12.3 GB" for what a button would free, nothing for less than a megabyte of noise.
@@ -65,7 +66,7 @@ namespace launcher_ui
         const char* title = GameName(m_s->game.id, GameNameForm::Full);
         BeginSettingsPage("##gamesettingscolumn", title != nullptr ? title : m_s->game.name, true);
 
-        static const char* const Tabs[] = { N_("Video"), N_("Keyboard"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
+        static const char* const Tabs[] = { N_("Video"), N_("Keyboard"), N_("Controller"), N_("Language"), N_("Disc"), N_("Saves"), N_("Game") };
         int tab = int(m_gameTab);
         DrawTabBar(Tabs, int(std::size(Tabs)), &tab);
         m_gameTab = GameTab(tab);
@@ -74,6 +75,7 @@ namespace launcher_ui
         {
         case GameTab::Video: DrawGameVideo(); break;
         case GameTab::Keyboard: DrawGameKeyboard(); break;
+        case GameTab::Controller: DrawGameController(); break;
         case GameTab::Language: DrawGameLanguage(); break;
         case GameTab::Disc: DrawGameDisc(); break;
         case GameTab::Saves: DrawSaveBackups(); break;
@@ -109,6 +111,15 @@ namespace launcher_ui
         ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 is experimental."));
         SettingSelect("##fps", video, "fps_limit", FpsChoices, 0);
 
+        ui::SettingRow(Tr("FPS counter"), Tr("A small frame rate readout in the game (F3 in the game turns it on too)."));
+        toggle("##showfps", "show_fps", "0");
+
+        ui::SettingRow(Tr("Volume"), Tr("The game's master volume (F3 in the game changes it too)."));
+        {
+            const std::string audioSection = std::string(m_s->game.id) + ".audio";
+            SettingSelect("##volume", audioSection.c_str(), "volume", VolumeChoices, 10);
+        }
+
         ui::SettingRow(Tr("Skip intro movies"), nullptr);
         toggle("##skipintromovies", "skip_intro_movies", "0");
 
@@ -132,13 +143,12 @@ namespace launcher_ui
         ui::SettingRow(Tr("Texture pack folder"), nullptr);
         ui::ButtonOptions folder;
         folder.icon = ui::Icon::Folder;
-        folder.width = -1;
         if (ui::Button(Tr("Show in folder"), folder))
         {
             std::error_code error;
             std::filesystem::create_directories(GameInstallFolder({}) / "textures", error);
             if (!OpenFolder(GameInstallFolder({}) / "textures"))
-                Toast(Tr("Couldn't open the folder"), true);
+                Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         }
         ui::EndSettings();
 
@@ -151,7 +161,8 @@ namespace launcher_ui
         }
     }
 
-    // The keys of this game: one row per action the game uses, named as the game names it, the pad button beside it.
+    // The keys of this game, as key caps: the movement (the left stick) as a cross of four keys, the right stick's as another
+    // when the game uses it, then one row per other action, named as the game names it, the pad's button after the name.
     // [<game>.input] holds them; PLAY puts them in [input] (game_keys.h).
     void App::DrawGameKeyboard()
     {
@@ -159,47 +170,104 @@ namespace launcher_ui
         const std::string section = GameInputSection(game);
         const std::span<const GameKey> keys = GameKeys(game);
         const PadFamily family = PadFamilyNow();
-        ui::SectionHeader(Tr("Keyboard"), m_capturing != nullptr ? Tf("Press a key for \"{}\" (Escape cancels)", Tr(m_capturing->label)).c_str()
-                                                                  : Tr("Click a key to change it."), false);
-        ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(ui::space::S, ui::space::XS));
-        if (ImGui::BeginTable("##keys", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
+        auto find = [&](std::string_view action) -> const GameKey* {
+            for (const GameKey& key : keys)
+                if (action == key.action)
+                    return &key;
+            return nullptr;
+        };
+        // What the key is for, in words: the right stick's directions are named by the stick (their rows say "Same").
+        auto purpose = [&](const GameKey& action) {
+            return std::string_view(action.action).starts_with("right_") ? PadButtonName(action, family) : std::string(Tr(action.label));
+        };
+        auto keyCap = [&](const GameKey& action) {
+            const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
+            const std::string tip = purpose(action);
+            ui::KeyButtonOptions options;
+            options.capturing = m_capturing == &action;
+            options.conflict = GameKeyConflict(m_config, game, action);
+            options.tooltip = options.conflict ? Tr("This key is used by another action") : tip.c_str();
+            ImGui::PushID(action.action);
+            if (ui::KeyButton("##key", key.c_str(), options))
+                m_capturing = &action;
+            ImGui::PopID();
+        };
+        auto capWidth = [&](const GameKey* action) {
+            ui::KeyButtonOptions options;
+            options.capturing = m_capturing == action;
+            options.conflict = GameKeyConflict(m_config, game, *action);
+            return ui::KeyButtonWidth(KeyDisplayName(GameKeyName(m_config, game, *action)).c_str(), options);
+        };
+
+        // What to do, or what is awaited.
+        ui::Text(ui::TextStyle::Body, m_capturing != nullptr ? Tf("Press a key for \"{}\" (Escape cancels)", purpose(*m_capturing)).c_str()
+                                                              : Tr("Click a key to change it."), m_capturing != nullptr ? ui::color::Ink : ui::color::Dim);
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+
+        // The crosses, side by side: a title (the action, the stick after it), then up over down, left and right beside it.
+        struct Cross
         {
-            ImGui::TableSetupColumn("action1", ImGuiTableColumnFlags_WidthStretch, 3);
-            ImGui::TableSetupColumn("key1", ImGuiTableColumnFlags_WidthStretch, 2);
-            ImGui::TableSetupColumn("action2", ImGuiTableColumnFlags_WidthStretch, 3);
-            ImGui::TableSetupColumn("key2", ImGuiTableColumnFlags_WidthStretch, 2);
-            for (size_t i = 0; i < keys.size(); i++)
-            {
-                const GameKey& action = keys[i];
-                if (i % 2 == 0)
-                    ImGui::TableNextRow();
-                ImGui::TableNextColumn();
-                // The pad's button as the pad in use prints it (A on a 360 pad, Cross on a PS5, B on a Switch); words translated.
-                // Beside the name when it fits, else under it.
-                const std::string name = Tr(action.label), pad = PadButtonName(action, family);
-                const float room = ImGui::GetContentRegionAvail().x;
-                const bool oneLine = ui::TextSize(ui::TextStyle::Body, name.c_str()).x + ui::space::XS + ui::TextSize(ui::TextStyle::Caption, pad.c_str()).x + 2 * ui::space::S <= room;
-                ImGui::AlignTextToFramePadding();
-                ui::Text(ui::TextStyle::Body, name.c_str(), ui::color::Ink, oneLine ? -1 : 0);
-                if (oneLine)
-                    ImGui::SameLine(0, ui::space::XS);
-                ui::Text(ui::TextStyle::Caption, ("(" + pad + ")").c_str(), ui::color::Dim, -1);
-                ImGui::TableNextColumn();
-                const std::string key = KeyDisplayName(GameKeyName(m_config, game, action));
-                const bool duplicate = GameKeyConflict(m_config, game, action);
-                ImGui::PushID(action.action);
-                ui::ButtonOptions options;
-                options.kind = m_capturing == &action ? ui::ButtonKind::Primary : ui::ButtonKind::Secondary;
-                options.icon = duplicate ? ui::Icon::Warning : ui::Icon::None;
-                options.width = -1;
-                options.tooltip = duplicate ? Tr("This key is used by another action") : nullptr;
-                if (ui::Button(m_capturing == &action ? "..." : key.c_str(), options))
-                    m_capturing = &action;
-                ImGui::PopID();
-            }
-            ImGui::EndTable();
+            std::string title, note;
+            const GameKey *up, *left, *down, *right;
+        };
+        std::vector<Cross> crosses;
+        if (const GameKey* up = find("left_up"); up != nullptr && find("left_down") && find("left_left") && find("left_right"))
+            crosses.push_back({ Tr("Movement"), "(" + PadButtonName(*up, family) + ")", up, find("left_left"), find("left_down"), find("left_right") });
+        if (const GameKey* up = find("right_up"); up != nullptr && find("right_down") && find("right_left") && find("right_right"))
+            crosses.push_back({ Tr(up->label), "(" + std::string(Tr("R stick")) + ")", up, find("right_left"), find("right_down"), find("right_right") });
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const float columnW = ImGui::GetContentRegionAvail().x / 2;
+        const float crossH = ui::type::Body + ui::space::S + 2 * ui::height::Normal + ui::space::XS;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        for (size_t i = 0; i < crosses.size(); i++)
+        {
+            const Cross& cross = crosses[i];
+            const float x = origin.x + float(i) * columnW;
+            ui::PushText(ui::TextStyle::Body, true);
+            ui::DrawText(draw, ImVec2(x, origin.y), ui::Col(ui::color::Ink), cross.title.c_str());
+            const float titleEnd = x + ImGui::CalcTextSize(cross.title.c_str()).x;
+            ui::PopText();
+            ui::PushText(ui::TextStyle::Caption);
+            ui::DrawText(draw, ImVec2(titleEnd + ui::space::XS, origin.y + ui::Baseline(ui::TextStyle::Body, true) - ui::Baseline(ui::TextStyle::Caption)),
+                ui::Col(ui::color::Dim), cross.note.c_str());
+            ui::PopText();
+            const float wL = capWidth(cross.left), wD = capWidth(cross.down), wR = capWidth(cross.right), wU = capWidth(cross.up);
+            const float top = origin.y + ui::type::Body + ui::space::S, below = top + ui::height::Normal + ui::space::XS;
+            // The keys' row starts on the title's edge; the top key over the middle one.
+            const float middle = x + wL + ui::space::XS + wD / 2;
+            ImGui::SetCursorScreenPos(ImVec2(std::round(middle - wU / 2), top));
+            keyCap(*cross.up);
+            ImGui::SetCursorScreenPos(ImVec2(x, below));
+            keyCap(*cross.left);
+            ImGui::SetCursorScreenPos(ImVec2(x + wL + ui::space::XS, below));
+            keyCap(*cross.down);
+            ImGui::SetCursorScreenPos(ImVec2(x + wL + wD + 2 * ui::space::XS, below));
+            keyCap(*cross.right);
         }
-        ImGui::PopStyleVar();
+        if (!crosses.empty())
+        {
+            // A hairline (M below the keys) parts them from the list, like the list's rows from each other.
+            const float line = origin.y + crossH + ui::space::M;
+            draw->AddLine(ImVec2(origin.x, line + 0.5f), ImVec2(origin.x + ImGui::GetContentRegionAvail().x, line + 0.5f),
+                ui::Col(ui::color::Hairline, 110.0f / 255), ui::stroke::Hairline);
+            ImGui::SetCursorScreenPos(ImVec2(origin.x, line + ui::stroke::Hairline));
+        }
+
+        // The other actions: a settings row each, the key right-aligned in the control column.
+        if (ui::BeginSettings("##keys"))
+        {
+            for (const GameKey& action : keys)
+            {
+                const std::string_view name = action.action;
+                if (name.starts_with("left_") || name.starts_with("right_"))
+                    continue;
+                const std::string pad = "(" + PadButtonName(action, family) + ")";
+                ui::SettingRow(Tr(action.label), nullptr, pad.c_str());
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - capWidth(&action));
+                keyCap(action);
+            }
+            ui::EndSettings();
+        }
         ImGui::Dummy(ImVec2(0, ui::space::XS));
         ui::ButtonOptions reset;
         reset.kind = ui::ButtonKind::Danger;
@@ -211,6 +279,77 @@ namespace launcher_ui
             Set(section.c_str(), "seeded", "1");
             m_capturing = nullptr;
             Toast(Tr("Keyboard bindings reset"), ui::ToastKind::Success);
+        }
+    }
+
+    // The pad of this game: which button does the job of which, and the rumble. [<game>.input] holds them (pad_<button>,
+    // rumble_p1, rumble_p2); the runtime reads them from there at the game's start (game_keys.h). A settings row per button
+    // (its name, the game's word for its job after it, what it does now in the control column), the rumble, one Reset.
+    void App::DrawGameController()
+    {
+        const std::string& game = m_s->game.id;
+        const std::string section = GameInputSection(game);
+        const PadFamily family = PadFamilyNow();
+        ui::Text(ui::TextStyle::Body, Tr("Choose what each button does."), ui::color::Dim);
+        ImGui::Dummy(ImVec2(0, ui::space::XXS));
+
+        // "B (Attack 3 / Back)": a button as the pad prints it, then the game's word for its job.
+        auto describe = [&](int button) {
+            const std::string job = PadActionName(game, button), name = PadButtonLabel(button, family);
+            return job.empty() ? name : name + " (" + job + ")";
+        };
+        if (ui::BeginSettings("##padmap"))
+        {
+            for (int button = 0; button < PadButtonTotal; button++)
+            {
+                const std::string job = PadActionName(game, button);
+                const std::string note = job.empty() ? std::string() : "(" + job + ")";
+                const std::string name = PadButtonLabel(button, family);
+                ui::SettingRow(name.c_str(), nullptr, note.empty() ? nullptr : note.c_str());
+                const int target = PadTarget(m_config, game, button);
+                const std::string preview = target == button ? std::string(Tr("Default")) : target < 0 ? std::string(Tr("Nothing")) : describe(target);
+                ImGui::PushID(button);
+                if (ui::BeginSelect("##job", preview.c_str()))
+                {
+                    int chosen = -2;
+                    if (ui::SelectOption(Tr("Default"), target == button))
+                        chosen = button;
+                    for (int other = 0; other < PadButtonTotal; other++)
+                        if (other != button && ui::SelectOption((describe(other) + "##" + std::to_string(other)).c_str(), target == other))
+                            chosen = other;
+                    if (ui::SelectOption(Tr("Nothing"), target < 0))
+                        chosen = -1;
+                    ui::EndSelect();
+                    if (chosen != -2)
+                    {
+                        SetPadTarget(m_config, game, button, chosen);
+                        Set(section.c_str(), "seeded", "1");
+                    }
+                }
+                ImGui::PopID();
+            }
+            ui::EndSettings();
+        }
+
+        ui::SectionHeader(Tr("Rumble"));
+        if (ui::BeginSettings("##rumble"))
+        {
+            ui::SettingRow(Tr("Player 1"), nullptr);
+            SettingSelect("##rumble1", section.c_str(), "rumble_p1", RumbleChoices, 2);
+            ui::SettingRow(Tr("Player 2"), nullptr);
+            SettingSelect("##rumble2", section.c_str(), "rumble_p2", RumbleChoices, 2);
+            ui::EndSettings();
+        }
+        ImGui::Dummy(ImVec2(0, ui::space::XS));
+        ui::ButtonOptions reset;
+        reset.kind = ui::ButtonKind::Danger;
+        reset.hold = true;
+        reset.tooltip = Tr(strings::ResetPadHint);
+        if (ui::Button(Tr(strings::ResetKeys), reset))
+        {
+            ResetPadMap(m_config, game);
+            Set(section.c_str(), "seeded", "1");
+            Toast(Tr("Controller buttons reset"), ui::ToastKind::Success);
         }
     }
 
@@ -242,7 +381,7 @@ namespace launcher_ui
         m_config[m_s->game.id].erase("iso");
         StoreDiscLanguages(m_config, m_s->game.id, {});
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
         RefreshInstall();
     }
 
@@ -309,7 +448,7 @@ namespace launcher_ui
             {
                 std::filesystem::path parent = std::filesystem::path(std::u8string(m_s->discPath.begin(), m_s->discPath.end())).parent_path();
                 if (!OpenFolder(parent))
-                    Toast(Tr("Couldn't open the folder"), true);
+                    Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
             }
             ui::Text(ui::TextStyle::Caption, Tr("The file stays where it is."), ui::color::Dim);
         }
@@ -333,16 +472,16 @@ namespace launcher_ui
         if (restore.ok)
             Toast(Tf("Saves restored from {}", BackupWhen(stamp)), ui::ToastKind::Success);
         else if (restore.error == "the game is running")
-            Toast(Tr("Quit the game before restoring a backup"), true);
+            Toast(Tr("Quit the game before restoring a backup"), ui::ToastKind::Error);
         else
-            Toast(Tf("Couldn't restore the backup: {}", restore.error), true);
+            Toast(Tf("Couldn't restore the backup: {}", restore.error), ui::ToastKind::Error);
     }
 
     void App::DrawSaveBackups()
     {
         if (!m_s->saveBackupsLoaded)
             RefreshSaveBackups();
-        const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id));
+        const bool running = savebackup::GameRunning(savebackup::Root(m_s->game.id)) || m_session.Running() == m_s->game.id;
         ui::SectionHeader(Tr("Save backups"), running ? Tr("The game is running: quit it to restore a backup.") : Tr("Earlier versions of your saves."), false);
         ui::ButtonOptions folder;
         folder.icon = ui::Icon::Folder;
@@ -352,7 +491,7 @@ namespace launcher_ui
             std::error_code error;
             std::filesystem::create_directories(saves, error);
             if (!OpenFolder(saves))
-                Toast(Tr("Couldn't open the folder"), true);
+                Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         }
         ImGui::Dummy(ImVec2(0, ui::space::XS));
         if (m_s->saveBackups.empty())
@@ -368,7 +507,7 @@ namespace launcher_ui
         restore.disabled = running;
         restore.tooltip = Tr(strings::RestoreSavesHint);
         const float rowHeight = ui::height::Large + ui::space::XXS + ImGui::GetStyle().ItemSpacing.y; // a row and the gap after it
-        ImGui::BeginChild("##savebackuplist", ImVec2(0, std::min(5 * rowHeight, rowHeight * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
+        ui::BeginRoomyChild("##savebackuplist", ImVec2(0, std::min(5 * rowHeight, rowHeight * float(m_s->saveBackups.size()))), ImGuiChildFlags_NavFlattened);
         const float buttonWidth = ui::ButtonWidth(Tr(strings::RestoreSaves), restore);
         for (const savebackup::Entry& backup : m_s->saveBackups)
         {
@@ -389,7 +528,7 @@ namespace launcher_ui
             ImGui::Dummy(ImVec2(0, ui::space::XXS));
             ImGui::PopID();
         }
-        ImGui::EndChild();
+        ui::EndRoomyChild();
     }
 
     // ---- Game: shortcut, folders, reinstall, delete data, uninstall -----------------------------------------------------
@@ -409,7 +548,7 @@ namespace launcher_ui
     void App::RunUninstall(const DataResult& result)
     {
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
         m_s->installed = {};
         RefreshInstall();
         RunDataAction(result, N_("Game uninstalled"));
@@ -438,7 +577,7 @@ namespace launcher_ui
         if (!m_s->dataSizesLoaded)
             RefreshDataSizes();
         const GameFolders folders = FoldersOf(m_s->game.id);
-        const bool busy = Installing(), running = GameIsRunning(folders);
+        const bool busy = Installing(), running = GameIsRunning(folders) || m_session.Running() == m_s->game.id;
         auto hold = [](const char* tooltip, bool disabled = false) {
             ui::ButtonOptions options;
             options.kind = ui::ButtonKind::Danger;
@@ -448,7 +587,22 @@ namespace launcher_ui
             return options;
         };
 
-        ui::SectionHeader(Tr("Desktop shortcut"), m_s->disc != DiscState::Ready ? Tr("Choose the disc image first.") : nullptr, false);
+        const bool swapForce = m_s->game.id == std::string_view("swapforce");
+        if (swapForce)
+        {
+            // The only game with a locked difficulty: Nightmare is offered at once, the save is not changed ([swapforce] in launcher.ini).
+            ui::SectionHeader(Tr("Difficulty"), nullptr, false);
+            if (ui::BeginSettings("##nightmare"))
+            {
+                ui::SettingRow(Tr("Nightmare from the start"), Tr("Offered before you beat the game. Your save is not changed."));
+                bool value = ParseBool(SettingGet(m_config, m_s->game.id, "nightmare_from_start", "0"));
+                if (ui::Toggle("##nightmarefromstart", &value))
+                    Set(m_s->game.id, "nightmare_from_start", value ? "1" : "0");
+                ui::EndSettings();
+            }
+        }
+
+        ui::SectionHeader(Tr("Desktop shortcut"), m_s->disc != DiscState::Ready ? Tr("Choose the disc image first.") : nullptr, swapForce);
         ui::ButtonOptions shortcut;
         shortcut.disabled = m_s->disc != DiscState::Ready;
         if (ui::Button(Tr("Create"), shortcut))
@@ -462,7 +616,7 @@ namespace launcher_ui
             std::error_code error;
             std::filesystem::create_directories(folders.game, error);
             if (!OpenFolder(folders.game))
-                Toast(Tr("Couldn't open the folder"), true);
+                Toast(Tr("Couldn't open the folder"), ui::ToastKind::Error);
         }
         ImGui::SameLine(0, ui::space::S);
         if (ui::Button(Tr(strings::OpenFigures), folder))

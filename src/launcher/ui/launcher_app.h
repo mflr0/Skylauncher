@@ -6,6 +6,7 @@
 #include "assets/launcher_assets.h"
 #include "launcher/game_copy.h"
 #include "launcher/game_install.h"
+#include "launcher/game_progress.h"
 #include "launcher/game_keys.h"
 #include "launcher/game_run.h"
 #include "launcher/game_settings.h"
@@ -51,6 +52,10 @@ namespace launcher_ui
 
     // The runtime runs at 30 or 60: any other limit it is given means 60 (docs/settings.md).
     inline constexpr Choice FpsChoices[] = { { "30", N_("30 (original)") }, { "60", N_("60 (experimental)"), "0 120 144 240" } };
+    inline constexpr Choice VolumeChoices[] = { { "0", "0 %" }, { "10", "10 %" }, { "20", "20 %" }, { "30", "30 %" }, { "40", "40 %" },
+        { "50", "50 %" }, { "60", "60 %" }, { "70", "70 %" }, { "80", "80 %" }, { "90", "90 %" }, { "100", "100 %" } };
+    inline constexpr Choice RumbleChoices[] = { { "off", N_("Off") }, { "low", N_("Low") }, { "normal", N_("Normal") }, { "strong", N_("Strong") } };
+
     inline constexpr Choice AspectChoices[] = { { "auto", N_("Auto (follows the window)") }, { "16:9", N_("16:9 (with bars)") } };
     inline constexpr Choice ScaleChoices[] = { { "auto", N_("Auto") }, { "1", "x1" }, { "2", "x2" }, { "3", "x3" }, { "4", "x4" },
         { "5", "x5" }, { "6", "x6" }, { "7", "x7" }, { "8", "x8" }, { "9", "x9" }, { "10", "x10" } };
@@ -122,8 +127,6 @@ namespace launcher_ui
 
     // ---- Drawing --------------------------------------------------------------------------------------------------
 
-    // `passes` extra copies, each BoldOffset further right: 1 is bold, more is heavier.
-    void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes = 1);
 
     // ---- Disc verification on a worker thread ---------------------------------------------------------------------
 
@@ -164,18 +167,20 @@ namespace launcher_ui
     // Home is the menu (the SKYLAUNCHER title opens it), Play is the game art and the main button, Collection is the
     // figures (its sidebar row), the gear opens the launcher's Settings, and the game's Settings button (on its Play
     // page) opens that game's own settings.
-    enum class Page { Home, Play, Collection, Settings, GameSettings };
+    enum class Page { Home, Play, Collection, Settings, GameSettings, Achievements };
     enum class SettingsTab { Controls, Launcher, Support, About };
-    enum class GameTab { Video, Keyboard, Language, Disc, Saves, Game };
+    enum class GameTab { Video, Keyboard, Controller, Language, Disc, Saves, Game };
     enum class DiscState { None, Verifying, Ready, Failed };
     // Everything a game can be in, read from its slot by App::SlotStatus: the one place that decides (docs/launcher_ui.md).
     enum class SlotState
     {
         Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame, DataDamaged,
-        DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready
+        DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready, Running
     };
-    // The shape and colour that say a game's state: never the colour alone (the sidebar, Home's cards, the page).
+    // The shape and colour that say a game's state: never the colour alone (the sidebar, Home's cards, the page). IconOf: the
+    // state's own icon (a disc, an update, a download...), else the status's.
     ui::Status StatusOf(SlotState state);
+    ui::Icon IconOf(SlotState state);
     // Where the keyboard and pad focus goes on the next frame: the sidebar's current row, or the page's first control.
     enum class FocusTo { None, Sidebar, Page };
 
@@ -272,15 +277,13 @@ namespace launcher_ui
             unsigned dot;
             float progress = -1;
             SlotState state = SlotState::Closed;
-            const char* button = "";   // the game page's main button: its label
+            std::string button;        // the game page's main button: its label
             bool buttonEnabled = true; // and whether it can be pressed
         };
         SlotLine SlotStatus(GameSlot* slot);
+        SlotLine SlotLineOf(GameSlot* slot); // the same, as if no game were running
         float PlayBandH() const; // the game page's band under the art: the main action, and the pad legend when a pad is in use
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
-        // The width of a PillButton: `width`, or wider when the label (a translation may be longer) needs it; `chevron` != 0
-        // makes room for the drawn chevron.
-        float PillWidth(const char* label, float width, bool bold = false, int chevron = 0);
 
     private:
         bool Init();
@@ -301,6 +304,10 @@ namespace launcher_ui
         void DrawSupport();      // support_page.cpp: logs and the problem report
         // A game's own settings (game_settings_page.cpp), opened from the Settings button on its Play page.
         void DrawGameSettings();
+        // A game's achievements and play time (achievements_page.cpp), opened from its Play page.
+        void DrawAchievements();
+        void RefreshProgress(bool force = false);
+        const ArtTexture* AchievementIcon(const std::filesystem::path& image);
         void DrawGameVideo();
         void DrawGameKeyboard();
         void DrawGameLanguage();
@@ -313,6 +320,8 @@ namespace launcher_ui
         void RefreshSaveBackups();
         void RestoreSaveBackup(const std::string& stamp);
         void DrawGameTab();
+        void DrawGameController();
+        void DrawUpdateAll(ImVec2 right);
         void DrawDataActions();
         void CreateShortcut();
         void ForgetDisc();       // "Remove the disc": the game forgets its image; the built game and the files stay
@@ -387,41 +396,15 @@ namespace launcher_ui
         void ForgetCachedArt(const char* game); // its disc was read again
         bool ReduceMotion() const;
 
-        // Widgets in the launcher's style. Each is now a thin wrapper over a component (components/components.h), kept so the
-        // screens build while they move to the components (docs/launcher_ui.md, "Migration map").
-        bool BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled = true);
-        bool PillButton(const char* label, bool primary = false, float width = 0, bool bold = false, unsigned fill = PanelRaised,
-            unsigned fillHover = PanelRaisedHover, unsigned fillActive = PanelRaisedActive, int chevron = 0);
-        // A chevron drawn with two lines (no font glyph): down when `dir` > 0, up when < 0; `size` is its width.
-        static void DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir);
-        // Draws the label of the last item (a button whose own text was made transparent) with a chevron after it.
-        void DrawLabelChevron(const char* label, unsigned color, int dir, bool bold);
-        void BoldText(const char* text, unsigned color);
-        // Acts once held for a second (HoldConfirm); `hint` is its tooltip, which says so. Red: for what deletes or overwrites.
-        bool HoldButton(const char* label, float width, const char* hint);
-        void ProgressBar(float fraction, ImVec2 size); // a rounded bar, the fill drawn with the cap of the track
-        // The keyboard and pad focus around the last item, for the widgets drawn over an InvisibleButton; `gap` < 0 draws
-        // it inside (rows that touch the window's edges).
-        void FocusRing(float rounding, float gap = 4, ImDrawFlags flags = 0);
         // A page's centred column (the cursor is at its left): it reaches a few points past each side and over the page's
         // bottom padding, so the clip rect neither shaves the borders at its edges nor cuts the scrolling content short of the window.
         float m_columnBelow = 0;
         void BeginPageColumn(const char* id, float width, bool alwaysScrollbar = false);
-        // The combo and its list rows as the launcher draws them: the chevron inside the rounded box (no arrow cell), rows with
-        // the rounded highlight; a level slider with a round knob of one size along the whole track.
-        bool BeginCombo(const char* id, const char* preview);
-        bool Option(const char* label, bool selected = false, ImGuiSelectableFlags flags = 0, ImVec2 size = ImVec2(0, 0));
-        bool LevelSlider(const char* id, int* value, int min, int max, float width);
         void EndPageColumn();
-        bool Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width = -1);
         // A settings row's select: the choices' labels, the value in [section] key; the control column's width.
         bool SettingSelect(const char* id, const char* section, const char* key, std::span<const Choice> choices, int fallback);
         void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
         void EndCard();
-        void Title(const char* text, float size = TitleSize, unsigned color = Accent);
-        // A rounded "chip" (filters, badges); returns true when clicked.
-        bool Chip(const char* label, bool selected, unsigned color = Accent);
-        void Badge(ImDrawList* draw, ImVec2 at, const char* text, unsigned fill, unsigned ink);
 
         // Installing the game (the band's INSTALL button, the progress card in place of the logo).
         void RefreshInstall();
@@ -439,6 +422,12 @@ namespace launcher_ui
         std::string GameVersion(const GameSlot& slot) const;         // "0.8.2": the built game's, else the kit's; "" when unknown
         void StartInstall();
         void PollInstall();
+        // "Update all" (Home): the games with an update, one after the other (docs/updates.md).
+        int GamesToUpdate() const;
+        void StartUpdateAll();
+        void CancelUpdateAll();
+        void PollUpdateAll();
+        bool UpdatingAll() const { return !m_updateAll.queue.empty() || !m_updateAll.current.empty(); }
         void DrawInstall(ImVec2 at, ImVec2 size);
         InstallProgress InstallSnapshot(size_t logTail = 0); // this session's install, else the one read back from its log
         InstallProgress InstallSnapshot(GameSlot& slot, size_t logTail = 0); // the same, for any game's slot
@@ -450,6 +439,10 @@ namespace launcher_ui
         void PollSlots();
         bool AnyInstalling() const;
         bool AnyVerifying() const;
+        // At start-up, the other games' discs are checked too, one after the other in the background (each as its first
+        // visit would), so every game shows its real state and art at once.
+        std::vector<std::string> m_discQueue;
+        void CheckQueuedDiscs();
         void StartVerify(const std::string& path);
         void StartGameDisc(); // the remembered disc image, or the game's copy when it is complete (game_data_page.cpp)
         void FinishVerify();
@@ -457,16 +450,18 @@ namespace launcher_ui
         void Browse();
         bool DiscStillThere(); // false, and the disc's line says so, when the verified image is gone
         void Set(const char* section, const char* key, const std::string& value);
-        void Toast(std::string text, bool error = false); // an error stays until it is closed; the rest go by themselves
-        void Toast(std::string text, ui::ToastKind kind);
+        // A message at the bottom right: an Error stays until it is closed; Info and Success go by themselves.
+        void Toast(std::string text, ui::ToastKind kind = ui::ToastKind::Info);
         void RefreshGamepads();
         PadFamily PadFamilyNow() const; // whose button names the Keyboard tab shows (game_keys.h)
+        ui::Glyphs PadGlyphs() const;   // the same family as the pictures of its buttons (never the keyboard)
         std::vector<std::pair<std::string, std::string>> DeviceOptions() const; // value, label
         std::string CurrentDevice() const;
         std::string DeviceLabel() const;
         void SetDevice(const std::string& value);
         void Screenshot(const char* name);
         void TestScript();
+        void TestScreensScript(uint64_t now);
         void TestInstallScript(uint64_t now);
         void TestUpdateScript(uint64_t now);
         void TestNavScript(uint64_t now);
@@ -477,8 +472,10 @@ namespace launcher_ui
         void TestUpdatesScript(uint64_t now);
         void TestSeatXScript(uint64_t now);
         void TestButtonsScript(uint64_t now);
-        void PlayNow(); // PLAY on the shown game: its disc and built game are what the launcher returns
+        void TestRunningScript(uint64_t now);
+        void PlayNow(); // PLAY on the shown game: starts it beside the window (m_startGames), else returns its disc and build
         void AutoPlay(); // --play: PLAY as soon as the shown game's disc is checked, if it can
+        void PollGame(); // the game running: its end (a crash is told), or one found running
 
         std::string m_configPath;
         LauncherConfig& m_config;
@@ -504,6 +501,9 @@ namespace launcher_ui
         SettingsTab m_tab = SettingsTab::Controls;
         GameTab m_gameTab = GameTab::Video;
         bool m_autoPlay = false; // --play: start the game as soon as it is ready (a desktop shortcut)
+        bool m_startGames = false; // PLAY starts the game and the window stays (LauncherOptions)
+        GameSession m_session;     // the game running: one at a time (game_run.h)
+        std::string m_sessionIso;  // the disc image it was started with (the crash report names it)
         ProbeJob m_probe;
         launcher_portal::Watcher m_portal;
         bool m_reportOpen = false;      // "Report a problem" shown (support_page.cpp)
@@ -515,6 +515,12 @@ namespace launcher_ui
         bool m_updateLater = false;      // the player closed the banner for this session
         bool m_testPlayWithout = false;        // tests: press "Play without updating" on the next frame
         std::vector<GameUpdate> m_gameUpdates; // the games line of the last answered check
+        struct UpdateAllRun
+        {
+            std::vector<std::string> queue; // games still to start
+            std::string current;            // the game being updated
+            int total = 0, started = 0, failed = 0;
+        } m_updateAll;
         bool m_whatsNewOpen = false;
         bool m_updateWasBusy = false;
         std::string m_updateDoneNote;    // the last answer of a manual check, shown in About
@@ -546,6 +552,12 @@ namespace launcher_ui
         bool m_uninstalled = false;    // done: the window only shows the result and quits
         bool m_testUninstall = false;  // SKY_LAUNCHER_TEST_UNINSTALL: the uninstall screens
         bool m_testKeys = false;       // SKY_LAUNCHER_TEST_KEYS: each game's Keyboard tab, one shot each
+        int m_testScreens = 0;         // SKY_LAUNCHER_TEST_SCREENS: Home, the game page and its Keyboard tab; 1 with the mouse, 2 with a pad
+        bool m_testPadInput = false;   // SKY_LAUNCHER_TEST_INPUT=pad (or SCREENS=pad): any script's shots as with a pad (its legends, the ring)
+        int m_testFocusView = -1;      // the page and tab the last pad focus was given on
+        bool m_testPad = false;        // SKY_LAUNCHER_TEST_PAD: each game's Controller tab, and Swap Force's Game tab
+        bool m_testRunning = false;      // SKY_LAUNCHER_TEST_RUNNING: one game at a time (TestRunningScript)
+        bool m_testAchievements = false; // SKY_LAUNCHER_TEST_ACHIEVEMENTS: the shown game's page with its play time, then its achievements
         bool m_testLogo = false;       // SKY_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
         uint64_t m_testHoldAt = 0;     // when the test pressed the hold button (it holds it down for the screenshots)
@@ -555,6 +567,11 @@ namespace launcher_ui
         const GameSlot* m_logoDropSlot = nullptr;
         bool m_logoDropHad = false; // the logo was there (it may arrive after the page, once the disc is read)
         Page m_lastPage = Page::Home;
+        GameProgress m_progress;           // the shown game's achievements and play time (RefreshProgress)
+        const GameSlot* m_progressSlot = nullptr;
+        std::string m_progressLanguage;
+        uint64_t m_progressAt = 0;
+        std::map<std::string, ArtTexture> m_achievementIcons; // by file
         std::map<std::string, ArtTexture> m_cachedArt; // CachedArt's, by "<game> <role> <width>"
 
         ui::Toasts m_toasts; // newest last; drawn at the bottom right, upwards
@@ -607,22 +624,4 @@ namespace launcher_ui
         return changed;
     }
 
-    inline bool App::Combo(const char* label, const char* section, const char* key, std::span<const Choice> choices, int fallback, float width)
-    {
-        const size_t N = choices.size();
-        int index = ChoiceIndex(choices, SettingGet(m_config, section, key), fallback);
-        bool changed = false;
-        ImGui::SetNextItemWidth(width);
-        if (BeginCombo(label, Tr(choices[index].label)))
-        {
-            for (size_t i = 0; i < N; i++)
-                if (Option(Tr(choices[i].label), int(i) == index))
-                {
-                    Set(section, key, choices[i].value);
-                    changed = true;
-                }
-            ImGui::EndCombo();
-        }
-        return changed;
-    }
 }

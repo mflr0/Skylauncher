@@ -4,6 +4,8 @@
 #include "launcher/ui/components/buttons.h"
 #include <algorithm>
 #include <cmath>
+#include <imgui_internal.h> // the parent's layout after a roomy child
+#include <vector>
 
 namespace ui
 {
@@ -28,6 +30,46 @@ namespace ui
         ImGui::PopStyleColor(2);
     }
 
+    // ---- Roomy child ---------------------------------------------------------------------------------------------------
+
+    namespace
+    {
+        struct Roomy
+        {
+            float bleed;
+            ImVec2 contentMin, contentMax; // where a plain child would have been (screen)
+            ImVec2 parentMax, parentIdeal; // the parent's content extent before it
+        };
+        std::vector<Roomy> g_roomy;
+    }
+
+    void BeginRoomyChild(const char* id, ImVec2 size, ImGuiChildFlags flags, ImGuiWindowFlags windowFlags, float bleed)
+    {
+        const ImVec2 at = ImGui::GetCursorScreenPos(), room = ImGui::GetContentRegionAvail();
+        const ImVec2 content(size.x > 0 ? size.x : std::max(1.0f, room.x + size.x), size.y > 0 ? size.y : std::max(1.0f, room.y + size.y));
+        const ImGuiWindow* parent = ImGui::GetCurrentWindow();
+        g_roomy.push_back({ bleed, at, ImVec2(at.x + content.x, at.y + content.y), parent->DC.CursorMaxPos, parent->DC.IdealMaxPos });
+        ImGui::SetCursorScreenPos(ImVec2(at.x - bleed, at.y - bleed));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(bleed, bleed));
+        ImGui::BeginChild(id, ImVec2(content.x + 2 * bleed, content.y + 2 * bleed), flags | ImGuiChildFlags_AlwaysUseWindowPadding, windowFlags);
+        ImGui::PopStyleVar();
+    }
+
+    void EndRoomyChild()
+    {
+        ImGui::EndChild();
+        const Roomy roomy = g_roomy.back();
+        g_roomy.pop_back();
+        // The parent lays out what follows as after a child of the content's size: SameLine beside the content, the next line
+        // under it, and the parent's content no larger for the room round it.
+        ImGuiWindow* window = ImGui::GetCurrentWindow();
+        window->DC.CursorPosPrevLine = ImVec2(roomy.contentMax.x, roomy.contentMin.y);
+        window->DC.PrevLineSize.y = roomy.contentMax.y - roomy.contentMin.y;
+        window->DC.CursorPos.y -= roomy.bleed;
+        window->DC.CursorMaxPos = ImMax(roomy.parentMax, roomy.contentMax);
+        window->DC.IdealMaxPos = ImMax(roomy.parentIdeal, roomy.contentMax);
+    }
+
     // ---- ListRow ---------------------------------------------------------------------------------------------------
 
     bool ListRow(const char* title, const ListRowOptions& options)
@@ -44,28 +86,44 @@ namespace ui
         if (options.selected)
             draw->AddRectFilled(min, ImVec2(min.x + stroke::Selection + 2, max.y), Col(color::Selected), radius::Control, ImDrawFlags_RoundCornersLeft);
 
+        // The leading column (an icon, or the caller's image), centred in `leadWidth` when the list gives one: the titles of a
+        // list's rows then start on one edge.
         float x = min.x + space::S, right = max.x - space::S;
         const float mid = std::round((min.y + max.y) / 2);
         if (options.icon != Icon::None)
         {
-            DrawIcon(draw, options.icon, ImVec2(x + type::Label / 2, mid), type::Label, Col(color::InkSoft));
-            x += type::Label + space::S;
+            const float slot = std::max(icon::Normal, options.leadWidth);
+            DrawIcon(draw, options.icon, ImVec2(x + slot / 2, mid), icon::Normal, Col(color::InkSoft));
+            x += slot + space::S;
         }
-        if (options.image)
+        else if (options.image)
         {
-            options.image(draw, ImVec2(x, min.y + space::XS), ImVec2(options.imageWidth, h - 2 * space::XS));
-            x += options.imageWidth + space::S;
+            const float slot = std::max(options.imageWidth, options.leadWidth);
+            options.image(draw, ImVec2(x + std::round((slot - options.imageWidth) / 2), min.y + space::XXS), ImVec2(options.imageWidth, h - 2 * space::XXS));
+            x += slot + space::S;
         }
+        else if (options.leadWidth > 0)
+            x += options.leadWidth + space::S;
         if (options.chevron)
         {
-            DrawIcon(draw, Icon::ChevronRight, ImVec2(right - 5, mid), 12, Col(color::Dim));
-            right -= 12 + space::S;
+            DrawIcon(draw, Icon::ChevronRight, ImVec2(right - icon::Small / 2, mid), icon::Small, Col(color::Dim));
+            right -= icon::Small + space::S;
         }
+        // One line: the title's capitals centred on the row. Two: the title and the subtitle as one block centred on it.
+        const TextStyle titleStyle = TextStyle::Body;
+        const bool titleBold = options.subtitle != nullptr;
+        const float gap = space::XXS;
+        const float titleTop = options.subtitle != nullptr
+            ? std::round(mid - (CapTop(titleStyle, titleBold) + SizeOf(titleStyle) + gap + Baseline(TextStyle::Caption)) / 2)
+            : std::round(mid - CapMiddle(titleStyle, titleBold));
+        const float baseline = titleTop + Baseline(titleStyle, titleBold);
         if (options.trailing != nullptr)
         {
+            // On the title's baseline on a row of one line, else centred on the row.
             PushText(TextStyle::Caption);
             ImVec2 text = ImGui::CalcTextSize(options.trailing);
-            DrawText(draw, ImVec2(right - text.x, mid - text.y / 2), Col(color::InkSoft), options.trailing);
+            const float y = options.subtitle != nullptr ? std::round(mid - CapMiddle(TextStyle::Caption)) : baseline - Baseline(TextStyle::Caption);
+            DrawText(draw, ImVec2(right - text.x, y), Col(color::InkSoft), options.trailing);
             right -= text.x + space::S;
             PopText();
         }
@@ -78,41 +136,37 @@ namespace ui
             PushText(TextStyle::Caption);
             noteW = ImGui::CalcTextSize(options.note).x + space::XS;
             PopText();
-            PushText(TextStyle::Body, options.subtitle != nullptr);
+            PushText(titleStyle, titleBold);
             if (ImGui::CalcTextSize(title).x + noteW > room) // the name comes first: a note that would cut it is left out
                 noteW = 0;
             PopText();
         }
-        auto drawTitle = [&](float y, bool bold, TextStyle style) {
-            PushText(style, bold);
-            const std::string shown = Ellipsize(title, room - noteW);
-            DrawText(draw, ImVec2(x, y), Col(titleInk), shown.c_str());
-            const float end = x + ImGui::CalcTextSize(shown.c_str()).x;
+        PushText(titleStyle, titleBold);
+        const std::string shown = Ellipsize(title, room - noteW);
+        DrawText(draw, ImVec2(x, titleTop), Col(titleInk), shown.c_str());
+        const float titleEnd = x + ImGui::CalcTextSize(shown.c_str()).x;
+        PopText();
+        if (options.note != nullptr && noteW > 0) // on the title's baseline
+        {
+            PushText(TextStyle::Caption);
+            DrawText(draw, ImVec2(titleEnd + space::XS, baseline - Baseline(TextStyle::Caption)), Col(color::InkSoft), options.note);
             PopText();
-            if (options.note != nullptr && noteW > 0)
-            {
-                PushText(TextStyle::Caption);
-                DrawText(draw, ImVec2(end + space::XS, y + (SizeOf(style) - ImGui::GetFontSize()) * 0.6f), Col(color::InkSoft), options.note);
-                PopText();
-            }
-        };
+        }
         if (options.subtitle != nullptr)
         {
-            const float titleH = type::Body;
-            const float subH = type::Caption, gap = space::XXS, top = std::round(mid - (titleH + gap + subH) / 2);
-            drawTitle(top, true, TextStyle::Body);
+            // The state's icon on the subtitle's line, centred on its capitals, at the title's left edge.
+            const float subTop = titleTop + SizeOf(TextStyle::Body) + gap;
             float subX = x;
             if (options.status != nullptr)
             {
-                DrawStatusIcon(draw, *options.status, ImVec2(x + subH / 2, top + titleH + gap + subH / 2 + 1), subH);
-                subX += subH + space::XXS;
+                DrawStatusIcon(draw, *options.status, options.statusIcon != Icon::None ? options.statusIcon : IconOf(*options.status),
+                    ImVec2(x + icon::Small / 2, std::round(subTop + CapMiddle(TextStyle::Caption))), icon::Small);
+                subX += icon::Small + space::XXS;
             }
             PushText(TextStyle::Caption);
-            DrawText(draw, ImVec2(subX, top + titleH + gap), Col(color::Dim), Ellipsize(options.subtitle, room - (subX - x)).c_str());
+            DrawText(draw, ImVec2(subX, subTop), Col(color::Dim), Ellipsize(options.subtitle, room - (subX - x)).c_str());
             PopText();
         }
-        else
-            drawTitle(mid - SizeOf(TextStyle::Body) / 2, false, TextStyle::Body);
         if (options.progress >= 0)
         {
             const float barLeft = x, barRight = max.x - space::S, y = max.y - space::XS + 1;
@@ -129,11 +183,13 @@ namespace ui
 
     // ---- Settings rows ---------------------------------------------------------------------------------------------
 
-    bool BeginSettings(const char* id)
+    bool BeginSettings(const char* id, float controlWidth)
     {
         ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(space::XXS, space::S));
         ImGui::PushStyleColor(ImGuiCol_TableBorderLight, LauncherTheme::Rgb(color::Hairline, 110));
-        const bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp);
+        // NoClip: a control at a column's edge keeps its whole focus ring (a column clips 4 points past its content, the ring
+        // reaches 6).
+        const bool open = ImGui::BeginTable(id, 2, ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoClip);
         if (!open)
         {
             ImGui::PopStyleColor();
@@ -141,24 +197,111 @@ namespace ui
             return false;
         }
         ImGui::TableSetupColumn("label", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("control", ImGuiTableColumnFlags_WidthFixed, height::SettingControl);
+        ImGui::TableSetupColumn("control", ImGuiTableColumnFlags_WidthFixed, std::max(controlWidth, float(height::SettingControl)));
         return true;
     }
 
-    void SettingRow(const char* label, const char* hint)
+    namespace
     {
+        // The row being drawn: its label waits until its control is drawn, to be centred on it.
+        struct PendingLabel
+        {
+            bool open = false;
+            std::string label, hint, note;
+            float controlTop = 0;
+            float controlX = 0; // the control column's left edge
+            bool grouped = false; // AlignRight placed a group: its controls stay where they are put
+        };
+        PendingLabel g_row;
+
+        float LabelBlockHeight(const char* hint, float width)
+        {
+            return SizeOf(TextStyle::Body) + (hint != nullptr ? space::XXS + TextSize(TextStyle::Caption, hint, nullptr, false, width).y : 0);
+        }
+
+        // From the label's capitals to the hint's last baseline: what is centred.
+        float LabelInk(const char* hint, float width)
+        {
+            return LabelBlockHeight(hint, width) - CapTop(TextStyle::Body) - (SizeOf(TextStyle::Caption) - Baseline(TextStyle::Caption));
+        }
+
+        // The label (and its note, its hint) in the first column, centred on what the second column holds: one line's
+        // capitals on its middle, a label and its hint as a block.
+        void FlushSettingRow()
+        {
+            if (!g_row.open)
+                return;
+            g_row.open = false;
+            const float controlBottom = std::max(g_row.controlTop, ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y);
+            const float centre = (g_row.controlTop + controlBottom) / 2;
+            ImGui::TableSetColumnIndex(0);
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            const float width = ImGui::GetContentRegionAvail().x;
+            const char* hint = g_row.hint.empty() ? nullptr : g_row.hint.c_str();
+            const float top = hint != nullptr ? std::round(centre - LabelInk(hint, width) / 2 - CapTop(TextStyle::Body)) : std::round(centre - CapMiddle(TextStyle::Body));
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            PushText(TextStyle::Body);
+            const std::string label = Ellipsize(g_row.label.c_str(), width);
+            DrawText(draw, ImVec2(at.x, top), Col(color::Ink), label.c_str());
+            const float labelEnd = at.x + ImGui::CalcTextSize(label.c_str()).x;
+            PopText();
+            if (!g_row.note.empty()) // on the label's baseline
+            {
+                PushText(TextStyle::Caption);
+                DrawText(draw, ImVec2(labelEnd + space::XS, top + Baseline(TextStyle::Body) - Baseline(TextStyle::Caption)), Col(color::Dim), g_row.note.c_str());
+                PopText();
+            }
+            float bottom = top + SizeOf(TextStyle::Body);
+            if (hint != nullptr) // drawn, not an item: a table lowers a row's text items to its controls' text baseline
+            {
+                PushText(TextStyle::Caption);
+                draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), ImVec2(at.x, bottom + space::XXS), Col(color::Dim), hint, nullptr, width);
+                bottom += space::XXS + ImGui::CalcTextSize(hint, nullptr, false, width).y;
+                PopText();
+            }
+            ImGui::SetCursorScreenPos(at);
+            ImGui::Dummy(ImVec2(0, std::max(0.0f, bottom - at.y))); // the row is as tall as the label needs
+        }
+    }
+
+    void SettingRow(const char* label, const char* hint, const char* note)
+    {
+        FlushSettingRow();
         ImGui::TableNextRow(ImGuiTableRowFlags_None, height::Large);
         ImGui::TableSetColumnIndex(0);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(space::XS, space::XXS - 1));
-        Text(TextStyle::Body, label, color::Ink);
-        if (hint != nullptr)
-            Text(TextStyle::Caption, hint, color::Dim);
-        ImGui::PopStyleVar();
+        const float block = LabelBlockHeight(hint, ImGui::GetContentRegionAvail().x);
         ImGui::TableSetColumnIndex(1);
+        // A label taller than a control (a hint on two lines) moves the control down to its middle.
+        const float lower = std::max(0.0f, std::round((block - height::Normal) / 2));
+        if (lower > 0)
+            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + lower);
+        g_row = { true, label, hint != nullptr ? hint : "", note != nullptr ? note : "", ImGui::GetCursorScreenPos().y, ImGui::GetCursorScreenPos().x };
+    }
+
+    namespace
+    {
+        void MoveRight(float width)
+        {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - width));
+        }
+    }
+
+    void SettingControl(float width)
+    {
+        if (g_row.open && !g_row.grouped && ImGui::TableGetColumnIndex() == 1 && std::abs(ImGui::GetCursorScreenPos().x - g_row.controlX) < 0.5f)
+            MoveRight(width);
+    }
+
+    void AlignRight(float width)
+    {
+        if (g_row.open)
+            g_row.grouped = true; // a group as wide as the column starts on its left edge: its first button must not move again
+        MoveRight(width);
     }
 
     void EndSettings()
     {
+        FlushSettingRow();
         ImGui::EndTable();
         ImGui::PopStyleColor();
         ImGui::PopStyleVar();
@@ -240,8 +383,13 @@ namespace ui
         Text(TextStyle::Title, title, color::Ink, -1);
         ImGui::PopTextWrapPos();
         const float below = ImGui::GetCursorPosY();
-        ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - space::L - cross, top - (cross - type::Title) / 2));
-        if (IconButton("##close", Icon::Cross, Tr("Close")))
+        // On the title's capitals; the pointer's only (B and Escape close a dialog): the keyboard's and the pad's first stop is
+        // the dialog's content or its action, never the cross.
+        ImGui::SetCursorPos(ImVec2(ImGui::GetWindowWidth() - space::L - cross, std::round(top + CapMiddle(TextStyle::Title) - cross / 2)));
+        ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
+        const bool closed = IconButton("##close", Icon::Cross, Tr("Close"));
+        ImGui::PopItemFlag();
+        if (closed)
         {
             *open = false;
             ImGui::CloseCurrentPopup();
@@ -309,17 +457,17 @@ namespace ui
 
     namespace
     {
-        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59, AnchorAbove = 0x4D454E5A; // "MENX", "MENY", "MENZ": where a menu opens, by its id
+        constexpr ImGuiID AnchorX = 0x4D454E58, AnchorY = 0x4D454E59, AnchorPivot = 0x4D454E5A; // "MENX", "MENY", "MENZ": where a menu opens, by its id
         constexpr float IconSlot = space::L; // a menu row's room for its icon or check, kept when it has none (the labels align)
     }
 
-    void OpenMenu(const char* id, bool above)
+    void OpenMenu(const char* id, MenuAnchor anchor)
     {
         ImGuiStorage* storage = ImGui::GetStateStorage();
         const ImGuiID key = ImGui::GetID(id);
-        storage->SetFloat(key ^ AnchorX, ImGui::GetItemRectMin().x);
-        storage->SetFloat(key ^ AnchorY, above ? ImGui::GetItemRectMin().y - space::XS : ImGui::GetItemRectMax().y + space::XS);
-        storage->SetBool(key ^ AnchorAbove, above);
+        storage->SetFloat(key ^ AnchorX, anchor.alignRight ? ImGui::GetItemRectMax().x : ImGui::GetItemRectMin().x);
+        storage->SetFloat(key ^ AnchorY, anchor.above ? ImGui::GetItemRectMin().y - space::XS : ImGui::GetItemRectMax().y + space::XS);
+        storage->SetInt(key ^ AnchorPivot, (anchor.alignRight ? 1 : 0) | (anchor.above ? 2 : 0));
         ImGui::OpenPopup(id);
     }
 
@@ -329,7 +477,7 @@ namespace ui
         const ImGuiID key = ImGui::GetID(id);
         if (ImGui::IsPopupOpen(id))
             ImGui::SetNextWindowPos(ImVec2(storage->GetFloat(key ^ AnchorX), storage->GetFloat(key ^ AnchorY)), ImGuiCond_Appearing,
-                ImVec2(0, storage->GetBool(key ^ AnchorAbove) ? 1.0f : 0.0f));
+                ImVec2(storage->GetInt(key ^ AnchorPivot) & 1 ? 1.0f : 0.0f, storage->GetInt(key ^ AnchorPivot) & 2 ? 1.0f : 0.0f));
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(space::XS, space::XS));
         ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, radius::Control);
         ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, elevation::Raised.border);
@@ -361,9 +509,9 @@ namespace ui
         const float mid = std::round((min.y + max.y) / 2);
         Icon icon = options.checked ? Icon::Check : options.icon;
         if (icon != Icon::None)
-            DrawIcon(draw, icon, ImVec2(min.x + space::S + IconSlot / 2 - space::XXS, mid), 14, Col(options.checked ? Ctx().accent : ink));
+            DrawIcon(draw, icon, ImVec2(min.x + space::S + IconSlot / 2 - space::XXS, mid), icon::Small, Col(options.checked ? Ctx().accent : ink));
         PushText(TextStyle::Body);
-        DrawText(draw, ImVec2(min.x + lead, mid - ImGui::GetFontSize() / 2), Col(ink), label, end);
+        DrawText(draw, ImVec2(min.x + lead, std::round(mid - CapMiddle(TextStyle::Body))), Col(ink), label, end);
         PopText();
         ImGui::EndDisabled();
         if (pressed && !options.disabled)
@@ -399,7 +547,7 @@ namespace ui
         const float width = ImGui::GetContentRegionAvail().x, x = ImGui::GetCursorPosX();
         ImGui::Dummy(ImVec2(0, space::XL));
         ImVec2 at = ImGui::GetCursorScreenPos();
-        DrawIcon(ImGui::GetWindowDrawList(), icon, ImVec2(at.x + width / 2, at.y + space::XXL / 2), space::XXL, Col(color::Dim), Col(color::Surface));
+        DrawIcon(ImGui::GetWindowDrawList(), icon, ImVec2(at.x + width / 2, at.y + space::XXL / 2), icon::Large, Col(color::Dim));
         ImGui::Dummy(ImVec2(0, space::XXL + space::XS));
         const float wrap = std::min(width, 420.0f);
         ImVec2 text = TextSize(TextStyle::Body, line, nullptr, false, wrap);

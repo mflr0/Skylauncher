@@ -84,11 +84,22 @@ game update. Wherever the notes are shown (What's new) HTML comments are removed
 - The version of a **built** game is recorded when it is built (`[install.<sha256>] version=`, from the kit that built it). The
   game's page shows it ("Giants 0.8.2"); before the build it shows the kit's.
 - When the release's version is higher than the built one (a build that recorded none counts as older), the game's main button
-  reads **UPDATE** and the sidebar says "Update available". The page says the versions, the download (the kit's size, or "no
-  download" when the kit in use is already the right one) and the time, then the link **Play without updating** (below). One click fetches the kit of the release
+  reads **UPDATE** and the sidebar says "Update available". Under the button one muted line says the version on offer, the
+  download (the kit's size; none when the kit in use is already the right one) and the time ("0.8.2 · 41 MB · ~15 min"), then
+  the link **Play without updating** (below). One click fetches the kit of the release
   `kit` names if the kit in use is older, then rebuilds the game (SkyBuild is incremental); PLAY is back at the end.
-- **Play without updating**, a small link under the "Update X to Y" line in the game's info block, plays what is built (offline,
+- **Play without updating**, a small link under that line, under the UPDATE button, plays what is built (offline,
   in a hurry) and sets the offer aside until the launcher is closed.
+- **Update all** (Home): when **two or more** games have an update, a button at the right of the "Library" title updates them
+  one after the other, in the order of the sidebar, each as its own UPDATE would (`App::StartUpdateAll`, `install_page.cpp`: the
+  game's slot is put in place for `StartInstall`, the page the player is on is left alone). While it runs the button gives
+  way to "<game>: Updating 40 % (1 of 2)", its progress bar and **Cancel**, which stops the running build and starts no other. The next
+  game starts when the last one has ended, built or not: a failure shows on that game's page as it always does and the run goes
+  on; at the end a note says "All games are updated" or how many were ("Games updated: 1 of 2"). The kit is fetched once for the
+  first game that needs it (`[update] kit_fetched`). A game played without updating (the link on its page) is not in the run.
+  Test: `ArkeyanLauncherTest`'s "updates" flow, steps 11 to 16 (two games made older, one click, both built one after the other
+  with Home shown the whole time, then a second run cancelled with both still old); screenshots `11-home-update-all`,
+  `12-home-updating-all`, `13-home-updated-all`, `16-home-cancelled`.
 - **Nothing is downloaded in the background**: tools are fetched only by a click on INSTALL or UPDATE, with the install card
   showing it. Only the launcher's own update is offered at start (the banner above), as before.
 

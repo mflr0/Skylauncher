@@ -1,5 +1,6 @@
 // The components' shared ground (core.h): context, state, text, colour, focus ring, icons.
 #include "launcher/ui/components/core.h"
+#include "launcher/ui/components/lucide.h"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -85,6 +86,25 @@ namespace ui
 
     void PushText(TextStyle style, bool bold) { ImGui::PushFont(FontOf(style, bold), SizeOf(style)); }
     void PopText() { ImGui::PopFont(); }
+
+    float CapMiddle(TextStyle style, bool bold, float size)
+    {
+        ImFontBaked* baked = FontOf(style, bold)->GetFontBaked(size > 0 ? size : SizeOf(style));
+        const ImFontGlyph* glyph = baked->FindGlyph('H');
+        return glyph != nullptr ? (glyph->Y0 + glyph->Y1) / 2 : baked->Ascent / 2;
+    }
+
+    float CapTop(TextStyle style, bool bold, float size)
+    {
+        ImFontBaked* baked = FontOf(style, bold)->GetFontBaked(size > 0 ? size : SizeOf(style));
+        const ImFontGlyph* glyph = baked->FindGlyph('H');
+        return glyph != nullptr ? glyph->Y0 : 0;
+    }
+
+    float Baseline(TextStyle style, bool bold, float size)
+    {
+        return FontOf(style, bold)->GetFontBaked(size > 0 ? size : SizeOf(style))->Ascent;
+    }
 
     ImVec2 TextSize(TextStyle style, const char* text, const char* end, bool bold, float wrap)
     {
@@ -254,113 +274,86 @@ namespace ui
         return float(g_context.now % uint64_t(periodMs)) / float(periodMs);
     }
 
-    void DrawSpinner(ImDrawList* draw, ImVec2 centre, float radius, ImU32 color)
+    namespace
     {
-        float start = Phase(motion::Spin) * Tau - Tau / 4;
-        draw->PathArcTo(centre, radius, start, start + Tau * 0.72f, 24);
-        draw->PathStroke(color, ImDrawFlags_None, std::max(2.0f, radius / 3.5f));
+        unsigned Glyph(Icon icon)
+        {
+            switch (icon)
+            {
+            case Icon::None: break;
+            case Icon::Check: return lucide::Check;
+            case Icon::Cross: return lucide::X;
+            case Icon::Plus: return lucide::Plus;
+            case Icon::Minus: return lucide::Minus;
+            case Icon::ChevronDown: return lucide::ChevronDown;
+            case Icon::ChevronUp: return lucide::ChevronUp;
+            case Icon::ChevronLeft: return lucide::ChevronLeft;
+            case Icon::ChevronRight: return lucide::ChevronRight;
+            case Icon::ArrowUp: return lucide::ArrowUp;
+            case Icon::ArrowDown: return lucide::ArrowDown;
+            case Icon::Search: return lucide::Search;
+            case Icon::Gear: return lucide::Settings;
+            case Icon::Info: return lucide::Info;
+            case Icon::Warning: return lucide::TriangleAlert;
+            case Icon::Error: return lucide::CircleX;
+            case Icon::Download: return lucide::Download;
+            case Icon::Trash: return lucide::Trash2;
+            case Icon::Folder: return lucide::Folder;
+            case Icon::Disc: return lucide::Disc3;
+            case Icon::Play: return lucide::Play;
+            case Icon::Hold: return lucide::Timer;
+            case Icon::More: return lucide::Ellipsis;
+            case Icon::Star: return lucide::Star;
+            case Icon::Success: return lucide::CircleCheck;
+            case Icon::Update: return lucide::CircleArrowDown;
+            case Icon::Pause: return lucide::CirclePause;
+            case Icon::Unknown: return lucide::CircleDashed;
+            case Icon::Loader: return lucide::LoaderCircle;
+            case Icon::Gamepad: return lucide::Gamepad2;
+            case Icon::Circle: return lucide::Circle;
+            case Icon::Square: return lucide::Square;
+            case Icon::Triangle: return lucide::Triangle;
+            case Icon::Trophy: return lucide::Trophy;
+            case Icon::External: return lucide::ExternalLink;
+            }
+            return 0;
+        }
     }
 
-    void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 c, float size, ImU32 color, ImU32 hole)
+    void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 c, float size, ImU32 color)
     {
-        const float h = size / 2, w = std::max(1.5f, size / 9);
-        auto p = [&](float x, float y) { return ImVec2(c.x + x * h, c.y + y * h); };
-        auto line = [&](float x0, float y0, float x1, float y1) { draw->AddLine(p(x0, y0), p(x1, y1), color, w); };
-        auto poly = [&](std::initializer_list<ImVec2> points, bool closed = false) {
-            draw->AddPolyline(points.begin(), int(points.size()), color, closed ? ImDrawFlags_Closed : ImDrawFlags_None, w);
-        };
-        switch (icon)
+        const unsigned glyph = Glyph(icon);
+        if (glyph == 0 || g_context.fonts.icons == nullptr)
+            return;
+        // The glyph's em square is Lucide's 24-point grid: its top left on whole pixels, the icon centred on `c`.
+        char text[4] = { char(0xE0 | glyph >> 12), char(0x80 | (glyph >> 6 & 0x3F)), char(0x80 | (glyph & 0x3F)), 0 };
+        draw->AddText(g_context.fonts.icons, size, ImVec2(Snap(c.x - size / 2), Snap(c.y - size / 2)), color, text);
+    }
+
+    void DrawSpinner(ImDrawList* draw, ImVec2 centre, float size, ImU32 color)
+    {
+        // Lucide's loader turning about its own centre (its vertices rotated); still when motion is reduced. The pivot is the
+        // middle of the glyph's quad as drawn, not the point asked for: the icon font's glyphs sit up to a point and a half off
+        // their em square's middle (its ascent, ImGui's whole points), which made the ring wobble. The loader's arc spans its
+        // whole circle, so its quad is centred on the ring; the ring stays where the still icon would be.
+        const int first = draw->VtxBuffer.Size;
+        DrawIcon(draw, Icon::Loader, centre, size, color);
+        if (draw->VtxBuffer.Size == first)
+            return;
+        ImVec2 low = draw->VtxBuffer[first].pos, high = low;
+        for (int i = first + 1; i < draw->VtxBuffer.Size; i++)
         {
-        case Icon::None: break;
-        case Icon::Check: poly({ p(-0.62f, 0.02f), p(-0.2f, 0.45f), p(0.62f, -0.42f) }); break;
-        case Icon::Cross: line(-0.5f, -0.5f, 0.5f, 0.5f); line(-0.5f, 0.5f, 0.5f, -0.5f); break;
-        case Icon::Plus: line(-0.6f, 0, 0.6f, 0); line(0, -0.6f, 0, 0.6f); break;
-        case Icon::Minus: line(-0.6f, 0, 0.6f, 0); break;
-        case Icon::ChevronDown: poly({ p(-0.55f, -0.25f), p(0, 0.3f), p(0.55f, -0.25f) }); break;
-        case Icon::ChevronUp: poly({ p(-0.55f, 0.25f), p(0, -0.3f), p(0.55f, 0.25f) }); break;
-        case Icon::ChevronLeft: poly({ p(0.25f, -0.55f), p(-0.3f, 0), p(0.25f, 0.55f) }); break;
-        case Icon::ChevronRight: poly({ p(-0.25f, -0.55f), p(0.3f, 0), p(-0.25f, 0.55f) }); break;
-        case Icon::ArrowUp: line(0, 0.7f, 0, -0.6f); poly({ p(-0.45f, -0.15f), p(0, -0.65f), p(0.45f, -0.15f) }); break;
-        case Icon::ArrowDown: line(0, -0.7f, 0, 0.6f); poly({ p(-0.45f, 0.15f), p(0, 0.65f), p(0.45f, 0.15f) }); break;
-        case Icon::Search:
-            draw->AddCircle(p(-0.15f, -0.15f), h * 0.5f, color, 20, w);
-            line(0.22f, 0.22f, 0.72f, 0.72f);
-            break;
-        case Icon::Gear:
-        {
-            constexpr int Teeth = 8;
-            float radius = h * 0.95f, half = radius * 0.2f, inner = radius * 0.7f;
-            for (int i = 0; i < Teeth; i++)
-            {
-                float angle = float(i) * Tau / Teeth, cs = std::cos(angle), sn = std::sin(angle);
-                auto at = [&](float along, float across) { return ImVec2(c.x + cs * along - sn * across, c.y + sn * along + cs * across); };
-                draw->AddQuadFilled(at(inner, -half), at(radius, -half), at(radius, half), at(inner, half), color);
-            }
-            if ((hole >> IM_COL32_A_SHIFT & 0xFF) == 0) // nothing known behind it: a ring, the hole left open
-                draw->AddCircle(c, radius * 0.55f, color, 32, radius * 0.46f);
-            else
-            {
-                draw->AddCircleFilled(c, radius * 0.78f, color, 32);
-                draw->AddCircleFilled(c, radius * 0.32f, hole, 24);
-            }
-            break;
+            const ImVec2& pos = draw->VtxBuffer[i].pos;
+            low = ImVec2(std::min(low.x, pos.x), std::min(low.y, pos.y));
+            high = ImVec2(std::max(high.x, pos.x), std::max(high.y, pos.y));
         }
-        case Icon::Info:
-            draw->AddCircle(c, h * 0.85f, color, 24, w);
-            line(0, -0.05f, 0, 0.42f);
-            draw->AddCircleFilled(p(0, -0.36f), w * 0.75f, color);
-            break;
-        case Icon::Warning:
-            poly({ p(0, -0.82f), p(0.86f, 0.7f), p(-0.86f, 0.7f) }, true);
-            line(0, -0.28f, 0, 0.2f);
-            draw->AddCircleFilled(p(0, 0.44f), w * 0.75f, color);
-            break;
-        case Icon::Error:
-            draw->AddCircle(c, h * 0.85f, color, 24, w);
-            line(-0.3f, -0.3f, 0.3f, 0.3f);
-            line(-0.3f, 0.3f, 0.3f, -0.3f);
-            break;
-        case Icon::Download:
-            line(0, -0.75f, 0, 0.3f);
-            poly({ p(-0.42f, -0.1f), p(0, 0.32f), p(0.42f, -0.1f) });
-            line(-0.7f, 0.72f, 0.7f, 0.72f);
-            break;
-        case Icon::Trash:
-            line(-0.72f, -0.5f, 0.72f, -0.5f);
-            poly({ p(-0.25f, -0.5f), p(-0.25f, -0.75f), p(0.25f, -0.75f), p(0.25f, -0.5f) });
-            poly({ p(-0.55f, -0.5f), p(-0.45f, 0.78f), p(0.45f, 0.78f), p(0.55f, -0.5f) });
-            line(-0.15f, -0.2f, -0.15f, 0.48f);
-            line(0.15f, -0.2f, 0.15f, 0.48f);
-            break;
-        case Icon::Folder:
-            poly({ p(-0.8f, 0.65f), p(-0.8f, -0.65f), p(-0.25f, -0.65f), p(-0.1f, -0.45f), p(0.8f, -0.45f), p(0.8f, 0.65f) }, true);
-            break;
-        case Icon::Disc:
-            draw->AddCircle(c, h * 0.85f, color, 28, w);
-            draw->AddCircle(c, h * 0.22f, color, 16, w);
-            break;
-        case Icon::Play: draw->AddTriangleFilled(p(-0.5f, -0.68f), p(0.7f, 0), p(-0.5f, 0.68f), color); break;
-        case Icon::Hold: // a timer: held for a moment
-            draw->AddCircle(p(0, 0.1f), h * 0.72f, color, 24, w);
-            line(0, 0.1f, 0, -0.3f);
-            line(0, 0.1f, 0.3f, 0.1f);
-            line(-0.25f, -0.88f, 0.25f, -0.88f);
-            break;
-        case Icon::More:
-            for (int i = -1; i <= 1; i++)
-                draw->AddCircleFilled(p(0.55f * float(i), 0), w * 1.1f, color);
-            break;
-        case Icon::Star:
+        const float angle = Phase(motion::Spin) * Tau, cosA = std::cos(angle), sinA = std::sin(angle);
+        const ImVec2 pivot((low.x + high.x) / 2, (low.y + high.y) / 2);
+        for (int i = first; i < draw->VtxBuffer.Size; i++)
         {
-            ImVec2 points[10];
-            for (int i = 0; i < 10; i++)
-            {
-                float angle = -Tau / 4 + float(i) * Tau / 10, r = (i % 2 == 0 ? 0.9f : 0.4f) * h;
-                points[i] = ImVec2(c.x + std::cos(angle) * r, c.y + std::sin(angle) * r + h * 0.06f);
-            }
-            draw->AddConcavePolyFilled(points, 10, color);
-            break;
-        }
+            ImVec2& pos = draw->VtxBuffer[i].pos;
+            const float x = pos.x - pivot.x, y = pos.y - pivot.y;
+            pos = ImVec2(pivot.x + x * cosA - y * sinA, pivot.y + x * sinA + y * cosA);
         }
     }
 }

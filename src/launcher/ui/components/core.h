@@ -17,6 +17,7 @@ namespace ui
         ImFont* bold = nullptr;  // Outfit SemiBold
         ImFont* title = nullptr; // Bungee
         ImFont* mono = nullptr;
+        ImFont* icons = nullptr; // Lucide
     };
 
     // Whose names the pad legend and the key caps show: the keyboard's keys or a pad family's buttons.
@@ -63,6 +64,12 @@ namespace ui
     float SizeOf(TextStyle style);
     void PushText(TextStyle style, bool bold = false);
     void PopText();
+    // Where a line of text drawn at y lies: the middle of its capitals (an icon beside it is centred there, a row's centre
+    // line goes through it), their top, and its baseline (two sizes on one line share it), as offsets from y. Lines stacked
+    // in a row are centred from the first one's capitals to the last one's baseline. `size` 0: the style's.
+    float CapMiddle(TextStyle style, bool bold = false, float size = 0);
+    float CapTop(TextStyle style, bool bold = false, float size = 0);
+    float Baseline(TextStyle style, bool bold = false, float size = 0);
     ImVec2 TextSize(TextStyle style, const char* text, const char* end = nullptr, bool bold = false, float wrap = -1);
     // A text item at the cursor, wrapped at `wrap` points (0: the available width; < 0: no wrap).
     void Text(TextStyle style, const char* text, unsigned rgb = color::Ink, float wrap = 0, bool bold = false);
@@ -88,6 +95,11 @@ namespace ui
     // The pressable area of a component (an InvisibleButton in the keyboard and pad navigation). ImGui's own square focus
     // cursor is left out: the component draws the ring. True when pressed.
     bool Hit(const char* id, ImVec2 size);
+    // A settings row's one alignment rule: every control ends on the control column's right edge. A control `width` wide that
+    // starts the column's line moves there (Button, Pill, IconButton, Toggle, Checkbox, Segmented, KeyButton and KeyCap call
+    // it); one that fills the column is already there, and the controls of a row placed with AlignRight stay where they are
+    // put. Nothing outside a settings row (layout.cpp).
+    void SettingControl(float width);
 
     // ---- Drawing. ----
     // The keyboard and pad focus ring around min..max (focus::Width, focus::Offset, Context::accent).
@@ -105,16 +117,19 @@ namespace ui
     // Takes the keyboard and pad focus on the last item (and shows its cursor when `show`).
     void FocusLastItem(bool show);
 
-    // ---- Icons: drawn with lines in one weight (no font glyph), centred on `centre`, `size` points square. ----
+    // ---- Icons: Lucide's (resources/fonts/Lucide.ttf, tools/lucide_subset.py), one family, outlined, centred on `centre` in a
+    // square of `size` points (icon::Small, Normal or Large). ----
     enum class Icon
     {
         None, Check, Cross, Plus, Minus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, ArrowUp, ArrowDown,
-        Search, Gear, Info, Warning, Error, Download, Trash, Folder, Disc, Play, Hold, More, Star
+        Search, Gear, Info, Warning, Error, Download, Trash, Folder, Disc, Play, Hold, More, Star,
+        Success, Update, Pause, Unknown, Loader, // a state: done, an update, stopped, not known yet; the spinner's
+        Gamepad, Circle, Square, Triangle, // with Cross: PlayStation's face buttons
+        Trophy, External // External: opens a web page
     };
-    // `hole`: the colour behind it, for the cut-outs of filled icons (the gear).
-    void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 centre, float size, ImU32 color, ImU32 hole = 0);
-    // A turning arc (an indeterminate wait); still when motion is reduced.
-    void DrawSpinner(ImDrawList* draw, ImVec2 centre, float radius, ImU32 color);
+    void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 centre, float size, ImU32 color);
+    // The loader icon turning (an indeterminate wait); still when motion is reduced.
+    void DrawSpinner(ImDrawList* draw, ImVec2 centre, float size, ImU32 color);
     // The time of the moving parts: 0..1 over `periodMs`, 0 with reduced motion. Marks the frame as animating.
     float Phase(int periodMs);
 }

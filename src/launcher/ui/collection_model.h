@@ -31,6 +31,8 @@ namespace launcher_ui
 
     // "Spyro's Adventure" for "ssa": the game's name without the series' prefix; the id itself if unknown.
     std::string ShortGameName(const std::string& game);
+    // "Skylanders: Giants": titles, headers and messages (the short name is for chips, filters and a select's rows).
+    std::string FullGameName(const std::string& game);
 
     // The launcher's own state from before the shared collection, moved once: favourites ([collection] favourites, file
     // names) become collection.json's, and the figures that started on the portal ([portal] place) the next session's

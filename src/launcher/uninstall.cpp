@@ -162,7 +162,7 @@ namespace uninstall
 
         Group GroupOfGameEntry(const std::string& name, bool regularFile)
         {
-            if (name == "saves" || name == "saves-backup" || name == "portal.txt")
+            if (name == "saves" || name == "saves-backup" || name == "portal.txt" || name == "achievements.txt" || name == "playtime.txt")
                 return Group::Saves;
             if (name == "figures" || name == "textures")
                 return Group::Figures;

@@ -96,7 +96,7 @@ namespace
         config["video"]["resolution_scale"] = "3";
         StoreGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["ssa.video"]["resolution_scale"] == "3" && config["giants.video"].count("resolution_scale") == 0);
-        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 10);
+        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 11);
 
         // Original resolution (Swap Force): kept in [swapforce.video], put in [video] when it plays, absent for the other games.
         config["swapforce.video"]["original_resolution"] = "1";
@@ -282,6 +282,45 @@ namespace
     }
 
     // ---- The command line ------------------------------------------------------------------------------------------------
+
+    // The Controller tab: what each pad button does (pad_<button> in [<game>.input]) and the rumble.
+    void PadChecks()
+    {
+        LauncherConfig config;
+        SETTINGS_EXPECT(PadButtons().size() == size_t(PadButtonTotal) && std::string_view(PadButtons()[5]) == "rb");
+        // Nothing stored: every button does its own job; the rumble is normal.
+        for (int button = 0; button < PadButtonTotal; button++)
+            SETTINGS_EXPECT(PadTarget(config, "giants", button) == button);
+        SETTINGS_EXPECT(RumbleLevel(config, "giants", 0) == "normal" && RumbleLevel(config, "giants", 1) == "normal");
+        // RB does B's job: one line in the game's own section, and the other games and sections are not touched.
+        SetPadTarget(config, "giants", 5, 1);
+        SETTINGS_EXPECT(config["giants.input"]["pad_rb"] == "b" && PadTarget(config, "giants", 5) == 1);
+        SETTINGS_EXPECT(PadTarget(config, "ssa", 5) == 5 && config.count("ssa.input") == 0 && config.count("input") == 0);
+        SetPadTarget(config, "giants", 12, -1); // the D-pad's up turned off
+        SETTINGS_EXPECT(config["giants.input"]["pad_dpad_up"] == "none" && PadTarget(config, "giants", 12) == -1);
+        config["giants.input"]["pad_a"] = "nonsense"; // a value the runtime would refuse: the button keeps its own job
+        SETTINGS_EXPECT(PadTarget(config, "giants", 0) == 0);
+        // A button given back its own job loses its line.
+        SetPadTarget(config, "giants", 5, 5);
+        SETTINGS_EXPECT(config["giants.input"].count("pad_rb") == 0 && PadTarget(config, "giants", 5) == 5);
+        // Reset: every pad_ line of the game goes, its keys and its rumble stay.
+        config["giants.input"]["key_a"] = "G";
+        config["giants.input"]["rumble_p1"] = "strong";
+        config["giants.input"]["rumble_p2"] = "mighty";
+        SetPadTarget(config, "giants", 1, 0);
+        ResetPadMap(config, "giants");
+        SETTINGS_EXPECT(PadTarget(config, "giants", 1) == 1 && PadTarget(config, "giants", 12) == 12);
+        SETTINGS_EXPECT(config["giants.input"]["key_a"] == "G" && RumbleLevel(config, "giants", 0) == "strong");
+        SETTINGS_EXPECT(RumbleLevel(config, "giants", 1) == "normal"); // an unknown level reads as normal, as the runtime does
+        SETTINGS_EXPECT(std::string_view(RumbleLevels()[0]) == "off" && RumbleLevels().size() == 4);
+        // Names: as the pad in use prints them, and the game's word for the button's job.
+        SETTINGS_EXPECT(PadButtonLabel(5, PadFamily::Xbox360) == "RB" && PadButtonLabel(5, PadFamily::PlayStation) == "R1");
+        SETTINGS_EXPECT(PadButtonLabel(10, PadFamily::PlayStation) == "L3" && PadButtonLabel(0, PadFamily::Nintendo) == "B");
+        SETTINGS_EXPECT(PadButtonLabel(12, PadFamily::XboxOne) == "D-pad up" && PadButtonLabel(99, PadFamily::XboxOne).empty());
+        SETTINGS_EXPECT(PadActionName("swapforce", 5) == "Attack 2" && PadActionName("swapforce", 4) == "Attack 3");
+        SETTINGS_EXPECT(PadActionName("giants", 5).empty() && PadActionName("giants", 12).empty() && PadActionName("giants", 0) == "Attack 1 / Accept");
+        printf("Pad buttons: remap, reset, rumble and names\n");
+    }
 
     void ArgumentChecks()
     {
@@ -673,6 +712,7 @@ int SettingsChecks(const fs::path& scratch)
     fs::create_directories(scratch);
     VideoChecks();
     KeyChecks();
+    PadChecks();
     ArgumentChecks();
     EnvironmentChecks();
     ShortcutChecks(scratch / "shortcut");

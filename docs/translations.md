@@ -54,7 +54,7 @@ with no restart.
   `ui::StatusPill`, `ui::Toggle`, `ui::Checkbox`, `ui::Radio`, `ui::ListRow`, `ui::SectionHeader`, `ui::MenuItem`, `ui::Tooltip`).
 - **French punctuation**: a no-break space (U+00A0) before `:`, `?`, `!` and `%`; the test fails on a plain space there.
 - **Values** are formatted by `ui/components/format.h` (`docs/launcher_ui.md`, "Consistency"), with three keys that are not
-  words: `.` is the decimal mark (French `,`), `,` the thousands separator (French a narrow no-break space), `{0} {1} {2}` the
+  words: `.` is the decimal mark (French `,`), `,` the thousands separator (French a no-break space), `{0} {1} {2}` the
   order of a date's day, month and year; the months are `Jan` to `Dec`.
 - Keep a translated string in a `std::string` rather than a `const char*` past the frame: the pointer `Tr` returns is valid until the
   language changes.

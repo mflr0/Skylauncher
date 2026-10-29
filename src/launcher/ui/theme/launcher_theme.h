@@ -71,7 +71,6 @@ namespace LauncherTheme
     // Fonts: Outfit for text, Bungee for titles and buttons (both SIL OFL 1.1, resources/fonts).
     inline constexpr float TextSize = 17, SmallSize = 14, TitleSize = 22, HeadlineSize = 34, HeroSize = 48;
     inline constexpr float CaptionSize = 12;  // the smallest text there is, at 1x
-    inline constexpr float BoldOffset = 0.6f; // extra copies of SemiBold text, this far apart, for what must read heavier (the chosen controller)
     inline constexpr int BolderPasses = 2;
 
     // Each game's own colours, for what belongs to the game on its page: the action button (docs/launcher_ui.md, "Each

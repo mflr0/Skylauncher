@@ -42,6 +42,7 @@ PadFamily PadFamilyFor(std::string_view glyphs, PadFamily seen);
 // The button a key stands for, named as that family's pad prints it, in the player's language where it is a word
 // (PlayStation's shapes, the sticks, the touchpad): "A" on a 360 pad, "Cross" on a PS5, "B" on a Switch (its south).
 std::string PadButtonName(const GameKey& key, PadFamily family);
+std::string PadButtonName(std::string_view xbox360Name, PadFamily family); // the same, from the 360's name ("RB", "D-pad up")
 // True when another row of the same game has the same key.
 bool GameKeyConflict(const LauncherConfig& config, std::string_view gameId, const GameKey& key);
 // Back to the game's defaults: its copy loses every key it had.
@@ -52,3 +53,23 @@ void ResetGameKeys(LauncherConfig& config, std::string_view gameId);
 void SeedGameInput(LauncherConfig& config, std::string_view gameId);
 // PLAY: the game's keys replace the key_ lines of [input] (the device and the glyph style stay as they are).
 void ApplyGameInput(LauncherConfig& config, std::string_view gameId);
+
+// ---- The Controller tab: what each pad button does, and the rumble (docs/settings.md, "Per-game controller") -----------------
+// [<game>.input] pad_<button>=<button>|none (absent: the button's own job) and rumble_p1 / rumble_p2=off|low|normal|strong
+// (absent: normal). The runtime reads them from the game's section itself; nothing is copied at PLAY.
+constexpr int PadButtonTotal = 16;
+// The runtime's names of the pad's buttons, in display order: a b x y lb rb lt rt start back ls rs dpad_up .. dpad_right.
+std::span<const char* const> PadButtons();
+// The button as the pad in use prints it ("RB", "R1", "R", "D-pad up"), words in the player's language.
+std::string PadButtonLabel(int button, PadFamily family);
+// What the game calls the button's job ("Attack 2"), empty when the game gives it none (the sticks' clicks, the D-pad).
+std::string PadActionName(std::string_view gameId, int button);
+// The button whose job `button` does now: its own when nothing is stored; -1 for "none" (turned off).
+int PadTarget(const LauncherConfig& config, std::string_view gameId, int button);
+// Stores it (the button's own job removes the line).
+void SetPadTarget(LauncherConfig& config, std::string_view gameId, int button, int target);
+// Back to the game's own jobs: every pad_ line of the game's copy goes.
+void ResetPadMap(LauncherConfig& config, std::string_view gameId);
+// The rumble choices, in order, and the player's now (player 0 or 1).
+std::span<const char* const> RumbleLevels();
+std::string RumbleLevel(const LauncherConfig& config, std::string_view gameId, int player);

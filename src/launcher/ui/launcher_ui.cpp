@@ -5,6 +5,7 @@
 #include "launcher/env.h"
 #include "launcher/ui/text_fit.h"
 #include "launcher/install_checklist.h"
+#include "launcher/problem_report.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/collection/datadir.h"
 #include "shared/embedded_fonts.h"
@@ -35,7 +36,6 @@
 
 namespace launcher_ui
 {
-    ImFont* g_boldFont = nullptr; // Outfit SemiBold, for AddBoldText (set by App::LoadFonts)
 
     namespace
     {
@@ -242,7 +242,12 @@ namespace launcher_ui
                 if (disc.Open(image.c_str()))
                 {
                     if (std::vector<uint8_t> xex = disc.ReadAll("default.xex"); !xex.empty())
+                    {
                         metadata = ReadTitleMetadata(xex);
+                        // The achievements: the list, its texts and pictures, cached once for this default.xex (game_progress.h).
+                        if (std::filesystem::path folder = AchievementCacheFolder(game.id); !folder.empty() && !achievements::CacheIsCurrent(folder, result.xexSha256))
+                            achievements::WriteCache(folder, result.xexSha256, xex);
+                    }
                     // The game's own art and its toys' portraits, decoded from the player's disc into the game's data
                     // folder (never shipped); a second time, only what is missing.
                     report(0.98f, Tr("Reading the game's pictures"));
@@ -293,11 +298,13 @@ namespace launcher_ui
         config.OversampleH = config.OversampleV = 1;
         config.PixelSnapH = true;
         m_textFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[0].data(), int(m_fontData[0].size()), TextSize, &config);
-        g_boldFont = m_boldFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[2].data(), int(m_fontData[2].size()), TextSize, &config);
+        m_boldFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[2].data(), int(m_fontData[2].size()), TextSize, &config);
         m_titleFont = io.Fonts->AddFontFromMemoryTTF(m_fontData[1].data(), int(m_fontData[1].size()), TitleSize, &config);
         m_monoFont = io.Fonts->AddFontDefaultVector(); // logs: Dear ImGui's own monospace font
-        ui::Ctx().fonts = { m_textFont, m_boldFont, m_titleFont, m_monoFont }; // the components' text styles
-        return m_textFont != nullptr && m_boldFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr;
+        // The icons (Lucide, ui::DrawIcon): always the built-in subset.
+        ImFont* icons = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(g_embeddedLucide), int(g_embeddedLucideSize), TextSize, &config);
+        ui::Ctx().fonts = { m_textFont, m_boldFont, m_titleFont, m_monoFont, icons }; // the components' text styles
+        return m_textFont != nullptr && m_boldFont != nullptr && m_titleFont != nullptr && m_monoFont != nullptr && icons != nullptr;
     }
 
     bool App::Init()
@@ -381,7 +388,14 @@ namespace launcher_ui
             m_testUninstall = LauncherEnv("SKY_LAUNCHER_TEST_UNINSTALL") != nullptr;
             m_testLogo = LauncherEnv("SKY_LAUNCHER_TEST_LOGO") != nullptr;
             m_testKeys = LauncherEnv("SKY_LAUNCHER_TEST_KEYS") != nullptr;
+            if (const char* screens = LauncherEnv("SKY_LAUNCHER_TEST_SCREENS"))
+                m_testScreens = std::string_view(screens) == "pad" ? 2 : 1;
+            const char* input = LauncherEnv("SKY_LAUNCHER_TEST_INPUT");
+            m_testPadInput = m_testScreens == 2 || (input != nullptr && std::string_view(input) == "pad");
             m_testGallery = LauncherEnv("SKY_LAUNCHER_TEST_GALLERY") != nullptr;
+            m_testPad = LauncherEnv("SKY_LAUNCHER_TEST_PAD") != nullptr;
+            m_testAchievements = LauncherEnv("SKY_LAUNCHER_TEST_ACHIEVEMENTS") != nullptr;
+            m_testRunning = LauncherEnv("SKY_LAUNCHER_TEST_RUNNING") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -389,12 +403,24 @@ namespace launcher_ui
         return true;
     }
 
+    namespace
+    {
+        std::vector<std::string> GameIds()
+        {
+            std::vector<std::string> ids;
+            for (const GameInfo& each : g_games)
+                ids.emplace_back(each.id);
+            return ids;
+        }
+    }
+
     App::App(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const LauncherOptions& options)
-        : m_configPath(configPath), m_config(config)
+        : m_configPath(configPath), m_config(config), m_session(GameIds())
     {
         m_s = &SlotFor(game);
         SetActiveGame(game.id);
         m_autoPlay = options.play;
+        m_startGames = options.startGames;
         if (options.openGame)
             m_page = Page::Play; // a shortcut opens on the game, not on the launcher's menu
         for (const GameInfo& each : g_games)
@@ -449,6 +475,27 @@ namespace launcher_ui
 
     // Every opened game's jobs go on while another is shown: each is polled with its own slot (and its game's folders)
     // in place, then the shown one comes back.
+    void App::CheckQueuedDiscs()
+    {
+        // One check at a time: the next starts when no disc is being read (the shown game's first).
+        if (m_discQueue.empty() || AnyVerifying())
+            return;
+        const GameInfo* game = FindGame(m_discQueue.front());
+        m_discQueue.erase(m_discQueue.begin());
+        if (game == nullptr)
+            return;
+        GameSlot& slot = SlotFor(*game);
+        if (slot.started)
+            return;
+        GameSlot* shown = m_s;
+        m_s = &slot;
+        SetActiveGame(game->id);
+        slot.started = true;
+        StartGameDisc();
+        m_s = shown;
+        SetActiveGame(m_s->game.id);
+    }
+
     void App::PollSlots()
     {
         GameSlot* shown = m_s;
@@ -510,6 +557,9 @@ namespace launcher_ui
         {
             m_s->started = true;
             StartGameDisc();
+            for (const LauncherGameEntry& entry : LauncherGameCatalog())
+                if (entry.enabled && FindGame(entry.id) != nullptr && std::string_view(entry.id) != m_s->game.id)
+                    m_discQueue.push_back(entry.id);
         }
         if (m_shots.empty() && LauncherEnv("SKY_LAUNCHER_NO_UPDATE_CHECK") == nullptr)
         {
@@ -528,6 +578,9 @@ namespace launcher_ui
             while (SDL_PollEvent(&event))
                 HandleEvent(event);
             PollSlots();
+            PollGame();
+            CheckQueuedDiscs();
+            PollUpdateAll();
             PollUpdates();
             AutoPlay();
             Frame();
@@ -598,6 +651,10 @@ namespace launcher_ui
             scaled.motion.y /= m_uiScale;
         }
         ImGui_ImplSDL3_ProcessEvent(&scaled);
+        // The focus ring is the keyboard's and the pad's: the pointer moving, pressing or scrolling hides it (ImGui shows it
+        // again on the next key or button that moves the focus).
+        if (event.type == SDL_EVENT_MOUSE_MOTION || event.type == SDL_EVENT_MOUSE_BUTTON_DOWN || event.type == SDL_EVENT_MOUSE_WHEEL)
+            ImGui::SetNavCursorVisible(false);
         switch (event.type)
         {
         case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
@@ -691,7 +748,7 @@ namespace launcher_ui
     {
         m_config[section][key] = value;
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
     }
 
     void App::StartVerify(const std::string& path)
@@ -747,7 +804,7 @@ namespace launcher_ui
             Set(m_s->game.id, "iso", m_s->discPath); // remembered even if the player quits without playing
         StoreDiscLanguages(m_config, m_s->game.id, m_s->check.languages);
         if (!SaveLauncherConfig(m_configPath, m_config))
-            Toast(Tr("Couldn't save the settings"), true);
+            Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
         m_s->disc = DiscState::Ready;
         RefreshInstall();
     }
@@ -766,7 +823,7 @@ namespace launcher_ui
             m_page = Page::Play;
             if (std::string iso = SettingGet(m_config, m_s->game.id, "iso"); !iso.empty())
             {
-                Toast(Tr("Game data damaged: using the disc image"), true);
+                Toast(Tr("Game data damaged: using the disc image"), ui::ToastKind::Error);
                 StartVerify(iso);
             }
             else
@@ -792,11 +849,41 @@ namespace launcher_ui
     {
         if (!DiscStillThere())
             return;
+        if (m_startGames)
+        {
+            // The game starts beside the window, which stays: one game at a time (GameSession refuses a second one).
+            if (!m_s->fromCopy)
+                Set(m_s->game.id, "iso", m_s->discPath);
+            const GameLaunch launch = PrepareGameLaunch(m_s->game, m_config, m_configPath, m_s->installed.runtime);
+            std::string error;
+            if (launch.runtime.empty())
+                Toast(Tr("Couldn't start the game: the file is missing"), ui::ToastKind::Error);
+            else if (!m_session.Start(m_s->game.id, launch, m_s->discPath, error))
+                Toast(error, ui::ToastKind::Error);
+            else
+                m_sessionIso = m_s->discPath;
+            return;
+        }
         m_s->chosen = m_s->discPath;
         m_s->chosenRuntime = m_s->installed.runtime;
         if (!m_s->fromCopy)
             Set(m_s->game.id, "iso", m_s->chosen);
         m_running = false;
+    }
+
+    void App::PollGame()
+    {
+        const std::optional<GameSession::Ended> ended = m_session.Poll(SDL_GetTicks());
+        if (!ended)
+            return;
+        m_progressAt = 0; // its play time and unlocks are read again
+        const GameInfo* game = FindGame(ended->game);
+        if (!ended->ours || ended->exitCode == 0 || game == nullptr)
+            return;
+        if (!m_shots.empty()) // a screenshot script: no dialog that waits for a click
+            m_drawn["stopped"] = fmt::format("{} {}", ended->game, ended->exitCode);
+        else
+            ShowGameStopped(*game, ended->exitCode, m_configPath, m_config, m_sessionIso, m_window);
     }
 
     // --play (a desktop shortcut): PLAY as soon as the shown game's disc is checked and the game is built. If it can't
@@ -893,152 +980,14 @@ namespace launcher_ui
 
     // ---- Widgets -------------------------------------------------------------------------------------------------
 
-    // Bold is Outfit SemiBold at the current size; `passes` extra copies BoldOffset apart make it heavier still.
-    void AddBoldText(ImDrawList* draw, ImVec2 at, ImU32 color, const char* text, int passes)
-    {
-        ImGui::PushFont(g_boldFont, ImGui::GetFontSize());
-        for (int i = 0; i < passes; i++)
-            draw->AddText(ImVec2(at.x + BoldOffset * i, at.y), color, text);
-        ImGui::PopFont();
-    }
-
-    void App::BoldText(const char* text, unsigned color)
-    {
-        ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        ImVec2 size = ImGui::CalcTextSize(text);
-        ImGui::PopFont();
-        AddBoldText(ImGui::GetWindowDrawList(), ImGui::GetCursorScreenPos(), Rgb(color), text);
-        ImGui::Dummy(size);
-    }
-
-    void App::Title(const char* text, float size, unsigned color)
-    {
-        ImGui::PushFont(m_titleFont, size);
-        ImGui::PushStyleColor(ImGuiCol_Text, Rgb(color));
-        ImGui::TextUnformatted(text);
-        ImGui::PopStyleColor();
-        ImGui::PopFont();
-    }
-
-    bool App::BigButton(const char* label, ImVec2 size, unsigned color, unsigned dark, unsigned ink, bool enabled)
-    {
-        (void)color, (void)dark, (void)ink; // no screen draws one any more: the main action is ui::MainAction
-        ui::ButtonOptions options;
-        options.kind = ui::ButtonKind::Primary;
-        options.size = ui::Size::Large;
-        options.width = size.x;
-        options.disabled = !enabled;
-        return ui::Button(label, options);
-    }
-
-    namespace
-    {
-        ui::ButtonOptions PillOptions(bool primary, float width, unsigned fill, int chevron)
-        {
-            ui::ButtonOptions options;
-            options.kind = primary ? ui::ButtonKind::Primary : ui::ButtonKind::Secondary;
-            options.width = width;
-            options.overArt = fill == BottomBarRaised; // the band's greys: on the game's art and the band
-            options.trailing = chevron > 0 ? ui::Icon::ChevronDown : chevron < 0 ? ui::Icon::ChevronUp : ui::Icon::None;
-            return options;
-        }
-    }
-
-    bool App::PillButton(const char* label, bool primary, float width, bool bold, unsigned fill, unsigned fillHover, unsigned fillActive, int chevron)
-    {
-        (void)bold, (void)fillHover, (void)fillActive; // every button's label is SemiBold; the fills are the kind's
-        return ui::Button(label, PillOptions(primary, width, fill, chevron));
-    }
-
-    float App::PillWidth(const char* label, float width, bool bold, int chevron)
-    {
-        (void)bold;
-        return ui::ButtonWidth(label, PillOptions(false, width, PanelRaised, chevron));
-    }
-
-    void App::DrawChevron(ImDrawList* draw, ImVec2 centre, float size, unsigned color, int dir)
-    {
-        float half = size / 2, rise = size / 4 * (dir > 0 ? 1 : -1);
-        ImVec2 points[3] = { ImVec2(centre.x - half, centre.y - rise), ImVec2(centre.x, centre.y + rise), ImVec2(centre.x + half, centre.y - rise) };
-        draw->AddPolyline(points, 3, Rgb(color), ImDrawFlags_None, std::max(1.5f, size / 6));
-    }
-
-    void App::DrawLabelChevron(const char* label, unsigned color, int dir, bool bold)
-    {
-        if (bold)
-            ImGui::PushFont(m_boldFont, ImGui::GetFontSize());
-        const char* end = std::strstr(label, "##");
-        ImVec2 text = ImGui::CalcTextSize(label, end);
-        float size = ImGui::GetFontSize() * 0.6f, gap = ImGui::GetFontSize() * 0.4f;
-        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        float left = (min.x + max.x - (text.x + gap + size)) / 2, middle = (min.y + max.y) / 2;
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->AddText(ImVec2(left, middle - text.y / 2), Rgb(color), label, end);
-        DrawChevron(draw, ImVec2(left + text.x + gap + size / 2, middle), size, color, dir);
-        if (bold)
-            ImGui::PopFont();
-    }
-
-    void App::FocusRing(float rounding, float gap, ImDrawFlags flags)
-    {
-        if (!ImGui::IsItemFocused() || !ImGui::GetIO().NavVisible)
-            return;
-        ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        if (gap < 0) // inside the item (rows that touch the window's edges): the ring `-gap` points in
-        {
-            float in = -gap + ui::focus::Offset + ui::focus::Width;
-            min = ImVec2(min.x + in, min.y + in);
-            max = ImVec2(max.x - in, max.y - in);
-        }
-        ui::FocusRing(min, max, rounding, flags);
-    }
-
-    bool App::BeginCombo(const char* id, const char* preview)
-    {
-        ImDrawList* draw = ImGui::GetWindowDrawList(); // the box's window, not the list's
-        ImVec2 at = ImGui::GetCursorScreenPos();
-        const float width = ImGui::CalcItemWidth(), height = ImGui::GetFrameHeight();
-        const bool open = ImGui::BeginCombo(id, preview, ImGuiComboFlags_NoArrowButton);
-        DrawChevron(draw, ImVec2(at.x + width - 18, at.y + height / 2), 10, TextSecondary, open ? -1 : 1);
-        return open;
-    }
-
-    bool App::Option(const char* label, bool selected, ImGuiSelectableFlags flags, ImVec2 size)
-    {
-        // ImGui's highlight is square: it is left out, and drawn with rounded corners under the row's text.
-        ImDrawList* draw = ImGui::GetWindowDrawList();
-        draw->ChannelsSplit(2);
-        draw->ChannelsSetCurrent(1);
-        ImGui::PushStyleColor(ImGuiCol_Header, 0);
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
-        const bool pressed = ImGui::Selectable(label, selected, flags, size);
-        ImGui::PopStyleColor(3);
-        draw->ChannelsSetCurrent(0);
-        if (selected || ImGui::IsItemHovered())
-            draw->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), Rgb(FieldActive), RadiusSmall);
-        draw->ChannelsMerge();
-        return pressed;
-    }
-
-    bool App::LevelSlider(const char* id, int* value, int min, int max, float width)
-    {
-        ui::SliderOptions options;
-        options.width = width;
-        options.showValue = false;
-        return ui::Slider(id, value, min, max, options);
-    }
-
     void App::BeginPageColumn(const char* id, float width, bool alwaysScrollbar)
     {
-        constexpr float Bleed = 4;
-        float below = ImGui::GetStyle().WindowPadding.y;
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() - Bleed);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(Bleed, 0));
-        ImGui::BeginChild(id, ImVec2(width + 2 * Bleed, ImGui::GetContentRegionAvail().y + below),
-            ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding,
-            ImGuiWindowFlags_NoBackground | (alwaysScrollbar ? ImGuiWindowFlags_AlwaysVerticalScrollbar : 0));
-        ImGui::PopStyleVar();
+        // The column has room round its content (ui::BeginRoomyChild): a ring, or a button raised onto a title's capitals, at
+        // its edge is not cut. Its foot reaches over the page's bottom padding (to the window's edge).
+        constexpr float Bleed = ui::space::M;
+        const float below = ImGui::GetStyle().WindowPadding.y;
+        ui::BeginRoomyChild(id, ImVec2(width, ImGui::GetContentRegionAvail().y + below - Bleed), ImGuiChildFlags_NavFlattened,
+            ImGuiWindowFlags_NoBackground | (alwaysScrollbar ? ImGuiWindowFlags_AlwaysVerticalScrollbar : 0), Bleed);
         ImGui::SetScrollX(0.0f);
         m_columnBelow = below;
     }
@@ -1046,20 +995,7 @@ namespace launcher_ui
     void App::EndPageColumn()
     {
         ImGui::Dummy(ImVec2(0, m_columnBelow));
-        ImGui::EndChild();
-    }
-
-    void App::ProgressBar(float fraction, ImVec2 size) { ui::ProgressBar(fraction, size.x); }
-
-    bool App::HoldButton(const char* label, float width, const char* hint)
-    {
-        ui::Ctx().testHeld = m_testHoldAt != 0 ? m_un.holdId : 0; // the screenshot test holds the uninstall button down
-        ui::ButtonOptions options;
-        options.kind = ui::ButtonKind::Danger;
-        options.width = width;
-        options.hold = true;
-        options.tooltip = hint;
-        return ui::Button(label, options);
+        ui::EndRoomyChild();
     }
 
     void App::BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags)
@@ -1131,6 +1067,26 @@ namespace launcher_ui
         };
         if (slot == nullptr)
             return line(S::Closed, Tr("Open"), Accent, Tr(strings::ChooseDisc));
+        // One game at a time: the one running says so; the others' buttons wait for it (Running, after the rest).
+        const std::string& running = m_session.Running();
+        if (running == slot->game.id)
+            return line(S::Running, Tr("Running"), Ready, Tr("Running"), false);
+        SlotLine result = SlotLineOf(slot);
+        if (!running.empty() && result.buttonEnabled)
+        {
+            result.button = Tf("{} is running", GameName(running, GameNameForm::Short));
+            result.buttonEnabled = false;
+        }
+        return result;
+    }
+
+    // A game's state as if none were running (SlotStatus).
+    App::SlotLine App::SlotLineOf(GameSlot* slot)
+    {
+        using S = SlotState;
+        auto line = [](S state, const char* text, unsigned dot, const char* button, bool enabled = true, float progress = -1) {
+            return SlotLine{ text, dot, progress, state, button, enabled };
+        };
         const bool built = !slot->installed.runtime.empty();
         if (slot->installer.Running() || slot->kitDownload.Running())
         {
@@ -1190,12 +1146,27 @@ namespace launcher_ui
         case S::Closed: return ui::Status::Neutral;
         case S::Checking: case S::DownloadingTools: case S::Installing: case S::Updating: case S::Finishing: return ui::Status::Busy;
         case S::NoDisc: case S::Interrupted: case S::ReadyToInstall: case S::UpdateAvailable: return ui::Status::Info;
-        case S::Ready: return ui::Status::Success;
+        case S::Ready: case S::Running: return ui::Status::Success;
         default: return ui::Status::Error; // the disc's problems, a damaged copy, a failed build
         }
     }
 
-    // The game's logo (with "Skylanders" on it) once its disc has been read, else its initial on its colour; centred in the box.
+    ui::Icon IconOf(SlotState state)
+    {
+        using S = SlotState;
+        switch (state)
+        {
+        case S::NoDisc: return ui::Icon::Disc;
+        case S::ReadyToInstall: return ui::Icon::Download;
+        case S::UpdateAvailable: return ui::Icon::Update;
+        case S::Interrupted: return ui::Icon::Pause;
+        case S::Running: return ui::Icon::Play;
+        default: return ui::IconOf(StatusOf(state));
+        }
+    }
+
+    // The game's logo (with "Skylanders" on it) once its disc has been read, else its initial on its colour (at most
+    // height::Normal across); centred in the box.
     void App::DrawGameMark(ImDrawList* draw, const LauncherGameEntry& entry, ImVec2 at, ImVec2 size)
     {
         const ArtTexture* logo = entry.enabled ? CachedArt(entry.id, LauncherAssets::Role::Logo, int(size.x * 2.5f)) : nullptr;
@@ -1206,7 +1177,7 @@ namespace launcher_ui
             return;
         }
         const ImVec2 centre(at.x + size.x / 2, at.y + size.y / 2);
-        const float radius = size.y / 2;
+        const float radius = std::min(size.y, ui::height::Normal) / 2;
         draw->AddCircleFilled(centre, radius, ui::Col(entry.accent, entry.enabled ? 1.0f : 0.35f));
         ImGui::PushFont(ui::Ctx().fonts.title, radius);
         char letter[2] = { entry.name[0], 0 };
@@ -1228,38 +1199,42 @@ namespace launcher_ui
         ImGui::PushStyleColor(ImGuiCol_NavCursor, 0); // the rows draw their own ring (FocusRing), not ImGui's as well
         ImDrawList* draw = ImGui::GetWindowDrawList();
 
-        // The title is the Home button; the launcher's version sits beside it, small and dim. The title is as large as the
-        // column leaves room for next to the version.
+        // The title: a link to Home for the pointer, not a stop for the keyboard or the pad (no ring: Home is the start page,
+        // the games are the rows below). The launcher's version beside it, on its baseline; everything on the rows' left edge.
+        const float left = ImGui::GetCursorScreenPos().x + ui::space::S;
         {
-            const ImVec2 titleAt = ImGui::GetCursorScreenPos();
+            const ImVec2 titleAt(left, ImGui::GetCursorScreenPos().y);
             const std::string version = "v" + LauncherVersion();
             const float versionW = ui::TextSize(ui::TextStyle::Caption, version.c_str(), nullptr, true).x;
-            const float room = SidebarW - 2 * ui::space::S - 2 * ui::space::XS - versionW - ui::space::XS;
+            const float room = SidebarW - 2 * ui::space::S - 2 * ui::space::S - versionW - ui::space::XS;
             const float titleSize = ui::FitSize(ui::Ctx().fonts.title, ui::type::Title, "ARKEYAN LAUNCHER", room);
             ImGui::PushFont(ui::Ctx().fonts.title, titleSize);
             const ImVec2 titleExtent = ImGui::CalcTextSize("ARKEYAN LAUNCHER");
             ImGui::PopFont();
-            ImGui::SetCursorScreenPos(ImVec2(titleAt.x + ui::space::XS, titleAt.y));
-            const bool pressed = ui::Hit("##home", titleExtent);
+            ImGui::SetCursorScreenPos(titleAt);
+            if (ImGui::InvisibleButton("##home", titleExtent)) // no ImGuiButtonFlags_EnableNav: the pointer's only
+                GoTo(Page::Home);
             const bool hovered = ImGui::IsItemHovered();
             if (hovered)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
-            ui::FocusRing(ImVec2(titleAt.x + ui::space::XS, titleAt.y), ImVec2(titleAt.x + ui::space::XS + titleExtent.x, titleAt.y + titleExtent.y), ui::radius::Control);
-            if (pressed)
-                GoTo(Page::Home);
             ImGui::PushFont(ui::Ctx().fonts.title, titleSize);
-            draw->AddText(ImVec2(titleAt.x + ui::space::XS, titleAt.y), ui::Col(hovered ? 0xFFFFFF : SidebarInk), "ARKEYAN LAUNCHER");
+            draw->AddText(titleAt, ui::Col(hovered ? 0xFFFFFF : SidebarInk), "ARKEYAN LAUNCHER");
             ImGui::PopFont();
+            const float baseline = titleAt.y + ui::Baseline(ui::TextStyle::Title, false, titleSize);
             ui::PushText(ui::TextStyle::Caption, true);
-            ui::DrawText(draw, ImVec2(titleAt.x + 2 * ui::space::XS + titleExtent.x, titleAt.y + titleExtent.y - ImGui::GetFontSize() - ui::space::XXS / 2), ui::Col(ui::color::Dim), version.c_str());
+            ui::DrawText(draw, ImVec2(titleAt.x + titleExtent.x + ui::space::XS, baseline - ui::Baseline(ui::TextStyle::Caption, true)), ui::Col(ui::color::Dim), version.c_str());
             ui::PopText();
-            ImGui::SetCursorScreenPos(ImVec2(titleAt.x, titleAt.y + titleExtent.y));
+            // Under it, the tagline; a section's air (L), then the list's overline and the rows.
+            float y = titleAt.y + titleExtent.y + ui::space::XXS;
+            ui::PushText(ui::TextStyle::Caption);
+            ui::DrawText(draw, ImVec2(left, y), ui::Col(ui::color::Dim), Tr("Native PC ports"));
+            ui::PopText();
+            y += ui::type::Caption + ui::space::L;
+            ui::PushText(ui::TextStyle::Caption, true);
+            ui::DrawText(draw, ImVec2(left, y), ui::Col(ui::color::Dim), Tr("YOUR GAMES"));
+            ui::PopText();
+            ImGui::SetCursorScreenPos(ImVec2(left - ui::space::S, y + ui::type::Caption + ui::space::XS));
         }
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ui::space::XS);
-        ui::Text(ui::TextStyle::Caption, Tr("Native PC ports"), ui::color::Dim, -1);
-        ImGui::Dummy(ImVec2(0, ui::space::S));
-        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ui::space::XS);
-        ui::Text(ui::TextStyle::Caption, Tr("YOUR GAMES"), ui::color::Dim, -1, true);
 
         // The games: only those with a runtime can be selected. The ones not out yet fold into one row under them.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ui::space::XXS));
@@ -1278,14 +1253,17 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             // Selected only once the player has picked it: Play is that game's page.
-            const bool selected = (m_page == Page::Play || m_page == Page::GameSettings) && std::string_view(entry.id) == m_s->game.id;
+            const bool selected = (m_page == Page::Play || m_page == Page::GameSettings || m_page == Page::Achievements) && std::string_view(entry.id) == m_s->game.id;
             const std::string version = slot != nullptr ? GameVersion(*slot) : std::string();
             SlotLine line = SlotStatus(slot);
             const ui::Status status = StatusOf(line.state);
             // Fits the column at the smallest window too: the row cuts its lines with "..." rather than run over the edge.
+            // Under the name, the state: its icon and its words on one line, on the name's left edge.
             ui::ListRowOptions options;
             options.subtitle = line.text.c_str();
             options.status = &status;
+            options.statusIcon = IconOf(line.state);
+            options.leadWidth = GameLogoW;
             options.note = version.empty() ? nullptr : version.c_str();
             options.selected = selected;
             options.progress = line.progress;
@@ -1298,7 +1276,7 @@ namespace launcher_ui
                     SelectGame(*FindGame(entry.id));
                 GoTo(Page::Play);
             }
-            if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings))
+            if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings || m_page == Page::Achievements))
                 TakeFocus(FocusTo::Sidebar);
             if (m_testSidebar)
                 m_drawn[std::string("sidebar:") + entry.id] = line.text;
@@ -1314,6 +1292,7 @@ namespace launcher_ui
             ui::ListRowOptions options;
             options.trailing = count.c_str();
             options.icon = open ? ui::Icon::ChevronDown : ui::Icon::ChevronRight;
+            options.leadWidth = GameLogoW;
             options.dim = true;
             if (ui::ListRow(Tr("Coming later"), options))
                 storage->SetBool(openKey, !open);
@@ -1324,19 +1303,21 @@ namespace launcher_ui
                     game.disabled = true;
                     game.dim = true;
                     game.imageWidth = ui::height::Small;
+                    game.leadWidth = GameLogoW;
                     game.image = [&](ImDrawList* list, ImVec2 at, ImVec2 box) { DrawGameMark(list, *entry, at, ImVec2(ui::height::Small, std::min(box.y, ui::height::Small))); };
                     ui::ListRow(entry->name, game);
                 }
         }
 
         // The collection, then Settings, at the bottom of the sidebar; selected while their page is shown.
-        const float footer = 2 * ui::height::Large + ui::space::XXS;
+        const float footer = 2 * ui::height::Normal + ui::space::XXS;
         ImGui::SetCursorPosY(std::max(ImGui::GetCursorPosY(), ImGui::GetWindowHeight() - ui::space::L - footer));
         {
             ui::ListRowOptions options;
             options.icon = ui::Icon::Star;
+            options.leadWidth = GameLogoW;
             options.selected = m_page == Page::Collection;
-            if (ui::ListRow(Tr("COLLECTION"), options))
+            if (ui::ListRow(Tr("Collection"), options))
                 GoTo(options.selected ? m_backPage : Page::Collection);
             if (options.selected)
                 TakeFocus(FocusTo::Sidebar);
@@ -1344,8 +1325,9 @@ namespace launcher_ui
         {
             ui::ListRowOptions options;
             options.icon = ui::Icon::Gear;
+            options.leadWidth = GameLogoW;
             options.selected = m_page == Page::Settings;
-            if (ui::ListRow(Tr("SETTINGS"), options))
+            if (ui::ListRow(Tr("Settings"), options))
                 GoTo(options.selected ? m_backPage : Page::Settings);
             if (options.selected)
                 TakeFocus(FocusTo::Sidebar);
@@ -1359,6 +1341,56 @@ namespace launcher_ui
 
     // The launcher's menu, opened by the ARKEYAN LAUNCHER title: the games as a library (a card each, with its art from the
     // player's disc), the games still to come under them, the project's links bottom right.
+    // "Update all" at the right of the Home title when two or more games have an update: one click updates them one after the
+    // other. While it runs the game and its progress show in its place, with Cancel.
+    void App::DrawUpdateAll(ImVec2 right)
+    {
+        // On the title's line (its capitals' middle), at the page's right edge.
+        const ImVec2 back = ImGui::GetCursorScreenPos();
+        const float y = std::round(right.y + ui::CapMiddle(ui::TextStyle::Display) - ui::height::Normal / 2);
+        if (UpdatingAll())
+        {
+            std::string text;
+            float progress = -1;
+            for (const auto& slot : m_slots)
+                if (std::string_view(slot->game.id) == m_updateAll.current)
+                {
+                    SlotLine line = SlotStatus(slot.get());
+                    text = Tf("{}: {} ({} of {})", GameName(slot->game.id, GameNameForm::Short), line.text, m_updateAll.started, m_updateAll.total);
+                    progress = line.progress;
+                }
+            // Which game and how far (its words over a bar, centred on the button's height), then Cancel.
+            const float cancelW = ui::ButtonWidth(Tr("Cancel"));
+            ImGui::SetCursorScreenPos(ImVec2(right.x - cancelW, y));
+            if (ui::Button(Tr("Cancel")))
+                CancelUpdateAll();
+            const float barH = ui::space::XS, blockH = ui::type::Caption + ui::space::XS + barH;
+            const float textW = std::max(ui::TextSize(ui::TextStyle::Caption, text.c_str()).x, 160.0f);
+            const ImVec2 at(right.x - cancelW - ui::space::M - textW, std::round(y + (ui::height::Normal - blockH) / 2));
+            ui::PushText(ui::TextStyle::Caption);
+            ui::DrawText(ImGui::GetWindowDrawList(), at, ui::Col(ui::color::InkSoft), text.c_str());
+            ui::PopText();
+            ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + ui::type::Caption + ui::space::XS));
+            if (progress >= 0)
+                ui::ProgressBar(progress, textW);
+            else
+                ui::IndeterminateBar(textW);
+        }
+        else if (GamesToUpdate() >= 2)
+        {
+            ui::ButtonOptions options;
+            options.kind = ui::ButtonKind::Primary;
+            options.icon = ui::Icon::Download;
+            const std::string tooltip = Tf("Updates {} games, one after the other", GamesToUpdate());
+            options.tooltip = tooltip.c_str();
+            options.disabled = !m_session.Running().empty(); // a game is running: its build can't be replaced
+            ImGui::SetCursorScreenPos(ImVec2(right.x - ui::ButtonWidth(Tr("Update all"), options), y));
+            if (ui::Button(Tr("Update all"), options))
+                StartUpdateAll();
+        }
+        ImGui::SetCursorScreenPos(back);
+    }
+
     void App::DrawHome()
     {
         constexpr const char* Project = "https://github.com/mflr0/Skylauncher";
@@ -1367,9 +1399,18 @@ namespace launcher_ui
         const ImVec2 origin = ImGui::GetCursorScreenPos();
         const float width = ImGui::GetContentRegionAvail().x;
 
-        ui::Text(ui::TextStyle::Display, Tr("Library"), ui::color::Ink, -1);
-        ui::Text(ui::TextStyle::Body, Tr("Game art comes from your own disc."), ui::color::Dim);
-        ImGui::Dummy(ImVec2(0, ui::space::S));
+        // The page's title, its line under it (XS), the cards a section's air (L) below.
+        float top = origin.y;
+        ui::PushText(ui::TextStyle::Display);
+        ui::DrawText(draw, origin, ui::Col(ui::color::Ink), Tr("Library"));
+        ui::PopText();
+        top += ui::type::Display + ui::space::XS;
+        ui::PushText(ui::TextStyle::Body);
+        ui::DrawText(draw, ImVec2(origin.x, top), ui::Col(ui::color::Dim), Tr("Game art comes from your own disc."));
+        ui::PopText();
+        top += ui::type::Body + ui::space::L;
+        ImGui::SetCursorScreenPos(ImVec2(origin.x, top));
+        DrawUpdateAll(ImVec2(origin.x + width, origin.y));
 
         // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
         std::vector<const LauncherGameEntry*> playable, later;
@@ -1404,7 +1445,7 @@ namespace launcher_ui
                     SelectGame(*FindGame(entry.id));
                 GoTo(Page::Play);
             }
-            if (i == 0)
+            if (std::string_view(entry.id) == m_s->game.id) // the page's first focus: the game shown last
                 TakeFocus(FocusTo::Page);
             if (hovered)
                 ImGui::SetMouseCursor(ImGuiMouseCursor_Hand);
@@ -1429,7 +1470,7 @@ namespace launcher_ui
             ui::GradientRect(draw, ImVec2(at.x, at.y + cardH * 0.45f), end, ui::Col(ui::color::Scrim, 0), ui::Col(ui::color::Scrim, 0.92f), ui::radius::Panel,
                 ImDrawFlags_RoundCornersBottom);
             // The logo above the name and the state: what the text takes at the foot is left out of its box.
-            const float textH = ui::space::L + ui::type::Caption + ui::space::XS + 2 + ui::space::XS + nameSize + ui::space::S;
+            const float textH = ui::space::L + ui::PillHeight + ui::space::XS + nameSize + ui::space::S;
             const float logoTop = at.y + ui::space::S, logoH = std::max(0.0f, cardH - textH - ui::space::S);
             if (const ArtTexture* logo = CachedArt(entry.id, LauncherAssets::Role::Logo, 640))
                 DrawLogo(draw, *logo, ImVec2(at.x + cardW * 0.12f, logoTop), ImVec2(cardW * 0.76f, logoH));
@@ -1447,24 +1488,27 @@ namespace launcher_ui
                 if (std::string_view(opened->game.id) == entry.id)
                     slot = opened.get();
             const SlotLine line = SlotStatus(slot);
-            // The full name, at the row's size, and under it the state in a word and a shape.
-            const float pillH = ui::type::Caption + ui::space::XS + 2;
+            // The full name, at the row's size, and under it (XS) the state in a word and a shape; the card's padding (L) at
+            // the left and the foot.
+            const float pillTop = end.y - ui::space::L - ui::PillHeight;
             ImGui::PushFont(ui::Ctx().fonts.bold, nameSize);
-            draw->AddText(ImVec2(at.x + ui::space::L, end.y - ui::space::L - pillH - ui::space::XS - ImGui::GetFontSize()), ui::Col(ui::color::Ink), GameName(entry.id));
+            draw->AddText(ImVec2(at.x + ui::space::L, pillTop - ui::space::XS - nameSize), ui::Col(ui::color::Ink), GameName(entry.id));
             ImGui::PopFont();
-            ImGui::SetCursorScreenPos(ImVec2(at.x + ui::space::L, end.y - ui::space::M - pillH));
-            ui::StatusPill(StatusOf(line.state), line.text.c_str());
+            ImGui::SetCursorScreenPos(ImVec2(at.x + ui::space::L, pillTop));
+            ui::StatusPill(StatusOf(line.state), line.text.c_str(), IconOf(line.state));
             if (m_testSidebar)
                 m_drawn[std::string("home:") + entry.id] = line.text;
             // Under the pointer: the game's own colour around the card.
             draw->AddRect(at, end, hovered ? Rgb(style.glow) : ui::Col(ui::color::Ink, 0.11f), ui::radius::Panel, 0, hovered ? ui::stroke::Selection : ui::stroke::Hairline);
-            ui::FocusRingIf(state, ui::radius::Panel);
+            if (state.focused) // around the card (its state pill is the last item drawn)
+                ui::FocusRing(at, end, ui::radius::Panel);
         }
-        ImGui::SetCursorScreenPos(ImVec2(row.x, row.y + cardH + ui::space::XL));
-
-        // The games still to come: their names, in their colours, quietly.
-        ui::Text(ui::TextStyle::Caption, Tr("COMING LATER"), ui::color::Dim, -1, true);
-        ImGui::Dummy(ImVec2(0, ui::space::XXS));
+        // The games still to come, a section's air (XL) below: their names, in their colours, quietly.
+        const float laterTop = row.y + cardH + ui::space::XL;
+        ui::PushText(ui::TextStyle::Caption, true);
+        ui::DrawText(draw, ImVec2(row.x, laterTop), ui::Col(ui::color::Dim), Tr("COMING LATER"));
+        ui::PopText();
+        ImGui::SetCursorScreenPos(ImVec2(row.x, laterTop + ui::type::Caption + ui::space::XS));
         for (size_t i = 0; i < later.size(); i++)
         {
             const float w = ui::BadgeSize(later[i]->name).x;
@@ -1504,6 +1548,7 @@ namespace launcher_ui
 
     void App::DrawPlay()
     {
+        RefreshProgress();
         // Edge to edge: the game's logo on top, a band with the main button below it.
         const ImVec2 position = ImGui::GetCursorScreenPos();
         const ImVec2 available = ImGui::GetContentRegionAvail();
@@ -1522,6 +1567,7 @@ namespace launcher_ui
         const ImGuiID heightKey = ImGui::GetID("##disc-block-height");
         const float blockH = storage->GetFloat(heightKey, ui::HeightOf(ui::Size::Large) * 2);
         const float blockW = std::min(available.x - 2 * ui::space::XL, 720.0f);
+        const float blockX = std::round(position.x + (available.x - blockW) / 2); // centred, like the logo and the band's group
         const bool blockShown = !m_s->installView;
 
         // The logo (else the game's name), as large as fits and centred between the language menu and the disc block.
@@ -1559,7 +1605,7 @@ namespace launcher_ui
         {
             // First run: no disc yet. The whole area is one target (a click chooses, a drop reads), and it says the three steps.
             const float zoneH = blockH;
-            const ImVec2 min(position.x + ui::space::XL, end.y - ui::space::M - zoneH), max(min.x + blockW, end.y - ui::space::M);
+            const ImVec2 min(blockX, end.y - ui::space::M - zoneH), max(min.x + blockW, end.y - ui::space::M);
             draw->AddRectFilled(min, max, ui::Col(ui::elevation::Card.fill, m_dragOver ? 1.0f : 0.92f), ui::radius::Card);
             // A dashed edge: it reads as a place to drop something.
             const unsigned edge = m_dragOver ? ui::color::Focus : ui::color::Edge;
@@ -1587,8 +1633,8 @@ namespace launcher_ui
             }
             const float pad = ui::space::L;
             float y = min.y + pad;
-            ui::DrawIcon(draw, ui::Icon::Disc, ImVec2(min.x + pad + ui::type::Display / 2, y + ui::type::Display / 2), ui::type::Display, ui::Col(ui::color::Info));
-            const float textX = min.x + pad + ui::type::Display + ui::space::M;
+            ui::DrawIcon(draw, ui::Icon::Disc, ImVec2(min.x + pad + ui::icon::Large / 2, y + ui::icon::Large / 2), ui::icon::Large, ui::Col(ui::color::Info));
+            const float textX = min.x + pad + ui::icon::Large + ui::space::M;
             ui::PushText(ui::TextStyle::Label, true);
             ui::DrawText(draw, ImVec2(textX, y), ui::Col(ui::color::Ink), Tf("Choose your {} disc image", GameName(m_s->game.id, GameNameForm::Short)).c_str());
             y += ImGui::GetFontSize() + ui::space::XXS;
@@ -1607,7 +1653,7 @@ namespace launcher_ui
                 x += ImGui::CalcTextSize(steps[i]).x + ui::space::XS;
                 if (i < 2)
                 {
-                    ui::DrawIcon(draw, ui::Icon::ChevronRight, ImVec2(x + ui::space::XS, y + ImGui::GetFontSize() / 2), ui::type::Caption, ui::Col(ui::color::Dim));
+                    ui::DrawIcon(draw, ui::Icon::ChevronRight, ImVec2(x + ui::space::XS, y + ui::CapMiddle(ui::TextStyle::Caption, true)), ui::icon::Small, ui::Col(ui::color::Dim));
                     x += 2 * ui::space::XS + ui::space::XS;
                 }
             }
@@ -1625,7 +1671,7 @@ namespace launcher_ui
         }
         else if (blockShown)
         {
-            ImGui::SetCursorScreenPos(ImVec2(position.x + ui::space::XL, end.y - ui::space::M - blockH));
+            ImGui::SetCursorScreenPos(ImVec2(blockX, end.y - ui::space::M - blockH));
             ui::CardOptions card;
             card.padding = ui::space::M;
             card.flags = ImGuiChildFlags_AutoResizeY;
@@ -1634,30 +1680,37 @@ namespace launcher_ui
             // the copy replaces the disc image.
             const std::string file = m_s->fromCopy ? Tr("Copied game data")
                 : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 64);
-            const bool changeDisc = ready && !installing && !m_s->fromCopy;
+            const bool changeDisc = ready && !installing && !m_s->fromCopy && m_session.Running() != m_s->game.id;
             const ui::ButtonOptions change{ .size = ui::Size::Small };
             const float changeW = changeDisc ? ui::ButtonWidth(Tr("Change disc..."), change) : 0;
+            // The head: the overline and the file name (XXS between them), the button centred on the two; the body S below,
+            // its lines XS apart.
             const ImVec2 top = ImGui::GetCursorScreenPos();
-            ui::Text(ui::TextStyle::Caption, m_s->fromCopy ? Tr("GAME DATA:") : Tr("DISC IMAGE:"), ui::color::Dim, -1, true);
-            ui::Text(ui::TextStyle::Label, ui::Ellipsize(file.c_str(), blockW - 2 * ui::space::M - changeW - ui::space::S).c_str(), ui::color::Ink, -1, true);
+            const float headH = ui::type::Caption + ui::space::XXS + ui::type::Label;
+            ui::PushText(ui::TextStyle::Caption, true);
+            ui::DrawText(ImGui::GetWindowDrawList(), top, ui::Col(ui::color::Dim), m_s->fromCopy ? Tr("GAME DATA:") : Tr("DISC IMAGE:"));
+            ui::PopText();
+            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + ui::type::Caption + ui::space::XXS));
+            ui::PushText(ui::TextStyle::Label, true);
+            const std::string shownFile = ui::Ellipsize(file.c_str(), blockW - 2 * ui::space::M - changeW - ui::space::S);
+            ui::PopText();
+            ui::Text(ui::TextStyle::Label, shownFile.c_str(), ui::color::Ink, -1, true);
             if (!m_s->discPath.empty() && ImGui::IsItemHovered())
                 ui::Tooltip(m_s->discPath.c_str());
-            ImGui::Dummy(ImVec2(0, ui::space::XXS));
             if (changeDisc)
             {
-                const float below = ImGui::GetCursorScreenPos().y; // under the file name
-                ImGui::SetCursorScreenPos(ImVec2(top.x + blockW - 2 * ui::space::M - changeW, top.y));
+                ImGui::SetCursorScreenPos(ImVec2(top.x + blockW - 2 * ui::space::M - changeW, std::round(top.y + (headH - ui::height::Small) / 2)));
                 if (ui::Button(Tr("Change disc..."), change))
                     Browse();
-                ImGui::SetCursorScreenPos(ImVec2(top.x, std::max(below, ImGui::GetItemRectMax().y + ui::space::XS)));
             }
+            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + headH + ui::space::S));
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ui::space::XS, ui::space::XS));
             switch (m_s->disc)
             {
             case DiscState::None:
                 break;
             case DiscState::Verifying:
                 ui::StatusPill(ui::Status::Busy, (m_s->verify.Stage() + "...").c_str());
-                ImGui::Dummy(ImVec2(0, ui::space::XXS));
                 if (m_s->verify.progress >= 0.97f) // the last stage has no count: a sweep, not a bar that sits at 98 %
                     ui::IndeterminateBar();
                 else
@@ -1669,34 +1722,7 @@ namespace launcher_ui
                 if (!m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
                     ui::StatusPill(ui::Status::Error, Tr("Game data damaged: using the disc image."));
                 if (NeedsInstall())
-                {
                     ui::Text(ui::TextStyle::Body, Tf("Builds the game on your PC: about {} min, {} GB, internet needed once.", InstallMinutesFor(m_s->game.id), InstallGigabytes).c_str(), ui::color::InkSoft);
-                }
-                else if (UpdateAvailable())
-                {
-                    // What UPDATE does: from the built version to the published one, the download (the kit, if it is not here yet)
-                    // and the time, then a quiet button to play what is built (offline, in a hurry).
-                    const GameUpdate* pending = PendingUpdate(*m_s);
-                    std::string size = Tr("no download");
-                    if (KitNeedsFetch(*m_s))
-                    {
-                        const ReleaseInfo kit = m_updates.Snapshot().kit;
-                        if (const ReleaseAsset* asset = FindAsset(kit, KitAssetName()); asset != nullptr && asset->size > 0)
-                            size = Tf("{} download", LauncherFormatSize(asset->size));
-                    }
-                    ui::Text(ui::TextStyle::Body, (m_s->installed.gameVersion.empty()
-                            ? Tf("Update to {}: {}, up to about {} min.", pending->version, size, InstallMinutesFor(m_s->game.id))
-                            : Tf("Update {} to {}: {}, up to about {} min.", m_s->installed.gameVersion, pending->version, size, InstallMinutesFor(m_s->game.id))).c_str(),
-                        ui::color::InkSoft);
-                    if (!Installing())
-                    {
-                        if (ui::Button(Tr("Play without updating"), { .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small }) || m_testPlayWithout)
-                        {
-                            m_testPlayWithout = false;
-                            m_s->skipUpdate = true;
-                        }
-                    }
-                }
                 break;
             case DiscState::Failed:
                 if (m_s->check.message.empty())
@@ -1711,22 +1737,87 @@ namespace launcher_ui
                 }
                 break;
             }
-            storage->SetFloat(heightKey, ImGui::GetCursorPosY() + ui::space::M);
+            storage->SetFloat(heightKey, ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y + ui::space::M);
+            ImGui::PopStyleVar();
             ui::EndCard();
         }
 
-        // Bottom band: the controller and the main button in the middle.
+        // Over the art, top right: the play time and the achievements in one pill ("12 h 34 · trophy 6/38"), which opens the
+        // Achievements page once the disc check cached their list. The room on its left is kept for the sound's button.
+        if (!m_s->installView && m_progress.hasList)
+        {
+            const std::string count = fmt::format("{}/{}", m_progress.unlocked, m_progress.rows.size());
+            const bool played = m_progress.play.sessions > 0 || m_progress.play.totalSeconds > 0;
+            const std::string time = played ? FormatPlayTime(m_progress.play.totalSeconds) : std::string();
+            std::string tooltip = Tr("Achievements");
+            if (m_progress.play.lastEnd > 0)
+                tooltip += "\n" + Tf("Last played: {}", FormatLastPlayed(m_progress.play.lastEnd, int64_t(std::time(nullptr))));
+            ui::PillOptions progress;
+            progress.icon = ui::Icon::Trophy;
+            progress.prefix = played ? time.c_str() : nullptr;
+            progress.overArt = true;
+            progress.tooltip = tooltip.c_str();
+            const std::string id = count + "##progress";
+            ImGui::SetCursorScreenPos(ImVec2(end.x - ui::space::XL - ui::PillWidth(id.c_str(), progress), position.y + ui::space::XL));
+            if (ui::Pill(id.c_str(), progress))
+                GoTo(Page::Achievements);
+        }
+
+        // Bottom band: one row on the main action's middle line, centred in the band on whole points: the controller picker and
+        // the portal's state (two pills, as high), then the action button (the main action and the game's settings), S apart.
+        // While an update is offered, under the action: what it brings (the version, the download, the time), then Play without
+        // updating; the row and those lines are centred in the band together.
         const ImVec2 bar(position.x, end.y), barEnd(end.x, position.y + available.y);
         ui::GradientRect(draw, bar, barEnd, Rgb(BottomBarTop), Rgb(BottomBar), 0);
         draw->AddLine(bar, ImVec2(barEnd.x, bar.y), ui::Col(ui::color::Ink, 0.1f), ui::stroke::Hairline);
-        const float middle = bar.y + BottomBarH / 2;
 
-        const char* label = state.button;
-        // The band's group, centred in it on whole points (crisp edges at any scale): the controller picker, then the
-        // action button (the main action and the game's settings). The smallest window fits it.
-        const float groupW = ControllerW + ControllerGap + PlayButtonW + PlayGearW;
-        const float groupX = std::floor(bar.x + (barEnd.x - bar.x - groupW) / 2), buttonY = std::floor(middle - PlayButtonH / 2);
-        const float mainX = groupX + ControllerW + ControllerGap;
+        const GameUpdate* pending = update && !installing && state.buttonEnabled ? PendingUpdate(*m_s) : nullptr;
+        std::string offer;
+        if (pending != nullptr)
+        {
+            std::string size;
+            if (KitNeedsFetch(*m_s))
+            {
+                const ReleaseInfo kit = m_updates.Snapshot().kit;
+                if (const ReleaseAsset* asset = FindAsset(kit, KitAssetName()); asset != nullptr && asset->size > 0)
+                    size = LauncherFormatSize(asset->size);
+            }
+            offer = size.empty() ? Tf("{} \xC2\xB7 ~{} min", pending->version, InstallMinutesFor(m_s->game.id))
+                                 : Tf("{} \xC2\xB7 {} \xC2\xB7 ~{} min", pending->version, size, InstallMinutesFor(m_s->game.id));
+        }
+        const ui::ButtonOptions without{ .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small, .overArt = true };
+        const float offerH = pending != nullptr ? ui::space::XS + ui::type::Caption + ui::space::XXS + ui::height::Small : 0;
+        const float buttonY = std::floor(bar.y + (BottomBarH - PlayButtonH - offerH) / 2), middle = buttonY + PlayButtonH / 2;
+
+        // The two pills: the device (a menu of the others above it), the portal (Launcher settings > Controls).
+        const std::string device = CurrentDevice();
+        const std::string deviceName = device == "auto" ? Tr("Automatic") : device == "keyboard" ? Tr("Keyboard") : LauncherMiddleEllipsis(DeviceLabel(), 13);
+        const std::string pickerId = deviceName + "##controller";
+        const std::string pickerTip = Tf("Controller: {}", DeviceLabel());
+        ui::PillOptions picker;
+        picker.icon = ui::Icon::Gamepad;
+        picker.trailing = ui::Icon::ChevronDown;
+        picker.overArt = true;
+        picker.tooltip = pickerTip.c_str();
+        const float pickerW = std::min(ui::PillWidth(pickerId.c_str(), picker), ControllerW);
+        picker.width = pickerW;
+        const launcher_portal::Status portal = m_portal.Current();
+        const bool portalShown = !portal.Line().empty();
+        const std::string portalId = std::string(portal.connected ? Tr("Portal") : Tr("No portal")) + "##portal";
+        const std::string portalTip = portal.Line() + "\n" + Tr(strings::PortalTip);
+        ui::PillOptions portalPill;
+        portalPill.icon = portal.connected ? ui::IconOf(ui::Status::Success) : ui::IconOf(ui::Status::Neutral);
+        portalPill.iconColor = ui::ColorOf(portal.connected ? ui::Status::Success : ui::Status::Neutral);
+        portalPill.overArt = true;
+        portalPill.tooltip = portalTip.c_str();
+        // As wide in both states: the row doesn't move when a portal is plugged in.
+        portalPill.width = std::max(ui::PillWidth((std::string(Tr("Portal")) + "##w").c_str(), portalPill), ui::PillWidth((std::string(Tr("No portal")) + "##w").c_str(), portalPill));
+        const float gap = ui::space::S, portalW = portalShown ? portalPill.width + gap : 0;
+        const float groupW = pickerW + gap + portalW + PlayButtonW + PlayGearW;
+        const float groupX = std::floor(bar.x + (barEnd.x - bar.x - groupW) / 2);
+        const float mainX = groupX + pickerW + gap + portalW, pillY = std::floor(middle - ui::height::Small / 2);
+
+        const char* label = state.button.c_str();
         if (m_testSidebar)
             m_drawn["button"] = std::string(label) + (state.buttonEnabled ? "" : " (off)");
         MainAction action{ label, state.buttonEnabled && !m_testButtonsOff };
@@ -1754,49 +1845,55 @@ namespace launcher_ui
             break;
         }
 
-        // Controller picker, left of the main button: what the game listens to, a menu of the choices above it.
+        // The update on offer under the action, centred on it: what it brings, then the quiet way round it.
+        if (pending != nullptr)
         {
-            const std::string device = CurrentDevice();
-            const std::string deviceName = device == "auto" ? Tr("Automatic") : device == "keyboard" ? Tr("Keyboard") : LauncherMiddleEllipsis(DeviceLabel(), 13);
-            const float pillY = std::floor(middle - ui::HeightOf(ui::Size::Small) / 2 + ui::space::S);
-            ui::PushText(ui::TextStyle::Caption, true);
-            ui::DrawText(draw, ImVec2(groupX + ui::space::XS, pillY - ui::space::XXS - ImGui::GetFontSize()), ui::Col(ui::color::Dim), Tr("CONTROLLER"));
+            const float actionW = PlayButtonW + PlayGearW, centre = mainX + actionW / 2;
+            float y = buttonY + PlayButtonH + ui::space::XS;
+            ui::PushText(ui::TextStyle::Caption);
+            ui::DrawText(draw, ImVec2(std::round(centre - ImGui::CalcTextSize(offer.c_str()).x / 2), y), ui::Col(ui::color::InkSoft), offer.c_str());
             ui::PopText();
-            ImGui::SetCursorScreenPos(ImVec2(groupX, pillY));
-            ui::PillOptions picker;
-            picker.trailing = ui::Icon::ChevronDown;
-            picker.overArt = true;
-            picker.width = ControllerW;
-            const std::string tooltip = Tf("Controller: {}", DeviceLabel());
-            picker.tooltip = tooltip.c_str();
-            if (ui::Pill((deviceName + "##controller").c_str(), picker) || m_testControllers)
+            y += ui::type::Caption + ui::space::XXS;
+            ImGui::SetCursorScreenPos(ImVec2(std::round(centre - ui::ButtonWidth(Tr("Play without updating"), without) / 2), y));
+            if (ui::Button(Tr("Play without updating"), without) || m_testPlayWithout)
             {
-                m_testControllers = false;
-                RefreshGamepads();
-                ui::OpenMenu("##controllers", true);
-            }
-            // PLAY WITH: the choices, the one in use checked.
-            if (ui::BeginMenu("##controllers"))
-            {
-                ui::Text(ui::TextStyle::Caption, Tr(strings::PlayWith), ui::color::Dim, -1, true);
-                for (const auto& [value, name] : DeviceOptions())
-                {
-                    ui::PushText(ui::TextStyle::Body);
-                    const std::string shown = ui::Ellipsize(name.c_str(), ControllerW + ui::space::XXL);
-                    ui::PopText();
-                    if (ui::MenuItem((shown + "##" + value).c_str(), { .checked = value == device }))
-                        SetDevice(value);
-                }
-                ui::EndMenu();
+                m_testPlayWithout = false;
+                m_s->skipUpdate = true;
             }
         }
 
-        // The portal's state under the main button, in a word and a shape (above the band's foot, clear of the pad legend).
-        if (const std::string line = m_portal.Current().Line(); !line.empty())
+        // The controller picker: what the game listens to, a menu of the choices above it (the pad icon says what it picks, the
+        // tooltip says it in words).
+        ImGui::SetCursorScreenPos(ImVec2(groupX, pillY));
+        if (ui::Pill(pickerId.c_str(), picker) || m_testControllers)
         {
-            ImGui::SetCursorScreenPos(ImVec2(mainX, buttonY + PlayButtonH + ui::space::XS));
-            ui::StatusPill(m_portal.Current().connected ? ui::Status::Success : ui::Status::Neutral, line.c_str());
-            ui::Tooltip(Tr(strings::PortalTip));
+            m_testControllers = false;
+            RefreshGamepads();
+            ui::OpenMenu("##controllers", {.above = true});
+        }
+        // PLAY WITH: the choices, the one in use checked.
+        if (ui::BeginMenu("##controllers"))
+        {
+            ui::Text(ui::TextStyle::Caption, Tr(strings::PlayWith), ui::color::Dim, -1, true);
+            for (const auto& [value, name] : DeviceOptions())
+            {
+                ui::PushText(ui::TextStyle::Body);
+                const std::string shown = ui::Ellipsize(name.c_str(), ControllerW + ui::space::XXL);
+                ui::PopText();
+                if (ui::MenuItem((shown + "##" + value).c_str(), { .checked = value == device }))
+                    SetDevice(value);
+            }
+            ui::EndMenu();
+        }
+        // The portal's state, in a word and a shape: a real portal plugged in, or not (the game then has its virtual one).
+        if (portalShown)
+        {
+            ImGui::SetCursorScreenPos(ImVec2(groupX + pickerW + gap, pillY));
+            if (ui::Pill(portalId.c_str(), portalPill))
+            {
+                m_tab = SettingsTab::Controls;
+                GoTo(Page::Settings);
+            }
         }
 
         // The pad's buttons for this page, when a pad is in use.
@@ -1807,19 +1904,18 @@ namespace launcher_ui
                 { ui::PadButton::North, nullptr, Tr("Game settings") },
                 { ui::PadButton::East, "Esc", Tr("Sidebar") },
             };
-            ImGui::SetCursorScreenPos(ImVec2(bar.x + ui::space::XL, barEnd.y - ui::height::Normal));
-            ui::PadLegend(hints, ui::Ctx().glyphs, barEnd.x - bar.x - 2 * ui::space::XL);
+            ImGui::SetCursorScreenPos(ImVec2(bar.x, barEnd.y - ui::height::Normal)); // the band's foot, edge to edge
+            ui::PadLegend(hints, ui::Ctx().glyphs, barEnd.x - bar.x);
         }
     }
 
     void App::DrawPortalStatus()
     {
-        std::string line = m_portal.Current().Line();
+        const std::string line = m_portal.Current().Line();
         if (line.empty())
             return;
-        ImGui::TextColored(ImColor(Rgb(TextDim)), "%s", line.c_str());
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", Tr(strings::PortalTip));
+        ui::StatusPill(m_portal.Current().connected ? ui::Status::Success : ui::Status::Neutral, line.c_str());
+        ui::Tooltip(Tr(strings::PortalTip));
     }
 
     void App::DrawControls()
@@ -1860,16 +1956,81 @@ namespace launcher_ui
         ui::SectionHeader(Tr("Toy Box keys"));
         if (ui::BeginSettings("##toyboxkeys"))
         {
-            ui::SettingRow(Tr("Open the Toy Box"), nullptr);
-            ui::KeyCap("F6");
-            ImGui::SameLine(0, ui::space::XS);
-            ui::KeyCap("Tab");
-            ui::SettingRow(Tr("Add a figure"), nullptr);
-            ui::KeyCap("F7");
-            ui::SettingRow(Tr("Clear the figures"), nullptr);
-            ui::KeyCap("F8");
+            // Each line: the keyboard's keys ("F6 / Tab": either), then the pad's buttons ("View + Y": together) in the pad's own
+            // pictures (the pad in use or chosen, else Xbox's), a dash where the pad has none (F7 and F8 are the keyboard's
+            // only). The pad's column ends on the control column's edge, the keys' column before it: two columns.
+            struct Line
+            {
+                const char* label;
+                std::vector<const char*> keys;
+                std::vector<ui::PadButton> buttons;
+            };
+            const Line lines[] = {
+                { Tr("Open the Toy Box"), { "F6", "Tab" }, { ui::PadButton::Back, ui::PadButton::North } },
+                { Tr("Add a figure"), { "F7" }, {} },
+                { Tr("Clear the figures"), { "F8" }, {} },
+            };
+            const ui::Glyphs glyphs = PadGlyphs();
+            const float joint = ui::space::XS; // on each side of the "/" or the "+"
+            auto separator = [](bool both) { return both ? "+" : "/"; };
+            auto groupWidth = [&](const Line& line, bool pad) {
+                const size_t count = pad ? line.buttons.size() : line.keys.size();
+                float w = 0;
+                for (size_t i = 0; i < count; i++)
+                    w += (pad ? ui::KeyCapWidth(line.buttons[i], glyphs) : ui::KeyCapWidth(line.keys[i])) +
+                        (i > 0 ? 2 * joint + ui::TextSize(ui::TextStyle::Caption, separator(pad)).x : 0);
+                return w;
+            };
+            float padColumn = 0;
+            for (const Line& line : lines)
+                padColumn = std::max(padColumn, groupWidth(line, true));
+            for (const Line& line : lines)
+            {
+                ui::SettingRow(line.label, nullptr);
+                ImDrawList* draw = ImGui::GetWindowDrawList();
+                const ImVec2 start = ImGui::GetCursorScreenPos();
+                const float right = start.x + ImGui::GetContentRegionAvail().x, padX = right - padColumn;
+                const float capH = ui::KeyCapHeight(), middle = start.y + std::round(capH / 2);
+                auto group = [&](float x, bool pad) {
+                    const size_t count = pad ? line.buttons.size() : line.keys.size();
+                    for (size_t i = 0; i < count; i++)
+                    {
+                        if (i > 0)
+                        {
+                            ui::PushText(ui::TextStyle::Caption);
+                            ui::DrawText(draw, ImVec2(x + joint, std::round(middle - ui::CapMiddle(ui::TextStyle::Caption))), ui::Col(ui::color::Dim), separator(pad));
+                            x += 2 * joint + ImGui::CalcTextSize(separator(pad)).x;
+                            ui::PopText();
+                        }
+                        x += (pad ? ui::DrawKeyCap(draw, ImVec2(x, middle), line.buttons[i], glyphs) : ui::DrawKeyCap(draw, ImVec2(x, middle), line.keys[i])).x;
+                    }
+                };
+                const float keysX = padX - (padColumn > 0 ? ui::space::L : 0) - groupWidth(line, false);
+                group(keysX, false);
+                if (!line.buttons.empty())
+                    group(padX, true);
+                else // no pad button for it: a quiet dash in the pad's column
+                {
+                    ui::PushText(ui::TextStyle::Body);
+                    const char* none = "\xE2\x80\x94";
+                    ui::DrawText(draw, ImVec2(std::round(padX + (padColumn - ImGui::CalcTextSize(none).x) / 2), std::round(middle - ui::CapMiddle(ui::TextStyle::Body))),
+                        ui::Col(ui::color::Dim), none);
+                    ui::PopText();
+                }
+                ImGui::SetCursorScreenPos(ImVec2(keysX, start.y));
+                ImGui::Dummy(ImVec2(right - keysX, capH));
+            }
             ui::EndSettings();
         }
+    }
+
+    // The pictures of the pad's buttons where the window names them whatever the input in use (the Toy Box keys): the pad in
+    // use or the one chosen, else Xbox's.
+    ui::Glyphs App::PadGlyphs() const
+    {
+        const PadFamily family = PadFamilyNow();
+        return family == PadFamily::PlayStation || family == PadFamily::PlayStation3 ? ui::Glyphs::PlayStation
+            : family == PadFamily::Nintendo ? ui::Glyphs::Nintendo : ui::Glyphs::Xbox;
     }
 
     // The tabs of a settings page: words on one line, an accent line under the selected one (like the sidebar's bar).
@@ -1913,7 +2074,7 @@ namespace launcher_ui
             options.kind = ui::ButtonKind::Ghost;
             options.icon = ui::Icon::ChevronLeft;
             ImGui::SetCursorPos(ImVec2(ImGui::GetContentRegionMax().x - ui::ButtonWidth(Tr("Back"), options), // the column's right edge, scrollbar or not
-                top + (bottom - top - ui::height::Normal) / 2));
+                std::round(top + ui::CapMiddle(ui::TextStyle::Display) - ui::height::Normal / 2))); // on the title's capitals
             if (ui::Button(Tr("Back"), options))
                 GoTo(Page::Play);
             ImGui::SetCursorPosY(std::max(bottom, ImGui::GetCursorPosY()));
@@ -2053,11 +2214,11 @@ namespace launcher_ui
             return; // nothing else to do in a launcher that has removed itself (and nothing to write back)
         if ((page == Page::Settings || page == Page::Collection) && (m_page == Page::Home || m_page == Page::Play))
             m_backPage = m_page;
-        else if (page == Page::GameSettings)
-            m_backPage = Page::Play; // a game's settings are opened from its page, and close back to it
-        else if (page == Page::Settings && m_page == Page::GameSettings)
+        else if (page == Page::GameSettings || page == Page::Achievements)
+            m_backPage = Page::Play; // a game's settings and achievements are opened from its page, and close back to it
+        else if (page == Page::Settings && (m_page == Page::GameSettings || m_page == Page::Achievements))
             m_backPage = Page::Play;
-        else if (page == Page::Collection && m_page == Page::GameSettings)
+        else if (page == Page::Collection && (m_page == Page::GameSettings || m_page == Page::Achievements))
             m_backPage = Page::Play;
         m_page = page;
         m_capturing = nullptr;
@@ -2067,7 +2228,7 @@ namespace launcher_ui
     // B / Escape when nothing else took it: out of Settings and Collection, else to the sidebar.
     void App::Back()
     {
-        if (m_page == Page::Settings || m_page == Page::Collection || m_page == Page::GameSettings)
+        if (m_page == Page::Settings || m_page == Page::Collection || m_page == Page::GameSettings || m_page == Page::Achievements)
             GoTo(m_backPage);
         else
             RequestFocus(FocusTo::Sidebar);
@@ -2086,13 +2247,6 @@ namespace launcher_ui
     }
 
     constexpr float ToastWidth = 420; // the longest line of a message before it wraps
-
-    void App::Toast(std::string text, bool error)
-    {
-        // A failure ("Couldn't ...", in any language: the collection's English toasts still say it so) is an error.
-        error = error || i18n::StartsLike(text, "Couldn't");
-        Toast(std::move(text), error ? ui::ToastKind::Error : ui::ToastKind::Info);
-    }
 
     void App::Toast(std::string text, ui::ToastKind kind) { m_toasts.Push(std::move(text), kind); }
 
@@ -2117,7 +2271,7 @@ namespace launcher_ui
         }
         // Keep installing is the default (the focus starts there, B / Escape keep installing); Quit is the danger.
         bool open = true;
-        const bool shown = ui::BeginModal("##quit", Tr(strings::QuitTitle), &open, ui::ModalSize::Small);
+        const bool shown = ui::BeginModal("##quit", Tr(strings::QuitTitle), &open, ui::ModalSize::Medium); // its title on one line in French too
         if (shown)
         {
             ui::Text(ui::TextStyle::Body, Tr(strings::QuitText), ui::color::InkSoft);
@@ -2146,21 +2300,26 @@ namespace launcher_ui
         frameIo.DisplayFramebufferScale = ImVec2(frameIo.DisplayFramebufferScale.x * m_uiScale, frameIo.DisplayFramebufferScale.y * m_uiScale);
         if (SDL_GetMouseFocus() == nullptr && !m_testSeatX) // the backend's outside-the-window position is in unscaled window units
             frameIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-        if (m_testNav || m_testSeatX)
+        if (m_testNav || m_testSeatX || m_testPadInput)
             frameIo.BackendFlags |= ImGuiBackendFlags_HasGamepad; // the test's pad keys count with no pad plugged in
         ImGui::NewFrame();
         // The components' context: the time, the focus ring in the shown game's colour on its pages, the pad family in use.
         ui::NewFrame(SDL_GetTicks());
         ui::Ctx().accent = m_page == Page::Play || m_page == Page::GameSettings ? StyleOf(m_s->game.id).glow : Accent;
         ui::Ctx().reduceMotion = ReduceMotion();
-        if (m_gamepads.empty() && !m_testNav)
+        if (const int view = int(m_page) * 100 + (m_page == Page::GameSettings ? int(m_gameTab) : m_page == Page::Settings ? int(m_tab) : 0);
+            m_testPadInput && m_testScreens == 0 && view != m_testFocusView)
+        {
+            // A script's page (or tab) shown as a pad player arrives there: the focus on its first stop, the ring shown.
+            m_testFocusView = view;
+            m_focusTo = FocusTo::Page;
+            m_focusShow = true;
+            ImGui::SetNavCursorVisible(true);
+        }
+        if (m_gamepads.empty() && !m_testNav && !m_testPadInput && !CollectionPage::TestPad())
             ui::Ctx().glyphs = ui::Glyphs::Keyboard;
         else
-        {
-            PadFamily family = PadFamilyNow();
-            ui::Ctx().glyphs = family == PadFamily::PlayStation || family == PadFamily::PlayStation3 ? ui::Glyphs::PlayStation
-                : family == PadFamily::Nintendo ? ui::Glyphs::Nintendo : ui::Glyphs::Xbox;
-        }
+            ui::Ctx().glyphs = PadGlyphs();
         if (m_testGallery)
         {
             DrawGallery();
@@ -2201,6 +2360,7 @@ namespace launcher_ui
         case Page::Collection: m_s->collection->Draw(); break;
         case Page::Settings: DrawSettings(); break;
         case Page::GameSettings: DrawGameSettings(); break;
+        case Page::Achievements: DrawAchievements(); break;
         }
         ImGui::End();
         ImGui::PopStyleVar();
@@ -2234,7 +2394,8 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || !m_testKit.empty())
+            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || m_testAchievements || m_testRunning ||
+                m_testScreens != 0 || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
                 Screenshot(UninstallNames[std::min<int>(m_testStep, int(std::size(UninstallNames)) - 1)]);
@@ -2399,7 +2560,7 @@ namespace launcher_ui
         }();
         if (m_testBegan == 0)
             m_testBegan = now;
-        if (now - m_testBegan > 180000)
+        if (now - m_testBegan > 240000)
         {
             expect(false, "timeout");
             m_running = false;
@@ -2488,7 +2649,57 @@ namespace launcher_ui
             expect(FindInstalledGame(m_config, a.check.xexSha256).kitVersion != "kit-new" && a.installed.gameVersion == "0.9.0", "Spyro's Adventure was not rebuilt");
             shoot("giants-updated");
             break;
-        case 11:
+        case 11: // "Update all" on Home: both games get an older build, the release names the versions the kit gives
+        {
+            for (GameSlot* slot : { &a, &g })
+            {
+                SelectGame(slot->game);
+                RecordInstalledGame(m_config, slot->check.xexSha256, slot->installed.runtime, slot->installed.kitVersion, "0.1.0");
+                RefreshInstall();
+            }
+            m_gameUpdates = { { ssa.id, "0.9.0", next }, { giants.id, "0.8.1", next } };
+            expect(GamesToUpdate() == 2 && !UpdatingAll(), "two games have an update");
+            m_page = Page::Home;
+            shoot("home-update-all");
+            break;
+        }
+        case 12: // one click: Spyro's Adventure first, then Giants; Home stays shown
+            StartUpdateAll();
+            expect(UpdatingAll() && m_updateAll.total == 2 && m_updateAll.current == ssa.id && a.installer.Running(), "Spyro's Adventure starts first");
+            expect(!g.installer.Running() && m_page == Page::Home, "the second waits, the page stays");
+            shoot("home-updating-all", 700);
+            break;
+        case 13:
+            if (UpdatingAll() || busy(a) || busy(g))
+                return;
+            expect(a.installed.gameVersion == "0.9.0" && g.installed.gameVersion == "0.8.1" && GamesToUpdate() == 0, "both games are updated, one after the other");
+            expect(m_updateAll.started == 2 && m_updateAll.failed == 0 && m_page == Page::Home, "none failed, still on Home");
+            shoot("home-updated-all");
+            break;
+        case 14: // Cancel stops the running one and the one waiting
+            for (GameSlot* slot : { &a, &g })
+            {
+                SelectGame(slot->game);
+                RecordInstalledGame(m_config, slot->check.xexSha256, slot->installed.runtime, slot->installed.kitVersion, "0.1.0");
+                RefreshInstall();
+            }
+            SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_DELAY", "0.5", true);
+            StartUpdateAll();
+            expect(UpdatingAll() && a.installer.Running(), "a second run starts");
+            shoot("home-updating-again", 1500); // the shot is taken once the first build has run a moment; the step moves on after it
+            break;
+        case 15:
+            CancelUpdateAll();
+            expect(m_updateAll.queue.empty(), "Cancel empties the queue");
+            m_testStep++;
+            break;
+        case 16: // a cancelled build leaves its card (interrupted), which is not "busy": only the running jobs are waited for
+            if (UpdatingAll() || a.installer.Running() || g.installer.Running() || a.kitDownload.Running() || g.kitDownload.Running())
+                return;
+            expect(GamesToUpdate() == 2 && !g.installer.Running() && g.installed.gameVersion == "0.1.0", "cancelled: nothing more starts, both still old");
+            shoot("home-cancelled");
+            break;
+        case 17:
             m_running = false;
             break;
         case 20: // offline
@@ -2674,9 +2885,9 @@ namespace launcher_ui
                 a.verify.done = true;
                 m_page = Page::Play;
                 Toast(Tr("Game installed: press PLAY"), ui::ToastKind::Success);
-                Toast(Tr("Log copied"));
-                Toast(Tr("Couldn't save the settings"), true);
-                Toast(Tf("Saves restored from {}", "2026-10-26 09:30"));
+                Toast(Tr("Log copied"), ui::ToastKind::Success);
+                Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
+                Toast(Tf("Saves restored from {}", "2026-10-26 09:30"), ui::ToastKind::Success);
                 shoot("toasts-stacked", 400);
                 break;
             }
@@ -2886,7 +3097,7 @@ namespace launcher_ui
         static const std::vector<int> Steps[] = {
             {},                                                        // 40: the launcher opens, the focus in the sidebar
             { ImGuiKey_Escape },                                       // 41: B: the ring on the game's row
-            { ImGuiKey_DownArrow, ImGuiKey_DownArrow },                // 42: down: past Giants and the games coming later
+            { ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow }, // 42: down: past Giants, Swap Force and Coming later
             { ImGuiKey_Space },                                        // 43: A: Collection, the ring on Add a figure
             { ImGuiKey_GamepadFaceUp },                                // 44: Y: the search box takes the keyboard
             { ImGuiKey_Escape },                                       // 45: B: out of the search
@@ -2896,9 +3107,35 @@ namespace launcher_ui
             { ImGuiKey_Space },                                        // 49: A: it goes on the seat, the choosing ends
             { ImGuiKey_GamepadFaceLeft },                              // 50: X: the focused card's sheet
             { ImGuiKey_GamepadFaceRight, ImGuiKey_GamepadFaceRight },  // 51: B, B: closed, back to Play
-            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space, ImGuiKey_GamepadR1 }, // 52: Settings > Controls
+            { ImGuiKey_Escape, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_DownArrow, ImGuiKey_Space,
+              ImGuiKey_GamepadR1 },                                    // 52: B to the sidebar, down to Settings, A, RB: Settings > Launcher
             { ImGuiKey_Escape },                                       // 53: Escape: back to Play
         };
+        // Where each step's keys must have led (checked when the next step begins): the sidebar's rows, the collection, the
+        // settings; a step that went elsewhere would open what the next keys press (a file chooser: the run would wait).
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL nav step %d: %s\n", 39 + m_testStep, what);
+                m_testFailures++;
+            }
+        };
+        if (m_testBegan == 0)
+            m_testBegan = now;
+        if (now - m_testBegan > 120000)
+        {
+            expect(false, "timeout");
+            m_running = false;
+            return;
+        }
+        switch (m_testStep)
+        {
+        case 4: expect(m_page == Page::Collection, "A on the sidebar's Collection row opens the collection"); break;
+        case 12: expect(m_page == Page::Play, "B, B close the sheet and the collection"); break;
+        case 13: expect(m_page == Page::Settings && m_tab == SettingsTab::Launcher, "Settings, then RB: its Launcher tab"); break;
+        case 14: expect(m_page == Page::Play, "Escape leaves Settings"); break;
+        default: break;
+        }
         if (m_testStep >= int(std::size(Steps)))
         {
             m_running = false;
@@ -3026,6 +3263,133 @@ namespace launcher_ui
     }
 
     // Screens of the screenshot test, each captured once it has settled.
+    // The three model screens (docs/polish_audit.md): Home, the game page and its Keyboard tab, as a player finds them: Spyro's
+    // Adventure's disc (SKY_LAUNCHER_TEST_DROP) verified and its game built (by hand: the runtime is not run), Giants opened
+    // with no disc, Swap Force not opened yet. With a pad (SKY_LAUNCHER_TEST_SCREENS=pad) the focus is on each page's first
+    // stop, its ring shown; with the mouse, no ring. SKY_LAUNCHER_LANGUAGE and SKY_LAUNCHER_TEST_SIZE set the rest;
+    // SKY_LAUNCHER_TEST_SCALE=2 draws them at twice the density (a Retina screen's), the same layout.
+    void App::TestScreensScript(uint64_t now)
+    {
+        const bool pad = m_testScreens == 2;
+        auto shoot = [&](const char* name, Page page, uint64_t wait) {
+            m_page = page;
+            m_gameTab = GameTab::Keyboard;
+            m_focusTo = FocusTo::Page;
+            m_focusShow = pad;
+            ImGui::SetNavCursorVisible(pad);
+            m_testShot = fmt::format("screen-{}", name);
+            m_testAt = now + wait;
+        };
+        GameSlot& ssa = SlotFor(*FindGame("ssa"));
+        switch (m_testStep)
+        {
+        case 0:
+            if (const char* scale = LauncherEnv("SKY_LAUNCHER_TEST_SCALE"); scale != nullptr && std::atof(scale) > 0)
+            {
+                int w = int(WindowW), h = int(WindowH);
+                if (const char* size = LauncherEnv("SKY_LAUNCHER_TEST_SIZE"))
+                    std::sscanf(size, "%dx%d", &w, &h);
+                m_testUiScale = m_uiScale = float(std::atof(scale));
+                SDL_SetWindowSize(m_window, int(float(w) * m_uiScale), int(float(h) * m_uiScale));
+            }
+            SelectGame(*FindGame("giants"));
+            SelectGame(*FindGame("ssa"));
+            if (ssa.disc == DiscState::None && !m_testDrop.empty())
+                StartVerify(m_testDrop);
+            m_page = Page::Play;
+            m_testStep = 1;
+            return;
+        case 1:
+            if (ssa.disc == DiscState::Verifying)
+                return;
+            ssa.installed.runtime = "test-built";
+            ssa.installed.gameVersion = "99.0.0";
+            shoot("home", Page::Home, 600);
+            break;
+        case 2: shoot("game", Page::Play, 2200); break; // the logo has fallen
+        case 3: shoot("keys", Page::GameSettings, 600); break;
+        default: m_running = false; break;
+        }
+    }
+
+    // One game at a time (SKY_LAUNCHER_TEST_RUNNING, with SKY_LAUNCHER_RUNTIME a stand-in game that runs a few seconds and exits
+    // with 3, and SKY_LAUNCHER_TEST_DROP Spyro's Adventure's disc): PLAY starts it and the window stays; its button says Running,
+    // a second PLAY starts nothing, another game's button waits for it; once it stops (a crash: its exit code is told) PLAY is
+    // back. Shots: running-1-game, running-2-other, running-3-ended.
+    void App::TestRunningScript(uint64_t now)
+    {
+        GameSlot& ssa = SlotFor(*FindGame("ssa"));
+        GameSlot& giants = SlotFor(*FindGame("giants"));
+        auto expect = [&](bool ok, const char* what) {
+            if (!ok)
+            {
+                fprintf(stderr, "FAIL running step %d: %s (running \"%s\")\n", m_testStep, what, m_session.Running().c_str());
+                m_testFailures++;
+            }
+        };
+        auto shoot = [&](const char* name) {
+            m_page = Page::Play;
+            m_testShot = fmt::format("running-{}", name);
+            m_testAt = now + 600;
+        };
+        switch (m_testStep)
+        {
+        case 0:
+            m_startGames = true;
+            SelectGame(*FindGame("giants"));
+            SelectGame(*FindGame("ssa"));
+            if (ssa.disc == DiscState::None && !m_testDrop.empty())
+                StartVerify(m_testDrop);
+            m_page = Page::Play;
+            m_testBegan = now;
+            m_testStep = 1;
+            return;
+        case 1:
+        {
+            if (ssa.disc == DiscState::Verifying)
+                return;
+            expect(ssa.disc == DiscState::Ready, "the disc is checked");
+            ssa.installed.runtime = "test-built"; // built by hand: SKY_LAUNCHER_RUNTIME is what runs
+            PlayNow();
+            PlayNow(); // a double click: still one game
+            const SlotLine line = SlotStatus(&ssa);
+            expect(m_session.Running() == "ssa" && m_session.Ours(), "PLAY starts the game, the window stays");
+            expect(line.state == SlotState::Running && line.button == "Running" && !line.buttonEnabled && line.text == "Running", "its button says Running, off");
+            expect(!m_toasts.Items().empty() && m_toasts.Items().back().text == "Spyro's Adventure is running", "the second PLAY is refused");
+            m_toasts.Clear();
+            shoot("1-game");
+            return;
+        }
+        case 2:
+        {
+            SelectGame(*FindGame("giants"));
+            const SlotLine line = SlotStatus(&giants);
+            expect(line.button == "Spyro's Adventure is running" && !line.buttonEnabled, "another game waits for it");
+            shoot("2-other");
+            return;
+        }
+        case 3:
+            if (m_session.Ours())
+            {
+                if (now - m_testBegan > 30000)
+                {
+                    expect(false, "the stand-in game stops");
+                    m_running = false;
+                }
+                return;
+            }
+            expect(m_session.Running().empty(), "nothing runs once it stopped");
+            expect(m_drawn["stopped"] == "ssa 3", "its crash is told");
+            SelectGame(*FindGame("ssa"));
+            expect(SlotStatus(&ssa).button == "PLAY" && SlotStatus(&ssa).buttonEnabled && SlotStatus(&giants).buttonEnabled, "PLAY is back");
+            shoot("3-ended");
+            return;
+        default:
+            m_running = false;
+            return;
+        }
+    }
+
     void App::TestScript()
     {
         if (m_shots.empty() || m_testAt != 0)
@@ -3046,6 +3410,47 @@ namespace launcher_ui
             TestUninstallScript(now);
             return;
         }
+        if (m_testScreens != 0)
+        {
+            TestScreensScript(now);
+            return;
+        }
+        if (m_testRunning)
+        {
+            TestRunningScript(now);
+            return;
+        }
+        if (m_testPad)
+        {
+            // Each game's Controller tab (SKY_LAUNCHER_TEST_PAD): with a few buttons given other jobs, to see the rows; Swap Force's
+            // Game tab has the Nightmare option (a second shot).
+            static const char* const Games[] = { "ssa", "giants", "swapforce" };
+            if (m_testStep >= int(std::size(Games)) + 1)
+            {
+                m_running = false;
+                return;
+            }
+            if (m_testStep < int(std::size(Games)))
+            {
+                SelectGame(*FindGame(Games[m_testStep]));
+                SetPadTarget(m_config, Games[m_testStep], 5, 1);   // RB does B's job
+                SetPadTarget(m_config, Games[m_testStep], 6, -1);  // LT is off
+                m_config[GameInputSection(Games[m_testStep])]["rumble_p2"] = "low";
+                m_page = Page::GameSettings;
+                m_gameTab = GameTab::Controller;
+                m_testShot = fmt::format("pad-{}", Games[m_testStep]);
+            }
+            else
+            {
+                SelectGame(*FindGame("swapforce"));
+                m_config["swapforce"]["nightmare_from_start"] = "1";
+                m_page = Page::GameSettings;
+                m_gameTab = GameTab::Game;
+                m_testShot = "game-swapforce";
+            }
+            m_testAt = now + 600;
+            return;
+        }
         if (m_testKeys)
         {
             // Each game's Keyboard tab (set SKY_LAUNCHER_LANGUAGE for the language of the shots).
@@ -3060,6 +3465,47 @@ namespace launcher_ui
             m_gameTab = GameTab::Keyboard;
             m_testShot = fmt::format("keys-{}", Games[m_testStep]);
             m_testAt = now + 600;
+            return;
+        }
+        if (m_testAchievements)
+        {
+            // The shown game's page with its disc verified and some progress, then its achievements (SKY_LAUNCHER_TEST_DROP names the disc;
+            // SKYLANDERS_DATA a scratch folder: the progress is written there).
+            switch (m_testStep)
+            {
+            case 0:
+                m_page = Page::Play;
+                m_testShot = "achievements-0-checking";
+                m_testAt = now + 300;
+                break;
+            case 1:
+                if (m_s->disc == DiscState::None && !m_testDrop.empty())
+                    StartVerify(m_testDrop);
+                if (m_s->disc == DiscState::Ready || m_s->disc == DiscState::Failed || m_testDrop.empty())
+                {
+                    // Six unlocks on different days, 12 h 34 of play, last played a moment ago.
+                    achievements::List list = achievements::ReadCache(AchievementCacheFolder(m_s->game.id), "en");
+                    const int64_t nowTime = int64_t(std::time(nullptr));
+                    for (size_t i = 0; i < list.items.size() && i < 6; i++)
+                        progress::WriteUnlock(progress::Folder(m_s->game.id), list.items[i * 2 % list.items.size()].id, nowTime - int64_t(i) * 86400 * 3 - 600);
+                    progress::WritePlayTime(progress::Folder(m_s->game.id), { 12 * 3600 + 34 * 60 + 20, nowTime - 90, 9 });
+                    RefreshProgress(true);
+                    m_testShot = "achievements-1-game";
+                    m_testAt = now + 1500;
+                }
+                break;
+            case 2:
+                GoTo(Page::Achievements);
+                m_testShot = "achievements-2-list";
+                m_testAt = now + 900;
+                break;
+            case 3:
+                m_testShot = "achievements-3-end";
+                m_testAt = now + 700;
+                break;
+            default:
+                m_running = false;
+            }
             return;
         }
         if (m_testLogo)

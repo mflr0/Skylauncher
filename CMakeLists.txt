@@ -67,11 +67,12 @@ target_link_libraries(XenonXex PUBLIC fmt::fmt)
 # The fonts are also built into the executable, so a lone executable works (Windows .exe).
 add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/embedded_fonts.cpp
     COMMAND ${CMAKE_COMMAND} -DOUTFIT=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf -DOUTFIT_BOLD=${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf
-        -DBUNGEE=${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf -DICON=${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_fonts.cpp
+        -DBUNGEE=${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf -DLUCIDE=${CMAKE_SOURCE_DIR}/resources/fonts/Lucide.ttf -DICON=${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png -DOUTPUT=${CMAKE_BINARY_DIR}/embedded_fonts.cpp
         -P ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake
     DEPENDS ${CMAKE_SOURCE_DIR}/cmake/embed_fonts.cmake ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf
         ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf
-        ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf ${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png
+        ${CMAKE_SOURCE_DIR}/resources/fonts/Bungee-Regular.ttf ${CMAKE_SOURCE_DIR}/resources/fonts/Lucide.ttf
+        ${CMAKE_SOURCE_DIR}/resources/icons/skylauncher-128.png
     COMMENT "Embedding the launcher fonts")
 
 # SSARecomp's collection library (src/shared/collection, tools/sync_collection.sh) builds its toy catalogue in.
@@ -115,6 +116,7 @@ add_library(ArkeyanLauncherCore STATIC
     src/launcher/launcher_games.cpp
     src/launcher/i18n.cpp
     src/launcher/game_install.cpp
+    src/launcher/game_progress.cpp
     src/launcher/ui/launcher_ui.cpp
     src/launcher/ui/collection_page.cpp
     src/launcher/ui/collection_figure.cpp
@@ -129,18 +131,21 @@ add_library(ArkeyanLauncherCore STATIC
     src/launcher/ui/components/feedback.cpp
     src/launcher/ui/components/format.cpp
     src/launcher/ui/gallery.cpp
+    src/launcher/ui/achievements_page.cpp
     src/assets/launcher_assets.cpp
     src/shared/figures/figure_catalog.cpp
     src/shared/figures/figure_crypto.cpp
     src/shared/figures/figure_data.cpp
     src/shared/figures/figure_tag.cpp
     src/shared/figures/figure_icons.cpp
+    src/shared/collection/achievements.cpp
     src/shared/collection/catalogue.cpp
     src/shared/collection/collection.cpp
     src/shared/collection/datadir.cpp
     src/shared/collection/game_data.cpp
     src/shared/collection/icons.cpp
     src/shared/collection/json.cpp
+    src/shared/collection/progress.cpp
     src/shared/collection/save_backup.cpp
     src/shared/collection/search.cpp
     src/shared/collection/upgrades.cpp
@@ -173,6 +178,7 @@ target_sources(ArkeyanLauncherCore PRIVATE
     src/launcher/ui/game_settings_page.cpp
     src/launcher/ui/game_data_page.cpp
     src/launcher/report.cpp
+    src/launcher/problem_report.cpp
     src/launcher/updater.cpp
     src/shared/mini_json.cpp
     src/launcher/ui/install_page.cpp

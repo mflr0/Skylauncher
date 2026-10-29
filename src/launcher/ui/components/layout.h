@@ -19,6 +19,13 @@ namespace ui
     void BeginCard(const char* id, ImVec2 size, const CardOptions& options = {});
     void EndCard();
 
+    // ---- A scrolling area (a child window) with room round its content: its clip rect reaches `bleed` points past the
+    // content on every side and its padding puts the content back where the cursor was, so a focus ring, a hover box or a
+    // border at the content's edge is never cut. `size` is the content's: > 0 that size, <= 0 the room left less |size|
+    // (BeginChild's rule). The layout after it is a plain child's of that size (SameLine beside it, the next line under it). ----
+    void BeginRoomyChild(const char* id, ImVec2 size, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0, float bleed = focus::Reach);
+    void EndRoomyChild();
+
     // ---- ListRow: one row of a list, the whole row pressable. Its title, a subtitle under it (the row is then
     // height::Large), a trailing text, a chevron when it opens something; selected: the raised grey and the orange bar. ----
     struct ListRowOptions
@@ -30,12 +37,14 @@ namespace ui
         bool selected = false;
         bool disabled = false;
         float width = -1;
-        // An image at the row's left (a game's logo, an initial): drawn by the caller in `imageWidth` points of the row's
-        // height, called with the box's top left and size. The sidebar's rows have one.
+        // An image at the row's left (a game's logo, a figure's picture): `imageWidth` points wide, the row's height less
+        // space::XXS above and below, drawn by the caller, called with the box's top left and size.
         std::function<void(ImDrawList*, ImVec2 at, ImVec2 size)> image;
         float imageWidth = 0;
         const char* note = nullptr;     // a small word after the title (a version)
-        const Status* status = nullptr; // the shape of the subtitle's state, before it
+        const Status* status = nullptr; // the subtitle's state: its icon before it, in its colour
+        Icon statusIcon = Icon::None;   // that icon when the state has its own (a disc, an update), else the status's
+        float leadWidth = 0;            // the leading column's width (the icon or the image centred in it): one per list
         float progress = -1;            // 0..1: a thin bar along the row's foot (an install running)
         unsigned progressColor = 0;     // its fill; 0: the accent
         bool dim = false;               // the title in the dim ink (a game not out yet)
@@ -44,10 +53,14 @@ namespace ui
 
     // ---- Settings rows: the one settings idiom. The label (and a one-line hint under it) on the left, the control in a
     // column on the right (height::SettingControl wide), rows at least height::Large high with a hairline between them.
-    // Between BeginSettings (false: draw nothing) and EndSettings, one SettingRow per setting, then its control. ----
-    bool BeginSettings(const char* id);
-    void SettingRow(const char* label, const char* hint = nullptr);
+    // Between BeginSettings (false: draw nothing) and EndSettings, one SettingRow per setting, then its control; the label is
+    // drawn once the control is, centred on it (`note`: a small word after the label, on its baseline: a pad's button). ----
+    bool BeginSettings(const char* id, float controlWidth = height::SettingControl); // wider for a row of buttons that needs it
+    void SettingRow(const char* label, const char* hint = nullptr, const char* note = nullptr);
     void EndSettings();
+    // Moves the cursor so that a control (or a group) `width` wide ends at the available room's right edge: a settings row's
+    // buttons end on the column's edge.
+    void AlignRight(float width);
 
     // ---- SectionHeader: a section's title in a card or a page, a divider above it unless it is the first. ----
     void SectionHeader(const char* title, const char* subtitle = nullptr, bool divider = true);
@@ -68,8 +81,14 @@ namespace ui
         ModalKind kind = ModalKind::Normal);
 
     // ---- Menu: a popover under the item that opens it, with its rows. ----
-    // After the item that opens it: the menu opens under that item, or above it (`above`: an item at the window's foot, a band).
-    void OpenMenu(const char* id, bool above = false);
+    // After the item that opens it: the menu opens under that item, its left edge on the item's; `above`: above it (an item
+    // at the window's foot, a band); `alignRight`: its right edge on the item's (an opener at the window's right).
+    struct MenuAnchor
+    {
+        bool above = false;
+        bool alignRight = false;
+    };
+    void OpenMenu(const char* id, MenuAnchor anchor = {});
     bool BeginMenu(const char* id);
     struct MenuItemOptions
     {

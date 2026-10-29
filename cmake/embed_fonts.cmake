@@ -1,5 +1,5 @@
 # Writes OUTPUT, a C++ file defining the font byte arrays declared in src/embedded_fonts.h.
-# Run as a script: cmake -DOUTFIT=<ttf> -DOUTFIT_BOLD=<ttf> -DBUNGEE=<ttf> -DICON=<png> -DOUTPUT=<cpp> -P embed_fonts.cmake
+# Run as a script: cmake -DOUTFIT=<ttf> -DOUTFIT_BOLD=<ttf> -DBUNGEE=<ttf> -DLUCIDE=<ttf> -DICON=<png> -DOUTPUT=<cpp> -P embed_fonts.cmake
 function(embed_array name path)
     file(READ "${path}" bytes HEX)
     string(LENGTH "${bytes}" length)
@@ -13,6 +13,7 @@ file(WRITE "${OUTPUT}" "// Generated from resources/fonts by cmake/embed_fonts.c
 embed_array(g_embeddedOutfit "${OUTFIT}")
 embed_array(g_embeddedOutfitBold "${OUTFIT_BOLD}")
 embed_array(g_embeddedBungee "${BUNGEE}")
+embed_array(g_embeddedLucide "${LUCIDE}")
 if(ICON)
     embed_array(g_embeddedIcon "${ICON}")
 endif()

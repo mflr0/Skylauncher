@@ -17,6 +17,7 @@
 #endif
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <fstream>
 #include <string>
 
@@ -169,6 +170,90 @@ namespace
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR");
 #endif
         printf("Game run: capture of stdout and stderr, exit code, logs text and portal probe checked\n");
+    }
+
+    // One game at a time (GameSession): a game started here is watched to its exit (its code: a crash); a second start, of it or
+    // of another game, is refused while it runs; a game found by its marker (one started by hand) counts too; and one left
+    // running when the launcher closed is found by the next launcher by the marker the game keeps (save_backup.h).
+    void GameSessionChecks(const std::filesystem::path& scratch)
+    {
+#if !defined(_WIN32)
+        namespace fs = std::filesystem;
+        const fs::path root = scratch / "session";
+        fs::create_directories(root / "logs");
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR", (root / "logs").string().c_str(), true);
+        auto script = [&](const char* name, const std::string& body) {
+            const fs::path path = root / name;
+            std::ofstream(path) << "#!/bin/sh\n" << body;
+            fs::permissions(path, fs::perms::owner_all);
+            return path.string();
+        };
+        // Polls as the window does until the game stops (at most 10 s).
+        auto waitEnd = [](GameSession& session) {
+            for (const uint64_t start = SDL_GetTicks(); SDL_GetTicks() - start < 10000; SDL_Delay(20))
+                if (std::optional<GameSession::Ended> ended = session.Poll(SDL_GetTicks()))
+                    return ended;
+            return std::optional<GameSession::Ended>();
+        };
+        std::map<std::string, bool> marked; // the games' markers, as this test sets them
+        GameSession session({ "ssa", "giants" }, [&](const std::string& game) { return marked[game]; });
+        GameLaunch launch;
+        launch.runtime = script("quits.sh", "echo \"language $SKY_LANGUAGE\"\nsleep 1\nexit 0\n");
+        launch.variables = { { "SKY_LANGUAGE", "fr" } };
+        std::string error;
+        SHELL_EXPECT(session.Running().empty() && session.Start("ssa", launch, "disc.iso", error));
+        SHELL_EXPECT(session.Running() == "ssa" && session.Ours());
+        SHELL_EXPECT(!session.Start("ssa", launch, "disc.iso", error) && error == "Spyro's Adventure is running"); // a double click
+        SHELL_EXPECT(!session.Start("giants", launch, "disc.iso", error) && session.Running() == "ssa");        // another game
+        std::optional<GameSession::Ended> ended = waitEnd(session);
+        SHELL_EXPECT(ended && ended->game == "ssa" && ended->ours && ended->exitCode == 0);
+        SHELL_EXPECT(session.Running().empty() && !session.Ours());
+        const std::string capture = ReadLogTail(root / "logs" / CaptureLogName);
+        SHELL_EXPECT(capture.find("language fr") != std::string::npos && capture.find("# exit code 0") != std::string::npos);
+        // A crash: its exit code, and the next game can start.
+        launch.runtime = script("crashes.sh", "exit 7\n");
+        SHELL_EXPECT(session.Start("giants", launch, "disc.iso", error));
+        ended = waitEnd(session);
+        SHELL_EXPECT(ended && ended->game == "giants" && ended->ours && ended->exitCode == 7 && session.Running().empty());
+        // A game found by its marker: nothing starts until it is gone.
+        marked["giants"] = true;
+        SHELL_EXPECT(!session.Poll(SDL_GetTicks()) && session.Running() == "giants" && !session.Ours());
+        SHELL_EXPECT(!session.Start("ssa", launch, "disc.iso", error) && error == "Giants is running");
+        marked["giants"] = false;
+        ended = session.Poll(SDL_GetTicks() + 2 * GameSession::MarkerMs);
+        SHELL_EXPECT(ended && ended->game == "giants" && !ended->ours && session.Running().empty());
+        // Started by hand a moment ago (the next look at the markers not due yet): Start sees it at once.
+        marked["ssa"] = true;
+        SHELL_EXPECT(!session.Start("giants", launch, "disc.iso", error) && session.Running() == "ssa");
+        marked["ssa"] = false;
+        ended = session.Poll(SDL_GetTicks() + 4 * GameSession::MarkerMs);
+        SHELL_EXPECT(ended && session.Running().empty());
+        // A runtime that isn't there: refused, nothing runs.
+        launch.runtime = (root / "nowhere").string();
+        SHELL_EXPECT(!session.Start("ssa", launch, "disc.iso", error) && session.Running().empty() && !session.Ours());
+
+        // The launcher closed while its game runs, then opened again: the game runs on, and the next launcher finds it by its
+        // marker (written and removed by the stand-in as the runtime does), and starts nothing until it is gone.
+        const fs::path saves = root / "saves", lock = savebackup::LockFile(saves);
+        launch.runtime = script("stays.sh", "mkdir -p '" + lock.parent_path().string() + "'\necho $$ > '" + lock.string() +
+            "'\nsleep 2\nrm -f '" + lock.string() + "'\n");
+        auto marker = [&](const std::string&) { return savebackup::GameRunning(saves); };
+        {
+            GameSession first({ "ssa" }, marker);
+            SHELL_EXPECT(first.Start("ssa", launch, "disc.iso", error));
+            for (const uint64_t start = SDL_GetTicks(); !savebackup::GameRunning(saves) && SDL_GetTicks() - start < 5000;)
+                SDL_Delay(20);
+        }
+        GameSession second({ "ssa" }, marker);
+        SHELL_EXPECT(!second.Poll(SDL_GetTicks()) && second.Running() == "ssa" && !second.Ours());
+        SHELL_EXPECT(!second.Start("ssa", launch, "disc.iso", error));
+        ended = waitEnd(second);
+        SHELL_EXPECT(ended && ended->game == "ssa" && !ended->ours && second.Running().empty());
+        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR");
+        printf("One game at a time: start, refusals, exit codes, markers and a launcher restarted while its game runs checked\n");
+#else
+        (void)scratch;
+#endif
     }
 }
 
@@ -471,13 +556,13 @@ namespace
 
         // The three home folders, with both separator spellings on Windows.
         SHELL_EXPECT(launcher_report::Redact("/Users/alice/Library/Application Support/Skylanders", identity) ==
-            "<home>/Library/Application Support/Skylanders");
-        SHELL_EXPECT(launcher_report::Redact("/home/alice/.local/share/Skylanders", identity) == "<home>/.local/share/Skylanders");
+            "~/Library/Application Support/Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("/home/alice/.local/share/Skylanders", identity) == "~/.local/share/Skylanders");
         SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData\\Roaming\\Skylanders", identity) ==
-            "<home>\\AppData\\Roaming\\Skylanders");
+            "~\\AppData\\Roaming\\Skylanders");
         SHELL_EXPECT(launcher_report::Redact("C:/Users/alice/AppData/Roaming/Skylanders", identity) ==
-            "<home>/AppData/Roaming/Skylanders");
-        SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData", identity) == "<home>\\AppData");
+            "~/AppData/Roaming/Skylanders");
+        SHELL_EXPECT(launcher_report::Redact("C:\\Users\\alice\\AppData", identity) == "~\\AppData");
         // Another account is not touched, and neither is a longer name that starts with ours.
         SHELL_EXPECT(launcher_report::Redact("/Users/alicia/x C:\\Users\\alice2\\x", identity) ==
             "/Users/alicia/x C:\\Users\\alice2\\x");
@@ -503,7 +588,7 @@ namespace
         // Nothing else changes: a text without the identity is returned as it is, byte for byte.
         std::string plain = "line one\r\n\tspaced  two\n[]{}%$#@! caf\xC3\xA9\n";
         SHELL_EXPECT(launcher_report::Redact(plain, identity) == plain);
-        SHELL_EXPECT(launcher_report::Redact("before /Users/alice after", identity) == "before <home> after");
+        SHELL_EXPECT(launcher_report::Redact("before /Users/alice after", identity) == "before ~ after");
         SHELL_EXPECT(launcher_report::Redact("", identity).empty());
 
         // The whole report: every file, the versions and the GPU line, all redacted.
@@ -513,9 +598,11 @@ namespace
         std::filesystem::create_directories(data / "logs");
         WriteBytes(data / "launcher.ini", "[video]\nvsync=1\n[ssa]\niso=/Users/alice/Documents/SSA.iso\n");
         WriteBytes(game / "SSARecomp.log", "[log] /Users/alice/Library/Application Support/Skylanders/SSA/SSARecomp.log\n"
-            "[version] SSARecomp 1.0.0, build abc123\n[system] macOS 15\n"
+            "[version] SSARecomp 1.0.0, build abc123\n[system] macOS 15\n[system] CPU Test CPU 3000\n"
             "[gpu] adapter Apple M2: vendor 106B, integrated, unified memory, 8192 MB of video memory, driver n/a\n");
-        WriteBytes(game / "SSARecomp.prev.log", "previous run\n");
+        WriteBytes(game / "SSARecomp.prev.log", "previous run\n\nFault (signal 11 segv) at host address 0x0\n"
+            "[crash] where: guest thread 7, lr 0x8262D6D4, ctr 0x82850DA8, r1 0x700B7D30, r3 0x40070600, r31 0x82BB0000\n"
+            "[crash] guest function: sub_822A95C0, called from sub_8262D690\n");
         WriteBytes(game / "install.log", "@done /Users/alice/Applications/SSARecomp\n");
         WriteBytes(game / "install.prev.log", "previous install\n");
         WriteBytes(game / "install-logs" / "compile.txt", "compiled on Alices-MacBook-Pro.local\n");
@@ -544,10 +631,27 @@ namespace
         SHELL_EXPECT(report.find("===== install.prev.log =====") != std::string::npos);
         SHELL_EXPECT(report.find("===== install-logs/compile.txt =====") != std::string::npos);
         SHELL_EXPECT(report.find("previous run") != std::string::npos && report.find("previous install") != std::string::npos);
+        // Where the game stopped: the last fault block of the log, from this run's log or else the previous run's, quoted once under
+        // its own heading and named in the header; the CPU line comes from the log.
+        SHELL_EXPECT(report.find("CPU: Test CPU 3000\n") != std::string::npos);
+        SHELL_EXPECT(report.find("Last crash: yes (the previous run), see below\n") != std::string::npos);
+        SHELL_EXPECT(report.find("===== last crash (the previous run) =====\nFault (signal 11 segv)") != std::string::npos);
+        SHELL_EXPECT(report.find("[crash] guest function: sub_822A95C0, called from sub_8262D690") != std::string::npos);
+        SHELL_EXPECT(launcher_report::CrashDetails("no fault here\n").empty());
+        SHELL_EXPECT(launcher_report::CrashDetails("Fault (a)\nold\nFault (b)\nnew\n") == "Fault (b)\nnew\n");
         SHELL_EXPECT(report.find("alice") == std::string::npos && report.find("Alices-MacBook-Pro") == std::string::npos);
-        SHELL_EXPECT(report.find("<home>") != std::string::npos && report.find("<iso folder>/SSA.iso") != std::string::npos);
+        SHELL_EXPECT(report.find("~") != std::string::npos && report.find("<iso folder>/SSA.iso") != std::string::npos);
         SHELL_EXPECT(launcher_report::FileName().starts_with("ArkeyanLauncher-report-") &&
             launcher_report::FileName().ends_with(".txt"));
+        // The file the Support page and the crash dialog write: the first folder that takes it, else the next.
+        {
+            std::filesystem::path blocked = scratch / "reportblocked";
+            WriteBytes(blocked, "a file where a folder is needed");
+            std::filesystem::path desktop = scratch / "reportdesktop";
+            std::filesystem::path saved = launcher_report::SaveToFirstFolder("text", "r.txt", { blocked / "Desktop", desktop });
+            SHELL_EXPECT(saved == desktop / "r.txt" && std::filesystem::exists(saved));
+            SHELL_EXPECT(launcher_report::SaveToFirstFolder("text", "r.txt", { blocked / "Desktop" }).empty());
+        }
         printf("Report: the three home folders, names in text, computer and ISO folder redacted; nothing else changed\n");
     }
 }
@@ -679,6 +783,7 @@ int ShellChecks(const std::filesystem::path& scratch)
 {
     ChecklistChecks(scratch);
     GameRunChecks(scratch);
+    GameSessionChecks(scratch);
     UpdaterChecks(scratch);
     DirectoryListChecks(scratch);
     KitFollowChecks(scratch);

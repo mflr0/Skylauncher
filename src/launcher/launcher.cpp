@@ -441,15 +441,13 @@ namespace
     }
 }
 
-SDL_Environment* CreateGameEnvironment()
+SDL_Environment* CreateGameEnvironment(const std::vector<std::pair<std::string, std::string>>& set)
 {
     SDL_Environment* environment = SDL_CreateEnvironment(false);
     if (environment == nullptr)
         return nullptr;
     char** variables = SDL_GetEnvironmentVariables(SDL_GetEnvironment());
-    if (variables == nullptr)
-        return environment;
-    for (int i = 0; variables[i] != nullptr; i++)
+    for (int i = 0; variables != nullptr && variables[i] != nullptr; i++)
     {
         std::string entry = variables[i];
         size_t equals = entry.find('=');
@@ -457,7 +455,7 @@ SDL_Environment* CreateGameEnvironment()
             SDL_SetEnvironmentVariable(environment, entry.substr(0, equals).c_str(), entry.c_str() + equals + 1, true);
     }
     // The aliases, after every variable is in: one that is set under its own name is never replaced by another's value.
-    for (int i = 0; variables[i] != nullptr; i++)
+    for (int i = 0; variables != nullptr && variables[i] != nullptr; i++)
     {
         std::string entry = variables[i];
         size_t equals = entry.find('=');
@@ -469,6 +467,9 @@ SDL_Environment* CreateGameEnvironment()
                 SDL_SetEnvironmentVariable(environment, name.c_str(), entry.c_str() + equals + 1, false);
     }
     SDL_free(variables);
+    for (const auto& [name, value] : set)
+        for (const std::string& each : AllNamesOf(name))
+            SDL_SetEnvironmentVariable(environment, each.c_str(), value.c_str(), true);
     return environment;
 }
 

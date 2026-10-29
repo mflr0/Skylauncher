@@ -2,6 +2,9 @@
 #include "launcher/env.h"
 #include "launcher/i18n.h"
 #include "launcher/game_install.h"
+#include "launcher/game_keys.h"
+#include "launcher/game_names.h"
+#include "launcher/game_settings.h"
 #include "launcher/launcher.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -208,6 +211,202 @@ GameRunResult RunGame(const std::string& runtime, const std::string& iso, const 
     log << "\n# exit code " << result.exitCode << "\n";
     SDL_DestroyProcess(process);
     return result;
+}
+
+GameLaunch PrepareGameLaunch(const GameInfo& game, LauncherConfig& config, const std::string& configPath, const std::string& installed)
+{
+    GameLaunch launch;
+    launch.runtime = FindRuntime(game, config, true);
+    if (launch.runtime.empty())
+        launch.runtime = !installed.empty() ? installed : FindRuntime(game, config);
+    if (launch.runtime.empty())
+    {
+        launch.error = Tf("The game ({}) wasn't found next to Arkeyan Launcher.\n\nPut it in the same folder.", game.runtime);
+        return launch;
+    }
+    // The video settings of this game are what the runtime reads from [video] (game_settings.h), and its keys from [input].
+    ApplyGameVideo(config, game.id);
+    ApplyGameInput(config, game.id);
+    SaveLauncherConfig(configPath, config);
+    // Settings the runtime already takes from its environment (the rest it reads from launcher.ini; docs/settings.md).
+    auto setting = [&](const char* section, const char* key) {
+        auto entry = config.find(section);
+        if (entry == config.end())
+            return std::string();
+        auto value = entry->second.find(key);
+        return value != entry->second.end() ? value->second : std::string();
+    };
+    auto pass = [&](const char* variable, const char* section, const char* key) {
+        if (std::string value = setting(section, key); !value.empty())
+            launch.variables.emplace_back(variable, value);
+    };
+    pass("SKY_PORTAL", "portal", "mode");
+    // [portal] place is the older list of figures to start on the portal; once the seats moved to the session file
+    // ([collection] moved) a left-over one would put its figures back over the seats the player chose.
+    if (setting("collection", "moved") != "1")
+        pass("SKY_PORTAL_PLACE", "portal", "place");
+    // A language the disc does not hold is not passed as is: the text takes the disc's first language and the voices
+    // follow the text, which is what the Language tab shows then. Nothing known about the disc: passed as saved.
+    const art::DiscLanguages onDisc = StoredDiscLanguages(config, game.id);
+    auto passLanguage = [&](const char* variable, const char* key, const std::vector<std::string>& held, bool firstHeld) {
+        const std::string value = setting(game.id, key);
+        if (value.empty())
+            return;
+        if (held.empty() || std::find(held.begin(), held.end(), value) != held.end())
+            launch.variables.emplace_back(variable, value);
+        else if (firstHeld)
+            launch.variables.emplace_back(variable, held.front());
+    };
+    passLanguage("SKY_LANGUAGE", "language", onDisc.text, true);
+    passLanguage("SKY_VOICE_LANGUAGE", "voice_language", onDisc.voice, false);
+    // A game built before the one data folder would look for its saves and settings in the older folders, which the
+    // migration emptied: point it at the new ones until "Update the game" rebuilds it (docs/install.md, "Older builds").
+    const std::filesystem::path gameFolder = GameInstallFolder({});
+    if (IsOlderLayoutBuild(Path(launch.runtime), gameFolder))
+    {
+        launch.variables.emplace_back("SKY_LAUNCHER_INI", configPath);
+        launch.variables.emplace_back("SKY_SAVE_DIR", Utf8(gameFolder / "saves"));
+        launch.variables.emplace_back("SKY_LOG", Utf8(gameFolder / "SSARecomp.log"));
+        launch.variables.emplace_back("SKY_PORTRAITS", Utf8(gameFolder / "portraits"));
+    }
+    return launch;
+}
+
+GameSession::GameSession(std::vector<std::string> games, Marker marker)
+    : m_games(std::move(games)), m_marker(std::move(marker))
+{
+    if (!m_marker)
+        m_marker = [](const std::string& game) { return GameIsRunning(FoldersOf(game)); };
+}
+
+GameSession::~GameSession()
+{
+    if (m_log != nullptr)
+        SDL_CloseIO(m_log);
+    if (m_process != nullptr)
+        SDL_DestroyProcess(m_process); // the game itself is not stopped
+#if defined(_WIN32)
+    if (m_handle != nullptr)
+        CloseHandle(HANDLE(m_handle));
+#endif
+}
+
+std::string GameSession::Marked() const
+{
+    for (const std::string& game : m_games)
+        if (m_marker(game))
+            return game;
+    return {};
+}
+
+bool GameSession::Start(const std::string& game, const GameLaunch& launch, const std::string& iso, std::string& error)
+{
+    // A game started by hand a moment ago counts too: the markers are looked at now, not at the next poll.
+    if (m_game.empty())
+        m_game = Marked();
+    if (!m_game.empty())
+    {
+        error = Tf("{} is running", GameName(m_game, GameNameForm::Short));
+        return false;
+    }
+    std::error_code ignored;
+    if (launch.runtime.empty() || !std::filesystem::exists(Path(launch.runtime), ignored))
+    {
+        error = Tr("Couldn't start the game: the file is missing");
+        return false;
+    }
+    // The output goes straight into the file (the previous run's kept as .prev): nothing of the launcher stands between the
+    // game and its log, and a launcher that is closed leaves the game running.
+    const std::filesystem::path folder = GameLogFolder(), capture = folder / CaptureLogName;
+    std::filesystem::create_directories(folder, ignored);
+    std::filesystem::rename(capture, folder / "skylauncher-game.prev.log", ignored);
+    SDL_IOStream* log = SDL_IOFromFile(Utf8(capture).c_str(), "ab");
+    if (log != nullptr)
+    {
+        const std::string head = fmt::format("# {} {}\n", launch.runtime, iso);
+        SDL_WriteIO(log, head.data(), head.size());
+        SDL_FlushIO(log);
+    }
+    std::vector<const char*> argv{ launch.runtime.c_str(), iso.c_str(), nullptr };
+    SDL_PropertiesID properties = SDL_CreateProperties();
+    SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ARGS_POINTER, argv.data());
+    SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDIN_NUMBER, SDL_PROCESS_STDIO_NULL);
+    if (log != nullptr)
+    {
+        SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_REDIRECT);
+        SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_POINTER, log);
+        SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, true);
+    }
+    else
+        SDL_SetNumberProperty(properties, SDL_PROP_PROCESS_CREATE_STDOUT_NUMBER, SDL_PROCESS_STDIO_NULL);
+#if defined(_WIN32)
+    SDL_SetBooleanProperty(properties, SDL_PROP_PROCESS_CREATE_BACKGROUND_BOOLEAN, true); // no console window
+#endif
+    SDL_Environment* environment = CreateGameEnvironment(launch.variables);
+    if (environment != nullptr)
+        SDL_SetPointerProperty(properties, SDL_PROP_PROCESS_CREATE_ENVIRONMENT_POINTER, environment);
+    SDL_Process* process = SDL_CreateProcessWithProperties(properties);
+    SDL_DestroyProperties(properties);
+    if (environment != nullptr)
+        SDL_DestroyEnvironment(environment);
+    if (process == nullptr)
+    {
+        error = Tf("Couldn't start the game: {}", SDL_GetError());
+        if (log != nullptr)
+            SDL_CloseIO(log);
+        return false;
+    }
+    m_process = process;
+    m_log = log;
+    m_game = game;
+#if defined(_WIN32)
+    // SDL doesn't report the exit code of a background process: read it from a handle of our own.
+    m_handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, DWORD(SDL_GetNumberProperty(SDL_GetProcessProperties(process), SDL_PROP_PROCESS_PID_NUMBER, 0)));
+#endif
+    fprintf(stderr, "launcher: %s started (process %lld)\n", game.c_str(), (long long)SDL_GetNumberProperty(SDL_GetProcessProperties(process), SDL_PROP_PROCESS_PID_NUMBER, 0));
+    return true;
+}
+
+std::optional<GameSession::Ended> GameSession::Poll(uint64_t nowMs)
+{
+    if (m_process != nullptr)
+    {
+        int exitCode = -1;
+        if (!SDL_WaitProcess(m_process, false, &exitCode))
+            return std::nullopt;
+#if defined(_WIN32)
+        if (m_handle != nullptr)
+        {
+            DWORD code = 0;
+            if (GetExitCodeProcess(HANDLE(m_handle), &code) && code != STILL_ACTIVE)
+                exitCode = int(code);
+            CloseHandle(HANDLE(m_handle));
+            m_handle = nullptr;
+        }
+#endif
+        if (m_log != nullptr)
+        {
+            const std::string tail = fmt::format("\n# exit code {}\n", exitCode);
+            SDL_WriteIO(m_log, tail.data(), tail.size());
+            SDL_CloseIO(m_log);
+            m_log = nullptr;
+        }
+        SDL_DestroyProcess(m_process);
+        m_process = nullptr;
+        m_nextLook = 0; // and the markers again at once
+        fprintf(stderr, "launcher: %s stopped (exit code %d)\n", m_game.c_str(), exitCode);
+        return Ended{ std::exchange(m_game, std::string()), true, exitCode };
+    }
+    if (nowMs < m_nextLook)
+        return std::nullopt;
+    m_nextLook = nowMs + MarkerMs;
+    std::string marked = Marked();
+    if (marked == m_game)
+        return std::nullopt;
+    std::string before = std::exchange(m_game, std::move(marked));
+    if (before.empty())
+        return std::nullopt; // one found running
+    return Ended{ std::move(before), false, 0 };
 }
 
 std::string ReadLogTail(const std::filesystem::path& file, size_t maxBytes)

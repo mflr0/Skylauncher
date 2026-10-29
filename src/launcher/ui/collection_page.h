@@ -5,6 +5,7 @@
 // look is the launcher's. Drawn by App's widgets (a friend), in collection_page.cpp, collection_figure.cpp,
 // collection_add.cpp and collection_manage.cpp.
 #include "launcher/ui/collection_model.h"
+#include "launcher/ui/components/components.h"
 #include "shared/figures/figure_icons.h"
 #include <SDL3/SDL.h>
 #include <imgui.h>
@@ -18,16 +19,23 @@ namespace launcher_ui
     class App;
 
     // Small helpers the collection's files share.
-    void DrawStar(ImDrawList* draw, ImVec2 center, float radius, ImU32 color);
     std::string PlayTime(uint32_t seconds);
-    std::string ShortDate(const std::string& iso);    // "2026-10-24 10:15" from ISO 8601 UTC
+    // When something happened, from an ISO 8601 UTC time ("Today 15:05", "28 Oct 2026"): the launcher's format helpers.
+    std::string When(const std::string& iso);
     std::string ElementName(collection::Element element);
     std::string CategoryLabel(collection::Category category);   // the type's name in the launcher's language
     std::string KindLabel(collection::VariantKind kind);        // the version's name in the launcher's language
     bool French();                                              // the launcher shows French (the library's own French texts)
     unsigned ElementInk(collection::Element element); // 0xRRGGBB
-    unsigned KindInk(uint32_t rgb);                    // the badge text colour that reads on a version's colour
     std::string Lower(std::string text);
+    // A line of text at `at`, drawn without an item, cut to `room` with "...".
+    void PutText(ImDrawList* draw, ImVec2 at, ui::TextStyle style, bool bold, unsigned color, const std::string& text, float room);
+    // What scrolls inside an overlay is this tall: the window less the dialog's margins and `chrome` (its title, footer...),
+    // between `least` and `most`.
+    float OverlayBody(float chrome, float least, float most);
+    // The footer of a view inside the overlay: Cancel, then the confirm button (primary), bottom right on the current line
+    // (ui::ModalActions' layout; it closes the dialog, this does not). `confirm` null: Cancel alone.
+    ui::ModalResult OverlayActions(const char* cancel, const char* confirm = nullptr, bool confirmDisabled = false);
     // "Doom Stone" for "Doom Stone (top)" or "(bottom)": a swapper's halves are named after it.
     std::string WithoutHalf(std::string name);
 
@@ -65,6 +73,7 @@ namespace launcher_ui
         void Seed();
         void TestScreen(int step);
         static const char* TestShotName(int step);
+        static bool TestPad(); // SKY_LAUNCHER_TEST_COLLECTION=pad: the shots show the page as a pad player sees it (the legend)
         static int TestShotCount();
 
     private:
@@ -80,23 +89,26 @@ namespace launcher_ui
         void TakeOff(size_t seat);
         void Choose(int seat);  // the next card picked goes on this seat; -1: stop choosing
         void DrawBar();
+        void DrawFilters(int active);
         void DrawTags();
         void ClearFilters();
         int FoundCount() const;
         void DrawList();
         bool DrawCard(const collection::Figure& figure, float width, bool dim);
         void DrawOverlay();
-        void DrawFigurePage(ImVec2 size);
-        void DrawFigureFacts(const collection::Figure& figure, float width);
+        void DrawFigurePage();
+        void DrawFigureMenu(const collection::Figure& figure, bool writable);
+        void DrawConfirm(const collection::Figure& figure);
+        void DrawFigureFacts(const collection::Figure& figure);
         void DrawDetails(const collection::Figure& figure);
         void DrawEditStats(const collection::Figure& figure);
-        void DrawChangeHalf(ImVec2 size);
+        void DrawChangeHalf();
         void ChangeHalf(const collection::Figure& keep, const collection::Figure& replacement);
         void DrawUpgradeEditor(const collection::Figure& figure);
         void OpenEdit(const collection::Figure& figure);
         void DeleteFigure(const std::string& path);
-        void DrawAdd(ImVec2 size);
-        void DrawManage(ImVec2 size);
+        void DrawAdd();
+        void DrawManage();
         void DrawTrash();
         void DrawBackups();
         void DrawImportExport();
@@ -118,14 +130,15 @@ namespace launcher_ui
         bool Busy(const collection::Figure& figure) const { return CardOf(figure).Busy(); }
         void DrawBottom(ImDrawList* draw, const collection::Figure& bottom, ImVec2 at, float size);
         void CloseOverlay();
-        void Toast(const std::string& text, bool error = false);
+        void Toast(const std::string& text, ui::ToastKind kind = ui::ToastKind::Info);
 
         // What Manage and the Figure page show from disk, read again only once the collection changed (m_generation):
         // drawn every frame, they read and decrypted every dump and backup at the display's rate.
         struct BackupRow
         {
             std::string path;
-            std::string label; // "2026-10-24 10:15   level 6 · 2400 gold"
+            std::string label; // "28 Oct 2026"
+            std::string detail; // "level 6 · 2400 gold"
         };
         void RefreshDisk();
         const std::vector<BackupRow>& Backups(const std::string& figure);
@@ -161,6 +174,7 @@ namespace launcher_ui
         int m_choosing = -1;            // the seat the next card goes on (a seat clicked, A, LB/RB); -1: browsing
         std::vector<ImVec2> m_crossAt;  // where each seat's X was drawn this frame (-1: none), for the test
         int m_navSeat = -1;             // the seat with the keyboard or pad focus this frame, -1: none
+        int m_testMenu = 0;             // the screenshot test opens a menu on its own: 1 Manage's, 2 the figure sheet's, 3 its Put on the portal
         int m_hoverSeat = -1;           // the seat under the mouse this frame
         int m_focusSeat = -1;           // the D-pad crosses between the seats and the shelf: focus this seat next frame,
         bool m_focusCard = false;       // or the shelf's first card
@@ -176,11 +190,13 @@ namespace launcher_ui
         bool m_details = false;         // the sheet's Details are open
         std::string m_changeKeep;       // "Change the bottom/top": the half the card keeps while the other is chosen
         bool m_editing = false;
+        std::string m_sheetShown;       // the figure and the view (sheet, Edit, Change...) drawn last: another one opens at the top
+        bool m_sheetTop = false;        // a new one is shown: its scrolling body starts at the top too
         figures::FigureStats m_edit;
         figures::FigureStats m_editBase; // as read when Edit stats opened: Save writes back only what changed since
         char m_nickname[64] = {};        // 16 characters of up to 3 bytes, and the terminator
         char m_label[64] = {};
-        std::string m_confirm;          // "restore:<backup>", "reset", "delete": the bar over the sheet's actions
+        std::string m_confirm;          // "reset", "delete": the question asked over the sheet
         std::string m_addGame = "ssa";
         uint16_t m_addToy = 0xFFFF;
         int m_addVersion = 0;           // 0: standard, else 1 + an index in the toy's variants
@@ -190,6 +206,7 @@ namespace launcher_ui
         std::string m_created;          // the figure Add a figure just made
         int m_diskGeneration = -1;
         std::vector<collection::TrashEntry> m_trash;
+        std::vector<std::string> m_trashNames; // the figure each trashed dump is (by m_trash's order)
         size_t m_starters = 0;          // untouched starters (Manage > Tidy)
         std::map<std::string, std::vector<BackupRow>> m_backups; // per figure, filled as asked
         int m_manageTab = 0;

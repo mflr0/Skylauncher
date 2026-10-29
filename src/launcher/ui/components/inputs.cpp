@@ -59,6 +59,7 @@ namespace ui
             Marked item;
             const char* end = LabelEnd(label);
             float text = end != label ? TextSize(TextStyle::Body, label, end).x + space::S : 0;
+            SettingControl(height::Mark + text);
             item.min = ImGui::GetCursorScreenPos();
             item.max = ImVec2(item.min.x + height::Mark + text, item.min.y + height::Small);
             item.mark = ImVec2(item.min.x, std::round(item.min.y + (height::Small - height::Mark) / 2));
@@ -122,7 +123,8 @@ namespace ui
                 draw->AddRectFilled(ImVec2(at.x, at.y + rowH - stroke::Selection), ImVec2(at.x + text.x, at.y + rowH), Col(color::AccentFillPressed));
             else if (state.hovered)
                 draw->AddRectFilled(ImVec2(at.x, at.y + rowH - 1), ImVec2(at.x + text.x, at.y + rowH), Col(color::Hairline));
-            FocusRingIf(state, radius::Control);
+            if (state.focused) // the label's row with S of air at its sides: the ring is not drawn on the letters
+                FocusRing(ImVec2(at.x - space::S, at.y), ImVec2(at.x + text.x + space::S, at.y + rowH), radius::Control);
             ImGui::SameLine(0, space::XL);
         }
         PopText();
@@ -146,6 +148,7 @@ namespace ui
             widest = std::max(widest, TextSize(TextStyle::Body, label, nullptr, true).x);
         const float h = height::Normal, inset = space::XXS;
         float segment = width > 0 ? std::floor((width - 2 * inset) / float(count)) : std::ceil(widest + 2 * space::M);
+        SettingControl(segment * float(count) + 2 * inset);
         ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + segment * float(count) + 2 * inset, min.y + h);
         ImDrawList* draw = ImGui::GetWindowDrawList();
         ImGui::PushID(id);
@@ -189,6 +192,11 @@ namespace ui
         constexpr int SelectVars = 3, SelectColors = 2; // pushed for the list while it is open
     }
 
+    float SelectWidth(const char* longest)
+    {
+        return std::ceil(TextSize(TextStyle::Body, longest).x + space::M + space::XS + icon::Small + space::S + 1);
+    }
+
     bool BeginSelect(const char* id, const char* preview, const SelectOptions& options)
     {
         ImDrawList* draw = ImGui::GetWindowDrawList(); // the box's window, not the list's
@@ -201,7 +209,9 @@ namespace ui
         ImGui::SetNextItemWidth(width);
         if (options.disabled)
             ImGui::BeginDisabled();
-        const bool open = ImGui::BeginCombo(id, preview, ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge);
+        // The value cut with "..." before the chevron, never under it.
+        const std::string shown = Ellipsize(preview, width - ImGui::GetStyle().FramePadding.x - space::XS - icon::Small - space::S);
+        const bool open = ImGui::BeginCombo(id, shown.c_str(), ImGuiComboFlags_NoArrowButton | ImGuiComboFlags_HeightLarge);
         if (options.disabled)
             ImGui::EndDisabled();
         if (!open)
@@ -209,7 +219,7 @@ namespace ui
             State state = ItemState(options.disabled);
             if (options.disabled)
                 ImGui::BeginDisabled();
-            DrawIcon(draw, Icon::ChevronDown, ImVec2(max.x - space::M - 5, (min.y + max.y) / 2), 10, Col(color::InkSoft));
+            DrawIcon(draw, Icon::ChevronDown, ImVec2(max.x - space::S - icon::Small / 2, (min.y + max.y) / 2), icon::Small, Col(color::InkSoft));
             if (options.disabled)
                 ImGui::EndDisabled();
             FocusRingIf(state, radius::Control);
@@ -219,7 +229,7 @@ namespace ui
             return false;
         }
         draw->AddRect(ImVec2(min.x + 0.5f, min.y + 0.5f), ImVec2(max.x - 0.5f, max.y - 0.5f), Col(Ctx().accent), radius::Control, 0, stroke::Edge);
-        DrawIcon(draw, Icon::ChevronUp, ImVec2(max.x - space::M - 5, (min.y + max.y) / 2), 10, Col(color::Ink));
+        DrawIcon(draw, Icon::ChevronUp, ImVec2(max.x - space::S - icon::Small / 2, (min.y + max.y) / 2), icon::Small, Col(color::Ink));
         // The list's rows: height::Small, text centred on them, a little air between them.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, space::XXS / 2));
         ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(0, 0.5f));
@@ -245,9 +255,10 @@ namespace ui
             ImGui::SetItemDefaultFocus();
         State state = ItemState(disabled);
         ImVec2 min = ImGui::GetItemRectMin(), max = ImGui::GetItemRectMax();
-        DrawText(draw, ImVec2(min.x + space::S, (min.y + max.y - ImGui::GetFontSize()) / 2), Col(disabled ? color::Dim : color::Ink), label);
+        const float mid = std::round((min.y + max.y) / 2);
+        DrawText(draw, ImVec2(min.x + space::S, std::round(mid - CapMiddle(TextStyle::Body))), Col(disabled ? color::Dim : color::Ink), label, LabelEnd(label));
         if (selected)
-            DrawIcon(draw, Icon::Check, ImVec2(max.x - space::M, (min.y + max.y) / 2), 12, Col(Ctx().accent));
+            DrawIcon(draw, Icon::Check, ImVec2(max.x - space::S - icon::Small / 2, mid), icon::Small, Col(Ctx().accent));
         draw->ChannelsSetCurrent(0);
         if (selected || state.hovered || state.pressed)
             draw->AddRectFilled(min, max, Col(state.pressed ? color::RaisedPressed : state.hovered ? color::RaisedHover : color::InsetActive), radius::Control);
@@ -272,6 +283,7 @@ namespace ui
         const float h = height::Small, w = std::round(h * 1.75f);
         const char* end = LabelEnd(label);
         const float text = end != label ? TextSize(TextStyle::Body, label, end).x + space::S : 0;
+        SettingControl(w + text);
         const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + w, min.y + h);
         ImGui::BeginDisabled(disabled);
         const bool pressed = Hit(label, ImVec2(w + text, h));
@@ -310,7 +322,7 @@ namespace ui
         if (*value)
         {
             draw->AddRectFilled(a, b, Col(lit ? color::AccentFillHover : color::AccentFill), r);
-            DrawIcon(draw, Icon::Check, ImVec2((a.x + b.x) / 2, (a.y + b.y) / 2), height::Mark * 0.62f, Col(color::OnAccent));
+            DrawIcon(draw, Icon::Check, ImVec2((a.x + b.x) / 2, (a.y + b.y) / 2), icon::Small, Col(color::OnAccent));
         }
         else
         {
@@ -431,7 +443,7 @@ namespace ui
 
     bool SearchField(const char* id, char* buffer, size_t size, const char* hint, float width)
     {
-        constexpr float Glass = space::M;
+        constexpr float Glass = icon::Small;
         TextFieldOptions options;
         options.hint = hint;
         options.width = width;
