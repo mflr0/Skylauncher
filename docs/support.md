@@ -44,19 +44,24 @@ the file is written by `src/launcher/problem_report.cpp` (`SaveProblemReport`).
 
 ## The launcher stays while the game runs
 
-`src/main.cpp` calls `RunGame` (`launcher/game_run.cpp`): the runtime starts with its output piped to
-`skylauncher-game.log`, and the launcher (no window) waits for it. On Windows the process is started without a console
-window and its exit code is read from a handle of our own, since SDL reports none for such processes.
+PLAY starts the runtime beside the launcher's window, which stays open (`GameSession`, `launcher/game_run.cpp`; one game at a
+time: `docs/launcher_ui.md`, "A game running"). The runtime's stdout and stderr go straight into `skylauncher-game.log`
+(after a `# <runtime> <disc>` line; the launcher adds `# exit code N` when it sees the game end), so the game runs on, and
+keeps its log, if the launcher is closed. The game's settings reach it as variables of its environment (`PrepareGameLaunch`).
+On Windows the process is started without a console window and its exit code is read from a handle of our own, since SDL
+reports none for such processes. (A screenshot script that plays, `SKY_LAUNCHER_TEST_PLAY`, still closes the window and
+`src/main.cpp` runs the game with `RunGame`, its output piped, waiting for it.)
 
-If the runtime exits with a non-zero code a dialog says **The game stopped unexpectedly**, with its exit code and the logs
+If the runtime exits with a non-zero code a dialog over the window says **The game stopped unexpectedly**, with its exit code and the logs
 folder, and three buttons: **Report** (writes the same report file as above to the Desktop, shows it in the file manager and opens a new
 GitHub issue with a template to attach it to), **Copy log**, **Close**. Nothing is sent by the launcher.
 
 ## Portal status
 
-Under PLAY and under COLLECTION's title the launcher shows "Portal: <model>" (for example "Portal: Portal of Power") or
-"Portal: not detected"; the tooltip says that without a real portal the game uses the virtual portal (its Toy Box) and points to
-"Test the portal" below. It is read with SDL's HID API (`SDL_hid_enumerate(0x1430, 0)`, Activision's vendor id) by a
+Under COLLECTION's title the launcher shows "Portal: <model>" (for example "Portal: Portal of Power") or "Portal: not
+detected"; on the game page, beside the controller, a Pill says "Portal" (a green check) or "No portal" (a dashed circle), with
+that line in its tooltip, and opens Launcher settings > Controls. The tooltips say that without a real portal the game uses the
+virtual portal (its Toy Box). It is read with SDL's HID API (`SDL_hid_enumerate(0x1430, 0)`, Activision's vendor id) by a
 worker thread (`src/launcher/portal_status.{h,cpp}`) that scans once at start, then only when `SDL_hid_device_change_count()`
 changes, at most every 2 s, so the UI never waits. Models by product id: `0150` Portal of Power, `1F17` Xbox 360 portal
 (only where the OS exposes it as HID), any other Activision id "Skylanders portal (1430:XXXX)". If SDL's HID can't start,

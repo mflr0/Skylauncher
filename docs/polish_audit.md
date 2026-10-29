@@ -130,4 +130,27 @@ then zoomed where something looked off. The checklist is the model screens' (abo
 pad), after the fixes above. `ArkeyanLauncherTest` with the three discs: all pass but the known `uninstall_test.cpp` line 213;
 the pad navigation (14 of 14 steps) and the seat X (12 of 12) runs included.
 
+## The owner's review (2026-10-29): eleven items
 
+The owner used the launcher and asked for eleven changes. Shots: the `default`, `COLLECTION`, `PAD`, `ACHIEVEMENTS`, `RUNNING` and
+`SCREENS` scripts, each in English and French, 1024x720, with the mouse and as a pad player sees it (`SKY_LAUNCHER_TEST_INPUT=pad`),
+looked at on contact sheets, then zoomed; the update offer from `ArkeyanLauncherTest`'s kit flow (`SKY_LAUNCHER_TEST_KEEP=1`); the
+spinner measured.
+
+| # | Where | Before | Now |
+|---|---|---|---|
+| 1 | The busy spinner (buttons, status icons, the install card) | It turned about the point asked for, but the icon font draws its glyphs off that point (0.5 and 1.5 points at 20): the ring wobbled | It turns about the middle of the glyph's quad as drawn, where the still icon is |
+| 2 | Figure sheet | Another figure opened at the last one's scroll (the dialog and its bodies are the same windows for all), Details still open | Each figure, and each of its views (the sheet, Edit, Change the bottom), opens at the top (`SetNextWindowScroll`), Details closed |
+| 3 | Collection's "Add a figure", the settings pages' Back, every scrolling area, settings rows | The page column's clip rect began at its content: a button raised onto the title's capitals lost its top edge. The shelf, Add's grid, the dialogs' scrolling bodies (Edit, Change the bottom, Manage) and the save backups cut focus rings and hover boxes at their edges; a settings table cut 2 points of a control's ring at a column's edge; Add's versions panel sat 6 points off (the previous attempt's bleed moved it) | `ui::BeginRoomyChild` for each (room round the content, the layout after it as a plain child's); the page column has M of room; the settings table no longer clips its columns; the versions panel as tall as the grid's scrollbar |
+| 4 | Collection's seats | S inside and between, 64 points high | M inside (72 high) and M between |
+| 5 | Settings rows (Launcher > Updates, Support, Video, Edit...) | A full-width "Check now" over a toggle at the column's left; buttons full width on some pages, not on others | One rule on every page: each control ends on the column's right edge (`ui::SettingControl`); Selects, fields and sliders fill the column; the buttons of a row placed with `AlignRight` keep their place (the previous attempt pushed Manage > Trash's first button to the edge in French, the second fell outside the dialog) |
+| 6 | Controller tab | "Its own job" | "Default" ("Par défaut") |
+| 7 | Game page | The play time line and an "Achievements 6/38" button in the disc block | One Pill at the top right, over the art: "12 h 34 · trophy 6/38", opens Achievements (its tooltip: last played); room on its left for a sound button |
+| 8 | Game page | The update's sentence and "Play without updating" in the disc block; the portal's state under the main button; a fixed 190-point picker 40 points before it | Under UPDATE: "0.8.2 · 41 MB · ~15 min", then "Play without updating"; the band one row on the action's middle line, S apart: the picker (as wide as its name), the portal Pill (as high, "Portal" / "No portal", as wide either way), the action |
+| 9 | PLAY | The launcher closed until the game ended | It stays; one game at a time (`GameSession`): RUNNING (off) on the game's button, "<Game> is running" on the others' (off), a double click or a second PLAY refused, the end seen (a crash told), a game left running across a launcher restart found by its marker |
+| 10 | Collection | A "Next start: <game>" Select on the count's line, under the header's buttons | "On the portal for [Giants]" over the seats; the count under the title; the header's buttons alone on their line |
+| 11 | Launcher settings > Toy Box keys | The keyboard's keys only | Two columns: the keys ("F6 / Tab") and the pad's buttons in the pad family's pictures ("View + Y"), a dash where the pad has none (F7, F8) |
+
+**Result**: every changed screen passes the checklist above (edges, baselines, centring, spacing, focus ring) in both
+languages, mouse and pad. `ArkeyanLauncherTest` with the three discs: all pass but the known `uninstall_test.cpp` line 213; the
+pad navigation (14 of 14), the seat X (12 of 12), one game at a time (3 of 3, and `GameSessionChecks`) included.
