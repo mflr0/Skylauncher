@@ -54,6 +54,11 @@ namespace launcher_ui
     inline constexpr Choice FpsChoices[] = { { "display", N_("Display refresh rate (up to 60)") }, { "30", N_("30 (original)") },
         { "60", N_("60 (experimental)") }, { "120", N_("120 (experimental)") }, { "144", N_("144 (experimental)") }, { "240", N_("240 (experimental)") },
         { "0", N_("Unlimited (experimental)") } };
+    // The frame rates a game is offered: the list up to 60 when the game is capped there (MaxFrameRate).
+    inline std::span<const Choice> FrameRateChoices(std::string_view gameId)
+    {
+        return MaxFrameRate(gameId) == 60 ? std::span<const Choice>(FpsChoices, 3) : std::span<const Choice>(FpsChoices);
+    }
     inline constexpr Choice VolumeChoices[] = { { "0", "0 %" }, { "10", "10 %" }, { "20", "20 %" }, { "30", "30 %" }, { "40", "40 %" },
         { "50", "50 %" }, { "60", "60 %" }, { "70", "70 %" }, { "80", "80 %" }, { "90", "90 %" }, { "100", "100 %" } };
     inline constexpr Choice RumbleChoices[] = { { "off", N_("Off") }, { "low", N_("Low") }, { "normal", N_("Normal") }, { "strong", N_("Strong") } };

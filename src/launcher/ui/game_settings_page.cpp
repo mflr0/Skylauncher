@@ -109,11 +109,12 @@ namespace launcher_ui
         SettingSelect("##scale", video, "resolution_scale", ScaleChoices, 0);
 
         ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 and above are experimental."));
+        const std::span<const Choice> fpsChoices = FrameRateChoices(m_s->game.id);
         int fpsDefault = 0;
-        for (size_t i = 0; i < std::size(FpsChoices); i++)
-            if (std::string_view(FpsChoices[i].value) == DefaultFrameRate(m_s->game.id))
+        for (size_t i = 0; i < fpsChoices.size(); i++)
+            if (std::string_view(fpsChoices[i].value) == DefaultFrameRate(m_s->game.id))
                 fpsDefault = int(i);
-        SettingSelect("##fps", video, "fps_limit", FpsChoices, fpsDefault);
+        SettingSelect("##fps", video, "fps_limit", fpsChoices, fpsDefault);
 
         ui::SettingRow(Tr("FPS counter"), Tr("A small frame rate readout in the game (F3 in the game turns it on too)."));
         toggle("##showfps", "show_fps", "0");

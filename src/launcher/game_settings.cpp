@@ -170,8 +170,19 @@ void ApplyGameVideo(LauncherConfig& config, std::string_view gameId)
 
 void StoreGameVideo(LauncherConfig& config, std::string_view gameId) { CopyVideo(config, "video", GameVideoSection(gameId)); }
 
+unsigned MaxFrameRate(std::string_view gameId) { return gameId == "giants" ? 60 : 0; }
+
 void MigrateFrameRates(LauncherConfig& config)
 {
+    // Giants' cap, once ([launcher] giants_cap=1): its own copy only, a value chosen above 60 before the cap becomes 60.
+    if (std::string& capped = config["launcher"]["giants_cap"]; capped != "1")
+    {
+        capped = "1";
+        if (auto giants = config.find(GameVideoSection("giants")); giants != config.end())
+            if (auto limit = giants->second.find("fps_limit");
+                limit != giants->second.end() && (limit->second == "0" || limit->second == "120" || limit->second == "144" || limit->second == "240"))
+                limit->second = "60";
+    }
     std::string& done = config["launcher"]["frame_rates"];
     if (done == "1")
         return;

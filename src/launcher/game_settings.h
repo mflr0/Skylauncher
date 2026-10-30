@@ -31,6 +31,10 @@ void StoreGameVideo(LauncherConfig& config, std::string_view gameId);
 // afterwards stays.
 void MigrateFrameRates(LauncherConfig& config);
 
+// The highest frame rate a game is offered: 60 for Giants, 0 (no cap) for the others. Giants' summon cutscene lasts 10 % less above 60
+// (the runtime caps it too), so its page lists 30 and 60 only and a higher saved value becomes 60 once.
+unsigned MaxFrameRate(std::string_view gameId);
+
 // What a game keeps in its folder (<data>/SSA, <data>/Giants), told apart for the delete and uninstall buttons.
 struct GameFolders
 {

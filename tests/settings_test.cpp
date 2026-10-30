@@ -98,6 +98,36 @@ namespace
         SETTINGS_EXPECT(fresh["launcher"]["frame_rates"] == "1" && fresh.count("video") == 0);
     }
 
+    // ---- Giants' cap ---------------------------------------------------------------------------------------------------------
+
+    void GiantsCap()
+    {
+        SETTINGS_EXPECT(MaxFrameRate("giants") == 60 && MaxFrameRate("ssa") == 0 && MaxFrameRate("swapforce") == 0);
+        SETTINGS_EXPECT(launcher_ui::FrameRateChoices("giants").size() == 3 && std::string(launcher_ui::FrameRateChoices("giants").back().value) == "60");
+        SETTINGS_EXPECT(launcher_ui::FrameRateChoices("ssa").size() == std::size(launcher_ui::FpsChoices) && launcher_ui::FrameRateChoices("swapforce").size() == std::size(launcher_ui::FpsChoices));
+        // A file from the version before the cap (frame rates already migrated): Giants' higher values become 60, once; the others stay.
+        for (const char* old : { "0", "120", "144", "240" })
+        {
+            LauncherConfig config;
+            config["launcher"]["frame_rates"] = "1";
+            config["giants.video"]["fps_limit"] = old;
+            config["ssa.video"]["fps_limit"] = old;
+            config["swapforce.video"]["fps_limit"] = old;
+            MigrateFrameRates(config);
+            SETTINGS_EXPECT(config["giants.video"]["fps_limit"] == "60" && config["ssa.video"]["fps_limit"] == old && config["swapforce.video"]["fps_limit"] == old);
+            config["giants.video"]["fps_limit"] = "30";
+            MigrateFrameRates(config);
+            SETTINGS_EXPECT(config["giants.video"]["fps_limit"] == "30" && config["launcher"]["giants_cap"] == "1");
+        }
+        LauncherConfig kept; // a Giants copy already at 30 or 60, or none, is left as it is
+        kept["giants.video"]["fps_limit"] = "30";
+        MigrateFrameRates(kept);
+        SETTINGS_EXPECT(kept["giants.video"]["fps_limit"] == "30");
+        LauncherConfig none;
+        MigrateFrameRates(none);
+        SETTINGS_EXPECT(none.count("giants.video") == 0);
+    }
+
     // ---- Per-game video settings ---------------------------------------------------------------------------------------
 
     void VideoChecks()
@@ -760,6 +790,7 @@ int SettingsChecks(const fs::path& scratch)
     fs::create_directories(scratch);
     VideoChecks();
     FrameRateMigration();
+    GiantsCap();
     KeyChecks();
     PadChecks();
     ArgumentChecks();
