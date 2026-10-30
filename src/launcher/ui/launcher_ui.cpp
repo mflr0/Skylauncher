@@ -2117,28 +2117,10 @@ namespace launcher_ui
         ui::SectionHeader(Tr("Updates"));
         DrawUpdates();
         ui::SectionHeader(Tr("Data folder"), Tr(strings::DataFolderHint));
-        {
-            // The path breaks after a separator, never in the middle of a name.
-            const std::string path = datadir::Text(LauncherDataFolder());
-            const float room = ImGui::GetContentRegionAvail().x;
-            std::string line;
-            for (size_t from = 0; from < path.size();)
-            {
-                size_t to = path.find_first_of("/\\", from);
-                to = to == std::string::npos ? path.size() : to + 1;
-                const std::string part = path.substr(from, to - from);
-                if (!line.empty() && ui::TextSize(ui::TextStyle::Caption, (line + part).c_str()).x > room)
-                {
-                    ui::Text(ui::TextStyle::Caption, line.c_str(), ui::color::Dim, -1);
-                    line.clear();
-                }
-                line += part;
-                from = to;
-            }
-            ui::Text(ui::TextStyle::Caption, line.c_str(), ui::color::Dim, -1);
-        }
+        const std::string dataPath = datadir::Text(LauncherDataFolder()); // in the tooltip, not in the text
         ui::ButtonOptions folder;
         folder.icon = ui::Icon::Folder;
+        folder.tooltip = dataPath.c_str();
         if (ui::Button(Tr("Show in folder"), folder))
         {
             std::error_code error;
