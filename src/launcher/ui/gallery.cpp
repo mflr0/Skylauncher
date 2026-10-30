@@ -232,6 +232,8 @@ namespace launcher_ui
                     options.progress = c.progress;
                     options.indeterminate = c.indeterminate;
                     options.style = &StyleOf(Games[g]);
+                    options.separated = true;
+                    options.icon = ui::Icon::Play;
                     const unsigned accent = ui::Ctx().accent;
                     ui::Ctx().accent = StyleOf(Games[g]).glow; // the focus ring in the game's colour, as on its page
                     ui::PreviewState(c.state);
@@ -485,6 +487,8 @@ namespace launcher_ui
                 ImGui::SameLine(0, ui::space::XS);
             }
             ImGui::NewLine();
+            Caption("StatusLine over the game background");
+            ui::StatusLine(ui::Status::Success, Tr("Ready to play"));
             Caption("The status shapes alone (the sidebar's dot)");
             ImVec2 at = ImGui::GetCursorScreenPos();
             for (int i = 0; i < 6; i++)
@@ -505,6 +509,9 @@ namespace launcher_ui
             ImGui::EndGroup();
             ImGui::SameLine(0, ui::space::S);
             ui::Spinner();
+            ImGui::Dummy(ImVec2(0, ui::space::M));
+            Caption("GuideStep: disc setup");
+            ui::GuideStep(1, Tr("Choose your disc"), Tr("Your own copy, as an .iso"), ImGui::GetContentRegionAvail().x, true);
             break;
         }
         case 7: // Toasts, key caps, the pad legend

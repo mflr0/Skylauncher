@@ -9,6 +9,7 @@
 
 namespace ui
 {
+    void DrawEmptySeat(ImDrawList* draw, ImVec2 at, float size);
     // ---- Badge: a word on a card (Legendary, Series 2, P1), not pressable. Its ink is chosen for contrast when 0. ----
     ImVec2 BadgeSize(const char* text);
     ImVec2 DrawBadge(ImDrawList* draw, ImVec2 at, const char* text, unsigned fill, unsigned ink = 0); // returns its size
@@ -37,6 +38,7 @@ namespace ui
     // The icon and the text in a tinted pill, PillHeight high (`icon`: the state's own, else the status's).
     inline constexpr float PillHeight = 24;
     void StatusPill(Status status, const char* text, Icon icon = Icon::None);
+    void StatusLine(Status status, const char* text, float width = -1);
 
     // ---- Progress. ----
     // A determinate bar (`fraction` 0..1) with its percentage after it when `showPercent`.

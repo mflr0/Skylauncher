@@ -248,11 +248,78 @@ namespace ui
         }
     }
 
+    void NavigationColumns::Begin(bool move)
+    {
+        Ctx().navigation = this;
+        m_current.clear();
+        m_column = 0;
+        m_target = 0;
+        ImGuiContext& g = *ImGui::GetCurrentContext();
+        if (!move || g.OpenPopupStack.Size > 0 || !g.NavMoveSubmitted || (g.NavMoveFlags & ImGuiNavMoveFlags_IsTabbing)) return;
+        const auto source = std::find_if(m_previous.begin(), m_previous.end(), [&](const Entry& e) { return e.id == g.NavId; });
+        if (source == m_previous.end()) return;
+        const ImGuiDir direction = g.NavMoveDir;
+        if (direction < ImGuiDir_Left || direction > ImGuiDir_Down) return;
+        const bool vertical = direction == ImGuiDir_Up || direction == ImGuiDir_Down;
+        const ImVec2 centre((source->min.x + source->max.x) / 2, (source->min.y + source->max.y) / 2);
+        float best = FLT_MAX;
+        for (const Entry& candidate : m_previous)
+        {
+            if (candidate.id == source->id) continue;
+            const float dx = (candidate.min.x + candidate.max.x) / 2 - centre.x;
+            const float dy = (candidate.min.y + candidate.max.y) / 2 - centre.y;
+            float score;
+            if (vertical)
+            {
+                if (candidate.column != source->column || (direction == ImGuiDir_Down ? dy <= 1 : dy >= -1)) continue;
+                score = std::abs(dy) * 1000 + std::abs(dx);
+            }
+            else
+            {
+                if (direction == ImGuiDir_Right ? dx <= 1 : dx >= -1) continue;
+                const bool row = candidate.min.y < source->max.y && candidate.max.y > source->min.y;
+                if (candidate.column == source->column)
+                {
+                    if (!row) continue;
+                    score = std::abs(dx);
+                }
+                else
+                    score = 100000 + std::abs(dy) * 100 + std::abs(dx);
+            }
+            if (score < best)
+            {
+                best = score;
+                m_target = candidate.id;
+            }
+        }
+        // Native scoring can jump sideways on a vertical move when wide rows overlap the other column.
+        ImGui::NavMoveRequestCancel();
+    }
+
+    void NavigationColumns::Item(uint32_t id, ImVec2 min, ImVec2 max)
+    {
+        m_current.push_back({id, min, max, m_column});
+        if (id == m_target) FocusLastItem(true);
+    }
+
+    void NavigationColumns::End()
+    {
+        m_previous.swap(m_current);
+        Ctx().navigation = nullptr;
+    }
+
     bool Hit(const char* id, ImVec2 size)
     {
         ImGui::PushStyleColor(ImGuiCol_NavCursor, 0);
         bool pressed = ImGui::InvisibleButton(id, size, ImGuiButtonFlags_EnableNav);
         ImGui::PopStyleColor();
+        if (Ctx().navigation != nullptr && !(ImGui::GetItemFlags() & ImGuiItemFlags_Disabled))
+            Ctx().navigation->Item(ImGui::GetItemID(), ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+        if (Ctx().testNavigationItems != nullptr && !(ImGui::GetItemFlags() & ImGuiItemFlags_Disabled))
+        {
+            Ctx().testNavigationItems->push_back(ImGui::GetItemID());
+            Ctx().testNavigationLabels[ImGui::GetItemID()] = id;
+        }
         return pressed;
     }
 

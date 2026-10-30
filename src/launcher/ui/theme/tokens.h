@@ -57,6 +57,15 @@ namespace ui
         inline constexpr float Page = 940; // a settings page's column: settings read badly stretched across a wide window
     }
 
+    // Game hero: the large fallback name and the compact portal beside the main action.
+    namespace hero
+    {
+        inline constexpr float Title = 96, TitleWidth = 560;
+        inline constexpr float LogoHeight = 144;
+        inline constexpr float PanelWidth = 400, PanelMinWidth = 264;
+        inline constexpr float PanelHeight = 280, CompactPanelHeight = 320;
+    }
+
     namespace stroke
     {
         inline constexpr float Hairline = 1;  // card edges, dividers, a secondary button's edge

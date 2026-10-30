@@ -8,6 +8,10 @@
 
 namespace ui
 {
+    // The disc logo replaces this heading when present. Names wrap without crossing the portal column.
+    float HeroHeadingHeight(float width, const char* name);
+    void HeroHeading(ImDrawList* draw, ImVec2 at, ImVec2 size, const char* series, const char* name);
+    void GuideStep(int number, const char* title, const char* note, float width, bool active = false);
     // ---- Card: a rounded surface with the tokens' padding; its content is drawn between BeginCard and EndCard. ----
     struct CardOptions
     {
@@ -15,6 +19,7 @@ namespace ui
         bool inset = false;      // a sunken area inside a card (the inset grey, no edge)
         float padding = space::L;
         ImGuiChildFlags flags = 0; // ImGuiChildFlags_AutoResizeY for a card as tall as its content
+        unsigned edge = 0; // a live panel's status edge; 0 uses Hairline
     };
     void BeginCard(const char* id, ImVec2 size, const CardOptions& options = {});
     void EndCard();
@@ -48,6 +53,8 @@ namespace ui
         float progress = -1;            // 0..1: a thin bar along the row's foot (an install running)
         unsigned progressColor = 0;     // its fill; 0: the accent
         bool dim = false;               // the title in the dim ink (a game not out yet)
+        TextStyle titleStyle = TextStyle::Body, subtitleStyle = TextStyle::Caption;
+        float minHeight = 0;
     };
     bool ListRow(const char* title, const ListRowOptions& options = {});
 

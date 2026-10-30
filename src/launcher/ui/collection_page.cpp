@@ -703,6 +703,100 @@ namespace launcher_ui
     }
 
     // The portal at the next start: the chosen game's seats in a row, what each holds, and how to change it.
+    void CollectionPage::TestHeroPortal(bool installing, bool running)
+    {
+        m_heroFixture = m_heroLoaded = true;
+        m_model.figures.clear();
+        m_model.seats.assign(3, "");
+        for (int i = 0; i < (installing ? 1 : 2); i++)
+        {
+            Figure figure;
+            figure.type = i == 0 ? 9 : 19;
+            figure.toy = collection::Catalogue::Get().Find(figure.type);
+            figure.variantInfo.name = figure.toy != nullptr ? figure.toy->name : "?";
+            figure.path = i == 0 ? "hero-eruptor" : "hero-trigger-happy";
+            figure.level = i == 0 ? (running ? 11 : 10) : 2;
+            m_model.seats[size_t(i)] = figure.path;
+            m_model.figures.push_back(figure);
+        }
+    }
+
+    void CollectionPage::DrawHeroPortal(ImVec2 at, ImVec2 size, bool live)
+    {
+        // Read Collection's seats without opening its migration or editing flows.
+        if (m_model.gameId != m_app.m_s->game.id)
+        {
+            SelectPortalGame(m_app.m_s->game.id);
+            m_heroLoaded = true;
+        }
+        if (!m_heroLoaded)
+        {
+            m_model.Load();
+            m_heroLoaded = true;
+        }
+        if (!m_heroFixture) m_model.Poll(SDL_GetTicks());
+        ImGui::SetCursorScreenPos(at);
+        ui::BeginCard("##hero-portal", size, { .panel = true, .padding = ui::space::M, .edge = live ? ui::color::Success : 0 });
+        ui::Text(ui::TextStyle::Body, Tr("On the portal"), ui::color::Dim, -1, true);
+        if (live)
+        {
+            ImGui::SameLine();
+            ui::Badge(Tr("Live"), ui::color::Success);
+        }
+        const ui::ButtonOptions open{ .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small };
+        const float linkW = ui::ButtonWidth(Tr("Open the Toy Box"), open);
+        if (ImGui::GetItemRectMax().x + ui::space::S + linkW < at.x + size.x - ui::space::M)
+            ImGui::SetCursorScreenPos(ImVec2(at.x + size.x - ui::space::M - linkW, at.y + ui::space::M));
+        if (ui::Button(Tr("Open the Toy Box"), open))
+            m_app.GoTo(Page::Collection);
+        ImGui::SetCursorScreenPos(ImVec2(at.x + ui::space::M, std::max(ImGui::GetCursorScreenPos().y, at.y + ui::space::M + ui::height::Small) + ui::space::XS));
+        const collection::Game* game = m_model.Game();
+        if (game != nullptr)
+            for (size_t i = 0; i < game->seats.size(); i++)
+            {
+                const std::string& seatId = game->seats[i].id;
+                if (seatId != "p1" && seatId != "p2" && seatId != "item") continue;
+                const Figure* figure = i < m_model.seats.size() ? m_model.Find(m_model.seats[i]) : nullptr;
+                const std::string seat = SeatName(i);
+                const std::string name = figure != nullptr ? Name(*figure) : Tf("{} · empty", seat);
+                std::string detail;
+                if (figure != nullptr)
+                {
+                    const collection::Card card = CardOf(*figure);
+                    const std::string level = m_heroFixture ? Tf("Level {}", figure->level) : card.Swapper()
+                        ? collection::CardLevelText(card, m_model.gameId, French()) : collection::LevelText(*figure, m_model.gameId, French());
+                    detail = level.empty() ? seat : Tf("{} · {}", seat, level);
+                }
+                ImGui::PushID(int(i));
+                ui::ListRowOptions row;
+                row.subtitle = figure != nullptr ? detail.c_str() : nullptr;
+                row.titleStyle = figure != nullptr ? ui::TextStyle::Label : ui::TextStyle::Body;
+                row.subtitleStyle = ui::TextStyle::Body;
+                row.minHeight = ui::height::Large;
+                row.dim = figure == nullptr;
+                row.imageWidth = ui::height::Normal;
+                row.image = [&](ImDrawList* draw, ImVec2 picture, ImVec2 box) {
+                    const float side = std::min(box.x, box.y);
+                    picture.y += (box.y - side) / 2;
+                    if (figure != nullptr)
+                    {
+                        if (!DrawSwapper(draw, CardOf(*figure), picture, side))
+                            DrawPicture(draw, figure->toy, figure->Kind(), figure->variant, picture, side);
+                    }
+                    else
+                        ui::DrawEmptySeat(draw, picture, side);
+                };
+                if (ui::ListRow((name + "##hero-seat").c_str(), row))
+                {
+                    if (!m_opened) Open();
+                    Choose(live ? -1 : int(i));
+                    m_app.GoTo(Page::Collection);
+                }
+                ImGui::PopID();
+            }
+        ui::EndCard();
+    }
+
     void CollectionPage::DrawSeats(float width)
     {
         const collection::Game* game = m_model.Game();

@@ -9,13 +9,73 @@
 
 namespace ui
 {
+    namespace
+    {
+        float HeroFontSize(float width, const char* name)
+        {
+            float longest = 0;
+            const char* word = name;
+            ImGui::PushFont(Ctx().fonts.title, hero::Title);
+            for (const char* p = name;; p++)
+                if (*p == ' ' || *p == 0)
+                {
+                    longest = std::max(longest, ImGui::CalcTextSize(word, p).x);
+                    word = p + 1;
+                    if (*p == 0) break;
+                }
+            ImGui::PopFont();
+            return hero::Title * std::min(1.0f, (width - space::XS) / std::max(1.0f, longest));
+        }
+    }
+
+    float HeroHeadingHeight(float width, const char* name)
+    {
+        ImGui::PushFont(Ctx().fonts.title, HeroFontSize(width, name));
+        const float height = ImGui::CalcTextSize(name, nullptr, false, width).y;
+        ImGui::PopFont();
+        return type::Body + space::S + height;
+    }
+
+    void HeroHeading(ImDrawList* draw, ImVec2 at, ImVec2 size, const char* series, const char* name)
+    {
+        PushText(TextStyle::Body, true);
+        DrawText(draw, at, Col(color::Dim), series);
+        PopText();
+        const float fontSize = HeroFontSize(size.x, name);
+        ImGui::PushFont(Ctx().fonts.title, fontSize);
+        draw->AddText(ImGui::GetFont(), fontSize, ImVec2(at.x, at.y + type::Body + space::S), Col(color::Ink), name, nullptr, size.x);
+        ImGui::PopFont();
+    }
+
+    void GuideStep(int number, const char* title, const char* note, float width, bool active)
+    {
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        const float lead = height::Normal + space::S, textWidth = width - lead;
+        const ImVec2 centre(at.x + height::Normal / 2, at.y + height::Normal / 2);
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        if (active) draw->AddCircleFilled(centre, height::Normal / 2, Col(color::AccentFill));
+        else draw->AddCircle(centre, height::Normal / 2, Col(color::Edge), 0, stroke::Hairline);
+        const std::string value = std::to_string(number);
+        PushText(TextStyle::Label, true);
+        DrawText(draw, ImVec2(centre.x - ImGui::CalcTextSize(value.c_str()).x / 2, centre.y - CapMiddle(TextStyle::Label, true)),
+            Col(active ? color::OnAccent : color::InkSoft), value.c_str());
+        PopText();
+        ImGui::SetCursorScreenPos(ImVec2(at.x + lead, at.y));
+        Text(TextStyle::Label, title, color::Ink, textWidth, true);
+        const float titleH = ImGui::GetItemRectSize().y;
+        ImGui::SetCursorScreenPos(ImVec2(at.x + lead, at.y + titleH + space::XXS));
+        Text(TextStyle::Body, note, color::InkSoft, textWidth);
+        const float h = std::max(height::Normal, titleH + space::XXS + ImGui::GetItemRectSize().y);
+        ImGui::SetCursorScreenPos(at);
+        ImGui::Dummy(ImVec2(width, h + space::XS));
+    }
     // ---- Card ------------------------------------------------------------------------------------------------------
 
     void BeginCard(const char* id, ImVec2 size, const CardOptions& options)
     {
         const Elevation& level = elevation::Card;
         ImGui::PushStyleColor(ImGuiCol_ChildBg, options.inset ? LauncherTheme::Rgb(color::Inset) : LauncherTheme::Rgb(level.fill, level.fillAlpha));
-        ImGui::PushStyleColor(ImGuiCol_Border, LauncherTheme::Rgb(color::Hairline));
+        ImGui::PushStyleColor(ImGuiCol_Border, LauncherTheme::Rgb(options.edge != 0 ? options.edge : color::Hairline));
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, options.panel ? radius::Panel : radius::Card);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, options.inset ? 0.0f : level.border);
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(options.padding, options.padding));
@@ -74,7 +134,7 @@ namespace ui
 
     bool ListRow(const char* title, const ListRowOptions& options)
     {
-        const float h = options.subtitle != nullptr ? height::Large : height::Normal;
+        const float h = std::max(options.minHeight, options.subtitle != nullptr ? height::Large : height::Normal);
         const float w = options.width < 0 ? ImGui::GetContentRegionAvail().x : options.width;
         const ImVec2 min = ImGui::GetCursorScreenPos(), max(min.x + w, min.y + h);
         ImGui::BeginDisabled(options.disabled);
@@ -110,11 +170,12 @@ namespace ui
             right -= icon::Small + space::S;
         }
         // One line: the title's capitals centred on the row. Two: the title and the subtitle as one block centred on it.
-        const TextStyle titleStyle = TextStyle::Body;
+        const TextStyle titleStyle = options.titleStyle;
+        const TextStyle subtitleStyle = options.subtitleStyle;
         const bool titleBold = options.subtitle != nullptr;
         const float gap = space::XXS;
         const float titleTop = options.subtitle != nullptr
-            ? std::round(mid - (CapTop(titleStyle, titleBold) + SizeOf(titleStyle) + gap + Baseline(TextStyle::Caption)) / 2)
+            ? std::round(mid - (CapTop(titleStyle, titleBold) + SizeOf(titleStyle) + gap + Baseline(subtitleStyle)) / 2)
             : std::round(mid - CapMiddle(titleStyle, titleBold));
         const float baseline = titleTop + Baseline(titleStyle, titleBold);
         if (options.trailing != nullptr)
@@ -155,7 +216,7 @@ namespace ui
         if (options.subtitle != nullptr)
         {
             // The state's icon on the subtitle's line, centred on its capitals, at the title's left edge.
-            const float subTop = titleTop + SizeOf(TextStyle::Body) + gap;
+            const float subTop = titleTop + SizeOf(titleStyle) + gap;
             float subX = x;
             if (options.status != nullptr)
             {
@@ -163,7 +224,7 @@ namespace ui
                     ImVec2(x + icon::Small / 2, std::round(subTop + CapMiddle(TextStyle::Caption))), icon::Small);
                 subX += icon::Small + space::XXS;
             }
-            PushText(TextStyle::Caption);
+            PushText(subtitleStyle);
             DrawText(draw, ImVec2(subX, subTop), Col(color::Dim), Ellipsize(options.subtitle, room - (subX - x)).c_str());
             PopText();
         }

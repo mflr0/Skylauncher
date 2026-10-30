@@ -8,9 +8,25 @@
 #include <cstdint>
 #include <imgui.h>
 #include <string>
+#include <vector>
+#include <map>
 
 namespace ui
 {
+    // Directional navigation in a two-column page. Tab keeps ImGui's usual submission order.
+    class NavigationColumns
+    {
+    public:
+        void Begin(bool move = true);
+        void Column(int column) { m_column = column; }
+        void End();
+        void Item(uint32_t id, ImVec2 min, ImVec2 max);
+    private:
+        struct Entry { uint32_t id; ImVec2 min, max; int column; };
+        std::vector<Entry> m_previous, m_current;
+        uint32_t m_target = 0;
+        int m_column = 0;
+    };
     struct Fonts
     {
         ImFont* text = nullptr;  // Outfit Regular
@@ -36,6 +52,9 @@ namespace ui
         bool animating = false;          // something drawn last frame moves (a spinner, a held button): draw again now
         uint32_t holdHintId = 0;         // the hold button whose "Hold to confirm" shows after a tap too short
         uint64_t holdHintUntil = 0;
+        std::vector<uint32_t>* testNavigationItems = nullptr; // screenshot checks: enabled controls in the game page
+        std::map<uint32_t, std::string> testNavigationLabels;
+        NavigationColumns* navigation = nullptr;
     };
     Context& Ctx();
     // Once a frame, before any component: the time, and `animating` cleared for this frame.

@@ -350,6 +350,63 @@ namespace ui
 
     MainActionResult MainAction(const MainActionOptions& options)
     {
+        if (options.separated)
+        {
+            MainActionResult result;
+            const ImVec2 at = ImGui::GetCursorScreenPos();
+            const ImVec2 end(at.x + options.width, at.y + height::Main);
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            result.mainCentre = ImVec2((at.x + end.x) / 2, (at.y + end.y) / 2);
+            result.gearCentre = ImVec2(end.x + space::S + height::MainGear / 2, result.mainCentre.y);
+            ImGui::BeginDisabled(!options.enabled);
+            if (Hit("##main", ImVec2(options.width, height::Main)))
+                result.hit = MainActionHit::Main;
+            ImGui::EndDisabled();
+            State state = ItemState(!options.enabled);
+            if (options.takeFocus && options.enabled)
+            {
+                FocusLastItem(options.showFocus);
+                state.focused = options.showFocus;
+            }
+            const bool busy = options.progress >= 0 || options.indeterminate;
+            const unsigned fill = busy ? color::OverArt : options.danger ? color::OverArt : state.pressed ? color::AccentFillPressed
+                : state.hovered || state.focused ? color::AccentFillHover : color::AccentFill;
+            const unsigned ink = busy ? color::Ink : options.danger ? color::Danger : color::OnAccent;
+            draw->AddRectFilled(at, end, Col(fill, options.enabled || busy ? 1 : DisabledAlpha), radius::Card);
+            if (options.danger)
+                draw->AddRect(at, end, Col(color::Danger), radius::Card, 0, stroke::Edge);
+            std::string label = options.label;
+            if (options.progress >= 0 && !options.indeterminate)
+                label += " " + FormatPercent(options.progress);
+            const float lead = options.icon == Icon::None ? 0 : icon::Normal + space::S;
+            ImGui::PushFont(Ctx().fonts.title, FitSize(Ctx().fonts.title, type::Title, label.c_str(), options.width - 2 * space::M - lead));
+            const float total = ImGui::CalcTextSize(label.c_str()).x + lead;
+            if (lead > 0)
+                DrawIcon(draw, options.icon, ImVec2(result.mainCentre.x - total / 2 + icon::Normal / 2, result.mainCentre.y), icon::Normal, Col(ink));
+            DrawCapsLabel(draw, ImVec2(at.x + lead, at.y), end, label.c_str(), Col(ink, options.enabled || busy ? 1 : DisabledAlpha));
+            ImGui::PopFont();
+            if (options.progress >= 0 || options.indeterminate)
+                DrawProgress(draw, at, end, radius::Card, 0, color::AccentFill, options.progress, options.indeterminate);
+            FocusRingIf(state, radius::Card);
+
+            const ImVec2 gearAt(end.x + space::S, at.y), gearEnd(gearAt.x + height::MainGear, end.y);
+            ImGui::SetCursorScreenPos(gearAt);
+            if (Hit("##gamesettings", ImVec2(height::MainGear, height::Main)))
+                result.hit = MainActionHit::Settings;
+            State gear = ItemState();
+            if (options.takeFocus && !options.enabled)
+            {
+                FocusLastItem(options.showFocus);
+                gear.focused = options.showFocus;
+            }
+            draw->AddRectFilled(gearAt, gearEnd, Col(gear.pressed ? color::OverArtPressed : gear.hovered ? color::OverArtHover : color::OverArt), radius::Card);
+            draw->AddRect(gearAt, gearEnd, Col(color::OverArtEdge), radius::Card, 0, stroke::Hairline);
+            DrawIcon(draw, Icon::Gear, result.gearCentre, icon::Large, Col(color::Ink));
+            FocusRingIf(gear, radius::Card);
+            if (options.gearTooltip != nullptr && WantsTooltip(gear))
+                Bubble(options.gearTooltip, gearAt, gearEnd);
+            return result;
+        }
         static constexpr LauncherTheme::GameStyle Launcher = { LauncherTheme::AccentHover, LauncherTheme::AccentDark, LauncherTheme::AccentInk, LauncherTheme::Accent };
         const LauncherTheme::GameStyle& style = options.style != nullptr ? *options.style : Launcher;
         const float rounding = radius::Card;

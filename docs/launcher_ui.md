@@ -74,6 +74,10 @@ margins, before a section, between tabs; was `TabGap` 34), `XXL` 48 (an empty st
 `Card` 14 (tiles and small cards, the main action, toasts; was `Radius`), `Panel` 22 (a page's big card, dialogs; was
 `RadiusLarge`). Chips, pills, badges, toggles, progress bars and icon buttons have round ends (height / 2).
 
+**Hero** (`ui::hero`): `Title` 96 and `TitleWidth` 560 for the fallback game name, `LogoHeight` 144, `PanelWidth` 400 and
+`PanelMinWidth` 264, `PanelHeight` 280 and `CompactPanelHeight` 320. These sizes let the approved two-column composition fit the smallest window; existing fonts,
+colours, radii, spacing and control heights are reused. No palette token is added.
+
 **Heights** (`ui::height`). `Small` 32 (chips, pills, compact buttons, the toggle, a select's rows), `Normal` 40 (buttons,
 fields, selects, tabs, segmented controls, one-line list rows), `Large` 56 (list rows with a subtitle, the sidebar's rows,
 settings rows, big buttons; was `GameRowH`), `Main` 64 with `MainWidth` 300 and `MainGear` 64 (the main action; were
@@ -154,6 +158,15 @@ cursor hidden). A label is translated by the caller (`Tr`); "Label##id" gives an
 model is `ui::State` read by `ui::ItemState`; the gallery forces one with `ui::PreviewState`. `ui::Ctx()` is set by the
 window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`Glyphs`), reduced motion, the time.
 
+### Hero heading and setup steps
+`HeroHeading` draws the series overline and the large fallback name in the supplied box. `HeroHeadingHeight` measures
+that same wrapping; long words shrink to the column, with XS of room to avoid rounding onto an extra line. A disc logo
+replaces the heading when present. `GuideStep` draws a numbered circle, a Label title and a wrapped Body note without
+adding a focus stop. `StatusLine` shows a status icon and Body text directly on the painting, ellipsized to its column.
+The gallery's feedback page shows the status line and a setup step; the hero screenshots show the heading in context.
+`CardOptions::edge` supplies the live panel's status edge; ListRow's `titleStyle`, `subtitleStyle` and `minHeight` keep
+portal names prominent and empty seats as tall as occupied ones, without changing other lists' defaults.
+
 ### Button
 | | |
 |---|---|
@@ -164,9 +177,9 @@ window each frame (`App::Frame`): the fonts, the focus colour, the pad family (`
 ### MainAction
 | | |
 |---|---|
-| When | The game page's big split button only: PLAY, INSTALL, UPDATE, CHOOSE DISC, and the game's settings in its gear segment. |
-| API | `MainActionResult ui::MainAction(MainActionOptions{label, enabled, progress, indeterminate, style, gearTooltip, takeFocus, showFocus})` at the cursor; `result.hit` is `Main`, `Settings` or `None`. `style` is the game's `GameStyle`. `App::DrawMainAction` calls it. |
-| States | Each half on its own: hover and focus 10 % lighter, pressed 10 % darker; disabled greyed with a faded label (the gear lights again under the pointer); busy with a known end: dark, tinted up to `progress`, a bar along the bottom, the label ending in the percentage; `indeterminate`: a band sweeping along that bar. Focus: one ring around the whole button in the game's colour. ("Each game's look".) |
+| When | The game page's main action: PLAY, INSTALL, UPDATE, CHOOSE DISC, and the separate settings button. |
+| API | `MainActionResult ui::MainAction(MainActionOptions{label, enabled, progress, indeterminate, style, gearTooltip, takeFocus, showFocus, separated, icon, danger, width})` at the cursor; `result.hit` is `Main`, `Settings` or `None`. `style` is the game's `GameStyle`. `App::DrawMainAction` calls it. |
+| States | Each half on its own: hover and focus 10 % lighter, pressed 10 % darker; disabled greyed with a faded label (the gear lights again under the pointer); busy with a known end: dark, tinted up to `progress`, a bar along the bottom, the label ending in the percentage; `indeterminate`: a band sweeping along that bar. With `separated`, the primary action uses the launcher accent and the settings button uses `OverArt`, S apart, each with its own focus ring. `danger` gives Stop its danger outline. The gallery shows the separated variant in every state. ("Each game's look".) |
 
 ### Pill
 | | |
@@ -539,11 +552,10 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
    SuperChargers Racing included), then Collection and Settings at the bottom. Each enabled row shows its game's icon
    and its live state (every game's disc is checked at start-up, one after the other: "A game's states"); the
    selected game's row has the bar while its Play page is open. Rows are reachable with the keyboard and the pad like the others.
-2. Play (no tabs) - the game's logo from the player's disc over the drawn sky (the disc's background art is not shown); a light band under it holds the controller button
-   (current device, PLAY WITH: a menu of the others), the portal's state, the main button (CHOOSE DISC, INSTALL, then PLAY)
-   and, on its right, **Game settings** (the band is described in full below). PLAY and
-   INSTALL check that the image is still there first. Changing the disc moved to the game's settings (Disc tab); CHOOSE DISC
-   stays the main button while there is no disc.
+2. Play (no tabs) - a hero over the disc's background, with continuous dark shades on the left and bottom.
+   The disc logo (else the name), state, main action and separate settings button form the left column. Controller and
+   portal pills sit below them. The right column shows the three first-run steps before a disc is chosen, otherwise the
+   collection's portal seats, an Open the Toy Box link and a Live badge while running. See "Game page hero" below.
 3. Collection - see below.
 4. Settings (the gear) - **the launcher's own settings and what both games share**, in four tabs: Controls (device, portal, glyphs), Launcher (language slot, updates, data folder, **Remove Arkeyan Launcher**: "Uninstall everything", below), Support (report a problem, logs), About (version, credits).
    Clicking a game goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from.
@@ -599,35 +611,38 @@ every game shows its real state and art at once ("Update all" on Home's title li
      icons of Collection and Settings centred in it): all the titles start on one edge.
    - Collection and Settings at the bottom (sentence case), rows with an icon, L from the window's foot.
    - Rows are reachable with the keyboard and the pad like the others.
-2. **Play** (the game page, no tabs).
-   - The backdrop is the game's own painting from the disc (SSA: the painted Skylands sky; Giants: the main menu's sky; Swap Force: the main menu's painted sky),
-     cropped to fill the page and shaded (`DrawBackdrop`: darker at the top, light behind the logo, dark towards the band,
-     a shadow along the sidebar) so the logo and white text read on any painting. Before any disc: the drawn night sky.
-   - The logo, large and centred, with a soft shadow, **falls in** on each arrival (see "The logo's arrival"). Before the
-     disc was ever read: the game's name.
-   - At the top right, over the art (XL from the edges), the **play time and achievements** in one Pill (`overArt`):
-     "12 h 34 · trophy 6/38" (`PillOptions::prefix`: the time before the trophy; a game never played shows the trophy and
-     the count only), shown once the disc check cached the list; it opens the Achievements page; its tooltip says
-     "Achievements" and when the game was last played. The room on its left is kept for a sound button to come.
-   - At the hero's foot, centred like the logo and the band, the **disc block**: "DISC IMAGE:" and the image's file name (XXS
-     apart) with "Change disc..." centred on the two once a disc is verified, then (S below) its state and the install note,
-     XS apart. Nothing else: the play time, the achievements and the update's details left it (the owner's review,
-     2026-10-29). (The small rounded app icon that sat here is gone: the owner's request, 2026-10-25.)
-   - The band under it: **one row** on the main action's middle line, centred in the band, S between its parts: the
-     controller picker (a Pill: a pad icon and the current device, as wide as its name up to `ControllerW`; PLAY WITH: a
-     menu of the others, above it), the **portal** (a Pill as high: "Portal" with a green check when a real portal is
-     plugged in, "No portal" with a dashed circle when not; as wide in both states, so the row never moves; its tooltip
-     says the model or "not detected" and that the game then has its virtual portal; a click opens Launcher settings >
-     Controls), then the **action button** in the game's colours ("Each game's look"): the main action (CHOOSE DISC,
-     INSTALL, UPDATE, PLAY) and the **game's settings** (a gear) in its right segment. While an update is offered, under the
-     action, centred on it: one muted Caption line, "0.8.2 · 41 MB · ~15 min" (the version on offer, the kit's download if
-     one is needed, the time), then **Play without updating** (a Small Ghost Button); the row and those two lines are
-     centred in the band together. PLAY and INSTALL check that the image is still there first. With a pad, the pad legend
-     runs along the band's foot, edge to edge.
+2. **Play** (the game page, no tabs): see "Game page hero" below. The disc's art fills the page; title,
+   state, commands and device pills sit on it, with the collection's portal at the right. There is no bottom bar.
 3. Collection - see below.
 4. Settings (the gear) - Graphics, Controls (device, portal), Language, Game data, About. Clicking a game
    goes back to Play; clicking the gear again, or B / Escape, goes back to the page you came from. The game page's settings
    button opens it too, until each game has a settings page of its own (another branch).
+
+## Game page hero
+The page keeps XL margins and an L gap between two columns. The left contains the disc's logo, fitted with its aspect
+kept and aligned to the title edge, or a Bungee name under Skylanders. The right panel and the controls share a lower
+edge. Continuous dark gradients cover the painting's left and lower edges. Without art the current night sky remains.
+The portal column narrows from 400 to 264 points at small window sizes; longer names wrap or ellipsize inside their column.
+
+- **Ready**: the logo or name, Ready to play (with the recorded play time and last-played date when available), Play,
+  a separate settings button, and the device and portal pills below. Change disc remains available at the top; copied
+  game data continues to use the existing Disc settings. The achievements pill still opens Achievements.
+- **Needs a disc**: Not installed yet, Choose disc and settings; the hint explains window-wide .iso dropping and local
+  reading. The right card gives Choose your disc, Install (the existing time and space estimates), and Play.
+- **Installing**: the title stays visible, with the current checklist step, overall percentage and progress bar, four
+  milestones, Cancel, Show details and settings. The milestones collect tools/disc, recompilation, shaders, and the
+  remaining compile/link/movie/finish work. The detailed checklist and log, failure, retry and resume views remain
+  available in the left column. The portal stays visible and usable throughout installation.
+- **Running**: Playing now, the Stop and Show the game controls, the Toy Box shortcut hint, and the live portal.
+  **Current limitation:** `GameSession` has no stop or window activation API. These two controls are disabled and the
+  page directs the player to the game's window. No process signalling or window manipulation is added to the UI.
+
+The portal reads and polls `CollectionModel`, including the session file and figure stats. Each seat is a focusable
+ListRow with the disc portrait or the collection's generated icon, the figure's name, seat and level; empty seats use a
+ring and plus. Activating a seat opens Collection's existing chooser; while running, Collection keeps its existing
+read-only rules. Open the Toy Box opens Collection, the launcher's existing figure view. The device picker keeps its
+existing menu and choices; the portal pill still opens Launcher settings > Controls. Virtual portal is shown even when
+no hardware detector is available. Buttons, pills and rows use their usual keyboard and gamepad focus rings.
 
 ## A game's states
 One function decides: `App::SlotStatus(slot)` returns the game's `SlotState`, its line and the main button's label (its icon and colour: `IconOf` and `StatusOf`)
@@ -777,25 +792,18 @@ What belongs to the game on its page is drawn in **the game's own colours**, tak
 | Swap Force | the logo's lime to green, dark green ink | `SwapForceStyle` |
 | any other | the launcher's own blue | |
 
-**The action button** (`ui::MainAction`, called by `App::DrawMainAction(at, {label, enabled, progress})`, the owner's choice
-of 2026-10-25, "flat and crisp"): one split button, `height::MainWidth` + `height::MainGear` by `height::Main` (300 + 64 by
-64 points).
-- Flat: a light gradient between the game's two colours (20 % to 58 % of the way), `radius::Card` corners, no outline, a soft
-  shadow, a hairline of light along the top. The label in Bungee at `type::Title` (smaller if it would not fit), centred
-  on its capitals and placed on whole pixels; its ink is white when that reads at 3:1 on the fill, else the game's dark
-  ink (navy for SSA, brown for Giants, dark green for Swap Force), and it never changes under the pointer.
-- The game's settings: a gear in the right segment, behind a dark and a light hairline; its tooltip "<game> settings".
-- States, each half on its own: under the pointer 10 % lighter, pressed 10 % darker; **focused** (keyboard, pad): the
-  focused half lit as under the pointer and one ring around the whole button in the game's colour (`GameStyle::glow`);
-  **disabled**: greyed, a light faded label; **busy** (checking the disc, installing): a dark face tinted in the game's
-  colour up to the progress, a 5-point bar in that colour along the bottom edge, the label ending in the percentage
-  ("INSTALLING 42%", `FormatPercent`: "42 %" in French); `indeterminate`: a band sweeping along that bar.
-- The band's group (the controller picker, 40 points, the button) is centred in the band on whole points; the picker is
-  as tall as the button. At 100 % and 200 % and in the smallest window (1024x680) both share their top, bottom and
-  centre to the pixel, and the margins left and right are equal.
-- Everything else (the sidebar, the band, Settings, Collection) keeps the launcher's neutral look: the games' styles
-  never mix.
-- A new game: add its `GameStyle` and a line in `StyleOf`.
+**The hero action** uses `ui::MainAction` with `separated=true`: an accent-filled primary button, then S of space,
+then a quiet settings button. Both use `height::Main` (64), `radius::Card`, Bungee `type::Title` and the existing Lucide
+icons. The main width is at most `height::MainWidth` (300); the gear is `height::MainGear` (64). Labels fit the available
+width and retain their focus when they change. Each control has its own ring in the selected game's focus colour.
+Hover, press, disabled and busy treatments use the existing tokens; busy text remains readable and the bar shows the
+real progress. The running state's Stop uses the danger outline; its unavailable operations are described above.
+The previous split-button component option remains available to existing callers.
+
+`NavigationColumns` records enabled controls while the page is drawn: up/down stays within a column, left/right visits
+neighbours in the same row before crossing to the other column. It uses ImGui focus, keyboard arrows and gamepad
+navigation, and leaves Tab and open menus to ImGui. This prevents wide portal rows from diverting a downward move past
+the device pills. The screenshot test visits every enabled control with both input methods.
 
 `SKY_LAUNCHER_TEST_BUTTONS=1` (with `SKY_LAUNCHER_SHOTS`, a `[launcher] kit=` that is the fake kit, and both games' `iso=`)
 shoots the button's states: for each game `00-install`, `01-hover`, `02-pressed`, `03-focused`, `04-settings-hover`,
@@ -992,6 +1000,24 @@ X for a card's sheet, B back, then down to Settings, A, RB to its Launcher tab, 
 a timeout stops a run that went astray); `ArkeyanLauncherTest` runs it (`NavChecks`).
 With `SKY_LAUNCHER_TEST_INSTALL=1` and `SKY_LAUNCHER_KIT=$PWD/build/fake-kit` it shows the install screens instead
 (`docs/install.md`). With `SKY_LAUNCHER_TEST_GALLERY=1` it shoots the component gallery ("Gallery").
+
+### Hero screenshots
+Build with `ninja -j4 -C build ArkeyanLauncher ArkeyanLauncherTest FakeSkyBuild`, then run:
+```sh
+python3 tests/hero_shots.py --disc /absolute/path/to/supported-game.iso
+```
+The script sets `SKY_LAUNCHER_TEST_HERO=1` and `SKY_LAUNCHER_SHOTS` to `.shots/`, isolates every data folder in
+`.scratch/hero/`, uses offscreen rendering and bounds the launcher to 150 seconds (only its own process can be stopped).
+It writes `hero-<ready|needs-disc|installing|running>-<art|noart>.png`. The four states and two figures are in-memory display
+fixtures: no game, installer or figure writing runs. Disc verification and the existing art reader still run read-only
+against the supplied image; cache writes stay in scratch data. The no-art shots explicitly hide the hero art even if
+cached. A missing logo or background is logged as `FAIL hero`, and the script fails even if fallback screenshots exist;
+it never counts a fallback as a successful art check. Trap Team has no art manifest in the current reader, so its disc
+cannot validate the art shots. Use a supported disc for that check.
+
+`--language fr`, `--size 1024x680` and `--pad` exercise French, the smallest window and focus rings. The default is English
+at 1600x1000; each run replaces the eight files. After the eight captures, keyboard Tab and gamepad directional input must reach every enabled control in all four states.
+The render log reports unreachable controls as failures and stays in `.scratch/hero/screenshots.log`.
 
 ## Other screenshot variables
 `SKY_LAUNCHER_TEST_SCREENS=mouse` (or `pad`) with `SKY_LAUNCHER_TEST_DROP=<SSA disc>` shoots the three model screens,

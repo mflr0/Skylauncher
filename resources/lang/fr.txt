@@ -95,7 +95,6 @@ Compiling the game	Compilation du jeu
 Controller	Manette
 Controller: {}	Manette : {}
 Controls	Commandes
-Copied game data	Données du jeu copiées
 Copied: {}, 1 file	Copié : {}, 1 fichier
 Copied: {}, {} files	Copié : {}, {} fichiers
 Copies the disc's files ({}). No image needed after.	Copie les fichiers du disque ({}). Plus d'image nécessaire ensuite.
@@ -127,7 +126,6 @@ Couldn't unpack {}	Impossible de décompresser {}
 Couldn't create the shortcut	Impossible de créer le raccourci
 Create	Créer
 Credits	Crédits
-DISC IMAGE:	IMAGE DISQUE :
 Data folder	Dossier de données
 Clean up	Nettoyage
 Delete saves and data	Supprimer sauvegardes et données
@@ -137,11 +135,9 @@ Desktop shortcut	Raccourci sur le bureau
 Disc	Disque
 Disc image	Image disque
 Disc not found	Disque introuvable
-Disc verified: {}	Disque vérifié : {}
 Downloading Arkeyan Launcher	Téléchargement d'Arkeyan Launcher
 Downloading the game tools	Téléchargement des outils du jeu
 Downloading tools	Téléchargement des outils
-Drop your disc image (.iso) here.	Déposez votre image disque (.iso) ici.
 Dump textures	Extraire les textures
 Stopping keeps the files already copied.	Arrêter garde les fichiers déjà copiés.
 Game art comes from your own disc.	Les images viennent de votre propre disque.
@@ -153,10 +149,8 @@ Found	Détecté
 Found, not usable	Détecté, inutilisable
 Frame rate limit	Limite d'images par seconde
 Fullscreen	Plein écran
-GAME DATA:	DONNÉES DU JEU :
 Game	Jeu
 Game data	Données du jeu
-Game data copied: {}	Données du jeu copiées : {}
 Game data damaged	Données du jeu endommagées
 Game installed: press PLAY	Jeu installé : appuyez sur JOUER
 Game log copied	Journal du jeu copié
@@ -212,7 +206,6 @@ Move up	Haut
 Native PC ports	Portages PC natifs
 Needs your disc	Disque requis
 No backups yet.	Aucune copie de secours pour l'instant.
-No disc image yet	Aucune image disque
 No game log yet.	Pas encore de journal du jeu.
 No gamepad connected.	Aucune manette connectée.
 No notes were published with this version.	Aucune note n'a été publiée avec cette version.
@@ -241,7 +234,6 @@ Play {}	Jouer à {}
 Play {} with Arkeyan Launcher	Jouer à {} avec Arkeyan Launcher
 Plug in the portal, then test it.	Branchez le portail, puis testez-le.
 Portal	Portail
-No portal	Sans portail
 Portal of Power	Portail des Pouvoirs
 Problem report	Rapport de problème
 Portal: not detected	Portail : non détecté
@@ -804,10 +796,6 @@ On the wheel: {}	Sur la roue : {}
 The wheel is full: take a figure off it first	La roue est pleine : retirez d’abord une figurine
 
 # Game page (phase B)
-1. Choose your disc	1. Choisir votre disque
-2. Install	2. Installer
-3. Play	3. Jouer
-Your disc is read on this computer only.	Votre disque est lu sur cet ordinateur uniquement.
 Play	Jouer
 Sidebar	Barre latérale
 
@@ -856,3 +844,27 @@ less than a minute	moins d'une minute
 today	aujourd'hui
 yesterday	hier
 {} days ago	il y a {} jours
+
+# Game page
+On the portal	Sur le portail
+Live	En direct
+{} · empty	{} · libre
+Not installed yet	Pas encore installé
+Installing · {}	Installation · {}
+Ready · {} played	Prêt · {} de jeu
+Close or switch to the game in its own window.	Fermez le jeu ou retrouvez sa fenêtre directement.
+Show the game	Afficher le jeu
+Virtual portal	Portail virtuel
+Or drop your .iso anywhere on this window. Your disc is read on this computer only.	Ou déposez votre .iso dans cette fenêtre. Votre disque est lu uniquement sur cet ordinateur.
+You can set up your portal while you wait.	Vous pouvez préparer votre portail en attendant.
+Toy Box in the game: F6, or View + Y on a controller.	Toy Box en jeu : F6, ou View + Y sur la manette.
+Three steps	Trois étapes
+Choose your disc	Choisissez votre disque
+About {} min, {} GB	Environ {} min, {} Go
+Your own copy, as an .iso	Votre propre copie, au format .iso
+Controller, keyboard, real or virtual portal	Manette, clavier, portail réel ou virtuel
+Disc checked	Disque vérifié
+Code	Code
+Shaders	Shaders
+Ready	Prêt
+Install	Installer

@@ -283,7 +283,7 @@ namespace launcher_ui
         };
         SlotLine SlotStatus(GameSlot* slot);
         SlotLine SlotLineOf(GameSlot* slot); // the same, as if no game were running
-        float PlayBandH() const; // the game page's band under the art: the main action, and the pad legend when a pad is in use
+        float PlayBandH() const; // space reserved only for the pad legend on the game page
         void DrawPortalStatus(); // "Portal: <model>" or "Portal: not detected", with its tooltip; nothing when HID is unavailable
 
     private:
@@ -297,6 +297,10 @@ namespace launcher_ui
         void DrawSidebar();
         void DrawHome();
         void DrawPlay();
+        void DrawHeroInstall(ImVec2 at, float width);
+        void DrawHeroSteps(ImVec2 at, ImVec2 size);
+        void TestHeroScript(uint64_t now);
+        void TestHeroNavigation();
         void DrawSettings();     // the launcher's settings (the gear): Controls, Launcher, Support, About
         void DrawControls();
         void DrawLauncherTab();
@@ -372,14 +376,16 @@ namespace launcher_ui
         friend class CollectionPage;
 
         // The game page in the game's own look (game_look.cpp, docs/launcher_ui.md "Each game's look").
-        // The band's action button: the main action (PLAY, INSTALL...) and the game's settings (a gear) as one split
-        // button in the game's colours, PlayButtonW + PlayGearW by PlayButtonH at `at`. Takes the page's focus.
+        // The hero's main action and separate settings button. Takes the page's first available focus stop.
         struct MainAction
         {
             const char* label;
             bool enabled = true;
             float progress = -1; // 0..1 while busy (checking the disc, installing); < 0 otherwise
             bool indeterminate = false; // busy with no known end: a sweep in place of the percentage
+            ui::Icon icon = ui::Icon::None;
+            bool danger = false;
+            float width = ui::height::MainWidth;
         };
         enum class MainActionHit { None, Main, Settings };
         MainActionHit DrawMainAction(ImVec2 at, const MainAction& action);
@@ -407,7 +413,7 @@ namespace launcher_ui
         void BeginCard(const char* id, ImVec2 size, ImGuiChildFlags flags = ImGuiChildFlags_None);
         void EndCard();
 
-        // Installing the game (the band's INSTALL button, the progress card in place of the logo).
+        // Installing the game: the hero progress and its detailed checklist.
         void RefreshInstall();
         bool NeedsInstall() const;
         bool NeedsInstall(const GameSlot& slot) const;
@@ -528,6 +534,7 @@ namespace launcher_ui
         float m_bannerH = 0;             // the height the banner takes at the top of the page, this frame
         SDL_Texture* m_github = nullptr;
         bool m_dragOver = false;
+        ui::NavigationColumns m_heroNavigation;
 
         std::vector<SDL_JoystickID> m_gamepads;
         SDL_GamepadType m_lastPadType = SDL_GAMEPAD_TYPE_UNKNOWN; // the last pad connected
@@ -558,6 +565,14 @@ namespace launcher_ui
         int m_testFocusView = -1;      // the page and tab the last pad focus was given on
         bool m_testPad = false;        // SKY_LAUNCHER_TEST_PAD: each game's Controller tab, and Swap Force's Game tab
         bool m_testRunning = false;      // SKY_LAUNCHER_TEST_RUNNING: one game at a time (TestRunningScript)
+        bool m_testHero = false;         // SKY_LAUNCHER_TEST_HERO: four display fixtures, no game or install started
+        int m_testHeroState = -1;        // ready, needs-disc, installing, running
+        bool m_testHeroNoArt = false;
+        InstallProgress m_testHeroProgress;
+        std::vector<uint32_t> m_testHeroControls, m_heroNavExpected, m_heroNavSeen;
+        std::map<std::pair<uint32_t, int>, uint32_t> m_heroNavEdges;
+        int m_heroNavCase = 0, m_heroNavPhase = -1, m_heroNavWarmup = 0, m_heroNavMoves = 0, m_heroNavDirection = 0;
+        uint32_t m_heroNavFrom = 0;
         bool m_testAchievements = false; // SKY_LAUNCHER_TEST_ACHIEVEMENTS: the shown game's page with its play time, then its achievements
         bool m_testLogo = false;       // SKY_LAUNCHER_TEST_LOGO: each game's page with its logo (from the art already read), one shot each
         bool m_testScrollEnd = false;  // the uninstall screenshots: scroll the settings column to its end
