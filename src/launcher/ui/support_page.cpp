@@ -5,6 +5,7 @@
 #include "launcher/report.h"
 #include "launcher/ui/launcher_app.h"
 #include "launcher/game_names.h"
+#include "shared/collection/datadir.h"
 #include <fmt/format.h>
 #include <fstream>
 #include <memory>
@@ -31,7 +32,7 @@ namespace launcher_ui
         }
         if (files[0] == nullptr) // cancelled
             return;
-        std::ofstream out(files[0], std::ios::binary | std::ios::trunc);
+        std::ofstream out(datadir::FromText(files[0]), std::ios::binary | std::ios::trunc); // UTF-8: accents in a Windows user name
         out.write(text->data(), std::streamsize(text->size()));
         out.close();
         if (out)
