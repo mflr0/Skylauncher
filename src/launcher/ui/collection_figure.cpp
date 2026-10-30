@@ -103,6 +103,15 @@ namespace launcher_ui
         case Overlay::Manage: DrawManage(); break;
         case Overlay::None: break;
         }
+        if (!m_confirm.empty())
+        {
+            // The question asked over the sheet dims everything under it: the sheet, which the question's own dim leaves out of
+            // the rest, goes with the page.
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            draw->PushClipRectFullScreen();
+            draw->AddRectFilled(ImVec2(0, 0), ImGui::GetIO().DisplaySize, ui::Col(ui::color::Scrim, float(ui::elevation::ScrimAlpha) / 255.0f));
+            draw->PopClipRect();
+        }
         ui::EndModal();
         if (!open && m_overlay != Overlay::None) // the cross, B or Escape
         {
