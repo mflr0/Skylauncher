@@ -1086,16 +1086,19 @@ int AchievementChecks()
 
 int main(int argc, char** argv)
 {
+    // --no-disc <scratch dir>: only the checks that need no disc image (what CI runs).
+    const bool noDisc = argc >= 3 && std::string_view(argv[1]) == "--no-disc";
     if (argc < 3)
     {
-        fprintf(stderr, "usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]\n");
+        fprintf(stderr, "usage: ArkeyanLauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]\n"
+                        "       ArkeyanLauncherTest --no-disc <scratch dir>\n");
         return 2;
     }
     // The text the windows are checked against is English, whatever language the computer is in (SKY_LAUNCHER_TEST_LANGUAGE=fr
     // only takes screenshots in another language: the text checks then fail).
     const char* testLanguage = skyenv::Get("SKY_LAUNCHER_TEST_LANGUAGE");
     SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LANGUAGE", testLanguage != nullptr && *testLanguage != 0 ? testLanguage : "en", true);
-    std::filesystem::path iso = argv[1];
+    std::filesystem::path iso = noDisc ? std::filesystem::path() : std::filesystem::path(argv[1]);
     std::filesystem::path scratch = std::filesystem::path(argv[2]) / "launcher_test";
     std::filesystem::remove_all(scratch);
     std::filesystem::create_directories(scratch);
@@ -1133,7 +1136,8 @@ int main(int argc, char** argv)
     HoldChecks();
     EditChecks();
     PortalChecks();
-    InstallChecks(scratch, iso.string());
+    if (!noDisc)
+        InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);
     g_failures += SettingsChecks(scratch / "settings");
     g_failures += UninstallChecks(scratch);
@@ -1159,6 +1163,12 @@ int main(int argc, char** argv)
         LauncherTheme::StyleOf("swapforce").top != LauncherTheme::StyleOf("giants").top);
     EXPECT(giants != nullptr && giants->releases[0].titleId == 0x415608DA && std::string(giants->releases[0].defaultXexSha256).size() == 64);
 
+    if (noDisc)
+    {
+        std::filesystem::remove_all(scratch);
+        printf(g_failures == 0 ? "All launcher checks passed (no disc image)\n" : "%d launcher check(s) failed (no disc image)\n", g_failures);
+        return g_failures == 0 ? 0 : 1;
+    }
     printf("Player's disc image:\n");
     auto start = Clock::now();
     EXPECT(Check(iso) == GameSourceStatus::Ok);

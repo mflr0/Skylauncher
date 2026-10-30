@@ -241,6 +241,7 @@ else()
 endif()
 
 # Checks against the player's own disc image: ArkeyanLauncherTest <game disc .iso> <scratch dir> [<damaged copy>...]
+# (ArkeyanLauncherTest --no-disc <scratch dir> runs the ones that need no disc image)
 add_executable(ArkeyanLauncherTest EXCLUDE_FROM_ALL tests/launcher_test.cpp)
 target_link_libraries(ArkeyanLauncherTest PRIVATE ArkeyanLauncherCore)
 target_include_directories(ArkeyanLauncherTest PRIVATE lib/stb)

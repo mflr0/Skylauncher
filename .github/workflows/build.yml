@@ -35,6 +35,12 @@ jobs:
           if ($version) { $extra += "-DLAUNCHER_VERSION=$version" }
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl @extra
           cmake --build build --target ArkeyanLauncher
+          # The checks that need no disc image (the others need the player's own).
+          cmake --build build --target ArkeyanLauncherTest FakeSkyBuild
+          $env:SDL_VIDEO_DRIVER = 'offscreen'
+          $env:SDL_AUDIO_DRIVER = 'dummy'
+          .\build\ArkeyanLauncherTest.exe --no-disc "$env:RUNNER_TEMP\launcher-test"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item build/ArkeyanLauncher.exe dist/ArkeyanLauncher.exe
       - uses: actions/upload-artifact@v4
@@ -61,6 +67,9 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-15 -DCMAKE_CXX_COMPILER=clang++-15 \
             ${VERSION:+"-DLAUNCHER_VERSION=${VERSION#v}"}
           cmake --build build --target ArkeyanLauncher
+          # The checks that need no disc image (the others need the player's own).
+          cmake --build build --target ArkeyanLauncherTest FakeSkyBuild
+          SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy build/ArkeyanLauncherTest --no-disc "$RUNNER_TEMP/launcher-test"
           cmake --install build --prefix AppDir/usr
       - name: AppImage
         run: |
@@ -90,6 +99,9 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ${VERSION:+"-DLAUNCHER_VERSION=${VERSION#v}"}
           cmake --build build --target ArkeyanLauncher
+          # The checks that need no disc image (the others need the player's own).
+          cmake --build build --target ArkeyanLauncherTest FakeSkyBuild
+          SDL_VIDEO_DRIVER=offscreen SDL_AUDIO_DRIVER=dummy build/ArkeyanLauncherTest --no-disc "$RUNNER_TEMP/launcher-test"
       - name: Icon, signature, .dmg and .zip
         run: tools/package_macos.sh build/ArkeyanLauncher.app resources/icons/skylauncher.svg dist
       - uses: actions/upload-artifact@v4

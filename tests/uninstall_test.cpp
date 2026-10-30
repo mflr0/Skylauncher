@@ -593,14 +593,14 @@ namespace
             UN_EXPECT(Has(mac.root / "notes.txt")); // nothing else was touched
         }
         {
-            Tree linux = MakeTree(run / "linux", Os::Linux);
-            LauncherRemoval removal = PlanLauncherRemoval(linux.env);
-            UN_EXPECT(removal.ok && RunHelper(ScheduleCommand(Os::Linux, removal, DeadPid())) && !Has(linux.self) && Has(linux.root / "notes.txt"));
+            Tree linuxTree = MakeTree(run / "linux", Os::Linux);
+            LauncherRemoval removal = PlanLauncherRemoval(linuxTree.env);
+            UN_EXPECT(removal.ok && RunHelper(ScheduleCommand(Os::Linux, removal, DeadPid())) && !Has(linuxTree.self) && Has(linuxTree.root / "notes.txt"));
         }
         {
             // It waits for the launcher to end: a live process holds it back, then it runs once that process is gone.
-            Tree linux = MakeTree(run / "linux-wait", Os::Linux);
-            LauncherRemoval removal = PlanLauncherRemoval(linux.env);
+            Tree linuxTree = MakeTree(run / "linux-wait", Os::Linux);
+            LauncherRemoval removal = PlanLauncherRemoval(linuxTree.env);
             const char* sleeper[] = { "/bin/sleep", "1", nullptr };
             SDL_Process* live = SDL_CreateProcess(sleeper, false);
             uint32_t pid = live == nullptr ? 0 : uint32_t(SDL_GetNumberProperty(SDL_GetProcessProperties(live), SDL_PROP_PROCESS_PID_NUMBER, 0));
@@ -613,10 +613,10 @@ namespace
                 argv.push_back(nullptr);
                 SDL_Process* helper = SDL_CreateProcess(argv.data(), false);
                 SDL_Delay(300);
-                UN_EXPECT(Has(linux.self)); // the sleeper still runs: not yet
+                UN_EXPECT(Has(linuxTree.self)); // the sleeper still runs: not yet
                 SDL_WaitProcess(live, true, nullptr);
                 SDL_WaitProcess(helper, true, nullptr);
-                UN_EXPECT(!Has(linux.self));
+                UN_EXPECT(!Has(linuxTree.self));
                 SDL_DestroyProcess(helper);
                 SDL_DestroyProcess(live);
             }
