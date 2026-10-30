@@ -33,7 +33,7 @@ namespace launcher_ui
     // was chosen for goes back to the disc it had.
     void App::UseDiscForOtherGame()
     {
-        const GameInfo* other = FindGame(m_s->check.otherGame);
+        const GameInfo* other = FindEnabledGame(m_s->check.otherGame, m_config);
         if (other == nullptr || m_s->disc != DiscState::Failed)
             return;
         GameSlot& target = SlotFor(*other);

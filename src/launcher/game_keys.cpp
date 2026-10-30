@@ -69,7 +69,7 @@ std::span<const GameKey> GameKeys(std::string_view gameId)
         return Ssa;
     if (gameId == "giants")
         return Giants;
-    if (gameId == "swapforce")
+    if (gameId == "swapforce" || gameId == "trapteam")
         return SwapForce;
     return {};
 }

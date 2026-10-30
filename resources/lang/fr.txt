@@ -856,3 +856,6 @@ less than a minute	moins d'une minute
 today	aujourd'hui
 yesterday	hier
 {} days ago	il y a {} jours
+
+Trap Team (experimental)	Trap Team (expérimental)
+Show Trap Team in your games.	Afficher Trap Team dans vos jeux.

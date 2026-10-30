@@ -31,25 +31,26 @@ int main(int argc, char** argv)
     {
         std::vector<std::pair<std::string, std::string>> shortcutGames;
         for (const GameInfo& info : g_games)
-            shortcutGames.emplace_back(info.id, info.name);
+            if (FindEnabledGame(info.id, config) != nullptr)
+                shortcutGames.emplace_back(info.id, info.name);
         RefreshShortcuts(DesktopFolder(), shortcutGames, SelfExecutable());
     }
 
     // The game last shown ([launcher] game=), else Spyro's Adventure. Picking another game in the sidebar switches the
     // window to it in place; the game that was shown when PLAY was pressed is the one that runs.
-    const GameInfo* game = arguments.game.empty() ? FindGame(config["launcher"]["game"]) : FindGame(arguments.game);
+    const GameInfo* game = arguments.game.empty() ? FindEnabledGame(config["launcher"]["game"], config) : FindEnabledGame(arguments.game, config);
     if (!arguments.game.empty() && game == nullptr)
-        fprintf(stderr, "launcher: no game called \"%s\" (ssa, giants or swapforce)\n", arguments.game.c_str());
+        fprintf(stderr, "launcher: no game called \"%s\" (see --help)\n", arguments.game.c_str());
     if (game == nullptr)
-        game = FindGame(config["launcher"]["game"]);
+        game = FindEnabledGame(config["launcher"]["game"], config);
     if (game == nullptr)
         game = FindGame("ssa");
     if (game == nullptr)
         return 1;
     std::string installed;
     LauncherOptions options;
-    options.openGame = !arguments.game.empty() && FindGame(arguments.game) != nullptr;
-    options.play = arguments.play;
+    options.openGame = !arguments.game.empty() && FindEnabledGame(arguments.game, config) != nullptr;
+    options.play = arguments.play && (arguments.game.empty() || FindEnabledGame(arguments.game, config) != nullptr);
     options.startGames = true;
     std::string chosen = RunLauncherWindow(*game, configPath, config, config[game->id]["iso"], &installed, &game, options);
     if (chosen.empty())

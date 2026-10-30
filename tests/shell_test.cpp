@@ -711,6 +711,12 @@ namespace
         std::optional<InstallKit> three = InstallKitIn(root / "three");
         SHELL_EXPECT(three && three->Builds("ssa") && three->Builds("giants") && three->Builds("swapforce") && !three->Builds("trapteam"));
 
+        kit(root / "four", "version=0.6.0\nbuild=e\ngames=ssa,giants,swapforce,trapteam\n");
+        WriteBytes(root / "four" / "SkyBuild", "x");
+        WriteBytes(root / "four" / "SkyBuild.exe", "x");
+        std::optional<InstallKit> four = InstallKitIn(root / "four");
+        SHELL_EXPECT(four && four->Builds("trapteam") && four->ssabuild.stem() == "SkyBuild");
+
         // From an older release than the launcher: the kit.txt version, or the folder's release tag; the player's own never.
         SHELL_EXPECT(KitOlderThanLauncher(*old, "0.4.0") && !KitOlderThanLauncher(*old, "0.3.1") && !KitOlderThanLauncher(*multi, "0.4.0"));
         old->tag = "v0.4.0";

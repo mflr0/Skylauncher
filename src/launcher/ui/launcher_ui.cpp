@@ -379,6 +379,7 @@ namespace launcher_ui
             m_testCollection = LauncherEnv("SKY_LAUNCHER_TEST_COLLECTION") != nullptr;
             m_testNav = LauncherEnv("SKY_LAUNCHER_TEST_NAV") != nullptr;
             m_testSwitch = LauncherEnv("SKY_LAUNCHER_TEST_SWITCH") != nullptr;
+            m_testExperimental = LauncherEnv("SKY_LAUNCHER_TEST_TRAPTEAM") != nullptr;
             m_testSidebar = LauncherEnv("SKY_LAUNCHER_TEST_SIDEBAR") != nullptr;
             if (const char* kit = LauncherEnv("SKY_LAUNCHER_TEST_KIT"))
                 m_testKit = kit;
@@ -417,14 +418,16 @@ namespace launcher_ui
     App::App(const GameInfo& game, const std::string& configPath, LauncherConfig& config, const LauncherOptions& options)
         : m_configPath(configPath), m_config(config), m_session(GameIds())
     {
-        m_s = &SlotFor(game);
-        SetActiveGame(game.id);
+        m_s = &SlotFor(FindEnabledGame(game.id, config) != nullptr ? game : *FindGame("ssa"));
+        SetActiveGame(m_s->game.id);
         m_autoPlay = options.play;
         m_startGames = options.startGames;
         if (options.openGame)
             m_page = Page::Play; // a shortcut opens on the game, not on the launcher's menu
         for (const GameInfo& each : g_games)
         {
+            if (FindEnabledGame(each.id, m_config) == nullptr)
+                continue;
             SeedGameVideo(m_config, each.id); // each game starts from the video settings the player already had
             SeedGameInput(m_config, each.id); // and from the keys
         }
@@ -449,7 +452,11 @@ namespace launcher_ui
     // visit and runs in the background; a game seen before is shown as it was left.
     void App::SelectGame(const GameInfo& game)
     {
+        if (FindEnabledGame(game.id, m_config) == nullptr)
+            return;
         m_s = &SlotFor(game);
+        SeedGameVideo(m_config, game.id);
+        SeedGameInput(m_config, game.id);
         SetActiveGame(game.id);
         Set("launcher", "game", game.id);
         if (!m_s->started)
@@ -486,7 +493,7 @@ namespace launcher_ui
             return;
         const GameInfo* game = FindGame(m_discQueue.front());
         m_discQueue.erase(m_discQueue.begin());
-        if (game == nullptr)
+        if (game == nullptr || FindEnabledGame(game->id, m_config) == nullptr)
             return;
         GameSlot& slot = SlotFor(*game);
         if (slot.started)
@@ -561,7 +568,7 @@ namespace launcher_ui
         {
             m_s->started = true;
             StartGameDisc();
-            for (const LauncherGameEntry& entry : LauncherGameCatalog())
+            for (const LauncherGameEntry& entry : LauncherGameCatalog(m_config))
                 if (entry.enabled && FindGame(entry.id) != nullptr && std::string_view(entry.id) != m_s->game.id)
                     m_discQueue.push_back(entry.id);
         }
@@ -1244,7 +1251,7 @@ namespace launcher_ui
         // The games: only those with a runtime can be selected. The ones not out yet fold into one row under them.
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, ui::space::XXS));
         std::vector<const LauncherGameEntry*> later;
-        for (const LauncherGameEntry& entry : LauncherGameCatalog())
+        for (const LauncherGameEntry& entry : LauncherGameCatalog(m_config))
         {
             if (!entry.enabled || FindGame(entry.id) == nullptr)
             {
@@ -1289,7 +1296,7 @@ namespace launcher_ui
             // One compact row; opened, the games to come are listed under it, quietly.
             ImGuiStorage* storage = ImGui::GetStateStorage();
             const ImGuiID openKey = ImGui::GetID("##coming-later");
-            const bool open = storage->GetBool(openKey, false);
+            const bool open = storage->GetBool(openKey, m_testExperimental && m_testStep == 0);
             const std::string count = std::to_string(later.size());
             ui::ListRowOptions options;
             options.trailing = count.c_str();
@@ -1416,7 +1423,7 @@ namespace launcher_ui
 
         // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
         std::vector<const LauncherGameEntry*> playable, later;
-        for (const LauncherGameEntry& entry : LauncherGameCatalog())
+        for (const LauncherGameEntry& entry : LauncherGameCatalog(m_config))
             (entry.enabled && FindGame(entry.id) != nullptr ? playable : later).push_back(&entry);
         const float gap = ui::space::L;
         const float cardW = (width - gap * float(playable.size() - 1)) / float(std::max<size_t>(playable.size(), 1));
@@ -1729,7 +1736,7 @@ namespace launcher_ui
                 else
                     ui::Text(ui::TextStyle::Body, m_s->check.message.c_str(), ui::color::Danger);
                 // The other supported game's disc: one button to use it there.
-                if (const GameInfo* other = FindGame(m_s->check.otherGame); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
+                if (const GameInfo* other = FindEnabledGame(m_s->check.otherGame, m_config); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
                 {
                     if (ui::Button(Tf("Use it for {}", other->name).c_str(), { .kind = ui::ButtonKind::Primary }))
                         UseDiscForOtherGame();
@@ -2114,6 +2121,14 @@ namespace launcher_ui
             return;
         }
         DrawLauncherLanguage();
+        if (ui::BeginSettings("##experimental"))
+        {
+            bool enabled = ExperimentalTrapTeam(m_config);
+            ui::SettingRow(Tr("Trap Team (experimental)"), Tr("Show Trap Team in your games."));
+            if (ui::Toggle("##trapteam", &enabled))
+                SetExperimentalTrapTeam(enabled);
+            ui::EndSettings();
+        }
         ui::SectionHeader(Tr("Updates"));
         DrawUpdates();
         ui::SectionHeader(Tr("Data folder"), Tr(strings::DataFolderHint));
@@ -2128,6 +2143,27 @@ namespace launcher_ui
             OpenFolder(LauncherDataFolder());
         }
         DrawUninstallSection();
+    }
+
+    void App::SetExperimentalTrapTeam(bool enabled)
+    {
+        Set("launcher", "experimental_trapteam", enabled ? "1" : "0");
+        if (enabled)
+        {
+            SeedGameVideo(m_config, "trapteam");
+            SeedGameInput(m_config, "trapteam");
+            if (m_shots.empty())
+                m_discQueue.emplace_back("trapteam");
+        }
+        else
+        {
+            std::erase(m_discQueue, "trapteam");
+            if (std::string_view(m_s->game.id) == "trapteam")
+            {
+                SelectGame(*FindGame("ssa"));
+                m_backPage = Page::Home;
+            }
+        }
     }
 
     namespace
@@ -2375,7 +2411,7 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || m_testAchievements || m_testRunning ||
+            if (m_testExperimental || m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || m_testAchievements || m_testRunning ||
                 m_testScreens != 0 || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
@@ -3376,6 +3412,41 @@ namespace launcher_ui
         if (m_shots.empty() || m_testAt != 0)
             return;
         uint64_t now = SDL_GetTicks();
+        if (m_testExperimental)
+        {
+            switch (m_testStep)
+            {
+            case 0:
+                SetExperimentalTrapTeam(false);
+                m_page = Page::Home;
+                m_testShot = "trapteam-01-sidebar-off";
+                break;
+            case 1:
+                m_page = Page::Settings;
+                m_tab = SettingsTab::Launcher;
+                m_testShot = "trapteam-02-settings-off";
+                break;
+            case 2:
+                SetExperimentalTrapTeam(true);
+                m_testShot = "trapteam-03-settings-on";
+                break;
+            case 3:
+                SelectGame(*FindGame("trapteam"));
+                m_page = Page::Play;
+                m_testShot = "trapteam-04-sidebar-on";
+                break;
+            case 4:
+                SetExperimentalTrapTeam(false);
+                m_page = Page::Home;
+                m_testShot = "trapteam-05-sidebar-off-again";
+                break;
+            default:
+                m_running = false;
+                return;
+            }
+            m_testAt = now + 400;
+            return;
+        }
         if (m_testInstall)
         {
             TestInstallScript(now);
@@ -3726,7 +3797,7 @@ void LauncherTheme::Apply(ImGuiStyle& style)
     colors[ImGuiCol_TableBorderLight] = color(Border, 0.5f);
 }
 
-std::span<const LauncherGameEntry> LauncherGameCatalog()
+std::span<const LauncherGameEntry> LauncherGameCatalog(const LauncherConfig& config)
 {
     // The names are game_names.h's (the short one: the sidebar's rows).
     static const LauncherGameEntry catalog[] = {
@@ -3738,7 +3809,13 @@ std::span<const LauncherGameEntry> LauncherGameCatalog()
         { "racing", GameName("racing", GameNameForm::Short), 0xE85D75, false },
         { "imaginators", GameName("imaginators", GameNameForm::Short), 0xB49BFF, false },
     };
-    return catalog;
+    static const auto experimental = [] {
+        std::array<LauncherGameEntry, std::size(catalog)> entries;
+        std::copy(std::begin(catalog), std::end(catalog), entries.begin());
+        entries[3].enabled = true;
+        return entries;
+    }();
+    return ExperimentalTrapTeam(config) ? std::span<const LauncherGameEntry>(experimental) : std::span<const LauncherGameEntry>(catalog);
 }
 
 std::string LauncherLanguageLabel(const LauncherConfig& config, const GameInfo& game)

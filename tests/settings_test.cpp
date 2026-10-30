@@ -82,6 +82,16 @@ namespace
         SETTINGS_EXPECT(config["ssa.video"]["fps_limit"] == "60" && config["giants.video"]["vsync"] == "0");
         SETTINGS_EXPECT(config["ssa.video"].count("custom") == 0);
 
+        SETTINGS_EXPECT(GameKeys("trapteam").size() == GameKeys("swapforce").size());
+        SeedGameVideo(config, "trapteam");
+        SETTINGS_EXPECT(config["trapteam.video"]["fps_limit"] == "30" && config["trapteam.video"]["vsync"] == "0");
+        config["trapteam.video"]["fps_limit"] = "60";
+        SeedGameVideo(config, "trapteam");
+        SETTINGS_EXPECT(config["trapteam.video"]["fps_limit"] == "60");
+        LauncherConfig freshTrapTeam;
+        SeedGameVideo(freshTrapTeam, "trapteam");
+        SETTINGS_EXPECT(freshTrapTeam["trapteam.video"]["fps_limit"] == "30");
+
         // Giants gets its own limit and no vsync line; SSA stays as it was.
         config["giants.video"]["fps_limit"] = "30";
         config["giants.video"].erase("vsync");

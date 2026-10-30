@@ -23,7 +23,7 @@ struct InstallKit
     std::filesystem::path ssabuild; // the kit's SSABuild executable
     std::string release;            // "version=" in kit.txt: the release it came from, "" when it has none
     std::string version;            // "build=" (else "version=") in the kit's kit.txt, else a fingerprint of SSABuild
-    std::vector<std::string> games; // "games=" in kit.txt: what the kit builds ("ssa", "giants", "swapforce"); a kit before 0.5.0 has none: SSA only
+    std::vector<std::string> games; // "games=" in kit.txt: what the kit builds ("ssa", "giants", "swapforce", "trapteam"); a kit before 0.5.0 has none: SSA only
     std::map<std::string, std::string> gameVersions; // "game_version.<id>=" in kit.txt: the version of each game the kit builds ("0.8.2"); a kit before 0.5.2 has none
     std::string tag;                // the release it was downloaded from (its kit/<tag>/ folder), "" for any other kit
     bool chosen = false;            // SKY_LAUNCHER_KIT or "[launcher] kit=": the player's own, never replaced by the launcher

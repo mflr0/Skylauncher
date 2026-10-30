@@ -17,8 +17,8 @@ struct LauncherGameEntry
     bool enabled;
 };
 
-// The console Skylanders games in release order, SuperChargers Racing included. Enabled entries match g_games.
-std::span<const LauncherGameEntry> LauncherGameCatalog();
+// The console games in release order; experimental entries follow the saved setting.
+std::span<const LauncherGameEntry> LauncherGameCatalog(const LauncherConfig& config = {});
 
 // Shows the launcher window until the player quits, or the screenshot test script finishes (with `options.startGames`, PLAY
 // starts the game and the window stays; without, PLAY closes it). Returns the chosen image path (empty when nothing was chosen).

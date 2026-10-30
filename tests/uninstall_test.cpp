@@ -197,6 +197,13 @@ namespace
         UN_EXPECT(ShortcutName(Os::Windows, "Skylanders: Giants") == "Skylanders Giants.lnk");
         UN_EXPECT(ShortcutName(Os::Linux, "Skylanders: Giants") == "skylanders-giants.desktop");
 
+        // An explicit scratch root takes precedence over the system's home, including a redirected HOME.
+        if (const char* root = SDL_getenv("SKYLANDERS_DATA"); root != nullptr && *root != 0)
+        {
+            UN_EXPECT(ThisMachine({}).root == fs::absolute(fs::path(root)));
+            return;
+        }
+
         // On this machine, with nothing overriding it, the shared folder code agrees with the table above.
         const char* names[] = { "SKYLANDERS_DATA", "XDG_DATA_HOME" };
         std::map<std::string, std::string> saved;

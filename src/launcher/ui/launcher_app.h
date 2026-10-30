@@ -297,6 +297,7 @@ namespace launcher_ui
         void DrawSidebar();
         void DrawHome();
         void DrawPlay();
+        void SetExperimentalTrapTeam(bool enabled);
         void DrawSettings();     // the launcher's settings (the gear): Controls, Launcher, Support, About
         void DrawControls();
         void DrawLauncherTab();
@@ -588,6 +589,7 @@ namespace launcher_ui
         std::vector<std::string> m_testSeats; // the seats the SEATX script restores before each try
         std::string m_testBuilt;                    // the sidebar test's built game, put back between the states it sets by hand
         std::map<std::string, std::string> m_drawn; // while testing: what the sidebar, Home and the main button drew ("sidebar:ssa", "home:ssa", "button")
+        bool m_testExperimental = false; // SKY_LAUNCHER_TEST_TRAPTEAM: visibility and settings, without a disc
         bool m_testSidebar = false;    // SKY_LAUNCHER_TEST_SIDEBAR: the sidebar's line through an install and an update (fake kit)
         bool m_testCopy = false;       // SKY_LAUNCHER_TEST_COPY: copying the game data, playing from it, the wrong-disc button
         std::string m_testKit;         // SKY_LAUNCHER_TEST_KIT: "old", "giants", "updates" or "offline": the kit that follows the launcher, the game updates (fake release)

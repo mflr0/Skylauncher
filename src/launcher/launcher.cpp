@@ -328,7 +328,7 @@ LauncherArguments ParseLauncherArguments(int argc, const char* const* argv)
 const char* LauncherUsage()
 {
     return "Arkeyan Launcher [--game <id>] [--play]\n\n"
-           "  --game <id>  open on that game's page: ssa (Spyro's Adventure), giants (Giants) or swapforce (Swap Force)\n"
+           "  --game <id>  open on that game's page: ssa (Spyro's Adventure), giants (Giants), swapforce (Swap Force), or trapteam (Trap Team, experimental setting on)\n"
            "  --play       start the game as soon as its disc is checked (what a desktop shortcut runs)\n"
            "  --help       show this";
 }

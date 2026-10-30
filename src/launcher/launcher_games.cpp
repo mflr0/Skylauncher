@@ -27,12 +27,19 @@ namespace
         { "Europe", 0x415608E9, 0x74FDDE06, 0x0000001C, "3db455f6ee17e8cb3a4d58873d96583d9160396d360a0130e5eb88adad8a5518" },
     };
 
+    const GameRelease TrapTeamReleases[] =
+    {
+        // Redump "Skylanders - Trap Team (Europe) (En,De)", 8738846720 bytes.
+        { "Europe", 0x41560911, 0x7A74A451, 0x00000014, "f1d2373e4507e21cc371e6f22d02e909602a1b5bc4704896c3c099cc64002a35" },
+    };
+
     // `runtime` is the executable the player kit builds for the game (its config/<id>/game.txt).
     const GameInfo Games[] =
     {
         { "ssa", GameName("ssa"), SpyrosAdventureReleases, "SSARecomp" },
         { "giants", GameName("giants"), GiantsReleases, "SGRecomp" },
         { "swapforce", GameName("swapforce"), SwapForceReleases, "SSFRecomp" },
+        { "trapteam", GameName("trapteam"), TrapTeamReleases, "TTRecomp" },
     };
 }
 
@@ -47,4 +54,18 @@ const GameInfo* FindGame(std::string_view id)
             return &game;
     }
     return nullptr;
+}
+
+bool ExperimentalTrapTeam(const LauncherConfig& config)
+{
+    auto section = config.find("launcher");
+    if (section == config.end())
+        return false;
+    auto value = section->second.find("experimental_trapteam");
+    return value != section->second.end() && value->second == "1";
+}
+
+const GameInfo* FindEnabledGame(std::string_view id, const LauncherConfig& config)
+{
+    return id == "trapteam" && !ExperimentalTrapTeam(config) ? nullptr : FindGame(id);
 }

@@ -12,6 +12,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `launcher` | `ui_scale` | `auto`, `0.75` to `3` | The launcher's size: `auto` follows the display's scale (Windows 150 %, 200 %...); Ctrl + / Ctrl - / Ctrl 0 change it | n/a |
 | `launcher` | `language` | empty (the system's language), or a code (`en`, `fr`...) | The language of the launcher's own text, never the game's (`docs/translations.md`): a code that has no file in `resources/lang` shows English. An old `game` (follow the shown game) is read as empty and erased at the next save. The environment variable `SKY_LAUNCHER_LANGUAGE` overrides it (tests, screenshots) | n/a |
 | `launcher` | `reduce_motion` | `auto`, `0`, `1` | The logo's fall on the game page (`docs/launcher_ui.md`): `auto` follows the system (macOS Reduce motion, Windows animation effects), `1` never animates, `0` always does | n/a |
+| `launcher` | `experimental_trapteam` | `0` (default), `1` | Show Trap Team in the library and sidebar (Settings > Launcher). Uses `trapteam`, runtime `TTRecomp`; the kit must list `trapteam` in `games=` | n/a |
 | `launcher` | `runtime` | path | The game runtime to start, if not next to the launcher | n/a |
 | `launcher` | `kit` | folder | The player kit that installs the game, if not next to the launcher (`docs/install.md`) | n/a |
 | `update` | `auto_check` | `0`, `1` | Look for a new Arkeyan Launcher and for game updates at every start (default 1; `docs/updates.md`) | n/a |
@@ -62,13 +63,13 @@ the launcher then writes no settings until it is started again.
 
 The runtime reads one `[video]` section, but the games do not have to share it. Each game keeps its own copy of the
 eleven keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
-`anisotropy`, `aspect`, `texture_packs`, `texture_dump`, `original_resolution`, `show_fps`) in **`[ssa.video]`**, **`[giants.video]`** and **`[swapforce.video]`**:
+`anisotropy`, `aspect`, `texture_packs`, `texture_dump`, `original_resolution`, `show_fps`) in **`[ssa.video]`**, **`[giants.video]`**, **`[swapforce.video]`** and **`[trapteam.video]`**:
 
 | Section | Key | Meaning |
 | --- | --- | --- |
 | `<game>.video` | the eleven `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
 
-- The first time, a game's copy starts from the `[video]` the player already had (`SeedGameVideo`).
+- The first time, a game's copy starts from the `[video]` the player already had (`SeedGameVideo`). Trap Team starts at 30 FPS even if the shared limit is 60; later choices are kept.
 - **PLAY** puts the copy of the game that starts into `[video]` (keys it lacks are dropped, so the runtime's defaults apply):
   the runtime needs no change (`ApplyGameVideo`).
 - The runtime also reads the game's own `[<game>.video]` after `[video]` and lets it win for every key it has, so a game
@@ -87,7 +88,7 @@ eleven keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`
 ## Per-game keyboard keys
 
 The runtime reads one `[input]` section (`key_<action>=<SDL key name>`), but the keys are each game's own: **`[ssa.input]`**,
-**`[giants.input]`** and **`[swapforce.input]`** hold a game's `key_<action>` lines, edited on the game's settings page
+**`[giants.input]`**, **`[swapforce.input]`** and **`[trapteam.input]`** hold a game's `key_<action>` lines, edited on the game's settings page
 (Keyboard tab). Only the keys are per game: `device`, `gamepad` and `glyphs` stay in `[input]`.
 
 | Section | Key | Meaning |

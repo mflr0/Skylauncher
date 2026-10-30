@@ -5,6 +5,7 @@
 #include "launcher/game_install.h"
 #include "launcher/game_progress.h"
 #include "launcher/launcher.h"
+#include "shared/collection/datadir.h"
 #include "launcher/updater.h"
 #include "assets/launcher_assets.h"
 #include "shared/art/game_art.h"
@@ -1155,13 +1156,43 @@ int main(int argc, char** argv)
     printf("Game table: %zu game(s); \"ssa\" = %s, %zu release(s)\n", g_games.size(), game.name, game.releases.size());
     EXPECT(FindGame("unknown") == nullptr);
     const GameInfo* giants = FindGame("giants");
-    EXPECT(g_games.size() == 3 && giants != nullptr && std::string(giants->runtime) == "SGRecomp" && giants->releases.size() == 1);
+    EXPECT(g_games.size() == 4 && giants != nullptr && std::string(giants->runtime) == "SGRecomp" && giants->releases.size() == 1);
     const GameInfo* swapForce = FindGame("swapforce");
     EXPECT(swapForce != nullptr && std::string(swapForce->runtime) == "SSFRecomp" && swapForce->releases.size() == 2 &&
         swapForce->releases[0].titleId == 0x415608E9 && std::string(swapForce->releases[0].defaultXexSha256).size() == 64);
     EXPECT(std::string(LauncherTheme::StyleOf("swapforce").top == LauncherTheme::SwapForceStyle.top ? "own" : "launcher") == "own" &&
         LauncherTheme::StyleOf("swapforce").top != LauncherTheme::StyleOf("giants").top);
     EXPECT(giants != nullptr && giants->releases[0].titleId == 0x415608DA && std::string(giants->releases[0].defaultXexSha256).size() == 64);
+
+    const GameInfo* trapTeam = FindGame("trapteam");
+    EXPECT(trapTeam != nullptr && std::string(trapTeam->runtime) == "TTRecomp" && trapTeam->releases.size() == 1);
+    EXPECT(std::string(trapTeam->name) == "Skylanders: Trap Team" &&
+        std::string(trapTeam->releases[0].defaultXexSha256) == "f1d2373e4507e21cc371e6f22d02e909602a1b5bc4704896c3c099cc64002a35");
+    LauncherConfig experimental;
+    auto countEnabled = [](const LauncherConfig& config) {
+        size_t count = 0;
+        for (const LauncherGameEntry& entry : LauncherGameCatalog(config))
+        {
+            EXPECT(entry.enabled == (FindEnabledGame(entry.id, config) != nullptr));
+            count += entry.enabled ? 1 : 0;
+        }
+        return count;
+    };
+    EXPECT(!ExperimentalTrapTeam(experimental) && FindEnabledGame("trapteam", experimental) == nullptr);
+    EXPECT(countEnabled(experimental) == 3 && !LauncherGameCatalog(experimental)[3].enabled);
+    experimental["launcher"]["experimental_trapteam"] = "1";
+    EXPECT(ExperimentalTrapTeam(experimental) && FindEnabledGame("trapteam", experimental) == trapTeam);
+    EXPECT(countEnabled(experimental) == 4 && LauncherGameCatalog(experimental)[3].enabled);
+    const std::string experimentalIni = (scratch / "experimental.ini").string();
+    EXPECT(SaveLauncherConfig(experimentalIni, experimental));
+    EXPECT(ExperimentalTrapTeam(LoadLauncherConfig(experimentalIni)));
+    experimental["launcher"]["experimental_trapteam"] = "0";
+    EXPECT(SaveLauncherConfig(experimentalIni, experimental));
+    EXPECT(!ExperimentalTrapTeam(LoadLauncherConfig(experimentalIni)) && countEnabled(experimental) == 3);
+    experimental["launcher"]["experimental_trapteam"] = "invalid";
+    EXPECT(!ExperimentalTrapTeam(experimental));
+    EXPECT(LauncherTheme::StyleOf("trapteam").top == LauncherTheme::TrapTeamStyle.top);
+    EXPECT(datadir::GameFolderName("trapteam") == "TrapTeam");
 
     if (noDisc)
     {
@@ -1385,7 +1416,7 @@ int main(int argc, char** argv)
         EXPECT(entry.accent != 0);
         enabledEntries += entry.enabled ? 1 : 0;
     }
-    EXPECT(enabledEntries == g_games.size());
+    EXPECT(enabledEntries == 3);
 
     LauncherConfig helperConfig;
     // The game reads "[ssa] language" / "voice_language" (codes); the labels name them, unknown codes stay as they are.

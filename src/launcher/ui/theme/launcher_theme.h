@@ -85,6 +85,7 @@ namespace LauncherTheme
     inline constexpr GameStyle SpyrosAdventureStyle = { 0x7CC8FF, 0x2C7FD8, 0x0C2A5C, 0x6BBAFF };
     inline constexpr GameStyle GiantsStyle = { 0xFFD23C, 0xF06A10, 0x3A1404, 0xFFB43A };
     inline constexpr GameStyle SwapForceStyle = { 0xD9EC45, 0x6FB42E, 0x0F2E22, 0xBFE04A };
+    inline constexpr GameStyle TrapTeamStyle = { 0x6DF0B4, 0x31B47D, 0x0F2E22, 0x6DF0B4 };
     // The game's style by catalogue id; the launcher's own blue for a game without one.
     const GameStyle& StyleOf(const char* game);
 

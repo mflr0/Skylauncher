@@ -414,7 +414,7 @@ namespace launcher_ui
                 ui::StatusPill(ui::Status::Error, SlotStatus(m_s).text.c_str());
                 ui::Text(ui::TextStyle::Body, m_s->check.message.c_str(), ui::color::InkSoft);
                 if (m_s->check.status == GameSourceStatus::WrongGame)
-                    other = FindGame(m_s->check.otherGame);
+                    other = FindEnabledGame(m_s->check.otherGame, m_config);
                 break;
             case DiscState::None:
                 break;

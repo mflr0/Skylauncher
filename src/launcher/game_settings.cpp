@@ -130,11 +130,12 @@ void SeedGameVideo(LauncherConfig& config, std::string_view gameId)
     if (auto own = config.find(section); own != config.end() && !own->second.empty())
         return; // an empty section is one something only looked at (operator[]): it has nothing to keep
     auto shared = config.find("video");
-    if (shared == config.end())
-        return;
-    for (const char* key : VideoKeys)
-        if (auto value = shared->second.find(key); value != shared->second.end())
-            config[section][key] = value->second;
+    if (shared != config.end())
+        for (const char* key : VideoKeys)
+            if (auto value = shared->second.find(key); value != shared->second.end())
+                config[section][key] = value->second;
+    if (gameId == "trapteam")
+        config[section]["fps_limit"] = "30";
 }
 
 namespace
