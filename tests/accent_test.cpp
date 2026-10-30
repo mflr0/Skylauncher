@@ -173,6 +173,9 @@ namespace
             why.clear();
             ACCENT_EXPECT(ExtractZip(folder / "kit.zip", folder / "out", why));
             ACCENT_EXPECT(Slurp(folder / "out" / "kit" / "kit.txt") == "build=b1\n");
+            // The files keep the date they have in the zip: the same kit unpacked twice is the same kit.
+            ACCENT_EXPECT(ExtractZip(folder / "kit.zip", folder / "again", why));
+            ACCENT_EXPECT(fs::last_write_time(folder / "out" / "kit" / "kit.txt", error) == fs::last_write_time(folder / "again" / "kit" / "kit.txt", error));
             // curl writes where it is told (-o), in that folder: from a plain address, a local file.
             HttpResult got = HttpDownload(TestFileUrl(plain), folder / "downloaded.zip");
             ACCENT_EXPECT(got.ok && Slurp(folder / "downloaded.zip") == Slurp(plain));
