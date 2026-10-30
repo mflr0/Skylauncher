@@ -1166,7 +1166,7 @@ namespace launcher_ui
         }
     }
 
-    // The game's logo (with "Skylanders" on it) once its disc has been read, else its initial on its colour (at most
+    // The game's logo (with "Skylanders" on it) once its disc has been read, else its initials on its colour (at most
     // height::Normal across); centred in the box.
     void App::DrawGameMark(ImDrawList* draw, const LauncherGameEntry& entry, ImVec2 at, ImVec2 size)
     {
@@ -1181,9 +1181,13 @@ namespace launcher_ui
         const float radius = std::min(size.y, ui::height::Normal) / 2;
         draw->AddCircleFilled(centre, radius, ui::Col(entry.accent, entry.enabled ? 1.0f : 0.35f));
         ImGui::PushFont(ui::Ctx().fonts.title, radius);
-        char letter[2] = { entry.name[0], 0 };
-        const ImVec2 extent = ImGui::CalcTextSize(letter);
-        draw->AddText(ImVec2(centre.x - extent.x / 2, centre.y - extent.y / 2), Rgb(BadgeInk), letter);
+        // The first letters of its words, two at most: SA, G, SF.
+        char letters[3] = {};
+        for (const char* c = entry.name; *c != 0 && letters[1] == 0; c++)
+            if (c == entry.name || c[-1] == ' ')
+                letters[letters[0] == 0 ? 0 : 1] = *c;
+        const ImVec2 extent = ImGui::CalcTextSize(letters);
+        draw->AddText(ImVec2(centre.x - extent.x / 2, centre.y - extent.y / 2), Rgb(BadgeInk), letters);
         ImGui::PopFont();
     }
 

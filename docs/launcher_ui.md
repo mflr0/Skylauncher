@@ -591,7 +591,7 @@ every game shows its real state and art at once ("Update all" on Home's title li
      rows' content edge. The title is Home's link for the pointer (a hand on it), not a keyboard or pad stop: no ring.
    - The three playable games as rows (Spyro's Adventure, Giants and Swap Force), then one "Coming later" row for the four others. An enabled game whose disc has been read (this session or an earlier one) shows **its logo**, the
      art with "Skylanders" on it, in the row's left column (`GameLogoW` x `GameLogoH`); before that, and for the games
-     coming later (no disc, so never any game art), a neutral badge: the initial on the game's colour.
+     coming later (no disc, so never any game art), a neutral badge: the initials (SA, G, SF) on the game's colour.
    - The name, then under it the game's state: **its icon and its words on one line** (`IconOf(SlotState)`, "A game's
      states", below), the icon at the name's left edge, centred on the words' capitals. The selected game's row has the
      orange bar while its Play page is open.
