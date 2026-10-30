@@ -1,5 +1,6 @@
 // Checks the launcher's disc verification and settings file without showing any UI.
 // usage: SSALauncherTest <game disc .iso> <scratch dir> [<damaged copy of the image>...]
+#include "test_env.h"
 #include "launcher/portal_status.h"
 #include "launcher/env.h"
 #include "launcher/game_install.h"
@@ -248,10 +249,10 @@ namespace
         fs::path folder = scratch / "collection", legacy = scratch / "legacy", save = scratch / "save";
         fs::create_directories(legacy);
         fs::create_directories(save);
-        SDL_setenv_unsafe("SKY_COLLECTION", folder.string().c_str(), 1);
-        SDL_setenv_unsafe("SKY_SAVE_DIR", save.string().c_str(), 1);
-        SDL_setenv_unsafe("SKY_MIGRATE_FROM", legacy.string().c_str(), 1);
-        SDL_setenv_unsafe("SKY_LAUNCHER_INI", "", 1);
+        TestSetEnv("SKY_COLLECTION", folder.string().c_str());
+        TestSetEnv("SKY_SAVE_DIR", save.string().c_str());
+        TestSetEnv("SKY_MIGRATE_FROM", legacy.string().c_str());
+        TestSetEnv("SKY_LAUNCHER_INI", "");
         auto dump = [&](const fs::path& at, uint16_t type) {
             FigureData data = figures::CreateFigure(type, 0);
             WriteFile(at, std::vector<uint8_t>(data.begin(), data.end()));
@@ -1223,7 +1224,7 @@ int main(int argc, char** argv)
         {
             const char* saveDir = getenv("SKY_SAVE_DIR");
             std::string savedSaveDir = saveDir != nullptr ? saveDir : "";
-            SDL_unsetenv_unsafe("SKY_SAVE_DIR");
+            TestUnsetEnv("SKY_SAVE_DIR");
             std::filesystem::path cache = AchievementCacheFolder(id);
             std::vector<uint8_t> xex = gameDisc.ReadAll("default.xex");
             EXPECT(!cache.empty() && !achievements::CacheIsCurrent(cache, "k") && achievements::WriteCache(cache, "k", xex) && achievements::CacheIsCurrent(cache, "k"));
@@ -1248,7 +1249,7 @@ int main(int argc, char** argv)
                 EXPECT(french.rows.size() == achievementCount && french.unlocked == 2 && differ > 0);
             }
             if (!savedSaveDir.empty())
-                SDL_setenv_unsafe("SKY_SAVE_DIR", savedSaveDir.c_str(), 1);
+                TestSetEnv("SKY_SAVE_DIR", savedSaveDir.c_str());
         }
         if (std::string_view(id) == "swapforce")
             return;
@@ -1260,7 +1261,7 @@ int main(int argc, char** argv)
     };
     printf("Disc pictures:\n");
     std::string dataBefore = getenv("SKYLANDERS_DATA") != nullptr ? getenv("SKYLANDERS_DATA") : "";
-    SDL_setenv_unsafe("SKYLANDERS_DATA", (scratch / "art-data").string().c_str(), 1);
+    TestSetEnv("SKYLANDERS_DATA", (scratch / "art-data").string().c_str());
     artChecks("ssa", iso.string(), 70, 38);
     if (const char* giantsIso = skyenv::Get("SKY_LAUNCHER_TEST_GIANTS_ISO"); giantsIso != nullptr)
     {
@@ -1286,9 +1287,9 @@ int main(int argc, char** argv)
         EXPECT(std::filesystem::exists(scratch / "art-data" / "SwapForce" / "portraits")); // the data folder is SwapForce/
     }
     if (dataBefore.empty())
-        SDL_unsetenv_unsafe("SKYLANDERS_DATA");
+        TestUnsetEnv("SKYLANDERS_DATA");
     else
-        SDL_setenv_unsafe("SKYLANDERS_DATA", dataBefore.c_str(), 1);
+        TestSetEnv("SKYLANDERS_DATA", dataBefore.c_str());
 
     printf("Wrong inputs:\n");
     EXPECT(Check(scratch / "missing.iso") == GameSourceStatus::NotFound);

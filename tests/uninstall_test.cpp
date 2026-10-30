@@ -3,6 +3,7 @@
 // Scratch trees only: nothing here names the real data folders, the real Desktop, the real Trash, the real figures or the
 // running launcher. The launcher to remove is always a dummy file or bundle made in the scratch folder.
 // Called from launcher_test.cpp's main; returns the number of failures.
+#include "test_env.h"
 #include "launcher/uninstall.h"
 #include "launcher/env.h"
 #include "launcher/launcher.h"
@@ -59,7 +60,7 @@ namespace
             if (saved.find(name) == saved.end())
                 saved.emplace(name, std::make_pair(Read(SDL_getenv(name)), Read(std::getenv(name))));
             UN_EXPECT(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true));
-            UN_EXPECT(SDL_setenv_unsafe(name, value.c_str(), 1) == 0);
+            UN_EXPECT(TestSetEnv(name, value.c_str()) == 0);
         }
 
         ~ScratchEnvironment()
@@ -72,9 +73,9 @@ namespace
                 else
                     UN_EXPECT(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name.c_str()));
                 if (native)
-                    UN_EXPECT(SDL_setenv_unsafe(name.c_str(), native->c_str(), 1) == 0);
+                    UN_EXPECT(TestSetEnv(name.c_str(), native->c_str()) == 0);
                 else
-                    UN_EXPECT(SDL_unsetenv_unsafe(name.c_str()) == 0);
+                    UN_EXPECT(TestUnsetEnv(name.c_str()) == 0);
             }
         }
     };

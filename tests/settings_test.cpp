@@ -1,6 +1,7 @@
 // ArkeyanLauncherTest's checks for the settings split: each game's own video settings, the command line, the desktop shortcut
 // files of every system, and what delete data and uninstall remove. Scratch folders only: nothing here touches the real
 // data folder or the real Desktop. Called from launcher_test.cpp's main; returns the number of failures.
+#include "test_env.h"
 #include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/game_keys.h"
@@ -60,12 +61,12 @@ namespace
         if (value.empty())
         {
             SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name);
-            SDL_unsetenv_unsafe(name);
+            TestUnsetEnv(name);
         }
         else
         {
             SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true);
-            SDL_setenv_unsafe(name, value.c_str(), 1);
+            TestSetEnv(name, value.c_str());
         }
     }
 
