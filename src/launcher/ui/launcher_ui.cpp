@@ -88,7 +88,7 @@ namespace launcher_ui
 
     bool ReadWholeFile(const std::string& path, std::vector<uint8_t>& out)
     {
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        std::ifstream file(datadir::FromText(path), std::ios::binary | std::ios::ate); // UTF-8: accents in a Windows user name
         if (!file.good())
             return false;
         std::streamoff size = file.tellg();
