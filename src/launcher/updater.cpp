@@ -350,11 +350,7 @@ std::string KitPlatform()
 #if defined(_WIN32)
     return "windows-x64";
 #elif defined(__APPLE__)
-#if defined(__aarch64__)
     return "macos-arm64";
-#else
-    return "macos-x64";
-#endif
 #else
     return "linux-x64";
 #endif

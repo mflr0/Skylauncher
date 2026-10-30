@@ -395,7 +395,7 @@ namespace launcher_ui
         case 23: // Giants: its own folder and copy
             if (giantsIso.empty())
             {
-                m_testStep += 2;
+                m_testStep += 3;
                 break;
             }
             SelectGame(giants);
