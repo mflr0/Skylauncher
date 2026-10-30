@@ -85,6 +85,7 @@ Choose disc	Choisir le disque
 Choose...	Choisir...
 Choose your {} disc image	Choisissez l'image disque de {}
 Clear caches	Vider les caches
+Clearing caches frees {}.	Vider les caches libère {}.
 Clearing caches frees {}; deleting saves and data frees {} more.	Vider les caches libère {} ; supprimer sauvegardes et données en libère {} de plus.
 Click a key to change it.	Cliquez sur une touche pour la modifier.
 Close	Fermer
@@ -130,6 +131,7 @@ DISC IMAGE:	IMAGE DISQUE :
 Data folder	Dossier de données
 Clean up	Nettoyage
 Delete saves and data	Supprimer sauvegardes et données
+Deleting saves and data frees {}.	Supprimer sauvegardes et données libère {}.
 Frees {}. Saves and settings are kept.	Libère {}. Les sauvegardes et les réglages sont gardés.
 Desktop shortcut	Raccourci sur le bureau
 Disc	Disque

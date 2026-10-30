@@ -630,13 +630,17 @@ namespace launcher_ui
         if (ui::Button(Tr(strings::Reinstall), hold(Tr(strings::ReinstallHint), busy || running || m_s->installed.runtime.empty())) && !Installing())
             StartInstall();
 
-        ui::SectionHeader(Tr("Clean up"), running ? Tr("The game is running: quit it first.")
-                                                  : Tf("Clearing caches frees {}; deleting saves and data frees {} more.",
-                                                        Freed(m_s->dataSizes.caches), Freed(m_s->dataSizes.saves)).c_str());
-        if (ui::Button(Tr("Clear caches"), hold(Tr(strings::ClearCachesHint), busy || running)))
+        const uint64_t caches = m_s->dataSizes.caches, saves = m_s->dataSizes.saves;
+        const bool built = !m_s->installed.runtime.empty();
+        std::string cleanHelp = caches != 0 && saves != 0 ? Tf("Clearing caches frees {}; deleting saves and data frees {} more.", Freed(caches), Freed(saves))
+            : caches != 0 ? Tf("Clearing caches frees {}.", Freed(caches))
+            : saves != 0  ? Tf("Deleting saves and data frees {}.", Freed(saves))
+                          : std::string();
+        ui::SectionHeader(Tr("Clean up"), running ? Tr("The game is running: quit it first.") : cleanHelp.empty() ? nullptr : cleanHelp.c_str());
+        if (ui::Button(Tr("Clear caches"), hold(Tr(strings::ClearCachesHint), busy || running || !built || caches == 0)))
             RunDataAction(ClearGameCaches(folders), N_("Caches cleared"));
         ImGui::SameLine(0, ui::space::S);
-        if (ui::Button(Tr(strings::DeleteData), hold(Tr(strings::DeleteDataHint), busy || running)))
+        if (ui::Button(Tr(strings::DeleteData), hold(Tr(strings::DeleteDataHint), busy || running || !built || saves == 0)))
             RunDataAction(DeleteGameData(folders), N_("Saves and data deleted"));
 
         ui::SectionHeader(Tr("Uninstall"), Tf("Frees {}. Saves and settings are kept.", Freed(m_s->dataSizes.installed)).c_str());
