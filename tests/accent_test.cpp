@@ -3,6 +3,7 @@
 // system's data folder moved into scratch: APPDATA on Windows, SKYLANDERS_DATA elsewhere. The word is only a word.
 #include "launcher/game_install.h"
 #include "launcher/launcher.h"
+#include "launcher/ui/launcher_app.h"
 #include "launcher/updater.h"
 #include "shared/collection/collection.h"
 #include "shared/collection/datadir.h"
@@ -111,6 +112,30 @@ namespace
         printf("Accented collection: written, read, listed, imported, saved and deleted\n");
     }
 
+    // The pictures the collection shows are files of the game's data folder, read by the window.
+    void PortraitChecks()
+    {
+        const fs::path portrait = datadir::Game("ssa") / "portraits" / "toys" / "014.png";
+        ACCENT_EXPECT(Spit(portrait, "picture bytes"));
+        std::vector<uint8_t> bytes;
+        ACCENT_EXPECT(launcher_ui::ReadWholeFile(datadir::Text(portrait), bytes) && std::string(bytes.begin(), bytes.end()) == "picture bytes");
+        printf("Accented portraits folder: a picture read\n");
+    }
+
+    // "Report a problem", saved: the save dialog hands the callback a UTF-8 path.
+    void ReportChecks()
+    {
+        const fs::path report = datadir::Root() / "Desktop" / "report.txt";
+        std::error_code error;
+        fs::create_directories(report.parent_path(), error);
+        const std::string chosen = datadir::Text(report);
+        const char* files[] = { chosen.c_str(), nullptr };
+        launcher_ui::SaveReport(new std::string("report text"), files, 0);
+        ACCENT_EXPECT(Slurp(report) == "report text");
+        ACCENT_EXPECT(fs::remove(report, error) && !fs::exists(report));
+        printf("Accented folder for the report: saved\n");
+    }
+
     void InstallFolderChecks(const fs::path& scratch)
     {
         const fs::path install = GameInstallFolder({});
@@ -139,6 +164,21 @@ namespace
             printf("accent_test: InstallKitZip said: %s\n", why.c_str());
         ACCENT_EXPECT(Slurp(kits / "v0.0.1" / "kit.txt") == "build=b1\n" && Lists(kits, "v0.0.1"));
         ACCENT_EXPECT(fs::remove_all(kits / "v0.0.1", error) > 0 && !fs::exists(kits / "v0.0.1"));
+        // Both sides of the unpacking and of a download, with a name the ANSI code page has a letter for and one it has not.
+        for (const fs::path& word : { fs::path(u8"donn\u00e9es-\u00e9"), fs::path(u8"\u30c7\u30fc\u30bf") })
+        {
+            const fs::path folder = scratch / "accents" / word / "zip";
+            fs::create_directories(folder, error);
+            fs::copy_file(plain, folder / "kit.zip", fs::copy_options::overwrite_existing, error);
+            why.clear();
+            ACCENT_EXPECT(ExtractZip(folder / "kit.zip", folder / "out", why));
+            ACCENT_EXPECT(Slurp(folder / "out" / "kit" / "kit.txt") == "build=b1\n");
+            // curl writes where it is told (-o), in that folder: from a plain address, a local file.
+            HttpResult got = HttpDownload(TestFileUrl(plain), folder / "downloaded.zip");
+            ACCENT_EXPECT(got.ok && Slurp(folder / "downloaded.zip") == Slurp(plain));
+            if (!got.ok)
+                printf("accent_test: the download said: %s\n", got.error.c_str());
+        }
         ACCENT_EXPECT(fs::remove(install / "install.log", error) && !fs::exists(install / "install.log"));
         printf("Accented install folder and kit: written, unpacked, listed and deleted\n");
     }
@@ -164,6 +204,8 @@ int AccentChecks(const fs::path& scratch)
     DataRootChecks(root);
     CollectionChecks();
     InstallFolderChecks(scratch);
+    PortraitChecks();
+    ReportChecks();
     printf("%d failures in the accented folder checks\n", g_failures);
     return g_failures;
 }

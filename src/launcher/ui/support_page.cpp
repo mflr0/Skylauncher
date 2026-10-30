@@ -18,29 +18,32 @@ namespace launcher_ui
         // the window tells the player on its next frame.
         std::mutex g_saveMutex;
         bool g_saveOk = false, g_saveFailed = false;
+    }
 
-        void SDLCALL SaveReport(void* userdata, const char* const* files, int)
+    void SDLCALL SaveReport(void* userdata, const char* const* files, int)
+    {
+        std::unique_ptr<std::string> text(static_cast<std::string*>(userdata));
+        std::lock_guard lock(g_saveMutex);
+        if (files == nullptr)
         {
-            std::unique_ptr<std::string> text(static_cast<std::string*>(userdata));
-            std::lock_guard lock(g_saveMutex);
-            if (files == nullptr)
-            {
-                g_saveFailed = true;
-                return;
-            }
-            if (files[0] == nullptr) // cancelled
-                return;
-            std::ofstream out(files[0], std::ios::binary | std::ios::trunc);
-            out.write(text->data(), std::streamsize(text->size()));
-            out.close();
-            if (out)
-            {
-                g_saveOk = true;
-            }
-            else
-                g_saveFailed = true;
+            g_saveFailed = true;
+            return;
         }
+        if (files[0] == nullptr) // cancelled
+            return;
+        std::ofstream out(files[0], std::ios::binary | std::ios::trunc);
+        out.write(text->data(), std::streamsize(text->size()));
+        out.close();
+        if (out)
+        {
+            g_saveOk = true;
+        }
+        else
+            g_saveFailed = true;
+    }
 
+    namespace
+    {
         // What the game will do with the portal, given the mode and what the test found.
         std::string PortalVerdict(const std::string& mode, const PortalProbeResult& result, bool& good)
         {
