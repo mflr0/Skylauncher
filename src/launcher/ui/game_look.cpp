@@ -225,7 +225,7 @@ namespace launcher_ui
         ui::Text(ui::TextStyle::Title, percent.c_str());
         ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + ui::type::Title + ui::space::S));
         ui::ProgressBar(list.overall, width);
-        ImGui::SetCursorScreenPos(ImVec2(at.x, at.y + ui::type::Title + ui::space::L));
+        ImGui::SetCursorScreenPos(ImVec2(at.x, ImGui::GetItemRectMax().y + ui::space::S));
         const char* steps[] = { Tr("Disc checked"), Tr("Code"), Tr("Shaders"), Tr("Ready") };
         int current = 0;
         if (list.current >= 0)
