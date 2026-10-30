@@ -28,6 +28,7 @@
 #include <set>
 #include <fmt/format.h>
 #include <SDL3/SDL.h>
+#include "fake_game.h"
 #if defined(_WIN32)
 #include <process.h>
 #define getpid _getpid
@@ -1084,8 +1085,11 @@ int AchievementChecks()
     return g_failures - before;
 }
 
+#include "launcher_control_checks.h"
+
 int main(int argc, char** argv)
 {
+    if (argc == 2 && std::string_view(argv[1]) == "--fake-game") return fake_game::Run();
     // --no-disc <scratch dir>: only the checks that need no disc image (what CI runs).
     const bool noDisc = argc >= 3 && std::string_view(argv[1]) == "--no-disc";
     if (argc < 3)
@@ -1139,6 +1143,7 @@ int main(int argc, char** argv)
     if (!noDisc)
         InstallChecks(scratch, iso.string());
     g_failures += ShellChecks(scratch);
+    LauncherControlChecks(scratch);
     g_failures += SettingsChecks(scratch / "settings");
     g_failures += UninstallChecks(scratch);
     g_failures += I18nChecks();

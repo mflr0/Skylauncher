@@ -854,6 +854,8 @@ Installing · {}	Installation · {}
 Ready · {} played	Prêt · {} de jeu
 Close or switch to the game in its own window.	Fermez le jeu ou retrouvez sa fenêtre directement.
 Show the game	Afficher le jeu
+Stopping...	Arrêt en cours...
+Couldn't show the game window.	Impossible d’afficher la fenêtre du jeu.
 Virtual portal	Portail virtuel
 Or drop your .iso anywhere on this window. Your disc is read on this computer only.	Ou déposez votre .iso dans cette fenêtre. Votre disque est lu uniquement sur cet ordinateur.
 You can set up your portal while you wait.	Vous pouvez préparer votre portail en attendant.

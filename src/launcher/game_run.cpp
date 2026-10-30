@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <fmt/format.h>
 #include <fstream>
+#include "launcher/game_window.h"
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -272,11 +273,16 @@ GameLaunch PrepareGameLaunch(const GameInfo& game, LauncherConfig& config, const
     return launch;
 }
 
-GameSession::GameSession(std::vector<std::string> games, Marker marker)
-    : m_games(std::move(games)), m_marker(std::move(marker))
+GameSession::GameSession(std::vector<std::string> games, Marker marker, WindowControl windows)
+    : m_games(std::move(games)), m_marker(std::move(marker)), m_windows(std::move(windows))
 {
     if (!m_marker)
         m_marker = [](const std::string& game) { return GameIsRunning(FoldersOf(game)); };
+    if (!m_windows.available) m_windows.available = game_window::Available;
+    if (!m_windows.show) m_windows.show = game_window::Show;
+#if defined(_WIN32)
+    if (!m_windows.close) m_windows.close = game_window::Close;
+#endif
 }
 
 GameSession::~GameSession()
@@ -359,6 +365,8 @@ bool GameSession::Start(const std::string& game, const GameLaunch& launch, const
     m_process = process;
     m_log = log;
     m_game = game;
+    m_stopping = false;
+    m_forceAt = 0;
 #if defined(_WIN32)
     // SDL doesn't report the exit code of a background process: read it from a handle of our own.
     m_handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, FALSE, DWORD(SDL_GetNumberProperty(SDL_GetProcessProperties(process), SDL_PROP_PROCESS_PID_NUMBER, 0)));
@@ -367,13 +375,48 @@ bool GameSession::Start(const std::string& game, const GameLaunch& launch, const
     return true;
 }
 
+uint32_t GameSession::Pid() const
+{
+    return m_process == nullptr ? 0 : uint32_t(SDL_GetNumberProperty(SDL_GetProcessProperties(m_process), SDL_PROP_PROCESS_PID_NUMBER, 0));
+}
+
+bool GameSession::Stop(uint64_t nowMs)
+{
+    if (!Ours() || Pid() == 0) return false;
+    if (m_stopping) return true; // repeated presses never postpone the timeout
+    if (m_windows.close)
+        m_windows.close(Pid()); // WM_CLOSE; a missing or unresponsive window still gets the timeout
+    else
+        SDL_KillProcess(m_process, false); // SIGTERM: SDL turns it into the same quit event as closing the window
+    m_stopping = true;
+    m_forceAt = nowMs + StopTimeoutMs;
+    return true;
+}
+
+bool GameSession::CanShow() const
+{
+    return Ours() && Pid() != 0 && !m_stopping && m_windows.available(Pid());
+}
+
+bool GameSession::Show()
+{
+    return CanShow() && m_windows.show(Pid());
+}
+
 std::optional<GameSession::Ended> GameSession::Poll(uint64_t nowMs)
 {
     if (m_process != nullptr)
     {
         int exitCode = -1;
         if (!SDL_WaitProcess(m_process, false, &exitCode))
+        {
+            if (m_stopping && nowMs >= m_forceAt)
+            {
+                SDL_KillProcess(m_process, true); // this SDL process owns exactly the PID started above
+                m_forceAt = nowMs + StopTimeoutMs; // retry a failed termination without blocking the window
+            }
             return std::nullopt;
+        }
 #if defined(_WIN32)
         if (m_handle != nullptr)
         {
@@ -395,7 +438,7 @@ std::optional<GameSession::Ended> GameSession::Poll(uint64_t nowMs)
         m_process = nullptr;
         m_nextLook = 0; // and the markers again at once
         fprintf(stderr, "launcher: %s stopped (exit code %d)\n", m_game.c_str(), exitCode);
-        return Ended{ std::exchange(m_game, std::string()), true, exitCode };
+        return Ended{ std::exchange(m_game, std::string()), true, exitCode, std::exchange(m_stopping, false) };
     }
     if (nowMs < m_nextLook)
         return std::nullopt;

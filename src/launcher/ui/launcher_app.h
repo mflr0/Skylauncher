@@ -568,6 +568,7 @@ namespace launcher_ui
         bool m_testHero = false;         // SKY_LAUNCHER_TEST_HERO: four display fixtures, no game or install started
         int m_testHeroState = -1;        // ready, needs-disc, installing, running
         bool m_testHeroNoArt = false;
+        std::vector<uint8_t> m_testHeroArtPixels;
         InstallProgress m_testHeroProgress;
         std::vector<uint32_t> m_testHeroControls, m_heroNavExpected, m_heroNavSeen;
         std::map<std::pair<uint32_t, int>, uint32_t> m_heroNavEdges;

@@ -56,8 +56,16 @@ class GameSession
 public:
     using Marker = std::function<bool(const std::string& game)>; // true while that game's marker says it runs
     static constexpr uint64_t MarkerMs = 1000;
+    static constexpr uint64_t StopTimeoutMs = 5000;
+    // Native window operations receive only the PID held by this session. Override for headless checks.
+    struct WindowControl
+    {
+        std::function<bool(uint32_t)> available;
+        std::function<bool(uint32_t)> show;
+        std::function<bool(uint32_t)> close;
+    };
     // `games`: the ids whose markers are looked at; `marker`: the game's own by default (GameIsRunning).
-    explicit GameSession(std::vector<std::string> games, Marker marker = {});
+    explicit GameSession(std::vector<std::string> games, Marker marker = {}, WindowControl windows = {});
     ~GameSession(); // the game runs on: only the watch ends
     GameSession(const GameSession&) = delete;
     GameSession& operator=(const GameSession&) = delete;
@@ -70,11 +78,17 @@ public:
         std::string game;
         bool ours = false; // started here: its exit code is known
         int exitCode = 0;
+        bool stopped = false; // requested here: do not report a forced stop as a crash
     };
     // Sees the game's exit, and the markers (`nowMs`: SDL_GetTicks). The game that stopped since the last call, if any.
     std::optional<Ended> Poll(uint64_t nowMs);
     const std::string& Running() const { return m_game; } // the game that runs, "" for none
     bool Ours() const { return m_process != nullptr; }
+    uint32_t Pid() const;
+    bool Stop(uint64_t nowMs);
+    bool Stopping() const { return m_stopping; }
+    bool CanShow() const;
+    bool Show();
 
 private:
     std::string Marked() const; // the first game whose marker is up
@@ -85,6 +99,9 @@ private:
     SDL_IOStream* m_log = nullptr;
     uint64_t m_nextLook = 0;
     void* m_handle = nullptr; // Windows: our own handle on the process, for its exit code
+    WindowControl m_windows;
+    bool m_stopping = false;
+    uint64_t m_forceAt = 0;
 };
 
 // The last `maxBytes` of a file, from the start of a line; empty when missing.

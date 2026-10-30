@@ -28,6 +28,8 @@ namespace
 #define SHELL_EXPECT(condition) \
     do { if (!(condition)) { fprintf(stderr, "FAIL %s line %d: %s\n", __FILE__, __LINE__, #condition); g_shellFailures++; } } while (0)
 
+#include "game_session_checks.h"
+
     InstallProgress Feed(std::initializer_list<std::pair<const char*, uint64_t>> lines)
     {
         InstallProgress progress;
@@ -784,6 +786,7 @@ int ShellChecks(const std::filesystem::path& scratch)
     ChecklistChecks(scratch);
     GameRunChecks(scratch);
     GameSessionChecks(scratch);
+    GameControlChecks(scratch);
     UpdaterChecks(scratch);
     DirectoryListChecks(scratch);
     KitFollowChecks(scratch);

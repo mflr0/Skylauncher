@@ -883,7 +883,7 @@ namespace launcher_ui
             return;
         m_progressAt = 0; // its play time and unlocks are read again
         const GameInfo* game = FindGame(ended->game);
-        if (!ended->ours || ended->exitCode == 0 || game == nullptr)
+        if (!ended->ours || ended->stopped || ended->exitCode == 0 || game == nullptr)
             return;
         if (!m_shots.empty()) // a screenshot script: no dialog that waits for a click
             m_drawn["stopped"] = fmt::format("{} {}", ended->game, ended->exitCode);
@@ -1036,7 +1036,19 @@ namespace launcher_ui
             SDL_GetTextureSize(background, &w, &h);
             ImVec2 page(SidebarW, 0), pageSize(size.x - SidebarW, size.y);
             float scale = std::max(pageSize.x / w, pageSize.y / h), u = pageSize.x / (w * scale), v = pageSize.y / (h * scale);
-            draw->AddImage(Ref(background), page, size, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2));
+            // The software renderer overflows its fixed-point texture coordinates on a page-sized triangle.
+            // Small quads keep the same crop and work at every window size and display density.
+            const ImVec2 density = ImGui::GetIO().DisplayFramebufferScale;
+            const float tileW = 128 / std::max(1.0f, density.x), tileH = 128 / std::max(1.0f, density.y);
+            auto uv = [&](float x, float y) {
+                return ImVec2((1 - u) / 2 + u * (x - page.x) / pageSize.x, (1 - v) / 2 + v * y / pageSize.y);
+            };
+            for (float y = 0; y < size.y; y += tileH)
+                for (float x = page.x; x < size.x; x += tileW)
+                {
+                    const float right = std::min(x + tileW, size.x), bottom = std::min(y + tileH, size.y);
+                    draw->AddImage(Ref(background), ImVec2(x, y), ImVec2(right, bottom), uv(x, y), uv(right, bottom));
+                }
             // Continuous shades across the painting: the title's left and the controls' lower edge.
             draw->AddRectFilledMultiColor(page, size, ui::Col(ui::color::Scrim, 0.9f), ui::Col(ui::color::Scrim, 0.12f),
                 ui::Col(ui::color::Scrim, 0.12f), ui::Col(ui::color::Scrim, 0.9f));
@@ -1291,7 +1303,7 @@ namespace launcher_ui
             }
             if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings || m_page == Page::Achievements))
                 TakeFocus(FocusTo::Sidebar);
-            if (m_testSidebar)
+            if (m_testSidebar || m_testRunning)
                 m_drawn[std::string("sidebar:") + entry.id] = line.text;
             ImGui::PopID();
         }
@@ -1577,6 +1589,8 @@ namespace launcher_ui
         if (m_testSidebar)
             m_drawn["button"] = state.button + (state.buttonEnabled ? "" : " (off)");
         const bool running = state.state == SlotState::Running;
+        const bool stopping = running && m_session.Stopping();
+        const bool showGame = running && (m_testHero || m_session.CanShow());
         const bool installing = Installing() || (m_testHero && m_testHeroState == 2);
         const bool noDisc = state.state == SlotState::NoDisc;
         const bool ready = m_s->disc == DiscState::Ready;
@@ -1607,6 +1621,7 @@ namespace launcher_ui
                 ui::HeroHeading(draw, titleAt, ImVec2(titleW, titleH), "Skylanders", shortName);
 
             std::string status = noDisc ? Tr("Not installed yet") : running ? Tr("Playing now") : state.text;
+            if (stopping) status = Tr("Stopping...");
             if (installing)
             {
                 const InstallChecklist list = MakeInstallChecklist(m_testHero ? m_testHeroProgress : InstallSnapshot(), SDL_GetTicks());
@@ -1632,9 +1647,10 @@ namespace launcher_ui
                 action.width = std::min(ui::height::MainWidth, leftW - ui::height::MainGear - ui::space::S);
                 if (running)
                 {
-                    action.enabled = false; // GameSession exposes no stop or window activation operation.
-                    action.width = std::min(ui::height::MainWidth, std::max(ui::height::MainGear, leftW - ui::height::MainGear - 3 * ui::space::S
-                        - ui::ButtonWidth(Tr("Show the game"), { .size = ui::Size::Large })));
+                    action.enabled = (m_testHero || m_session.Ours()) && !stopping && !m_testButtonsOff;
+                    if (showGame)
+                        action.width = std::min(ui::height::MainWidth, std::max(ui::height::MainGear, leftW - ui::height::MainGear - 3 * ui::space::S
+                            - ui::ButtonWidth(Tr("Show the game"), { .size = ui::Size::Large })));
                 }
                 if (verifying)
                 {
@@ -1642,19 +1658,25 @@ namespace launcher_ui
                     action.indeterminate = m_s->verify.progress >= 0.97f;
                 }
                 const MainActionHit hit = DrawMainAction(ImVec2(left, buttonY), action);
+                if (m_testRunning)
+                {
+                    m_drawn["hero-main"] = std::string(action.label) + (action.enabled ? "" : " (off)");
+                    m_drawn["hero-show"] = showGame ? "shown" : "hidden";
+                }
                 if (hit == MainActionHit::Settings)
                     GoTo(Page::GameSettings);
                 else if (hit == MainActionHit::Main && !m_testHero)
                 {
-                    if (!ready) Browse();
+                    if (running) m_session.Stop(SDL_GetTicks());
+                    else if (!ready) Browse();
                     else if (install || update) StartInstall();
                     else PlayNow();
                 }
-                if (running)
+                if (showGame)
                 {
                     ImGui::SetCursorScreenPos(ImVec2(left + action.width + ui::space::S + ui::height::MainGear + ui::space::S, buttonY));
-                    ui::Button(Tr("Show the game"), { .size = ui::Size::Large, .disabled = true, .overArt = true,
-                        .tooltip = Tr("Close or switch to the game in its own window.") });
+                    if (ui::Button(Tr("Show the game"), { .size = ui::Size::Large, .overArt = true }) && !m_testHero)
+                        if (!m_session.Show()) Toast(Tr("Couldn't show the game window."), ui::ToastKind::Error);
                 }
             }
         }
@@ -2308,6 +2330,40 @@ namespace launcher_ui
             return;
         if (SDL_Surface* rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32))
         {
+            if (m_testHero && m_testStep < 8)
+            {
+                // Compare the clear upper sky in each art/no-art pair, not just the loaded texture's existence.
+                std::vector<uint8_t> samples;
+                const float sidebar = SidebarW / ImGui::GetIO().DisplaySize.x * rgba->w;
+                for (int y = 0; y < 6; y++)
+                    for (int x = 0; x < 6; x++)
+                    {
+                        int px = int(sidebar + (rgba->w - sidebar) * (0.4f + 0.08f * x));
+                        int py = int(rgba->h * (0.12f + 0.02f * y));
+                        const auto* pixel = static_cast<const uint8_t*>(rgba->pixels) + py * rgba->pitch + px * 4;
+                        samples.insert(samples.end(), pixel, pixel + 3);
+                    }
+                if (!m_testHeroNoArt)
+                    m_testHeroArtPixels = std::move(samples);
+                else
+                {
+                    int changed = 0;
+                    if (samples.size() == m_testHeroArtPixels.size())
+                        for (size_t i = 0; i < samples.size(); i += 3)
+                        {
+                            int difference = 0;
+                            for (size_t c = 0; c < 3; c++) difference += std::abs(int(samples[i + c]) - int(m_testHeroArtPixels[i + c]));
+                            if (difference > 24) changed++;
+                        }
+                    if (changed < 18)
+                    {
+                        fprintf(stderr, "FAIL hero background hidden: %d/36 sky samples differ\n", changed);
+                        m_testFailures++;
+                    }
+                    else
+                        fprintf(stderr, "hero background visible: %d/36 sky samples differ\n", changed);
+                }
+            }
             std::string path = m_shots + "/" + name + ".png";
             if (stbi_write_png(path.c_str(), rgba->w, rgba->h, 4, rgba->pixels, rgba->pitch))
                 fprintf(stderr, "launcher: shot %s\n", path.c_str());
@@ -3214,6 +3270,50 @@ namespace launcher_ui
             m_testShot = fmt::format("running-{}", name);
             m_testAt = now + 600;
         };
+        if (const char* mode = LauncherEnv("SKY_LAUNCHER_TEST_RUNNING"); mode != nullptr && std::string_view(mode) == "controls")
+        {
+            switch (m_testStep)
+            {
+            case 0:
+                m_startGames = true;
+                SelectGame(*FindGame("giants"));
+                SelectGame(*FindGame("ssa"));
+                ssa.disc = DiscState::Ready;
+                ssa.discPath = "--fake-game";
+                ssa.installed.runtime = LauncherEnv("SKY_LAUNCHER_RUNTIME");
+                ssa.installed.gameVersion = "99.0.0";
+                m_testBegan = now;
+                {
+                    std::string error;
+                    m_session.Start("ssa", { ssa.installed.runtime, {}, {} }, "--fake-game", error);
+                }
+                expect(m_session.Ours() && m_session.Running() == "ssa", "the fake game starts");
+                shoot("control-started");
+                return;
+            case 1:
+                if (now - m_testBegan > 10000)
+                {
+                    expect(false, "the fake game's ready file appears");
+                    m_running = false;
+                    return;
+                }
+                if (!std::filesystem::exists(LauncherEnv("SKY_FAKE_GAME_READY"))) return;
+                expect(m_drawn["sidebar:ssa"] == "Running" && m_drawn["hero-main"] == "Stop", "the sidebar runs and STOP is enabled");
+                expect(m_drawn["hero-show"] == "hidden", "a windowless process has no Show button");
+                expect(m_session.Stop(now), "STOP requests the owned process's end");
+                shoot("control-stopping");
+                return;
+            case 2:
+                if (m_session.Ours() && now - m_testBegan < 15000) return;
+                expect(m_session.Running().empty(), "the fake game stops");
+                expect(m_drawn["sidebar:ssa"] == "Ready to play" && m_drawn["hero-main"] == "PLAY", "the page and sidebar return to ready");
+                expect(SlotStatus(&giants).buttonEnabled, "other games can start again");
+                expect(!m_drawn.count("stopped"), "a requested stop has no crash dialog");
+                shoot("control-ready");
+                return;
+            default: m_running = false; return;
+            }
+        }
         switch (m_testStep)
         {
         case 0:

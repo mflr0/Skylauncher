@@ -266,6 +266,9 @@ namespace launcher_ui
             return;
         }
         if (m_s->disc == DiscState::Verifying) return;
+        // The Ready fixture represents a completed build, including its usual setup hint rules.
+        m_s->installed.runtime = "test-built";
+        m_s->installed.gameVersion = "99.0.0";
         if (m_testStep >= 8)
         {
             TestHeroNavigation();

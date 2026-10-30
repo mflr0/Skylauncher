@@ -1,6 +1,6 @@
 # Launcher UI Guide
 
-The launcher has its own Skylanders look, designed by dorydev: dark greys, one light-blue accent, Bungee titles over Outfit
+The launcher has its own Skylanders look, created by the designer: dark greys, one light-blue accent, Bungee titles over Outfit
 text, each game's own colours on its main action, chunky rounded buttons. This guide is the look's **system**: the tokens
 (every size and colour, by role), the components drawn from them, the consistency rules, the gallery that shows them, and
 the map of what each screen still has to move over (the migration, "phase B").
@@ -11,7 +11,7 @@ spacing of its own, never draws a button, a field, a dialog or a progress bar wi
 component has becomes a component (or an option of one) first, with its states drawn and a place in the gallery.
 
 ## Structure
-- `src/launcher/ui/theme/tokens.h` - the tokens (below). `launcher_theme.h` beside it - the palette (dorydev's colours),
+- `src/launcher/ui/theme/tokens.h` - the tokens (below). `launcher_theme.h` beside it - the palette (the designer's colours),
   each game's `GameStyle`, and the ImGui style (`LauncherTheme::Apply`); its old size constants stay until the screens no
   longer use them (phase B removes each one as it goes unused).
 - `src/launcher/ui/components/` - the components: `core` (context, states, text styles, colour helpers, focus ring, icons),
@@ -633,9 +633,17 @@ The portal column narrows from 400 to 264 points at small window sizes; longer n
   milestones, Cancel, Show details and settings. The milestones collect tools/disc, recompilation, shaders, and the
   remaining compile/link/movie/finish work. The detailed checklist and log, failure, retry and resume views remain
   available in the left column. The portal stays visible and usable throughout installation.
-- **Running**: Playing now, the Stop and Show the game controls, the Toy Box shortcut hint, and the live portal.
-  **Current limitation:** `GameSession` has no stop or window activation API. These two controls are disabled and the
-  page directs the player to the game's window. No process signalling or window manipulation is added to the UI.
+- **Running**: Playing now, Stop, the Toy Box shortcut hint, and the live portal. Stop addresses only the PID started by
+  this launcher: WM_CLOSE on Windows, SIGTERM (SDL's quit event) on macOS and Linux, then a forced end after five seconds.
+  Polling keeps the page responsive, returns the page and sidebar to their ready states, and suppresses crash reporting
+  for a requested stop. A game detected only by its marker cannot be stopped here.
+  Show the game appears only when that PID has an activatable window: Windows' foreground window API, macOS'
+  NSRunningApplication, or X11's `_NET_ACTIVE_WINDOW` with `_NET_WM_PID`. It is hidden on Wayland, with no window, and
+  in builds without X11 headers or systems without Xlib or a supporting window manager. Screenshot fixtures present
+  both controls without starting a process.
+
+The build time, space and internet hint appears only before the game is built. The Ready display fixture has a built
+runtime, so it follows the same rule as an installed game.
 
 The portal reads and polls `CollectionModel`, including the session file and figure stats. Each seat is a focusable
 ListRow with the disc portrait or the collection's generated icon, the figure's name, seat and level; empty seats use a
@@ -692,7 +700,7 @@ space, so nothing moves when the line changes.
 PLAY starts the game **beside the window, which stays open** (`GameSession`, `launcher/game_run.h`): one game at a time.
 - **Started here**: the runtime is started without waiting for it, its output going straight into `skylauncher-game.log`
   (`docs/support.md`), so it runs on if the launcher is closed. The launcher watches the process (`SDL_WaitProcess`, every
-  wake: at most 0.5 s) and goes back to normal when it exits; a non-zero exit code is a crash and shows the crash dialog
+  wake: at most 0.5 s) and goes back to normal when it exits; an unrequested non-zero exit code shows the crash dialog
   (`ShowGameStopped`, over the window).
 - **Found running**: a game this launcher did not start (one left running when the launcher was closed and opened again, or one
   started by hand) is seen by the marker each game keeps while it runs (`<saves>-backup/game.lock` with its process id:
@@ -1006,18 +1014,28 @@ Build with `ninja -j4 -C build ArkeyanLauncher ArkeyanLauncherTest FakeSkyBuild`
 ```sh
 python3 tests/hero_shots.py --disc /absolute/path/to/supported-game.iso
 ```
-The script sets `SKY_LAUNCHER_TEST_HERO=1` and `SKY_LAUNCHER_SHOTS` to `.shots/`, isolates every data folder in
-`.scratch/hero/`, uses offscreen rendering and bounds the launcher to 150 seconds (only its own process can be stopped).
+The script sets `SKY_LAUNCHER_TEST_HERO=1` and `SKY_LAUNCHER_SHOTS` to `build/shots/hero/`, isolates every data folder in
+`build/scratch/hero/`, uses offscreen rendering and bounds the launcher to 150 seconds (only its own process can be stopped).
 It writes `hero-<ready|needs-disc|installing|running>-<art|noart>.png`. The four states and two figures are in-memory display
 fixtures: no game, installer or figure writing runs. Disc verification and the existing art reader still run read-only
 against the supplied image; cache writes stay in scratch data. The no-art shots explicitly hide the hero art even if
-cached. A missing logo or background is logged as `FAIL hero`, and the script fails even if fallback screenshots exist;
-it never counts a fallback as a successful art check. Trap Team has no art manifest in the current reader, so its disc
+cached. A missing logo or background is logged as `FAIL hero`, and the script fails even if fallback screenshots exist.
+Each pair also compares 36 pixels in the clear upper sky; at least half must differ visibly, so a loaded texture hidden
+by a rendering failure fails the check. The SSA reader already extracts `fullscreen_000` from `uiimage.str`: the missing
+sky was a page-sized textured triangle overflowing the software renderer's fixed-point arithmetic. The page now draws
+the same image and crop in small quads before applying the left and bottom gradients.
+Trap Team has no art manifest in the current reader, so its disc
 cannot validate the art shots. Use a supported disc for that check.
 
 `--language fr`, `--size 1024x680` and `--pad` exercise French, the smallest window and focus rings. The default is English
 at 1600x1000; each run replaces the eight files. After the eight captures, keyboard Tab and gamepad directional input must reach every enabled control in all four states.
-The render log reports unreachable controls as failures and stays in `.scratch/hero/screenshots.log`.
+The render log reports unreachable controls as failures and stays in `build/scratch/hero/screenshots.log`.
+`ArkeyanLauncherTest --no-disc <absolute-scratch-dir>` also checks a fake child process's clean stop, forced stop after the
+deadline, repeated requests, a second instance of the same executable surviving both stops, and window capability and
+activation routed to the owned PID. The test executable's `--fake-game` mode handles termination or deliberately ignores
+it; no game runs. Window callbacks make supported and unsupported activation paths testable without a desktop.
+An offscreen launcher check also verifies the drawn STOP state, the missing Show button for a windowless process, the
+page and sidebar returning to Ready, other games becoming available again, and the absence of a crash report.
 
 ## Other screenshot variables
 `SKY_LAUNCHER_TEST_SCREENS=mouse` (or `pad`) with `SKY_LAUNCHER_TEST_DROP=<SSA disc>` shoots the three model screens,

@@ -15,8 +15,8 @@ def main():
     parser.add_argument("--pad", action="store_true")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    scratch = root / ".scratch" / "hero"
-    shots = root / ".shots"
+    scratch = root / "build" / "scratch" / "hero"
+    shots = root / "build" / "shots" / "hero"
     for folder in (scratch / "home", scratch / "collection", scratch / "data", shots):
         folder.mkdir(parents=True, exist_ok=True)
     names = [f"hero-{state}-{art}.png" for state in ("ready", "needs-disc", "installing", "running")
@@ -64,7 +64,7 @@ def main():
         print("FAIL: missing screenshots: " + ", ".join(missing), file=sys.stderr)
     # Missing art is a failure, even when the fallback layout could still be captured.
     return int(result != 0 or bool(missing) or "FAIL hero" in text
-               or text.count("0 unreachable") != 8)
+               or text.count("0 unreachable") != 8 or text.count("hero background visible:") != 4)
 
 
 if __name__ == "__main__":
