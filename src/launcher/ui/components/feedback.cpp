@@ -1,5 +1,6 @@
 // What tells the player something (feedback.h): badges, chips, status, progress, toasts, key caps and the pad legend.
 #include "launcher/ui/components/feedback.h"
+#include <numbers>
 #include "launcher/i18n.h"
 #include "launcher/ui/components/format.h"
 #include <SDL3/SDL_timer.h>
@@ -9,6 +10,18 @@
 
 namespace ui
 {
+    void DrawEmptySeat(ImDrawList* draw, ImVec2 at, float size)
+    {
+        const ImVec2 centre(at.x + size / 2, at.y + size / 2);
+        const float r = size / 2 - stroke::Edge;
+        for (int i = 0; i < 20; i++)
+        {
+            const float angle = float(i) * 2 * std::numbers::pi_v<float> / 20;
+            draw->PathArcTo(centre, r, angle, angle + std::numbers::pi_v<float> / 20);
+            draw->PathStroke(Col(color::Edge), 0, stroke::Edge);
+        }
+        DrawIcon(draw, Icon::Plus, centre, icon::Normal, Col(color::Ink));
+    }
     namespace
     {
         // Light or dark ink, whichever reads better on `fill`.
@@ -148,6 +161,19 @@ namespace ui
         PushText(TextStyle::Caption, true);
         DrawText(draw, ImVec2(min.x + space::XS + iconSize + space::XXS, std::round(mid - CapMiddle(TextStyle::Caption, true))), Col(color::Ink), text);
         PopText();
+    }
+
+    void StatusLine(Status status, const char* text, float width)
+    {
+        const ImVec2 at = ImGui::GetCursorScreenPos();
+        DrawStatusIcon(ImGui::GetWindowDrawList(), status, ImVec2(at.x + icon::Small / 2, at.y + CapMiddle(TextStyle::Body)), icon::Small);
+        ImGui::SetCursorScreenPos(ImVec2(at.x + icon::Small + space::XS, at.y));
+        PushText(TextStyle::Body);
+        const std::string shown = width > 0 ? Ellipsize(text, width - icon::Small - space::XS) : text;
+        PopText();
+        Text(TextStyle::Body, shown.c_str(), color::InkSoft, -1);
+        if (shown != text && ImGui::IsItemHovered())
+            Bubble(text, ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
     }
 
     // ---- Progress --------------------------------------------------------------------------------------------------

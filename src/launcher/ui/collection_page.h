@@ -55,6 +55,8 @@ namespace launcher_ui
         ~CollectionPage() { ClearIcons(); }
 
         void Draw();
+        void DrawHeroPortal(ImVec2 at, ImVec2 size, bool live);
+        void TestHeroPortal(bool installing, bool running);
         // The pictures come from the disc once it is verified: drop the cached textures.
         void ClearIcons();
         // A dropped file or folder: figure dumps join the collection. False if it holds none (a disc image).
@@ -77,6 +79,8 @@ namespace launcher_ui
         static int TestShotCount();
 
     private:
+        bool m_heroLoaded = false;
+        bool m_heroFixture = false;
         enum class Overlay { None, Figure, Add, Manage };
 
         void Open();

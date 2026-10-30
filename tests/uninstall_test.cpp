@@ -3,15 +3,18 @@
 // Scratch trees only: nothing here names the real data folders, the real Desktop, the real Trash, the real figures or the
 // running launcher. The launcher to remove is always a dummy file or bundle made in the scratch folder.
 // Called from launcher_test.cpp's main; returns the number of failures.
+#include "test_env.h"
 #include "launcher/uninstall.h"
 #include "launcher/env.h"
 #include "launcher/launcher.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -24,6 +27,58 @@ namespace
 
 #define UN_EXPECT(condition) \
     do { if (!(condition)) { fprintf(stderr, "FAIL %s line %d: %s\n", __FILE__, __LINE__, #condition); g_failures++; } } while (0)
+
+    // SDL and the shared folder code read separate environments; restore each one's original values, including absence.
+    class ScratchEnvironment
+    {
+        using Value = std::optional<std::string>;
+        std::map<std::string, std::pair<Value, Value>> saved;
+
+        static Value Read(const char* value) { return value != nullptr ? Value(value) : std::nullopt; }
+
+    public:
+        ScratchEnvironment(const fs::path& base, const fs::path& data)
+        {
+            fs::create_directories(data);
+            Set("HOME", (base / "home").string());
+            Set("USERPROFILE", (base / "home").string());
+            Set("APPDATA", (base / "home" / "AppData" / "Roaming").string());
+            Set("XDG_DATA_HOME", (base / "home" / ".local" / "share").string());
+            // macOS uses the account's home rather than HOME unless the data root is explicit.
+            Set("SKYLANDERS_DATA", data.string());
+            Set("SKY_LAUNCHER_DATA", data.string());
+            Set("SKY_LAUNCHER_INI", (data / "launcher.ini").string());
+            Set("SKY_COLLECTION", (data / "Collection").string());
+            Set("SKY_SAVE_DIR", (data / "saves").string());
+            Set("SKY_LAUNCHER_DESKTOP", (base / "home" / "Desktop").string());
+            Set("SKY_LAUNCHER_UNINSTALL_SELF", "");
+            Set("SKY_LAUNCHER_UNINSTALL_TRASH", "");
+        }
+
+        void Set(const char* name, const std::string& value)
+        {
+            if (saved.find(name) == saved.end())
+                saved.emplace(name, std::make_pair(Read(SDL_getenv(name)), Read(std::getenv(name))));
+            UN_EXPECT(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true));
+            UN_EXPECT(TestSetEnv(name, value.c_str()) == 0);
+        }
+
+        ~ScratchEnvironment()
+        {
+            for (const auto& [name, values] : saved)
+            {
+                const auto& [sdl, native] = values;
+                if (sdl)
+                    UN_EXPECT(SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name.c_str(), sdl->c_str(), true));
+                else
+                    UN_EXPECT(SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name.c_str()));
+                if (native)
+                    UN_EXPECT(TestSetEnv(name.c_str(), native->c_str()) == 0);
+                else
+                    UN_EXPECT(TestUnsetEnv(name.c_str()) == 0);
+            }
+        }
+    };
 
     void Put(const fs::path& file, size_t bytes = 100, const std::string& text = {})
     {
@@ -181,14 +236,19 @@ namespace
 
     // ---- The rules of each system, as path logic -------------------------------------------------------------------
 
-    void LayoutChecks()
+    void LayoutChecks(const fs::path& base)
     {
         SystemDirs dirs{ "/home/p", "/win/AppData/Roaming", {} };
         UN_EXPECT(DefaultRoot(Os::Windows, dirs) == fs::path("/win/AppData/Roaming") / "Skylanders");
         UN_EXPECT(DefaultRoot(Os::MacOS, dirs) == fs::path("/home/p/Library/Application Support/Skylanders"));
         UN_EXPECT(DefaultRoot(Os::Linux, dirs) == fs::path("/home/p/.local/share/Skylanders"));
-        dirs.xdgData = "/xdg/data";
-        UN_EXPECT(DefaultRoot(Os::Linux, dirs) == fs::path("/xdg/data/Skylanders"));
+#ifdef _WIN32
+        const fs::path xdg = "C:/xdg/data"; // absolute here: "/xdg/data" has no drive, so it counts as relative on Windows
+#else
+        const fs::path xdg = "/xdg/data";
+#endif
+        dirs.xdgData = xdg;
+        UN_EXPECT(DefaultRoot(Os::Linux, dirs) == xdg / "Skylanders");
         dirs.xdgData = "relative/data"; // the specification: a relative XDG_DATA_HOME is ignored
         UN_EXPECT(DefaultRoot(Os::Linux, dirs) == fs::path("/home/p/.local/share/Skylanders"));
         UN_EXPECT(DefaultRoot(Os::Windows, {}).empty() && DefaultRoot(Os::MacOS, {}).empty());
@@ -197,29 +257,18 @@ namespace
         UN_EXPECT(ShortcutName(Os::Windows, "Skylanders: Giants") == "Skylanders Giants.lnk");
         UN_EXPECT(ShortcutName(Os::Linux, "Skylanders: Giants") == "skylanders-giants.desktop");
 
-        // An explicit scratch root takes precedence over the system's home, including a redirected HOME.
-        if (const char* root = SDL_getenv("SKYLANDERS_DATA"); root != nullptr && *root != 0)
+        // The shared folder code agrees with the default layout, entirely inside scratch on every system.
+        const fs::path layout = base / "layout";
+        SystemDirs here{ layout / "home", layout / "home" / "AppData" / "Roaming", layout / "home" / ".local" / "share" };
+        fs::path data;
+        switch (CurrentOs())
         {
-            UN_EXPECT(ThisMachine({}).root == fs::absolute(fs::path(root)));
-            return;
+        case Os::Windows: data = here.appData / "Skylanders"; break;
+        case Os::MacOS: data = here.home / "Library" / "Application Support" / "Skylanders"; break;
+        case Os::Linux: data = here.xdgData / "Skylanders"; break;
         }
-
-        // On this machine, with nothing overriding it, the shared folder code agrees with the table above.
-        const char* names[] = { "SKYLANDERS_DATA", "XDG_DATA_HOME" };
-        std::map<std::string, std::string> saved;
-        for (const char* name : names)
-            if (const char* value = SDL_getenv(name))
-                saved[name] = value;
-        for (const char* name : names)
-            SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name), SDL_unsetenv_unsafe(name);
-        SystemDirs here;
-        if (const char* home = SDL_getenv("HOME"))
-            here.home = home;
-        if (const char* appdata = SDL_getenv("APPDATA"))
-            here.appData = appdata;
-        UN_EXPECT(DefaultRoot(CurrentOs(), here) == ThisMachine({}).root || LauncherEnv("SKY_LAUNCHER_DATA") != nullptr);
-        for (const auto& [name, value] : saved)
-            SDL_setenv_unsafe(name.c_str(), value.c_str(), 1), SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name.c_str(), value.c_str(), true);
+        ScratchEnvironment variables(layout, data);
+        UN_EXPECT(DefaultRoot(CurrentOs(), here) == ThisMachine({}).root);
     }
 
     // ---- The plan and the run --------------------------------------------------------------------------------------
@@ -580,6 +629,7 @@ namespace
             UN_EXPECT(Decode(EncodeForPowerShell("a\xC3\xA9 b")) == "a\xC3\xA9 b" && Decode(EncodeForPowerShell("")).empty());
         }
 
+#ifndef _WIN32 // the macOS and Linux helpers are /bin/sh scripts, which Windows does not have; its own helper is a PowerShell script, checked as text above
         // The helper itself, run for real on a copy of a dummy in scratch (macOS and Linux scripts; the process it waits for is gone).
         const fs::path run = base / "helper";
         fs::remove_all(run);
@@ -628,6 +678,7 @@ namespace
                 SDL_DestroyProcess(live);
             }
         }
+#endif
         printf("Uninstall of the launcher: each system's rules, the refusals, the commands, the helper run on a dummy in scratch\n");
     }
 
@@ -637,39 +688,25 @@ namespace
     {
         // With scratch variables the launcher is never the target, and the real Trash is never named.
         const fs::path data = base / "machine" / "data";
-        fs::create_directories(data);
-        auto set = [](const char* name, const std::string& value) {
-            if (value.empty())
-                SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name), SDL_unsetenv_unsafe(name);
-            else
-                SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true), SDL_setenv_unsafe(name, value.c_str(), 1);
-        };
-        const char* oldData = SDL_getenv("SKYLANDERS_DATA");
-        const std::string saved = oldData != nullptr ? oldData : std::string();
-        set("SKYLANDERS_DATA", data.string());
-        set("SKY_LAUNCHER_UNINSTALL_SELF", "");
-        set("SKY_LAUNCHER_UNINSTALL_TRASH", "");
+        const std::string home = SDL_getenv("HOME") != nullptr ? SDL_getenv("HOME") : "";
+        ScratchEnvironment variables(base / "machine", data);
         UN_EXPECT(ScratchRun());
         UN_EXPECT(ThisMachine({}).launcherSelf.empty());
         const fs::path dummy = base / "machine" / "Skylauncher.app";
         Put(dummy / "Contents" / "MacOS" / "Skylauncher", 10);
-        set("SKY_LAUNCHER_UNINSTALL_SELF", dummy.string());
+        variables.Set("SKY_LAUNCHER_UNINSTALL_SELF", dummy.string());
         Environment env = ThisMachine({});
         UN_EXPECT(env.os != Os::MacOS || env.launcherSelf.empty()); // macOS: no Trash named, so no launcher
-        set("SKY_LAUNCHER_UNINSTALL_TRASH", (base / "machine" / "Trash").string());
+        variables.Set("SKY_LAUNCHER_UNINSTALL_TRASH", (base / "machine" / "Trash").string());
         env = ThisMachine({});
         UN_EXPECT(env.launcherSelf == dummy && env.trash == base / "machine" / "Trash");
         UN_EXPECT(env.root == data && !env.games.empty());
         // None of its paths is in the real application folders.
-        const std::string home = SDL_getenv("HOME") != nullptr ? SDL_getenv("HOME") : "";
         if (!home.empty())
             for (const char* real : { "/Library/Application Support/Skylanders", "/Library/Application Support/SSARecomp", "/Library/Application Support/Skylauncher",
                      "/.local/share/Skylanders", "/.Trash" })
                 for (const fs::path& path : { env.root, env.launcherData, env.settingsFile, env.collection, env.trash })
                     UN_EXPECT(path.string().rfind(home + real, 0) != 0);
-        set("SKY_LAUNCHER_UNINSTALL_SELF", "");
-        set("SKY_LAUNCHER_UNINSTALL_TRASH", "");
-        set("SKYLANDERS_DATA", saved);
         printf("Uninstall on this machine: scratch variables keep the launcher, the Trash and the real folders out of it\n");
     }
 }
@@ -679,7 +716,7 @@ int UninstallChecks(const fs::path& scratch)
     const fs::path base = scratch / "uninstall";
     fs::remove_all(base);
     fs::create_directories(base);
-    LayoutChecks();
+    LayoutChecks(base);
     for (Os os : { Os::MacOS, Os::Windows, Os::Linux })
         PlanAndRunChecks(base, os);
     SymlinkChecks(scratch);

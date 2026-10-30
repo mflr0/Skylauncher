@@ -86,6 +86,10 @@ namespace ui
         const char* gearTooltip = nullptr; // "Spyro's Adventure settings"
         bool takeFocus = false;      // the main half takes the keyboard and pad focus this frame
         bool showFocus = false;      // and shows its ring
+        bool separated = false;     // hero: a quiet settings button, space::S after the main action
+        Icon icon = Icon::None;
+        bool danger = false;        // the running game's stop action
+        float width = height::MainWidth;
     };
     enum class MainActionHit { None, Main, Settings };
     struct MainActionResult

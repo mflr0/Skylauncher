@@ -18,10 +18,22 @@ std::span<const char* const> GameVideoKeys();
 std::string GameVideoSection(std::string_view gameId); // "giants.video"
 // Starts a game's copy from the shared [video] the first time (nothing happens when the copy exists).
 void SeedGameVideo(LauncherConfig& config, std::string_view gameId);
+// The frame rate a game gets when the player has saved none ("30" or "60"): the page shows it and PLAY writes it. The one place a
+// game's default is decided.
+const char* DefaultFrameRate(std::string_view gameId);
 // PLAY: the game's copy replaces [video].
 void ApplyGameVideo(LauncherConfig& config, std::string_view gameId);
 // The game ended: [video] (what the runtime may have changed) is the game's copy again.
 void StoreGameVideo(LauncherConfig& config, std::string_view gameId);
+
+// Once per settings file ([launcher] frame_rates=1 says it was done): the frame rates 0, 120, 144 and 240, which older versions
+// accepted and ran as 60, become 60 in [video] and [<game>.video], so an update does not change what a player had. A choice made
+// afterwards stays.
+void MigrateFrameRates(LauncherConfig& config);
+
+// The highest frame rate a game is offered: 60 for Giants, 0 (no cap) for the others. Giants' summon cutscene lasts 10 % less above 60
+// (the runtime caps it too), so its page lists 30 and 60 only and a higher saved value becomes 60 once.
+unsigned MaxFrameRate(std::string_view gameId);
 
 // What a game keeps in its folder (<data>/SSA, <data>/Giants), told apart for the delete and uninstall buttons.
 struct GameFolders

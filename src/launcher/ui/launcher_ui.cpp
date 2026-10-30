@@ -397,6 +397,7 @@ namespace launcher_ui
             m_testPad = LauncherEnv("SKY_LAUNCHER_TEST_PAD") != nullptr;
             m_testAchievements = LauncherEnv("SKY_LAUNCHER_TEST_ACHIEVEMENTS") != nullptr;
             m_testRunning = LauncherEnv("SKY_LAUNCHER_TEST_RUNNING") != nullptr;
+            m_testHero = LauncherEnv("SKY_LAUNCHER_TEST_HERO") != nullptr;
         }
         RefreshGamepads();
         m_github = CreateGitHubMarkTexture(m_renderer, 128);
@@ -889,7 +890,7 @@ namespace launcher_ui
             return;
         m_progressAt = 0; // its play time and unlocks are read again
         const GameInfo* game = FindGame(ended->game);
-        if (!ended->ours || ended->exitCode == 0 || game == nullptr)
+        if (!ended->ours || ended->stopped || ended->exitCode == 0 || game == nullptr)
             return;
         if (!m_shots.empty()) // a screenshot script: no dialog that waits for a click
             m_drawn["stopped"] = fmt::format("{} {}", ended->game, ended->exitCode);
@@ -1034,7 +1035,7 @@ namespace launcher_ui
         draw->AddRectFilledMultiColor(ImVec2(0, 0), size, Rgb(SkyTop), Rgb(SkyTop), Rgb(SkyBottom), Rgb(SkyBottom));
         // The game's own painting (its menus' backdrop, from the player's disc: this session's or an earlier one's),
         // cropped to fill the page, instead of the drawn stars.
-        const ArtTexture* art = CachedArt(m_s->game.id, LauncherAssets::Role::HeroBackground, BackdropArtW);
+        const ArtTexture* art = m_testHeroNoArt ? nullptr : CachedArt(m_s->game.id, LauncherAssets::Role::HeroBackground, BackdropArtW);
         SDL_Texture* background = art != nullptr ? art->texture : nullptr;
         if (background != nullptr)
         {
@@ -1042,17 +1043,24 @@ namespace launcher_ui
             SDL_GetTextureSize(background, &w, &h);
             ImVec2 page(SidebarW, 0), pageSize(size.x - SidebarW, size.y);
             float scale = std::max(pageSize.x / w, pageSize.y / h), u = pageSize.x / (w * scale), v = pageSize.y / (h * scale);
-            draw->AddImage(Ref(background), page, size, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2));
-            // Shading, so the logo and the white text read on any painting: darker at the top, lighter behind the logo,
-            // dark again towards the band; and a shadow the sidebar casts on its left edge.
-            float middle = size.y * 0.38f, low = size.y - PlayBandH();
-            draw->AddRectFilledMultiColor(page, ImVec2(size.x, middle), Rgb(SkyTop, BackdropTopShade), Rgb(SkyTop, BackdropTopShade),
-                Rgb(SkyTop, 40), Rgb(SkyTop, 40));
-            draw->AddRectFilledMultiColor(ImVec2(page.x, middle), ImVec2(size.x, low), Rgb(SkyTop, 40), Rgb(SkyTop, 40),
-                Rgb(SkyTop, BackdropBottomShade), Rgb(SkyTop, BackdropBottomShade));
-            draw->AddRectFilled(ImVec2(page.x, low), size, Rgb(SkyTop, BackdropBottomShade));
-            draw->AddRectFilledMultiColor(page, ImVec2(page.x + 120, size.y), IM_COL32(0, 0, 0, 90), IM_COL32(0, 0, 0, 0),
-                IM_COL32(0, 0, 0, 0), IM_COL32(0, 0, 0, 90));
+            // The software renderer overflows its fixed-point texture coordinates on a page-sized triangle.
+            // Small quads keep the same crop and work at every window size and display density.
+            const ImVec2 density = ImGui::GetIO().DisplayFramebufferScale;
+            const float tileW = 128 / std::max(1.0f, density.x), tileH = 128 / std::max(1.0f, density.y);
+            auto uv = [&](float x, float y) {
+                return ImVec2((1 - u) / 2 + u * (x - page.x) / pageSize.x, (1 - v) / 2 + v * y / pageSize.y);
+            };
+            for (float y = 0; y < size.y; y += tileH)
+                for (float x = page.x; x < size.x; x += tileW)
+                {
+                    const float right = std::min(x + tileW, size.x), bottom = std::min(y + tileH, size.y);
+                    draw->AddImage(Ref(background), ImVec2(x, y), ImVec2(right, bottom), uv(x, y), uv(right, bottom));
+                }
+            // Continuous shades across the painting: the title's left and the controls' lower edge.
+            draw->AddRectFilledMultiColor(page, size, ui::Col(ui::color::Scrim, 0.9f), ui::Col(ui::color::Scrim, 0.12f),
+                ui::Col(ui::color::Scrim, 0.12f), ui::Col(ui::color::Scrim, 0.9f));
+            draw->AddRectFilledMultiColor(page, size, ui::Col(ui::color::Scrim, 0), ui::Col(ui::color::Scrim, 0),
+                ui::Col(ui::color::Scrim, 0.9f), ui::Col(ui::color::Scrim, 0.9f));
             return;
         }
         // The portal's glow, low on the right, and twinkling stars.
@@ -1065,6 +1073,11 @@ namespace launcher_ui
             float twinkle = 0.45f + 0.55f * (0.5f + 0.5f * std::sin(time * 1.3f + star.w));
             draw->AddCircleFilled(ImVec2(star.x * size.x, star.y * size.y * 0.85f), star.z, IM_COL32(255, 255, 255, int(150 * twinkle)), 8);
         }
+        const ImVec2 page(SidebarW, 0);
+        draw->AddRectFilledMultiColor(page, size, ui::Col(ui::color::Scrim, 0.5f), ui::Col(ui::color::Scrim, 0),
+            ui::Col(ui::color::Scrim, 0), ui::Col(ui::color::Scrim, 0.5f));
+        draw->AddRectFilledMultiColor(page, size, ui::Col(ui::color::Scrim, 0), ui::Col(ui::color::Scrim, 0),
+            ui::Col(ui::color::Scrim, 0.8f), ui::Col(ui::color::Scrim, 0.8f));
     }
 
     // A game's state in a few words, for the sidebar and Home, and the label of the game page's main button: the one place
@@ -1076,6 +1089,16 @@ namespace launcher_ui
         auto line = [](S state, const char* text, unsigned dot, const char* button, bool enabled = true, float progress = -1) {
             return SlotLine{ text, dot, progress, state, button, enabled };
         };
+        if (m_testHero && slot == m_s && m_testHeroState >= 0)
+        {
+            switch (m_testHeroState)
+            {
+            case 0: return line(S::Ready, Tr("Ready to play"), Ready, Tr("PLAY"), true);
+            case 1: return line(S::NoDisc, Tr("Needs your disc"), Accent, Tr(strings::ChooseDisc), true);
+            case 2: return line(S::Installing, Tr("Installing"), Accent, Tr("INSTALLING..."), false);
+            case 3: return line(S::Running, Tr("Running"), Ready, Tr("Running"), false);
+            }
+        }
         // One game at a time: the one running says so; the others' buttons wait for it (Running, after the rest).
         const std::string& running = m_session.Running();
         if (running == slot->game.id)
@@ -1287,7 +1310,7 @@ namespace launcher_ui
             }
             if (std::string_view(entry.id) == m_s->game.id && (m_page == Page::Play || m_page == Page::Home || m_page == Page::GameSettings || m_page == Page::Achievements))
                 TakeFocus(FocusTo::Sidebar);
-            if (m_testSidebar)
+            if (m_testSidebar || m_testRunning)
                 m_drawn[std::string("sidebar:") + entry.id] = line.text;
             ImGui::PopID();
         }
@@ -1546,256 +1569,128 @@ namespace launcher_ui
             SDL_OpenURL(Project);
     }
 
-    // The band under the game art: the main action, and under it the pad's buttons once a pad is in use.
     float App::PlayBandH() const
     {
-        return BottomBarH + (ui::Ctx().glyphs != ui::Glyphs::Keyboard ? ui::height::Normal : 0.0f);
+        return ui::Ctx().glyphs != ui::Glyphs::Keyboard ? ui::height::Normal : 0.0f;
     }
 
     void App::DrawPlay()
     {
         RefreshProgress();
-        // Edge to edge: the game's logo on top, a band with the main button below it.
+        if (m_testHero)
+        {
+            m_testHeroControls.clear();
+            ui::Ctx().testNavigationItems = &m_testHeroControls;
+        }
         const ImVec2 position = ImGui::GetCursorScreenPos();
         const ImVec2 available = ImGui::GetContentRegionAvail();
         ImDrawList* draw = ImGui::GetWindowDrawList();
-        const float bandH = PlayBandH();
-        const ImVec2 end(position.x + available.x, position.y + available.y - bandH);
-
-        // Hero: the game's logo from the player's disc over its painting (DrawBackdrop shades it).
-        if (m_dragOver)
-            draw->AddRect(ImVec2(position.x + ui::space::XS, position.y + ui::space::XS), ImVec2(end.x - ui::space::XS, end.y - ui::space::XS),
-                ui::Col(ui::color::AccentFillPressed), ui::radius::Panel, 0, ui::stroke::Selection);
-
-        // The disc block (file, state, what INSTALL does) sits bottom left of the hero; it is as tall as its lines, which is
-        // known from the last frame, and the logo takes the room above it.
-        ImGuiStorage* storage = ImGui::GetStateStorage();
-        const ImGuiID heightKey = ImGui::GetID("##disc-block-height");
-        const float blockH = storage->GetFloat(heightKey, ui::HeightOf(ui::Size::Large) * 2);
-        const float blockW = std::min(available.x - 2 * ui::space::XL, 720.0f);
-        const float blockX = std::round(position.x + (available.x - blockW) / 2); // centred, like the logo and the band's group
-        const bool blockShown = !m_s->installView;
-
-        // The logo (else the game's name), as large as fits and centred between the language menu and the disc block.
-        const float areaTop = position.y + ui::space::XL, areaBottom = end.y - (blockShown ? blockH + 2 * ui::space::M : ui::space::XL);
-        const float areaH = areaBottom - areaTop;
-        const ArtTexture* logo = m_s->logo ? &m_s->logo : CachedArt(m_s->game.id, LauncherAssets::Role::Logo, 0);
-        if (m_s->installView)
-        {
-            float cardW = std::min(available.x - 2 * ui::space::XL, 680.0f);
-            DrawInstall(ImVec2(position.x + (available.x - cardW) / 2, areaTop), ImVec2(cardW, end.y - ui::space::XL - areaTop));
-        }
-        else if (logo != nullptr)
-            DrawHeroLogo(draw, *logo, ImVec2(position.x + available.x * 0.14f, areaTop), ImVec2(available.x * 0.72f, areaH));
-        else
-        {
-            ImGui::PushFont(ui::Ctx().fonts.title, HeroSize);
-            const float wrap = available.x - 2 * ui::space::XXL;
-            const ImVec2 text = ImGui::CalcTextSize(m_s->game.name, nullptr, false, wrap);
-            const ImVec2 at(position.x + (available.x - text.x) / 2, areaTop + std::max(0.0f, (areaH - text.y) / 2));
-            ImGui::SetCursorScreenPos(at);
-            ImGui::PushStyleColor(ImGuiCol_Text, Rgb(ui::color::Ink));
-            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + wrap); // window coordinates, not the screen's
-            ImGui::TextUnformatted(m_s->game.name);
-            ImGui::PopTextWrapPos();
-            ImGui::PopStyleColor();
-            ImGui::PopFont();
-        }
-
+        m_heroNavigation.Begin(m_focusTo == FocusTo::None);
+        const float margin = ui::space::XL;
+        const float left = position.x + margin;
+        const float innerW = available.x - 2 * margin;
+        const float panelW = std::clamp(innerW * 0.32f, ui::hero::PanelMinWidth, ui::hero::PanelWidth);
+        const float leftW = innerW - panelW - ui::space::L;
+        const float foot = position.y + available.y - margin - PlayBandH();
         const SlotLine state = SlotStatus(m_s);
-        const bool ready = m_s->disc == DiscState::Ready, verifying = state.state == SlotState::Checking, installing = Installing();
+        if (m_testSidebar)
+            m_drawn["button"] = state.button + (state.buttonEnabled ? "" : " (off)");
+        const bool running = state.state == SlotState::Running;
+        const bool stopping = running && m_session.Stopping();
+        const bool showGame = running && (m_testHero || m_session.CanShow());
+        const bool installing = Installing() || (m_testHero && m_testHeroState == 2);
+        const bool noDisc = state.state == SlotState::NoDisc;
+        const bool ready = m_s->disc == DiscState::Ready;
+        const bool verifying = state.state == SlotState::Checking;
         const bool install = ready && NeedsInstall();
         const bool update = ready && !install && UpdateAvailable();
+        const bool detailed = m_s->installView && (!installing || m_s->installLog);
+        const float panelH = panelW < ui::hero::PanelWidth ? ui::hero::CompactPanelHeight : ui::hero::PanelHeight;
 
-        if (blockShown && m_s->disc == DiscState::None)
+        // One lower edge for the portal and the commands; the painting remains visible between the columns.
+        const float hintH = (running ? 4 : 2) * ui::type::Body + ui::space::XS;
+        const float pillY = foot - ui::height::Small - hintH - ui::space::M;
+        const float buttonY = pillY - ui::space::M - (installing ? 2 * ui::height::Normal + ui::space::L : ui::height::Main);
+        const float statusY = buttonY - ui::space::L - ui::type::Body;
+        const ArtTexture* logo = m_testHeroNoArt ? nullptr : m_s->logo ? &m_s->logo : CachedArt(m_s->game.id, LauncherAssets::Role::Logo, 0);
+        const float titleW = std::min(leftW, ui::hero::TitleWidth);
+        const char* shortName = GameName(m_s->game.id, GameNameForm::Short);
+        const float titleH = logo != nullptr ? ui::hero::LogoHeight : ui::HeroHeadingHeight(titleW, shortName);
+        const ImVec2 titleAt(left, statusY - ui::space::M - titleH);
+        if (!detailed)
         {
-            // First run: no disc yet. The whole area is one target (a click chooses, a drop reads), and it says the three steps.
-            const float zoneH = blockH;
-            const ImVec2 min(blockX, end.y - ui::space::M - zoneH), max(min.x + blockW, end.y - ui::space::M);
-            draw->AddRectFilled(min, max, ui::Col(ui::elevation::Card.fill, m_dragOver ? 1.0f : 0.92f), ui::radius::Card);
-            // A dashed edge: it reads as a place to drop something.
-            const unsigned edge = m_dragOver ? ui::color::Focus : ui::color::Edge;
-            const float dash = ui::space::S, spacing = ui::space::XS, round = ui::radius::Card;
-            auto dashed = [&](ImVec2 from, ImVec2 to) {
-                const float length = std::abs(to.x - from.x) + std::abs(to.y - from.y);
-                const ImVec2 step((to.x - from.x) / length, (to.y - from.y) / length);
-                for (float at = 0; at < length; at += dash + spacing)
+            if (logo != nullptr)
+            {
+                const float logoW = std::min(leftW, ui::hero::LogoHeight * logo->aspect);
+                DrawHeroLogo(draw, *logo, titleAt, ImVec2(logoW, ui::hero::LogoHeight));
+            }
+            else
+                ui::HeroHeading(draw, titleAt, ImVec2(titleW, titleH), "Skylanders", shortName);
+
+            std::string status = noDisc ? Tr("Not installed yet") : running ? Tr("Playing now") : state.text;
+            if (stopping) status = Tr("Stopping...");
+            if (installing)
+            {
+                const InstallChecklist list = MakeInstallChecklist(m_testHero ? m_testHeroProgress : InstallSnapshot(), SDL_GetTicks());
+                const std::string eta = InstallTimeLeft(list.etaMs);
+                if (!eta.empty()) status = Tf("Installing · {}", eta);
+            }
+            if (state.state == SlotState::Ready && m_progress.play.totalSeconds > 0)
+            {
+                status = Tf("Ready · {} played", FormatPlayTime(m_progress.play.totalSeconds));
+                if (m_progress.play.lastEnd > 0)
+                    status += " · " + Tf("Last played: {}", FormatLastPlayed(m_progress.play.lastEnd, int64_t(std::time(nullptr))));
+            }
+            ImGui::SetCursorScreenPos(ImVec2(left, statusY));
+            ui::StatusLine(noDisc ? ui::Status::Warning : StatusOf(state.state), status.c_str(), leftW);
+
+            if (installing)
+                DrawHeroInstall(ImVec2(left, buttonY), leftW);
+            else
+            {
+                MainAction action{running ? Tr("Stop") : state.button.c_str(), state.buttonEnabled && !m_testButtonsOff};
+                action.icon = running ? ui::Icon::Cross : noDisc ? ui::Icon::Disc : ui::Icon::Play;
+                action.danger = running;
+                action.width = std::min(ui::height::MainWidth, leftW - ui::height::MainGear - ui::space::S);
+                if (running)
                 {
-                    const float stop = std::min(at + dash, length);
-                    draw->AddLine(ImVec2(from.x + step.x * at, from.y + step.y * at), ImVec2(from.x + step.x * stop, from.y + step.y * stop),
-                        ui::Col(edge), ui::stroke::Edge);
+                    action.enabled = (m_testHero || m_session.Ours()) && !stopping && !m_testButtonsOff;
+                    if (showGame)
+                        action.width = std::min(ui::height::MainWidth, std::max(ui::height::MainGear, leftW - ui::height::MainGear - 3 * ui::space::S
+                            - ui::ButtonWidth(Tr("Show the game"), { .size = ui::Size::Large })));
                 }
-            };
-            dashed(ImVec2(min.x + round, min.y), ImVec2(max.x - round, min.y));
-            dashed(ImVec2(min.x + round, max.y), ImVec2(max.x - round, max.y));
-            dashed(ImVec2(min.x, min.y + round), ImVec2(min.x, max.y - round));
-            dashed(ImVec2(max.x, min.y + round), ImVec2(max.x, max.y - round));
-            for (int corner = 0; corner < 4; corner++) // the corners, arcs between the dashes
-            {
-                const ImVec2 centre(corner % 2 == 0 ? min.x + round : max.x - round, corner < 2 ? min.y + round : max.y - round);
-                const float from = (corner == 0 ? 1.0f : corner == 1 ? 1.5f : corner == 2 ? 0.5f : 0.0f) * IM_PI;
-                draw->PathArcTo(centre, round, from, from + IM_PI / 2, 8);
-                draw->PathStroke(ui::Col(edge), 0, ui::stroke::Edge);
-            }
-            const float pad = ui::space::L;
-            float y = min.y + pad;
-            ui::DrawIcon(draw, ui::Icon::Disc, ImVec2(min.x + pad + ui::icon::Large / 2, y + ui::icon::Large / 2), ui::icon::Large, ui::Col(ui::color::Info));
-            const float textX = min.x + pad + ui::icon::Large + ui::space::M;
-            ui::PushText(ui::TextStyle::Label, true);
-            ui::DrawText(draw, ImVec2(textX, y), ui::Col(ui::color::Ink), Tf("Choose your {} disc image", GameName(m_s->game.id, GameNameForm::Short)).c_str());
-            y += ImGui::GetFontSize() + ui::space::XXS;
-            ui::PopText();
-            ui::PushText(ui::TextStyle::Body);
-            ui::DrawText(draw, ImVec2(textX, y), ui::Col(ui::color::InkSoft), Tr("Drop your disc image (.iso) here."));
-            y += ImGui::GetFontSize() + ui::space::M;
-            ui::PopText();
-            // 1 Choose your disc > 2 Install > 3 Play
-            ui::PushText(ui::TextStyle::Caption, true);
-            float x = min.x + pad;
-            const char* steps[] = { Tr("1. Choose your disc"), Tr("2. Install"), Tr("3. Play") };
-            for (int i = 0; i < 3; i++)
-            {
-                ui::DrawText(draw, ImVec2(x, y), ui::Col(ui::color::Ink), steps[i]);
-                x += ImGui::CalcTextSize(steps[i]).x + ui::space::XS;
-                if (i < 2)
+                if (verifying)
                 {
-                    ui::DrawIcon(draw, ui::Icon::ChevronRight, ImVec2(x + ui::space::XS, y + ui::CapMiddle(ui::TextStyle::Caption, true)), ui::icon::Small, ui::Col(ui::color::Dim));
-                    x += 2 * ui::space::XS + ui::space::XS;
+                    action.progress = m_s->verify.progress;
+                    action.indeterminate = m_s->verify.progress >= 0.97f;
                 }
-            }
-            y += ImGui::GetFontSize() + ui::space::XS;
-            ui::PopText();
-            ui::PushText(ui::TextStyle::Caption);
-            ui::DrawText(draw, ImVec2(min.x + pad, y), ui::Col(ui::color::Dim), Tr("Your disc is read on this computer only."));
-            y += ImGui::GetFontSize();
-            ui::PopText();
-            ImGui::SetCursorScreenPos(min);
-            if (ui::Hit("##dropzone", ImVec2(blockW, zoneH)))
-                Browse();
-            ui::FocusRingIf(ui::ItemState(), ui::radius::Card);
-            storage->SetFloat(heightKey, y + pad - min.y);
-        }
-        else if (blockShown)
-        {
-            ImGui::SetCursorScreenPos(ImVec2(blockX, end.y - ui::space::M - blockH));
-            ui::CardOptions card;
-            card.padding = ui::space::M;
-            card.flags = ImGuiChildFlags_AutoResizeY;
-            ui::BeginCard("##disc", ImVec2(blockW, 0), card);
-            // The file name on top (the whole path under the pointer), "Change disc..." at its right once a disc is verified;
-            // the copy replaces the disc image.
-            const std::string file = m_s->fromCopy ? Tr("Copied game data")
-                : m_s->discPath.empty() ? Tr("No disc image yet") : LauncherMiddleEllipsis(std::filesystem::path(m_s->discPath).filename().string(), 64);
-            const bool changeDisc = ready && !installing && !m_s->fromCopy && m_session.Running() != m_s->game.id;
-            const ui::ButtonOptions change{ .size = ui::Size::Small };
-            const float changeW = changeDisc ? ui::ButtonWidth(Tr("Change disc..."), change) : 0;
-            // The head: the overline and the file name (XXS between them), the button centred on the two; the body S below,
-            // its lines XS apart.
-            const ImVec2 top = ImGui::GetCursorScreenPos();
-            const float headH = ui::type::Caption + ui::space::XXS + ui::type::Label;
-            ui::PushText(ui::TextStyle::Caption, true);
-            ui::DrawText(ImGui::GetWindowDrawList(), top, ui::Col(ui::color::Dim), m_s->fromCopy ? Tr("GAME DATA:") : Tr("DISC IMAGE:"));
-            ui::PopText();
-            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + ui::type::Caption + ui::space::XXS));
-            ui::PushText(ui::TextStyle::Label, true);
-            const std::string shownFile = ui::Ellipsize(file.c_str(), blockW - 2 * ui::space::M - changeW - ui::space::S);
-            ui::PopText();
-            ui::Text(ui::TextStyle::Label, shownFile.c_str(), ui::color::Ink, -1, true);
-            if (!m_s->discPath.empty() && ImGui::IsItemHovered())
-                ui::Tooltip(m_s->discPath.c_str());
-            if (changeDisc)
-            {
-                ImGui::SetCursorScreenPos(ImVec2(top.x + blockW - 2 * ui::space::M - changeW, std::round(top.y + (headH - ui::height::Small) / 2)));
-                if (ui::Button(Tr("Change disc..."), change))
-                    Browse();
-            }
-            ImGui::SetCursorScreenPos(ImVec2(top.x, top.y + headH + ui::space::S));
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ui::space::XS, ui::space::XS));
-            switch (m_s->disc)
-            {
-            case DiscState::None:
-                break;
-            case DiscState::Verifying:
-                ui::StatusPill(ui::Status::Busy, (m_s->verify.Stage() + "...").c_str());
-                if (m_s->verify.progress >= 0.97f) // the last stage has no count: a sweep, not a bar that sits at 98 %
-                    ui::IndeterminateBar();
-                else
-                    ui::ProgressBar(m_s->verify.progress, -1, true);
-                break;
-            case DiscState::Ready:
-                ui::StatusPill(ui::Status::Success, (m_s->fromCopy ? Tf("Game data copied: {}", LauncherFormatSize(m_s->discSize))
-                                                                   : Tf("Disc verified: {}", LauncherFormatSize(m_s->discSize))).c_str());
-                if (!m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
-                    ui::StatusPill(ui::Status::Error, Tr("Game data damaged: using the disc image."));
-                if (NeedsInstall())
-                    ui::Text(ui::TextStyle::Body, Tf("Builds the game on your PC: about {} min, {} GB, internet needed once.", InstallMinutesFor(m_s->game.id), InstallGigabytes).c_str(), ui::color::InkSoft);
-                break;
-            case DiscState::Failed:
-                if (m_s->check.message.empty())
-                    ui::StatusPill(ui::Status::Error, state.text.c_str());
-                else
-                    ui::Text(ui::TextStyle::Body, m_s->check.message.c_str(), ui::color::Danger);
-                // The other supported game's disc: one button to use it there.
-                if (const GameInfo* other = FindEnabledGame(m_s->check.otherGame, m_config); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
+                const MainActionHit hit = DrawMainAction(ImVec2(left, buttonY), action);
+                if (m_testRunning)
                 {
-                    if (ui::Button(Tf("Use it for {}", other->name).c_str(), { .kind = ui::ButtonKind::Primary }))
-                        UseDiscForOtherGame();
+                    m_drawn["hero-main"] = std::string(action.label) + (action.enabled ? "" : " (off)");
+                    m_drawn["hero-show"] = showGame ? "shown" : "hidden";
                 }
-                break;
+                if (hit == MainActionHit::Settings)
+                    GoTo(Page::GameSettings);
+                else if (hit == MainActionHit::Main && !m_testHero)
+                {
+                    if (running) m_session.Stop(SDL_GetTicks());
+                    else if (!ready) Browse();
+                    else if (install || update) StartInstall();
+                    else PlayNow();
+                }
+                if (showGame)
+                {
+                    ImGui::SetCursorScreenPos(ImVec2(left + action.width + ui::space::S + ui::height::MainGear + ui::space::S, buttonY));
+                    if (ui::Button(Tr("Show the game"), { .size = ui::Size::Large, .overArt = true }) && !m_testHero)
+                        if (!m_session.Show()) Toast(Tr("Couldn't show the game window."), ui::ToastKind::Error);
+                }
             }
-            storage->SetFloat(heightKey, ImGui::GetCursorPosY() - ImGui::GetStyle().ItemSpacing.y + ui::space::M);
-            ImGui::PopStyleVar();
-            ui::EndCard();
         }
+        else
+            DrawInstall(ImVec2(left, position.y + margin), ImVec2(leftW, pillY - position.y - margin - ui::space::M));
 
-        // Over the art, top right: the play time and the achievements in one pill ("12 h 34 · trophy 6/38"), which opens the
-        // Achievements page once the disc check cached their list. The room on its left is kept for the sound's button.
-        if (!m_s->installView && m_progress.hasList)
-        {
-            const std::string count = fmt::format("{}/{}", m_progress.unlocked, m_progress.rows.size());
-            const bool played = m_progress.play.sessions > 0 || m_progress.play.totalSeconds > 0;
-            const std::string time = played ? FormatPlayTime(m_progress.play.totalSeconds) : std::string();
-            std::string tooltip = Tr("Achievements");
-            if (m_progress.play.lastEnd > 0)
-                tooltip += "\n" + Tf("Last played: {}", FormatLastPlayed(m_progress.play.lastEnd, int64_t(std::time(nullptr))));
-            ui::PillOptions progress;
-            progress.icon = ui::Icon::Trophy;
-            progress.prefix = played ? time.c_str() : nullptr;
-            progress.overArt = true;
-            progress.tooltip = tooltip.c_str();
-            const std::string id = count + "##progress";
-            ImGui::SetCursorScreenPos(ImVec2(end.x - ui::space::XL - ui::PillWidth(id.c_str(), progress), position.y + ui::space::XL));
-            if (ui::Pill(id.c_str(), progress))
-                GoTo(Page::Achievements);
-        }
-
-        // Bottom band: one row on the main action's middle line, centred in the band on whole points: the controller picker and
-        // the portal's state (two pills, as high), then the action button (the main action and the game's settings), S apart.
-        // While an update is offered, under the action: what it brings (the version, the download, the time), then Play without
-        // updating; the row and those lines are centred in the band together.
-        const ImVec2 bar(position.x, end.y), barEnd(end.x, position.y + available.y);
-        ui::GradientRect(draw, bar, barEnd, Rgb(BottomBarTop), Rgb(BottomBar), 0);
-        draw->AddLine(bar, ImVec2(barEnd.x, bar.y), ui::Col(ui::color::Ink, 0.1f), ui::stroke::Hairline);
-
-        const GameUpdate* pending = update && !installing && state.buttonEnabled ? PendingUpdate(*m_s) : nullptr;
-        std::string offer;
-        if (pending != nullptr)
-        {
-            std::string size;
-            if (KitNeedsFetch(*m_s))
-            {
-                const ReleaseInfo kit = m_updates.Snapshot().kit;
-                if (const ReleaseAsset* asset = FindAsset(kit, KitAssetName()); asset != nullptr && asset->size > 0)
-                    size = LauncherFormatSize(asset->size);
-            }
-            offer = size.empty() ? Tf("{} \xC2\xB7 ~{} min", pending->version, InstallMinutesFor(m_s->game.id))
-                                 : Tf("{} \xC2\xB7 {} \xC2\xB7 ~{} min", pending->version, size, InstallMinutesFor(m_s->game.id));
-        }
-        const ui::ButtonOptions without{ .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small, .overArt = true };
-        const float offerH = pending != nullptr ? ui::space::XS + ui::type::Caption + ui::space::XXS + ui::height::Small : 0;
-        const float buttonY = std::floor(bar.y + (BottomBarH - PlayButtonH - offerH) / 2), middle = buttonY + PlayButtonH / 2;
-
-        // The two pills: the device (a menu of the others above it), the portal (Launcher settings > Controls).
+        // These are the same device choices and portal settings as the previous page.
         const std::string device = CurrentDevice();
         const std::string deviceName = device == "auto" ? Tr("Automatic") : device == "keyboard" ? Tr("Keyboard") : LauncherMiddleEllipsis(DeviceLabel(), 13);
         const std::string pickerId = deviceName + "##controller";
@@ -1808,69 +1703,17 @@ namespace launcher_ui
         const float pickerW = std::min(ui::PillWidth(pickerId.c_str(), picker), ControllerW);
         picker.width = pickerW;
         const launcher_portal::Status portal = m_portal.Current();
-        const bool portalShown = !portal.Line().empty();
-        const std::string portalId = std::string(portal.connected ? Tr("Portal") : Tr("No portal")) + "##portal";
+        const std::string portalId = std::string(portal.connected ? Tr("Portal") : Tr("Virtual portal")) + "##portal";
         const std::string portalTip = portal.Line() + "\n" + Tr(strings::PortalTip);
         ui::PillOptions portalPill;
-        portalPill.icon = portal.connected ? ui::IconOf(ui::Status::Success) : ui::IconOf(ui::Status::Neutral);
-        portalPill.iconColor = ui::ColorOf(portal.connected ? ui::Status::Success : ui::Status::Neutral);
+        portalPill.icon = ui::IconOf(ui::Status::Success);
+        portalPill.iconColor = ui::ColorOf(ui::Status::Success);
+        portalPill.trailing = ui::Icon::ChevronDown;
         portalPill.overArt = true;
         portalPill.tooltip = portalTip.c_str();
-        // As wide in both states: the row doesn't move when a portal is plugged in.
-        portalPill.width = std::max(ui::PillWidth((std::string(Tr("Portal")) + "##w").c_str(), portalPill), ui::PillWidth((std::string(Tr("No portal")) + "##w").c_str(), portalPill));
-        const float gap = ui::space::S, portalW = portalShown ? portalPill.width + gap : 0;
-        const float groupW = pickerW + gap + portalW + PlayButtonW + PlayGearW;
-        const float groupX = std::floor(bar.x + (barEnd.x - bar.x - groupW) / 2);
-        const float mainX = groupX + pickerW + gap + portalW, pillY = std::floor(middle - ui::height::Small / 2);
-
-        const char* label = state.button.c_str();
-        if (m_testSidebar)
-            m_drawn["button"] = std::string(label) + (state.buttonEnabled ? "" : " (off)");
-        MainAction action{ label, state.buttonEnabled && !m_testButtonsOff };
-        if (installing)
-            action.progress = MakeInstallChecklist(InstallSnapshot(), SDL_GetTicks()).overall;
-        else if (verifying)
-        {
-            action.progress = m_s->verify.progress;
-            action.indeterminate = m_s->verify.progress >= 0.97f; // the last stage has no count: not a number stuck at 100 %
-        }
-        switch (DrawMainAction(ImVec2(mainX, buttonY), action))
-        {
-        case MainActionHit::Main:
-            if (!ready)
-                Browse();
-            else if (install || update)
-                StartInstall(); // which checks first that the image is still there; an update rebuilds the game
-            else
-                PlayNow();
-            break;
-        case MainActionHit::Settings:
-            GoTo(Page::GameSettings);
-            break;
-        case MainActionHit::None:
-            break;
-        }
-
-        // The update on offer under the action, centred on it: what it brings, then the quiet way round it.
-        if (pending != nullptr)
-        {
-            const float actionW = PlayButtonW + PlayGearW, centre = mainX + actionW / 2;
-            float y = buttonY + PlayButtonH + ui::space::XS;
-            ui::PushText(ui::TextStyle::Caption);
-            ui::DrawText(draw, ImVec2(std::round(centre - ImGui::CalcTextSize(offer.c_str()).x / 2), y), ui::Col(ui::color::InkSoft), offer.c_str());
-            ui::PopText();
-            y += ui::type::Caption + ui::space::XXS;
-            ImGui::SetCursorScreenPos(ImVec2(std::round(centre - ui::ButtonWidth(Tr("Play without updating"), without) / 2), y));
-            if (ui::Button(Tr("Play without updating"), without) || m_testPlayWithout)
-            {
-                m_testPlayWithout = false;
-                m_s->skipUpdate = true;
-            }
-        }
-
         // The controller picker: what the game listens to, a menu of the choices above it (the pad icon says what it picks, the
         // tooltip says it in words).
-        ImGui::SetCursorScreenPos(ImVec2(groupX, pillY));
+        ImGui::SetCursorScreenPos(ImVec2(left, pillY));
         if (ui::Pill(pickerId.c_str(), picker) || m_testControllers)
         {
             m_testControllers = false;
@@ -1892,9 +1735,8 @@ namespace launcher_ui
             ui::EndMenu();
         }
         // The portal's state, in a word and a shape: a real portal plugged in, or not (the game then has its virtual one).
-        if (portalShown)
         {
-            ImGui::SetCursorScreenPos(ImVec2(groupX + pickerW + gap, pillY));
+            ImGui::SetCursorScreenPos(ImVec2(left + pickerW + ui::space::S, pillY));
             if (ui::Pill(portalId.c_str(), portalPill))
             {
                 m_tab = SettingsTab::Controls;
@@ -1902,17 +1744,98 @@ namespace launcher_ui
             }
         }
 
-        // The pad's buttons for this page, when a pad is in use.
+        ImGui::SetCursorScreenPos(ImVec2(left, pillY + ui::height::Small + ui::space::M));
+        if (noDisc)
+            ui::Text(ui::TextStyle::Body, Tr("Or drop your .iso anywhere on this window. Your disc is read on this computer only."), ui::color::InkSoft, leftW);
+        else if (installing)
+            ui::Text(ui::TextStyle::Body, Tr("You can set up your portal while you wait."), ui::color::InkSoft, leftW);
+        else if (running)
+        {
+            ui::Text(ui::TextStyle::Body, Tr("Toy Box in the game: F6, or View + Y on a controller."), ui::color::InkSoft, leftW);
+            ImGui::SetCursorScreenPos(ImVec2(left, ImGui::GetCursorScreenPos().y));
+            ui::Text(ui::TextStyle::Caption, Tr("Close or switch to the game in its own window."), ui::color::Dim, leftW);
+        }
+        else if (!m_testHero && m_s->disc == DiscState::Failed)
+        {
+            ui::Text(ui::TextStyle::Caption, m_s->check.message.c_str(), ui::color::Danger, leftW);
+            ImGui::SetCursorScreenPos(ImVec2(left, ImGui::GetCursorScreenPos().y));
+            if (const GameInfo* other = FindEnabledGame(m_s->check.otherGame, m_config); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
+                if (ui::Button(Tf("Use it for {}", other->name).c_str(), { .kind = ui::ButtonKind::Primary }))
+                    UseDiscForOtherGame();
+        }
+        else if (update && !installing && state.buttonEnabled)
+        {
+            if (const GameUpdate* pending = PendingUpdate(*m_s))
+            {
+                std::string size;
+                if (KitNeedsFetch(*m_s))
+                {
+                    const ReleaseInfo kit = m_updates.Snapshot().kit;
+                    if (const ReleaseAsset* asset = FindAsset(kit, KitAssetName()); asset != nullptr && asset->size > 0)
+                        size = LauncherFormatSize(asset->size);
+                }
+                const std::string offer = size.empty() ? Tf("{} · ~{} min", pending->version, InstallMinutesFor(m_s->game.id))
+                    : Tf("{} · {} · ~{} min", pending->version, size, InstallMinutesFor(m_s->game.id));
+                ui::Text(ui::TextStyle::Caption, offer.c_str(), ui::color::InkSoft);
+            }
+            ImGui::SetCursorScreenPos(ImVec2(left, ImGui::GetCursorScreenPos().y));
+            if (ui::Button(Tr("Play without updating"), { .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small, .overArt = true }) || m_testPlayWithout)
+            {
+                m_testPlayWithout = false;
+                m_s->skipUpdate = true;
+            }
+        }
+
+        if (ready && !installing && !running && !m_s->fromCopy)
+        {
+            ImGui::SetCursorScreenPos(ImVec2(left, position.y + margin));
+            if (ui::Button(Tr("Change disc..."), { .kind = ui::ButtonKind::Ghost, .size = ui::Size::Small, .overArt = true }))
+                Browse();
+            ui::Tooltip(m_s->discPath.c_str());
+        }
+        if (ready && !installing && !running && install)
+        {
+            ImGui::SetCursorScreenPos(ImVec2(left, pillY + ui::height::Small + ui::space::M));
+            ui::Text(ui::TextStyle::Caption, Tf("Builds the game on your PC: about {} min, {} GB, internet needed once.",
+                InstallMinutesFor(m_s->game.id), InstallGigabytes).c_str(), ui::color::InkSoft, leftW);
+        }
+        if (ready && !m_s->fromCopy && m_s->copy.state == gamedata::State::Damaged)
+        {
+            ImGui::SetCursorScreenPos(ImVec2(left, position.y + margin + ui::height::Normal));
+            ui::StatusPill(ui::Status::Error, Tr("Game data damaged: using the disc image."));
+        }
+
+        m_heroNavigation.Column(1);
+        if (noDisc)
+            DrawHeroSteps(ImVec2(left + leftW + ui::space::L, foot - panelH), ImVec2(panelW, panelH));
+        else
+            m_s->collection->DrawHeroPortal(ImVec2(left + leftW + ui::space::L, foot - panelH), ImVec2(panelW, panelH), running);
+
+        m_heroNavigation.Column(0);
+        // Achievements keep their entry point over the painting.
+        if (!m_s->installView && m_progress.hasList)
+        {
+            const std::string count = fmt::format("{}/{}", m_progress.unlocked, m_progress.rows.size());
+            ui::PillOptions progress;
+            progress.icon = ui::Icon::Trophy;
+            progress.overArt = true;
+            progress.tooltip = Tr("Achievements");
+            const std::string id = count + "##progress";
+            ImGui::SetCursorScreenPos(ImVec2(position.x + available.x - margin - ui::PillWidth(id.c_str(), progress), position.y + margin));
+            if (ui::Pill(id.c_str(), progress)) GoTo(Page::Achievements);
+        }
         if (ui::Ctx().glyphs != ui::Glyphs::Keyboard)
         {
             const ui::PadHint hints[] = {
-                { ui::PadButton::South, "Enter", Tr("Play") },
+                { ui::PadButton::South, "Enter", Tr("Select") },
                 { ui::PadButton::North, nullptr, Tr("Game settings") },
                 { ui::PadButton::East, "Esc", Tr("Sidebar") },
             };
-            ImGui::SetCursorScreenPos(ImVec2(bar.x, barEnd.y - ui::height::Normal)); // the band's foot, edge to edge
-            ui::PadLegend(hints, ui::Ctx().glyphs, barEnd.x - bar.x);
+            ImGui::SetCursorScreenPos(ImVec2(position.x, position.y + available.y - ui::height::Normal));
+            ui::PadLegend(hints, ui::Ctx().glyphs, available.x);
         }
+        m_heroNavigation.End();
+        ui::Ctx().testNavigationItems = nullptr;
     }
 
     void App::DrawPortalStatus()
@@ -2317,7 +2240,7 @@ namespace launcher_ui
         frameIo.DisplayFramebufferScale = ImVec2(frameIo.DisplayFramebufferScale.x * m_uiScale, frameIo.DisplayFramebufferScale.y * m_uiScale);
         if (SDL_GetMouseFocus() == nullptr && !m_testSeatX) // the backend's outside-the-window position is in unscaled window units
             frameIo.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-        if (m_testNav || m_testSeatX || m_testPadInput)
+        if (m_testHero || m_testNav || m_testSeatX || m_testPadInput)
             frameIo.BackendFlags |= ImGuiBackendFlags_HasGamepad; // the test's pad keys count with no pad plugged in
         ImGui::NewFrame();
         // The components' context: the time, the focus ring in the shown game's colour on its pages, the pad family in use.
@@ -2411,7 +2334,7 @@ namespace launcher_ui
                 "45-nav-search-left", "46-nav-seat", "47-nav-choosing", "48-nav-card", "49-nav-placed", "50-nav-sheet",
                 "51-nav-back-to-play", "52-nav-settings-controls", "53-nav-settings-back" };
             static const char* const UninstallNames[] = { "01-settings", "02-list", "03-ticked", "04-confirm", "05-result" };
-            if (m_testExperimental || m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || m_testAchievements || m_testRunning ||
+            if (m_testExperimental || m_testHero || m_testButtons || m_testSidebar || m_testCopy || m_testLogo || m_testKeys || m_testPad || m_testAchievements || m_testRunning ||
                 m_testScreens != 0 || !m_testKit.empty())
                 Screenshot(m_testShot.c_str());
             else if (m_testUninstall)
@@ -2443,6 +2366,40 @@ namespace launcher_ui
             return;
         if (SDL_Surface* rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32))
         {
+            if (m_testHero && m_testStep < 8)
+            {
+                // Compare the clear upper sky in each art/no-art pair, not just the loaded texture's existence.
+                std::vector<uint8_t> samples;
+                const float sidebar = SidebarW / ImGui::GetIO().DisplaySize.x * rgba->w;
+                for (int y = 0; y < 6; y++)
+                    for (int x = 0; x < 6; x++)
+                    {
+                        int px = int(sidebar + (rgba->w - sidebar) * (0.4f + 0.08f * x));
+                        int py = int(rgba->h * (0.12f + 0.02f * y));
+                        const auto* pixel = static_cast<const uint8_t*>(rgba->pixels) + py * rgba->pitch + px * 4;
+                        samples.insert(samples.end(), pixel, pixel + 3);
+                    }
+                if (!m_testHeroNoArt)
+                    m_testHeroArtPixels = std::move(samples);
+                else
+                {
+                    int changed = 0;
+                    if (samples.size() == m_testHeroArtPixels.size())
+                        for (size_t i = 0; i < samples.size(); i += 3)
+                        {
+                            int difference = 0;
+                            for (size_t c = 0; c < 3; c++) difference += std::abs(int(samples[i + c]) - int(m_testHeroArtPixels[i + c]));
+                            if (difference > 24) changed++;
+                        }
+                    if (changed < 18)
+                    {
+                        fprintf(stderr, "FAIL hero background hidden: %d/36 sky samples differ\n", changed);
+                        m_testFailures++;
+                    }
+                    else
+                        fprintf(stderr, "hero background visible: %d/36 sky samples differ\n", changed);
+                }
+            }
             std::string path = m_shots + "/" + name + ".png";
             if (stbi_write_png(path.c_str(), rgba->w, rgba->h, 4, rgba->pixels, rgba->pitch))
                 fprintf(stderr, "launcher: shot %s\n", path.c_str());
@@ -3349,6 +3306,50 @@ namespace launcher_ui
             m_testShot = fmt::format("running-{}", name);
             m_testAt = now + 600;
         };
+        if (const char* mode = LauncherEnv("SKY_LAUNCHER_TEST_RUNNING"); mode != nullptr && std::string_view(mode) == "controls")
+        {
+            switch (m_testStep)
+            {
+            case 0:
+                m_startGames = true;
+                SelectGame(*FindGame("giants"));
+                SelectGame(*FindGame("ssa"));
+                ssa.disc = DiscState::Ready;
+                ssa.discPath = "--fake-game";
+                ssa.installed.runtime = LauncherEnv("SKY_LAUNCHER_RUNTIME");
+                ssa.installed.gameVersion = "99.0.0";
+                m_testBegan = now;
+                {
+                    std::string error;
+                    m_session.Start("ssa", { ssa.installed.runtime, {}, {} }, "--fake-game", error);
+                }
+                expect(m_session.Ours() && m_session.Running() == "ssa", "the fake game starts");
+                shoot("control-started");
+                return;
+            case 1:
+                if (now - m_testBegan > 10000)
+                {
+                    expect(false, "the fake game's ready file appears");
+                    m_running = false;
+                    return;
+                }
+                if (!std::filesystem::exists(LauncherEnv("SKY_FAKE_GAME_READY"))) return;
+                expect(m_drawn["sidebar:ssa"] == "Running" && m_drawn["hero-main"] == "Stop", "the sidebar runs and STOP is enabled");
+                expect(m_drawn["hero-show"] == "hidden", "a windowless process has no Show button");
+                expect(m_session.Stop(now), "STOP requests the owned process's end");
+                shoot("control-stopping");
+                return;
+            case 2:
+                if (m_session.Ours() && now - m_testBegan < 15000) return;
+                expect(m_session.Running().empty(), "the fake game stops");
+                expect(m_drawn["sidebar:ssa"] == "Ready to play" && m_drawn["hero-main"] == "PLAY", "the page and sidebar return to ready");
+                expect(SlotStatus(&giants).buttonEnabled, "other games can start again");
+                expect(!m_drawn.count("stopped"), "a requested stop has no crash dialog");
+                shoot("control-ready");
+                return;
+            default: m_running = false; return;
+            }
+        }
         switch (m_testStep)
         {
         case 0:
@@ -3445,6 +3446,11 @@ namespace launcher_ui
                 return;
             }
             m_testAt = now + 400;
+            return;
+        }
+        if (m_testHero)
+        {
+            TestHeroScript(now);
             return;
         }
         if (m_testInstall)
