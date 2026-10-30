@@ -59,7 +59,7 @@ Another edition is refused with a message. If you have one, tell us in an issue.
 
 1. Download Arkeyan Launcher from the [Releases page](https://github.com/mflr0/Skylauncher/releases):
    - **Windows:** `ArkeyanLauncher.exe`. If SmartScreen warns you, choose More info, then Run anyway.
-   - **Mac:** `ArkeyanLauncher-macOS.dmg`. The app is not notarized: the first time, right-click it and choose Open.
+   - **Mac:** `ArkeyanLauncher-macOS.dmg`. The app is not notarized: the first time, macOS blocks it; go to System Settings > Privacy & Security and choose Open Anyway (macOS 14 and earlier: right-click the app and choose Open). Apple Silicon only.
    - **Linux:** `ArkeyanLauncher-x86_64.AppImage`, after `chmod +x`.
 2. Drop your `.iso` on the window, or click the button to choose it. The disc is checked.
 3. Click **INSTALL**. The game is built from your disc. It takes 10 to 20 minutes depending on the game, and happens

@@ -84,9 +84,10 @@ jobs:
           submodules: recursive
       - name: Dependencies
         run: brew install ninja librsvg
-      - name: Build (Apple Silicon + Intel)
+      # Apple Silicon only, as the game kit: on an Intel Mac, macOS refuses the app instead of a failed install.
+      - name: Build (Apple Silicon)
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 ${VERSION:+"-DLAUNCHER_VERSION=${VERSION#v}"}
           cmake --build build --target ArkeyanLauncher
       - name: Icon, signature, .dmg and .zip
