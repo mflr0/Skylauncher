@@ -633,14 +633,20 @@ The portal column narrows from 400 to 264 points at small window sizes; longer n
   milestones, Cancel, Show details and settings. The milestones collect tools/disc, recompilation, shaders, and the
   remaining compile/link/movie/finish work. The detailed checklist and log, failure, retry and resume views remain
   available in the left column. The portal stays visible and usable throughout installation.
-- **Running**: Playing now, Stop, the Toy Box shortcut hint, and the live portal. Stop addresses only the PID started by
+- **Running**: a green dot and `Playing now · 0:42 this session` (also translated into French). The elapsed minutes and
+  seconds count from the successful process start on a monotonic clock, survive page changes, and reset after the game
+  ends. A game detected by its marker counts from its first observation in this launcher.
+  STOP has a filled square icon, a dark red tinted fill and a red outline. Show the game has a monitor icon; the two
+  actions sit side by side at the same Large height. There is no settings button in this row and no controller or portal
+  picker while running. The only hint is `Toy Box in the game: F6, or View + Y on a controller.`, fitted onto one line.
+  The portal panel keeps its existing behavior. Stop addresses only the PID started by
   this launcher: WM_CLOSE on Windows, SIGTERM (SDL's quit event) on macOS and Linux, then a forced end after five seconds.
   Polling keeps the page responsive, returns the page and sidebar to their ready states, and suppresses crash reporting
   for a requested stop. A game detected only by its marker cannot be stopped here.
   Show the game appears only when that PID has an activatable window: Windows' foreground window API, macOS'
   NSRunningApplication, or X11's `_NET_ACTIVE_WINDOW` with `_NET_WM_PID`. It is hidden on Wayland, with no window, and
   in builds without X11 headers or systems without Xlib or a supporting window manager. Screenshot fixtures present
-  both controls without starting a process.
+  both controls without starting a process; `SKY_LAUNCHER_TEST_HERO_WINDOW=0` hides Show in the fixture too.
 
 The build time, space and internet hint appears only before the game is built. The Ready display fixture has a built
 runtime, so it follows the same rule as an installed game.
@@ -1014,8 +1020,13 @@ Build with `ninja -j4 -C build ArkeyanLauncher ArkeyanLauncherTest FakeSkyBuild`
 ```sh
 python3 tests/hero_shots.py --disc /absolute/path/to/supported-game.iso
 ```
-The script sets `SKY_LAUNCHER_TEST_HERO=1` and `SKY_LAUNCHER_SHOTS` to `build/shots/hero/`, isolates every data folder in
-`build/scratch/hero/`, uses offscreen rendering and bounds the launcher to 150 seconds (only its own process can be stopped).
+The script sets `SKY_LAUNCHER_TEST_HERO=1` and `SKY_LAUNCHER_SHOTS` to `.scratch/shots/hero/`, isolates every data folder in
+`.scratch/hero/`, uses offscreen rendering and bounds the launcher to 150 seconds (only its own process can be stopped).
+`--scratch` and `--shots` select separate directories inside `.scratch/`; `--no-show` captures a running game without a
+window. Run at `--size 1024x720` and `--size 1600x900`, with and without `--no-show`, and with `--language fr` to check the
+translated row. Each running capture checks the action bounds, translated session status and navigation controls:
+the settings button and both pickers must be absent, and Show must match the fixture's window availability.
+Compare the Ready captures with the same size's previous captures to verify its layout remains unchanged.
 It writes `hero-<ready|needs-disc|installing|running>-<art|noart>.png`. The four states and two figures are in-memory display
 fixtures: no game, installer or figure writing runs. Disc verification and the existing art reader still run read-only
 against the supplied image; cache writes stay in scratch data. The no-art shots explicitly hide the hero art even if
@@ -1055,6 +1066,8 @@ and Swap Force's Game tab with Nightmare from the start on (`game-swapforce`).
 `SKY_LAUNCHER_TEST_UPDATE=1` with `SKY_LAUNCHER_UPDATE_URL=file://<fake latest.json>` shows the update screens (`20-` to `24-`).
 `ArkeyanLauncherTest --no-disc <absolute scratch dir>` runs only the checks that need no disc image (the unit parts; the build workflow runs it on
 the three systems); the full run is `ArkeyanLauncherTest <disc> <scratch dir>`.
+Its `SKY_LAUNCHER_TEST_RUNNING=controls` subprocess checks the live session timer, hidden window action, missing running
+pickers and gear, disabled STOP during a delayed clean stop, and the return to Ready, using only a windowless stand-in.
 `ArkeyanLauncherTest` removes its scratch folder at the end; `SKY_LAUNCHER_TEST_KEEP=1` keeps it with its screenshots.
 `SKY_LAUNCHER_TEST_INSTALL=real` runs the real kit. `private/shoot.sh <out dir> [VAR=value...]` is the wrapper used in this
 repository's working copy (its own HOME, the offscreen driver).

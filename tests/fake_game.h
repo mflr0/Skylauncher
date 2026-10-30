@@ -65,6 +65,7 @@ namespace fake_game
         DestroyWindow(window);
 #endif
         if (!ended) return 4;
+        if (mode != nullptr && std::strcmp(mode, "slow-close") == 0) SDL_Delay(1000);
         if (const char* ready = std::getenv("SKY_FAKE_GAME_READY")) std::ofstream(std::string(ready) + ".closed") << pid;
         return 0;
     }

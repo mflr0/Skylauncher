@@ -20,7 +20,7 @@ static void LauncherControlChecks(const std::filesystem::path& scratch)
         { "SKY_LAUNCHER_LOG_DIR", (root / "logs").string() }, { "SKY_LAUNCHER_NO_UPDATE_CHECK", "1" },
         { "SKY_LAUNCHER_RUNTIME", fake.string() }, { "SKY_LAUNCHER_SHOTS", (root / "shots").string() },
         { "SKY_LAUNCHER_TEST_RUNNING", "controls" }, { "SKY_LAUNCHER_TEST_DROP", "" },
-        { "SKY_FAKE_GAME_MODE", "clean" }, { "SKY_FAKE_GAME_READY", (root / "ready").string() }
+        { "SKY_FAKE_GAME_MODE", "slow-close" }, { "SKY_FAKE_GAME_READY", (root / "ready").string() }
     });
     SDL_IOStream* log = SDL_IOFromFile((root / "output.log").string().c_str(), "wb");
     const char* arguments[] = { SKYLAUNCHER_TEST_EXE, nullptr };
@@ -51,5 +51,5 @@ static void LauncherControlChecks(const std::filesystem::path& scratch)
     EXPECT(fs::exists(root / "ready.closed"));
     for (const char* name : { "started", "stopping", "ready" })
         EXPECT(fs::exists(root / "shots" / (std::string("running-control-") + name + ".png")));
-    printf("Game page: STOP enabled, unsupported Show hidden, page and sidebar ready after stopping, no crash dialog\n");
+    printf("Game page: session timer advances, STOP disables while stopping, unsupported Show hidden, no running pickers or gear, ready after stopping\n");
 }

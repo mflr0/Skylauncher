@@ -382,6 +382,8 @@ namespace ui
             case Icon::Triangle: return lucide::Triangle;
             case Icon::Trophy: return lucide::Trophy;
             case Icon::External: return lucide::ExternalLink;
+            case Icon::Stop:
+            case Icon::Monitor: break;
             }
             return 0;
         }
@@ -389,6 +391,22 @@ namespace ui
 
     void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 c, float size, ImU32 color)
     {
+        // Action symbols on the same 24-point grid as the font's icons.
+        const auto point = [&](float x, float y) {
+            return ImVec2(Snap(c.x + (x - 12) * size / 24), Snap(c.y + (y - 12) * size / 24));
+        };
+        if (icon == Icon::Stop)
+        {
+            draw->AddRectFilled(point(6, 6), point(18, 18), color, size / 24);
+            return;
+        }
+        if (icon == Icon::Monitor)
+        {
+            draw->AddRect(point(3, 3), point(21, 17), color, size / 12, 0, size / 12);
+            draw->AddLine(point(12, 17), point(12, 21), color, size / 12);
+            draw->AddLine(point(8, 21), point(16, 21), color, size / 12);
+            return;
+        }
         const unsigned glyph = Glyph(icon);
         if (glyph == 0 || g_context.fonts.icons == nullptr)
             return;

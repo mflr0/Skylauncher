@@ -518,6 +518,7 @@ namespace launcher_ui
         bool m_autoPlay = false; // --play: start the game as soon as it is ready (a desktop shortcut)
         bool m_startGames = false; // PLAY starts the game and the window stays (LauncherOptions)
         GameSession m_session;     // the game running: one at a time (game_run.h)
+        uint64_t m_sessionStart = 0; // SDL_GetTicks when the game started: the time on the game page
         std::string m_sessionIso;  // the disc image it was started with (the crash report names it)
         ProbeJob m_probe;
         launcher_portal::Watcher m_portal;

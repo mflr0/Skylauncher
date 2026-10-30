@@ -413,6 +413,39 @@ namespace launcher_ui
 
     App::MainActionHit App::DrawMainAction(ImVec2 at, const MainAction& action)
     {
+        if (action.danger)
+        {
+            ImGui::SetCursorScreenPos(at);
+            const ImVec2 end(at.x + action.width, at.y + ui::height::Large);
+            m_testMainAt = ImVec2((at.x + end.x) / 2, (at.y + end.y) / 2);
+            m_testGearAt = ImVec2(-1, -1);
+            ImGui::BeginDisabled(!action.enabled);
+            const bool pressed = ui::Hit("##main", ImVec2(action.width, ui::height::Large));
+            ui::State state = ui::ItemState(!action.enabled);
+            if (m_focusTo == FocusTo::Page && action.enabled)
+            {
+                ui::FocusLastItem(m_focusShow);
+                state.focused = m_focusShow;
+                m_focusTo = FocusTo::None;
+            }
+            ImDrawList* draw = ImGui::GetWindowDrawList();
+            const unsigned fill = state.pressed ? ui::color::DangerFillPressed
+                : state.hovered || state.focused ? ui::color::DangerFillHover : ui::color::DangerFill;
+            draw->AddRectFilled(at, end, ui::Col(fill, ui::DisabledAlpha), ui::radius::Control);
+            draw->AddRect(at, end, ui::Col(ui::color::Danger), ui::radius::Control, 0, ui::stroke::Edge);
+            const float lead = ui::icon::Normal + ui::space::S;
+            const float fontSize = ui::FitSize(ui::Ctx().fonts.title, ui::type::Title, action.label, action.width - 2 * ui::space::M - lead);
+            ImGui::PushFont(ui::Ctx().fonts.title, fontSize);
+            const float textW = ImGui::CalcTextSize(action.label).x;
+            const float x = m_testMainAt.x - (lead + textW) / 2;
+            const float mid = m_testMainAt.y + (state.pressed ? ui::stroke::Hairline : 0);
+            ui::DrawIcon(draw, action.icon, ImVec2(x + ui::icon::Normal / 2, mid), ui::icon::Normal, ui::Col(ui::color::Danger));
+            ui::DrawText(draw, ImVec2(x + lead, mid - ui::CapMiddle(ui::TextStyle::Title, false, fontSize)), ui::Col(ui::color::Danger), action.label);
+            ImGui::PopFont();
+            ui::FocusRingIf(state, ui::radius::Control);
+            ImGui::EndDisabled();
+            return pressed ? MainActionHit::Main : MainActionHit::None;
+        }
         // ui::MainAction (components/buttons.h) in the shown game's colours; it takes the page's focus when asked.
         ui::MainActionOptions options;
         options.label = action.label;
