@@ -438,6 +438,10 @@ namespace launcher_ui
                 return *slot;
         m_slots.push_back(std::make_unique<GameSlot>(game, *this));
         m_slots.back()->collection->SelectGame(game.id);
+        // Before its turn in the start-up checks the game reads as it will: a remembered disc is still to check, none is "Needs your disc".
+        GameSourcePick pick = PickGameSource(game, SettingGet(m_config, game.id, "iso"));
+        m_slots.back()->copy = pick.copy;
+        m_slots.back()->discQueued = !pick.path.empty();
         return *m_slots.back();
     }
 
@@ -1057,7 +1061,7 @@ namespace launcher_ui
     }
 
     // A game's state in a few words, for the sidebar and Home, and the label of the game page's main button: the one place
-    // that decides, read from the game's own slot (nullptr: not opened this session). The page's other lines (the disc's
+    // that decides, read from the game's own slot. The page's other lines (the disc's
     // status, the install card) say more about the same state. The table is in docs/launcher_ui.md.
     App::SlotLine App::SlotStatus(GameSlot* slot)
     {
@@ -1065,8 +1069,6 @@ namespace launcher_ui
         auto line = [](S state, const char* text, unsigned dot, const char* button, bool enabled = true, float progress = -1) {
             return SlotLine{ text, dot, progress, state, button, enabled };
         };
-        if (slot == nullptr)
-            return line(S::Closed, Tr("Open"), Accent, Tr(strings::ChooseDisc));
         // One game at a time: the one running says so; the others' buttons wait for it (Running, after the rest).
         const std::string& running = m_session.Running();
         if (running == slot->game.id)
@@ -1100,7 +1102,7 @@ namespace launcher_ui
             result.text = std::string(verb) + " " + ui::FormatPercent(std::clamp(list.overall, 0.0f, 1.0f));
             return result;
         }
-        if (slot->disc == DiscState::Verifying)
+        if (slot->disc == DiscState::Verifying || (!slot->started && slot->discQueued))
             return line(S::Checking, Tr("Checking your disc"), Accent, Tr("CHECKING..."), false, -1);
         if (slot->disc == DiscState::None)
         {
@@ -1143,7 +1145,6 @@ namespace launcher_ui
         using S = SlotState;
         switch (state)
         {
-        case S::Closed: return ui::Status::Neutral;
         case S::Checking: case S::DownloadingTools: case S::Installing: case S::Updating: case S::Finishing: return ui::Status::Busy;
         case S::NoDisc: case S::Interrupted: case S::ReadyToInstall: case S::UpdateAvailable: return ui::Status::Info;
         case S::Ready: case S::Running: return ui::Status::Success;
@@ -1241,20 +1242,17 @@ namespace launcher_ui
         std::vector<const LauncherGameEntry*> later;
         for (const LauncherGameEntry& entry : LauncherGameCatalog())
         {
-            if (!entry.enabled)
+            if (!entry.enabled || FindGame(entry.id) == nullptr)
             {
                 later.push_back(&entry);
                 continue;
             }
             ImGui::PushID(entry.id);
-            // The game already opened this session has its slot: its icon and disc state show here, not just the shown one's.
-            GameSlot* slot = nullptr;
-            for (const auto& opened : m_slots)
-                if (std::string_view(opened->game.id) == entry.id)
-                    slot = opened.get();
+            // Every game has its slot: its icon and disc state show here, not just the shown one's.
+            GameSlot* slot = &SlotFor(*FindGame(entry.id));
             // Selected only once the player has picked it: Play is that game's page.
             const bool selected = (m_page == Page::Play || m_page == Page::GameSettings || m_page == Page::Achievements) && std::string_view(entry.id) == m_s->game.id;
-            const std::string version = slot != nullptr ? GameVersion(*slot) : std::string();
+            const std::string version = GameVersion(*slot);
             SlotLine line = SlotStatus(slot);
             const ui::Status status = StatusOf(line.state);
             // Fits the column at the smallest window too: the row cuts its lines with "..." rather than run over the edge.
@@ -1415,7 +1413,7 @@ namespace launcher_ui
         // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
         std::vector<const LauncherGameEntry*> playable, later;
         for (const LauncherGameEntry& entry : LauncherGameCatalog())
-            (entry.enabled ? playable : later).push_back(&entry);
+            (entry.enabled && FindGame(entry.id) != nullptr ? playable : later).push_back(&entry);
         const float gap = ui::space::L;
         const float cardW = (width - gap * float(playable.size() - 1)) / float(std::max<size_t>(playable.size(), 1));
         const float below = ui::space::XL + ui::SizeOf(ui::TextStyle::Caption) + 3 * ui::height::Normal; // the coming-later row and the links
@@ -1483,10 +1481,7 @@ namespace launcher_ui
                 draw->AddText(ImVec2(at.x + (cardW - text.x) / 2, logoTop + (logoH - text.y) / 2), ui::Col(ui::color::Ink), word);
                 ImGui::PopFont();
             }
-            GameSlot* slot = nullptr;
-            for (const auto& opened : m_slots)
-                if (std::string_view(opened->game.id) == entry.id)
-                    slot = opened.get();
+            GameSlot* slot = &SlotFor(*FindGame(entry.id));
             const SlotLine line = SlotStatus(slot);
             // The full name, at the row's size, and under it (XS) the state in a word and a shape; the card's padding (L) at
             // the left and the foot.

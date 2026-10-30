@@ -174,7 +174,7 @@ namespace launcher_ui
     // Everything a game can be in, read from its slot by App::SlotStatus: the one place that decides (docs/launcher_ui.md).
     enum class SlotState
     {
-        Closed, NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame, DataDamaged,
+        NoDisc, Checking, DiscGone, DiscUnreadable, DiscWrong, DiscUnknown, DiscNotGame, DataDamaged,
         DownloadingTools, Installing, Updating, Finishing, Failed, Interrupted, ReadyToInstall, UpdateAvailable, Ready, Running
     };
     // The shape and colour that say a game's state: never the colour alone (the sidebar, Home's cards, the page). IconOf: the
@@ -213,6 +213,7 @@ namespace launcher_ui
         GameSlot(const GameInfo& info, App& app) : game(info), collection(std::make_unique<CollectionPage>(app)) {}
         const GameInfo& game;
         bool started = false; // its remembered disc has been sent to the check
+        bool discQueued = false; // it has a remembered disc, not checked yet (its line says so)
         std::string chosen;
         std::string chosenRuntime; // the game built for the chosen disc, if any
         DiscState disc = DiscState::None;
@@ -270,13 +271,13 @@ namespace launcher_ui
         const std::string& ChosenRuntime() const { return m_s->chosenRuntime; }
         int TestFailures() const { return m_testFailures; } // SKY_LAUNCHER_TEST_SWITCH: the checks that failed
         // What a game is doing, in a few words, for the sidebar and Home: the same state the game page draws, read from
-        // the game's own slot (nullptr: not opened this session). `progress` is 0..1 while it installs or updates.
+        // the game's own slot. `progress` is 0..1 while it installs or updates.
         struct SlotLine
         {
             std::string text;
             unsigned dot;
             float progress = -1;
-            SlotState state = SlotState::Closed;
+            SlotState state = SlotState::NoDisc;
             std::string button;        // the game page's main button: its label
             bool buttonEnabled = true; // and whether it can be pressed
         };
@@ -391,7 +392,7 @@ namespace launcher_ui
         // The game page's logo inside `size` at `at`, falling in on arrival (LogoDrop), with its shadow.
         void DrawHeroLogo(ImDrawList* draw, const ArtTexture& logo, ImVec2 at, ImVec2 size);
         // A game's cached picture (its logo, cropped; its background), at most `maxWidth` pixels wide, loaded once; nullptr
-        // before the game's disc was ever read. The sidebar and Home use them for games not opened this session too.
+        // before the game's disc was ever read. The sidebar and Home use them for games not yet shown too.
         const ArtTexture* CachedArt(const char* game, LauncherAssets::Role role, int maxWidth);
         void ForgetCachedArt(const char* game); // its disc was read again
         bool ReduceMotion() const;

@@ -636,12 +636,11 @@ disagree; the page's other lines (the disc's status, the install card, the game 
 `DiscState` / install state. In this order (the first that applies):
 | State | Sidebar and Home line | Icon | Main button |
 |---|---|---|---|
-| not checked yet (its turn in the start-up checks has not come; a screenshot script's games) | Open | a dashed circle, grey | CHOOSE DISC |
 | the kit being downloaded (the first step of an install or an update) | `Downloading tools 42 %` | the turning loader, blue | INSTALLING... (off) |
 | installing; its last step | `Installing 42 %`; `Finishing 97 %` | the turning loader, blue | INSTALLING... (off) |
 | updating a build; its last step | `Updating 42 %`; `Finishing 97 %` | the turning loader, blue | UPDATING... (off) |
-| the disc being checked | Checking your disc | the turning loader, blue | CHECKING... (off) |
-| no disc chosen | Needs your disc | a disc, blue | CHOOSE DISC |
+| the disc being checked; a remembered disc whose turn in the start-up checks has not come | Checking your disc | the turning loader, blue | CHECKING... (off) |
+| no disc chosen (a game never shown reads this too, from `launcher.ini`) | Needs your disc | a disc, blue | CHOOSE DISC |
 | the image moved or its drive gone | Disc not found | a crossed circle, red | CHOOSE DISC |
 | the image can't be read | Can't read the disc | a crossed circle, red | CHOOSE DISC |
 | another game's disc | Wrong disc | a crossed circle, red | CHOOSE DISC |
