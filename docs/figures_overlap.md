@@ -22,7 +22,7 @@ same jobs.
 2. **Locks.** Skylauncher writes and reads `<dump>.lock` as a bare process id; the game now writes JSON
    (`{ "game", "pid", "since" }`). Skylauncher's `IsLocked` reads no number from it and treats the figure as free,
    so it could rewrite a figure the game holds.
-3. **Favourites.** Skylauncher: `[collection] favourites=` in `launcher.ini`. Library: `collection.json`.
+3. **Favorites.** Skylauncher: `[collection] favourites=` in `launcher.ini`. Library: `collection.json`.
 4. **Backups.** Both use `backups/<...>/<date>.sky`, but the folder is the file's stem here
    (`backups/014 Gill Grunt/`) and the full file name there (`backups/014 Gill Grunt.sky/`), with different date formats.
 5. **Catalogue.** Skylauncher knows Spyro's Adventure's toys only; the library knows six games and the variants.

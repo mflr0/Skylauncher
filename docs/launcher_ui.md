@@ -44,7 +44,7 @@ component has becomes a component (or an option of one) first, with its states d
 - `src/shared/collection/` and `src/shared/figures/` - SSARecomp's collection library (copied by `tools/sync_collection.sh`:
   tag, crypto, catalogue, folder, locks, backups) and the launcher's `figure_icons` (generated icons and their `IconStyle`).
 - `lib/` - third-party code (SDL, Dear ImGui, XenonRecomp as submodules; stb and miniz vendored).
-- `resources/fonts/` - licensed fonts (Bungee, Outfit) with their OFL licences; they are also built into the executable.
+- `resources/fonts/` - licensed fonts (Bungee, Outfit) with their OFL licenses; they are also built into the executable.
 - `docs/settings.md` - the settings file the launcher writes and the game reads.
 
 ## Tokens
@@ -492,7 +492,7 @@ pad legend closes the page while a pad is in use. The list that follows is what 
 - Shelf: badges are `ui::DrawBadge` already; stars `Icon::Star`; P1 / P2 Badges; "No figure matches" and the empty
   collection EmptyStates with their action; "Not for {}" a SectionHeader.
 - Figure sheet (`BeginPopupModal` 680x520, Close in its footer): a Modal (Large) with its cross; Put on the portal, Edit,
-  Favourite a Button row, "..." a Menu; the XP bar a ProgressBar; Details a SectionHeader; its dates (`ShortDate`, "UTC")
+  Favorite a Button row, "..." a Menu; the XP bar a ProgressBar; Details a SectionHeader; its dates (`ShortDate`, "UTC")
   `ui::FormatWhen(ui::ParseIsoUtc(...))`.
 - Edit: `LevelSlider` is `ui::Slider`; name, gold, nickname TextFields; Reset and Delete Danger `hold` Buttons.
 - Add a figure: the catalogue search a SearchField; its list ListRows (`selected`); versions Radios or ListRows; the Name field a
@@ -866,10 +866,10 @@ the one standard COM call (`#ifdef _WIN32`, checked to compile with MinGW) and n
 `--play` starts it once its disc is checked and it is built. Anything else is ignored with a line on stderr.
 
 ## Collection
-See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favourites, backups
+See `docs/collection_ui.md`: the page shows SSARecomp's shared collection (the game's folder, locks, favorites, backups
 and six-game catalogue) with the Toy Box's model: the portal at the next start (the game's seats on top), the bar
-(the search field and Filters: Element, Game, Type, Sort by; the tags), the shelf (every figure once, favourites first), the figure sheet (Put on the portal, Edit,
-Favourite, `...`, Details), Add a figure and Manage. The icons are the shown game's portraits from its disc, else the
+(the search field and Filters: Element, Game, Type, Sort by; the tags), the shelf (every figure once, favorites first), the figure sheet (Put on the portal, Edit,
+Favorite, `...`, Details), Add a figure and Manage. The icons are the shown game's portraits from its disc, else the
 other game's, else the toy's family picture, else the generated ones (`figures::IconStyle`): "Disc art" below.
 
 ## Disc art

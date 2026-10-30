@@ -1652,7 +1652,7 @@ namespace collection
         {
         case GroupBy::Smart:
         {
-            // The shelf: every figure once. Favourites first, then the figures this game took (newest first), then the
+            // The shelf: every figure once. Favorites first, then the figures this game took (newest first), then the
             // rest by element (the menus' order) and category; a character's variants next to it.
             auto rank = [&](size_t i) {
                 const Toy* toy = list[i].toy;

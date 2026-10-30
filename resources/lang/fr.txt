@@ -186,7 +186,7 @@ INSTALLING...	INSTALLATION...
 The install stops and can resume later.	L'installation s'arrête ; vous pourrez la reprendre.
 Builds the game on your PC: about {} min, {} GB, internet needed once.	Construit le jeu sur votre PC : environ {} min, {} Go, internet requis une fois.
 Install failed	Échec de l'installation
-Installation cancelled	Installation annulée
+Installation canceled	Installation annulée
 Installing	Installation
 Installing Arkeyan Launcher	Installation d'Arkeyan Launcher
 Interrupted	Interrompue
@@ -199,7 +199,7 @@ Language	Langue
 Last checked {}	Dernière vérification : {}
 Later	Plus tard
 Launcher	Launcher
-Licences	Licences
+Licenses	Licences
 Linking the game	Assemblage du jeu
 Log copied	Journal copié
 Looking for the disc image	Recherche de l'image disque
@@ -482,12 +482,12 @@ Tidy · {}	Ranger · {}
 Trash · {}	Corbeille · {}
 Unknown toys · {}	Jouets inconnus · {}
  · {} already there	 · {} déjà présent(s)
- · {} favourite	 · {} favori
- · {} favourites	 · {} favoris
+ · {} favorite	 · {} favori
+ · {} favorites	 · {} favoris
  · {} not a figure	 · {} qui n'est pas une figurine
  · {} unknown toy (Manage)	 · {} jouet inconnu (Gérer)
  · {} unknown toys (Manage)	 · {} jouets inconnus (Gérer)
-Add to favourites	Ajouter aux favoris
+Add to favorites	Ajouter aux favoris
 Adventure	Aventure
 Adventure Packs	Packs d'aventure
 Air	Air
@@ -544,7 +544,7 @@ Export everything...	Tout exporter...
 Export the figures to	Exporter les figurines vers
 Exported {} figure to {}	{} figurine exportée vers {}
 Exported {} figures to {}	{} figurines exportées vers {}
-Favourite	Favori
+Favorite	Favori
 Figure dumps (.sky, .bin, .dmp)	Dumps de figurines (.sky, .bin, .dmp)
 File	Fichier
 created	créée
@@ -618,7 +618,7 @@ Reset to new...	Remettre à neuf...
 Reset {} to new? Level, gold and upgrades are lost.	Remettre {} à neuf ? Niveau, or et améliorations seront perdus.
 Save	Enregistrer
 Saved	Enregistré
-Search the catalogue	Rechercher dans le catalogue
+Search the catalog	Rechercher dans le catalogue
 Senseis	Senseis
 Series	Séries
 Show the collection folder	Afficher le dossier de la collection
@@ -638,7 +638,7 @@ Not available for this game yet	Pas encore disponible pour ce jeu
 Tidy the starters	Ranger les figurines de départ
 Toy	Jouet
 Toy type {}	Jouet de type {}
-Not in the catalogue. Name one to show it.	Absents du catalogue. Nommez-en un pour l'afficher.
+Not in the catalog. Name one to show it.	Absents du catalogue. Nommez-en un pour l'afficher.
 Trap	Piège
 Trap Masters	Maîtres des pièges
 Trap shape	Forme de piège

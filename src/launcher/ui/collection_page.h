@@ -1,6 +1,6 @@
 #pragma once
 
-// The Collection page: the portal at the next start (the seats of the chosen game), the bar (search, Filters), the shelf (every figure once, favourites first), the figure sheet, Add a figure and Manage
+// The Collection page: the portal at the next start (the seats of the chosen game), the bar (search, Filters), the shelf (every figure once, favorites first), the figure sheet, Add a figure and Manage
 // (docs/collection_ui.md). The figures are the shared collection's (SSARecomp's library); the
 // look is the launcher's. Drawn by App's widgets (a friend), in collection_page.cpp, collection_figure.cpp,
 // collection_add.cpp and collection_manage.cpp.

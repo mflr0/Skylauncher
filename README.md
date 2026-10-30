@@ -167,7 +167,7 @@ levels one by one. Before a release, the Windows and Linux builds of every game 
 
 The reverse engineering is the author's own work; AI tools assist with the reimplementation and run these tests.
 
-## Credits and licence
+## Credits and license
 
 Made by mflr0, designed by dorydev.
 
@@ -175,7 +175,7 @@ The ports are built with [XenonRecomp](https://github.com/hedge-dev/XenonRecomp)
 [XenosRecomp](https://github.com/hedge-dev/XenosRecomp) (hedge-dev), [plume](https://github.com/renderbag/plume)
 (renderbag) and SDL 3, and adapt parts of [Xenia](https://github.com/xenia-project/xenia). Thank you to all of them.
 
-MIT licence, see `LICENSE`. The third-party components are listed in `THIRD_PARTY_NOTICES.md`.
+MIT license, see `LICENSE`. The third-party components are listed in `THIRD_PARTY_NOTICES.md`.
 
 Skylanders is a trademark of Activision. This project is not affiliated with or endorsed by Activision. You need your
 own copy of the game.

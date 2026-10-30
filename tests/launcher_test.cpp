@@ -302,7 +302,7 @@ namespace
         EXPECT(collection::Restore(gill, backup) && collection::Read(gill, figure) && figure.stats.gold == 1234);
         EXPECT(collection::ResetToNew(gill) && collection::Read(gill, figure) && figure.state == figures::AreaState::Blank);
 
-        // The folder's other jobs: label, favourite, duplicate, trash, import.
+        // The folder's other jobs: label, favorite, duplicate, trash, import.
         EXPECT(collection::SetLabel(gill, "Splash's") && collection::SetFavourite(gill, true));
         EXPECT(collection::Read(gill, figure) && figure.label == "Splash's" && figure.favourite && figure.DisplayName() == "Splash's");
         std::string copy = collection::Duplicate(gill);
@@ -406,7 +406,7 @@ namespace
         SDL_Delay(30);
         EXPECT(model.Poll(4000000, 0) && model.Find(gill)->level == 10);
 
-        // The shelf (docs/collection_ui.md): every figure once, the favourites first; choosing for a seat shows only what
+        // The shelf (docs/collection_ui.md): every figure once, the favorites first; choosing for a seat shows only what
         // goes there and the game reads; the bar's filters and search. The card's level is the Toy Box's.
         {
             std::vector<collection::Figure> shown;
@@ -477,7 +477,7 @@ namespace
                 launcher_ui::SessionFile(*catalogue.FindGame("trap_team")).empty());
         }
 
-        // The launcher's own earlier state moves over: favourites and "starts on the portal", by name.
+        // The launcher's own earlier state moves over: favorites and "starts on the portal", by name.
         fs::remove(session);
         std::vector<std::string> moved = launcher_ui::MoveLauncherSettings(ssa, legacy.string(), { "016 Spyro.sky" }, { "200 Anvil Rain.sky", "014 Gill Grunt.sky", "new:5" });
         EXPECT(moved.size() == 4 && moved[0] == gill && moved[2] == anvil);

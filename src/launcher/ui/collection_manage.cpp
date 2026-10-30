@@ -248,7 +248,7 @@ namespace launcher_ui
 
     void CollectionPage::DrawUnknown()
     {
-        ui::Text(ui::TextStyle::Caption, Tr("Not in the catalogue. Name one to show it."), ui::color::Dim);
+        ui::Text(ui::TextStyle::Caption, Tr("Not in the catalog. Name one to show it."), ui::color::Dim);
         bool any = false;
         if (ui::BeginSettings("##unknown"))
         {

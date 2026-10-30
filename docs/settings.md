@@ -52,8 +52,8 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `portal` | `mode` | `auto` (default), `emulated` (Virtual), `real` (`hid` and `usb` still work) | Portal of Power backend | yes (`SKY_PORTAL`) |
 | `portal` | `toybox_auto_open` | `1` (default), `0` | The Toy Box opens by itself when the game asks for a figure | no: the game reads `launcher.ini` itself (Settings > Controls > Portal of Power) |
 | `portal` | `place` | figure file names, comma separated | Figures put on the emulated portal at start | yes (`SKY_PORTAL_PLACE`) |
-| `collection` | `favourites` | figure file names, comma separated | Old favourites; moved once into the shared collection's `collection.json` | read once (see `collection_ui.md`) |
-| `collection` | `moved` | `1` | Set once the old favourites and `[portal] place` were moved | launcher only |
+| `collection` | `favourites` | figure file names, comma separated | Old favorites; moved once into the shared collection's `collection.json` | read once (see `collection_ui.md`) |
+| `collection` | `moved` | `1` | Set once the old favorites and `[portal] place` were moved | launcher only |
 
 Removing the settings: Settings > Launcher > Uninstall everything deletes `launcher.ini` with everything else (`docs/install.md`, "Uninstall everything");
 the launcher then writes no settings until it is started again.
@@ -173,7 +173,7 @@ On the French pad names, the Back button reads "Retour" (the Xbox 360 French nam
 ## Figures
 
 The launcher and the game share one collection folder (`collection::Folder()`: `Skylanders/Collection` in the user's data
-folder, or `SKY_COLLECTION`), with `collection.json` (labels, favourites, views, trash), `<dump>.lock` (JSON written by
+folder, or `SKY_COLLECTION`), with `collection.json` (labels, favorites, views, trash), `<dump>.lock` (JSON written by
 the game while a figure is on its portal), `backups/` and `trash/`. `docs/collection_ui.md` describes the page; the
 format is SSARecomp's `docs/collection.md`. The old `figures` folder next to `launcher.ini` is copied in once, never
 changed.

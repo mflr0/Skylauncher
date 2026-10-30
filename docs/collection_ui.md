@@ -2,7 +2,7 @@
 
 The launcher shows the same figures as the game and the Toy Box: SSARecomp's collection library (option A of
 `figures_overlap.md`, now done). **One model for both apps** (SSARecomp's `docs/runtime/host/toybox_ux.md`, the
-2026-10-26 redesign): the portal's seats on top, the shelf below (every figure once, favourites first), the same cards
+2026-10-26 redesign): the portal's seats on top, the shelf below (every figure once, favorites first), the same cards
 and words, a sheet with three main actions. The look is dorydev's: her colours, fonts and widgets are untouched
 (`launcher_theme.h`).
 
@@ -41,7 +41,7 @@ A Swap Force swapper is two toys, a top and a bottom, each its own dump. The lib
 `collection::Cards`, `CardName`, `CardLevelText`, `CreateSwapper`, `Pair`, `ChangeHalf`) and the page shows the pair as
 **one card** everywhere: the shelf, the seat tile, the sheet, Add a figure and the search.
 - **The card**: the swapper's picture, then its name ("Doom Stone", "Magna Jet" for a top and a bottom of two different
-  swappers, as the game names them: `collection::CardName`, or the label the player gave), the top's level and favourite
+  swappers, as the game names them: `collection::CardName`, or the label the player gave), the top's level and favorite
   star, one seat badge. A half on its own (no partner) is a card of its own. A search or a filter that lets one half
   through brings the whole card.
 - **The picture** is the game's swap screen: the top's artwork joined to the bottom's at the waist, the
@@ -59,7 +59,7 @@ A Swap Force swapper is two toys, a top and a bottom, each its own dump. The lib
   bottom** and **Change the top**: a list of the other halves (one row each, those on a seat or in use left out, "Now with
   Blast Zone" or "On its own" under each); the card keeps one half and takes the one chosen, and a swapper that lost it is
   given the old one, so no card disappears. A card on a seat stays there, written again for the new half. A half on its own
-  offers the change that finds it a partner. Edit, Reset, Back up and the favourite act on the top.
+  offers the change that finds it a partner. Edit, Reset, Back up and the favorite act on the top.
 - **Delete** (hold) sends both halves to the trash and takes the card off its seat; a half on its own deletes alone. Duplicate
   copies both halves, linked. A swapper is in use when either half is held by a running game: the whole card is read-only.
   Export and the other Manage actions work on dumps, so they carry both halves.
@@ -74,8 +74,8 @@ At the first visit to the page (`CollectionPage::Open`):
 1. `collection::Migrate(collection::LegacyFolder())` **copies** the old `<SSARecomp prefs>/figures` dumps into the
    collection; originals are never moved, changed or deleted, a second pass copies nothing. The game does the same at
    its start, so either side may go first.
-2. The launcher's own earlier state moves once (`[collection] moved=1` in `launcher.ini` records it): favourites
-   (`[collection] favourites`, file names) become `collection.json` favourites on the copies; the figures that
+2. The launcher's own earlier state moves once (`[collection] moved=1` in `launcher.ini` records it): favorites
+   (`[collection] favourites`, file names) become `collection.json` favorites on the copies; the figures that
    started on the portal (`[portal] place`) become the next session's seats; `[portal] place` is then emptied, because
    `SKY_PORTAL_PLACE` overrides the session file at the game's start. The old keys are left in `launcher.ini` otherwise.
 3. The never-played starters the game made on its own (37 of them, one per character) are not the player's: My
@@ -106,7 +106,7 @@ At the first visit to the page (`CollectionPage::Open`):
   (`Icon::Cross`, tooltip "Take it off") at the corner.
 - **Live**: figures a game holds (JSON lock of a live process) read "Playing now"; while the shown game runs a status pill
   "Spyro's Adventure is running: use its Toy Box" follows the game's Select above the seats, the seats are
-  read-only and Edit, Reset, Delete are disabled for those figures (favourites and names stay editable). "Mark as not in
+  read-only and Edit, Reset, Delete are disabled for those figures (favorites and names stay editable). "Mark as not in
   use" (held) breaks a stale lock.
 - Refresh: every 1.5 s the model compares a signature of the folder (names, sizes, times of dumps, locks,
   `collection.json`, the session file) and whether each lock's process still runs; any change reloads the shelf. The
@@ -119,7 +119,7 @@ At the first visit to the page (`CollectionPage::Open`):
   state ("Portal: not detected") beside it, `+ Add a figure` (Primary) and **Manage** (a Secondary button with a chevron,
   its menu right-aligned under it: Trash, Backups, Import and export, Unknown toys, Tidy the starters: Manage on that tab;
   Show the collection folder); the buttons have the line to themselves. Under the title, a Caption: "14 figures · 3
-  favourites". L below: "On the portal for [Spyro's Adventure]" (the game the seats are for), S below it the seats, then
+  favorites". L below: "On the portal for [Spyro's Adventure]" (the game the seats are for), S below it the seats, then
   the bar.
 - **The seats** (above).
 - **The bar** (2026-10-27, the Toy Box's too, same words and order; `docs/runtime/host/toybox_ux.md` of the game's repo
@@ -136,10 +136,10 @@ At the first visit to the page (`CollectionPage::Open`):
   "objet", "adventure", "mini", "swapper"), a version ("legendary", "lightcore"), "level 10" / "niveau 10"; case and
   accents do not matter, English and French both always work, and one typo is tolerated in a word of 5 letters or more
   ("giatns"). A swapper is found by either half and stays one card.
-- **Sort** (the Select of the bar): Recent (the default: favourites first, then what the game took, then by element), Name, Level (highest
-  first), Element, Game. The other four ignore favourites. `ShelfFilter::sort`.
+- **Sort** (the Select of the bar): Recent (the default: favorites first, then what the game took, then by element), Name, Level (highest
+  first), Element, Game. The other four ignore favorites. `ShelfFilter::sort`.
 - **The shelf** (`CollectionModel::Shelf`, `collection::Group` Smart for the portal's game): every figure once,
-  favourites first, then the ones that game took (newest first), then by element; "Unknown toys" and "Not for
+  favorites first, then the ones that game took (newest first), then by element; "Unknown toys" and "Not for
   Spyro's Adventure" (greyed: they can't go on this portal) after it. The untouched starters the game made on its own
   are left out (Manage > Tidy). A card: the picture, the name (the label, else the toy's name with the game's nickname:
   "Gill Grunt (Splash)"), the level line for the portal's game, the star, the variant's name, P1/P2/"On" for the seats.
@@ -148,7 +148,7 @@ At the first visit to the page (`CollectionPage::Open`):
   type, in a Modal (Large, titled with the figure's name, the cross at the top right; B and Escape close it); the version,
   where it sits (a status pill "On Player 1 at the next start of Spyro's Adventure") or which game holds it (a warning
   pill); **three actions** in a row: **Put on the portal** (Secondary with a chevron; a menu of the seats: "(replaces
-  Bash)", a check on its own seat, disabled where it doesn't fit; Take it off), **Edit**, **Favourite** (a star), and a
+  Bash)", a check on its own seat, disabled where it doesn't fit; Take it off), **Edit**, **Favorite** (a star), and a
   "More actions" icon: On the wheel, Duplicate, Back up now, Restore a backup... (opens Manage > Backups on this figure),
   Show in folder, then Reset to new... and Delete... (red menu rows: a danger dialog asks first, the focus on Cancel;
   backed up first; Delete goes to the trash); "Level 10 (15)" with a ProgressBar to the next level, gold and play time,
@@ -211,7 +211,7 @@ At the first visit to the page (`CollectionPage::Open`):
 - `ArkeyanLauncherTest` (`CollectionChecks`): library, migration (originals intact, second pass copies none), stats,
   backups, restore, reset, duplicate, trash, import dedupe, JSON locks (live, stale), seats and `portal.txt`, live
   refresh, settings move, unknown toy naming, icons for every catalogue toy (and the family's mark on items and packs),
-  **the shelf** (every figure once, none left out, favourites first; choosing for the Magic item seat shows only the
+  **the shelf** (every figure once, none left out, favorites first; choosing for the Magic item seat shows only the
   item; for a player seat only characters; the Element, Game and search filters, the smart search in both languages with a typo and a level, the sort), the card's level ("Level 10"), and
   that Giants and Swap Force can be prepared but not the games without a runtime, **the swapper cards** (a swapper once on the
   shelf whichever half a search or a filter matches, one seat and two lines of `portal.txt` for it, a bottom first in the

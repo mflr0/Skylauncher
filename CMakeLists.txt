@@ -194,7 +194,7 @@ if(WIN32)
     target_link_libraries(ArkeyanLauncherCore PUBLIC ole32 uuid) # the desktop shortcut (IShellLink)
 endif()
 
-# Fonts are data, not game content: Outfit and Bungee (SIL Open Font License, licence files next to them).
+# Fonts are data, not game content: Outfit and Bungee (SIL Open Font License, license files next to them).
 set(SKYLAUNCHER_FONTS
     ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-Regular.ttf
     ${CMAKE_SOURCE_DIR}/resources/fonts/Outfit-SemiBold.ttf

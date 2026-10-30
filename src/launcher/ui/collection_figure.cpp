@@ -1,5 +1,5 @@
 // The overlays of the collection page and the figure sheet: the picture, the level for the portal's game and the facts
-// that matter; three main actions (Put on the portal, Edit, Favourite), the rest in a menu (duplicate, back up, restore,
+// that matter; three main actions (Put on the portal, Edit, Favorite), the rest in a menu (duplicate, back up, restore,
 // show the file, reset and delete, asked first), the technical details behind "Details". Every overlay is one ui::Modal.
 #include "launcher/ui/launcher_app.h"
 #include "launcher/ui/launcher_ui.h"
@@ -416,11 +416,11 @@ namespace launcher_ui
         edit.disabled = !writable || f.state == figures::AreaState::Damaged;
         if (ui::Button(Tr("Edit"), edit))
             OpenEdit(f);
-        // 3. Favourite: shown first everywhere.
+        // 3. Favorite: shown first everywhere.
         ImGui::SameLine(0, ui::space::S);
         ui::ButtonOptions favourite;
         favourite.icon = ui::Icon::Star;
-        if (ui::Button(f.favourite ? Tr("Favourite") : Tr("Add to favourites"), favourite))
+        if (ui::Button(f.favourite ? Tr("Favorite") : Tr("Add to favorites"), favourite))
         {
             collection::SetFavourite(path, !f.favourite);
             Reload();

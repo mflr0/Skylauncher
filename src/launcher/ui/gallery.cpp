@@ -162,7 +162,7 @@ namespace launcher_ui
             ui::PillOptions selected;
             selected.selected = true;
             selected.icon = ui::Icon::Star;
-            ui::Pill(Tr("Favourite"), selected);
+            ui::Pill(Tr("Favorite"), selected);
             r++;
             grid.RowLabel(r, "IconButton");
             for (size_t c = 0; c + 1 < std::size(States); c++)
@@ -363,12 +363,12 @@ namespace launcher_ui
             ui::TextField("##f4", filled, sizeof filled, hint);
             grid.RowLabel(1, "SearchField");
             grid.At(1, 0);
-            ui::SearchField("##s1", search, sizeof search, Tr("Search the catalogue"), w);
+            ui::SearchField("##s1", search, sizeof search, Tr("Search the catalog"), w);
             grid.At(1, 1);
-            ui::SearchField("##s2", searched, sizeof searched, Tr("Search the catalogue"), w);
+            ui::SearchField("##s2", searched, sizeof searched, Tr("Search the catalog"), w);
             grid.At(1, 2);
             ui::PreviewState({ .focused = true });
-            ui::SearchField("##s3", searched, sizeof searched, Tr("Search the catalogue"), w);
+            ui::SearchField("##s3", searched, sizeof searched, Tr("Search the catalog"), w);
             grid.At(1, 3);
             ui::TextFieldOptions off = hint;
             off.disabled = true;
@@ -595,7 +595,7 @@ namespace launcher_ui
             if (ui::BeginMenu("##gallerymenu"))
             {
                 ui::MenuItem(Tr("Edit"), { ui::Icon::None, false });
-                ui::MenuItem(Tr("Favourite"), { ui::Icon::Star, true });
+                ui::MenuItem(Tr("Favorite"), { ui::Icon::Star, true });
                 ui::MenuItem(Tr("Show in folder"), { ui::Icon::Folder });
                 ui::MenuSeparator();
                 ui::MenuItem(Tr("Remove"), { ui::Icon::Trash, false, true });

@@ -372,7 +372,7 @@ namespace launcher_ui
             else if (kit.state == KitDownloader::State::Cancelled)
             {
                 m_s->installView = m_s->kitUsed = false;
-                Toast(Tr("Installation cancelled"), ui::ToastKind::Info);
+                Toast(Tr("Installation canceled"), ui::ToastKind::Info);
             }
             return;
         }
@@ -395,7 +395,7 @@ namespace launcher_ui
         {
             SetInstallState(m_s->installSha, nullptr);
             m_s->installView = false;
-            Toast(Tr("Installation cancelled"), ui::ToastKind::Info);
+            Toast(Tr("Installation canceled"), ui::ToastKind::Info);
         }
         else if (progress.state == InstallProgress::State::Failed && SettingGet(m_config, "install." + m_s->installSha, "state") != "failed")
             SetInstallState(m_s->installSha, "failed");

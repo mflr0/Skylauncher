@@ -67,7 +67,7 @@ namespace launcher_ui
             ui::EndSelect();
         }
         ImGui::SameLine(0, ui::space::S);
-        ui::SearchField("##addsearch", m_addSearch, sizeof(m_addSearch), Tr("Search the catalogue"), room - 2 * selectW - 2 * ui::space::S);
+        ui::SearchField("##addsearch", m_addSearch, sizeof(m_addSearch), Tr("Search the catalog"), room - 2 * selectW - 2 * ui::space::S);
         // Type: the same menu as the shelf's bar.
         ImGui::SameLine(0, ui::space::S);
         ui::SelectOptions typeOptions;

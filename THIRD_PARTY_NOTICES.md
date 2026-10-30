@@ -1,11 +1,11 @@
 # Third-party notices
 
-Arkeyan Launcher itself is released under the MIT licence (see `LICENSE`). It builds and ships the components below.
+Arkeyan Launcher itself is released under the MIT license (see `LICENSE`). It builds and ships the components below.
 The GNU binutils disassembler that XenonUtils normally includes is neither built nor linked.
 
 ## SDL 3
 
-Licence: zlib. Source: `lib/SDL` (git submodule).
+License: zlib. Source: `lib/SDL` (git submodule).
 
 ```
 Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
@@ -29,7 +29,7 @@ freely, subject to the following restrictions:
 
 ## Dear ImGui
 
-Licence: MIT. Source: `lib/imgui` (git submodule).
+License: MIT. Source: `lib/imgui` (git submodule).
 
 ```
 The MIT License (MIT)
@@ -57,7 +57,7 @@ SOFTWARE.
 
 ## XenonRecomp (XenonUtils: XEX and XDBF readers only)
 
-Licence: MIT. Source: `lib/XenonRecomp` (git submodule).
+License: MIT. Source: `lib/XenonRecomp` (git submodule).
 
 ```
 MIT License
@@ -85,7 +85,7 @@ SOFTWARE.
 
 ## {fmt}
 
-Licence: MIT with an optional exception for binary distribution. Source: `lib/XenonRecomp/thirdparty/fmt` (nested submodule).
+License: MIT with an optional exception for binary distribution. Source: `lib/XenonRecomp/thirdparty/fmt` (nested submodule).
 
 ```
 Copyright (c) 2012 - present, Victor Zverovich and {fmt} contributors
@@ -119,11 +119,11 @@ without including the above copyright and permission notices.
 
 ## libmspack (LZX decompressor, lzxd.c)
 
-Licence: GNU LGPL 2.1. Source: `lib/XenonRecomp/thirdparty/libmspack` (nested submodule). The full licence text is in `libmspack/COPYING.LIB` there. Skylauncher links it statically; since the complete source of Skylauncher is published, you can rebuild it against a modified libmspack.
+License: GNU LGPL 2.1. Source: `lib/XenonRecomp/thirdparty/libmspack` (nested submodule). The full license text is in `libmspack/COPYING.LIB` there. Skylauncher links it statically; since the complete source of Skylauncher is published, you can rebuild it against a modified libmspack.
 
 ## tiny-AES-c
 
-Licence: The Unlicense (public domain). Source: `lib/XenonRecomp/thirdparty/tiny-AES-c` (nested submodule).
+License: The Unlicense (public domain). Source: `lib/XenonRecomp/thirdparty/tiny-AES-c` (nested submodule).
 
 ```
 This is free and unencumbered software released into the public domain.
@@ -154,7 +154,7 @@ For more information, please refer to <http://unlicense.org/>
 
 ## TinySHA1
 
-Licence: ISC-style permission notice. Source: `lib/XenonRecomp/thirdparty/TinySHA1`.
+License: ISC-style permission notice. Source: `lib/XenonRecomp/thirdparty/TinySHA1`.
 
 ```
 TinySHA1 - a header only implementation of the SHA1 algorithm in C++. Based
@@ -182,7 +182,7 @@ Modified for use by Xenia
 
 ## SIMDe (headers)
 
-Licence: MIT. Source: `lib/XenonRecomp/thirdparty/simde` (nested submodule).
+License: MIT. Source: `lib/XenonRecomp/thirdparty/simde` (nested submodule).
 
 ```
 Copyright (c) 2017 Evan Nemerson <evan@nemerson.com>
@@ -209,7 +209,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## stb (stb_image, stb_image_write)
 
-Licence: MIT or public domain, at your choice. Source: `lib/stb` (vendored).
+License: MIT or public domain, at your choice. Source: `lib/stb` (vendored).
 
 ```
 This software is available under 2 licenses -- choose whichever you prefer.
@@ -253,7 +253,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## miniz 1.15
 
-Licence: The Unlicense (public domain). Source: `lib/miniz` (vendored).
+License: The Unlicense (public domain). Source: `lib/miniz` (vendored).
 
 ```
 This is free and unencumbered software released into the public domain.
@@ -285,7 +285,7 @@ This is free and unencumbered software released into the public domain.
 ## Xenia (adapted code)
 
 The 2D tiling of Xbox 360 textures in `src/shared/art/xenos_texture.cpp` (`TiledOffset`, used to decode the art read
-from the player's own disc) is adapted from Xenia's `texture_address::Tiled2D`. Licence: BSD 3-Clause.
+from the player's own disc) is adapted from Xenia's `texture_address::Tiled2D`. License: BSD 3-Clause.
 
 ```text
 Copyright (c) 2015, Ben Vanik.
@@ -316,8 +316,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Lucide icons
 
-Licence: ISC (the icons derived from Feather: MIT). Source: lucide-static 1.54.0 (https://lucide.dev), the icon font cut down
-to the icons used by `tools/lucide_subset.py` into `resources/fonts/Lucide.ttf`; the full licence is `LICENSE-Lucide.txt`
+License: ISC (the icons derived from Feather: MIT). Source: lucide-static 1.54.0 (https://lucide.dev), the icon font cut down
+to the icons used by `tools/lucide_subset.py` into `resources/fonts/Lucide.ttf`; the full license is `LICENSE-Lucide.txt`
 next to it.
 
 ```
@@ -342,4 +342,4 @@ The icons derived from Feather: MIT, Copyright (c) 2013-present Cole Bemis (full
 
 ## Bungee and Outfit fonts
 
-Licence: SIL Open Font License 1.1. Source: `resources/fonts/`; the full licences are `OFL-Bungee.txt` and `OFL-Outfit.txt` next to the fonts.
+License: SIL Open Font License 1.1. Source: `resources/fonts/`; the full licenses are `OFL-Bungee.txt` and `OFL-Outfit.txt` next to the fonts.

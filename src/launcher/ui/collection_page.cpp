@@ -1,5 +1,5 @@
 // The collection page: the portal at the next start along the top (the chosen game's seats), the bar (search, Element,
-// Game, Type), the shelf below (every figure once, favourites first). The figures and their folder are the shared
+// Game, Type), the shelf below (every figure once, favorites first). The figures and their folder are the shared
 // library's (src/shared/collection); the model is collection_model.cpp; the figure sheet, Add a figure and Manage are
 // in collection_figure.cpp, collection_add.cpp and collection_manage.cpp.
 #include "launcher/ui/launcher_app.h"
@@ -245,7 +245,7 @@ namespace launcher_ui
                 Toast(migration.copied == 1 ? Tf("{} figure copied", migration.copied)
                                             : Tf("{} figures copied", migration.copied), ui::ToastKind::Success);
         }
-        // The launcher's own favourites and portal list, from before the shared collection, move once.
+        // The launcher's own favorites and portal list, from before the shared collection, move once.
         if (SettingGet(m_app.m_config, "collection", "moved") != "1")
         {
             if (const collection::Game* game = m_model.Game())
@@ -675,7 +675,7 @@ namespace launcher_ui
         const size_t favourites = std::count_if(m_model.figures.begin(), m_model.figures.end(), [](const Figure& f) { return f.favourite; });
         std::string summary = collection::FigureCount(shown, French());
         if (favourites > 0)
-            summary += favourites == 1 ? Tf(" · {} favourite", favourites) : Tf(" · {} favourites", favourites);
+            summary += favourites == 1 ? Tf(" · {} favorite", favourites) : Tf(" · {} favorites", favourites);
         ui::Text(ui::TextStyle::Caption, summary.c_str(), ui::color::InkSoft, -1);
         ImGui::SetCursorScreenPos(ImVec2(top.x, ImGui::GetCursorScreenPos().y - ImGui::GetStyle().ItemSpacing.y + ui::space::L));
     }
@@ -1129,7 +1129,7 @@ namespace launcher_ui
         if (std::string detail = Detail(figure); !detail.empty())
             centred(ui::TextStyle::Caption, false, busy ? ui::color::Success : ui::color::Dim, detail, textY + ui::type::Caption + ui::space::XXS);
 
-        // Marks: the variant, favourite, seat.
+        // Marks: the variant, favorite, seat.
         collection::VariantKind kind = figure.Kind();
         if (kind != collection::VariantKind::Base)
             ui::DrawBadge(draw, ImVec2(at.x + ui::space::XS, at.y + ui::space::XS), KindLabel(kind).c_str(), collection::VariantKindRgb(kind));

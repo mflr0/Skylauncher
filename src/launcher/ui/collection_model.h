@@ -34,7 +34,7 @@ namespace launcher_ui
     // "Skylanders: Giants": titles, headers and messages (the short name is for chips, filters and a select's rows).
     std::string FullGameName(const std::string& game);
 
-    // The launcher's own state from before the shared collection, moved once: favourites ([collection] favourites, file
+    // The launcher's own state from before the shared collection, moved once: favorites ([collection] favourites, file
     // names) become collection.json's, and the figures that started on the portal ([portal] place) the next session's
     // seats, unless the session file already names some. `legacy` is the old figure folder (LegacyFolder()).
     // Returns the seats to write, empty if nothing changes.
@@ -94,8 +94,8 @@ namespace launcher_ui
         bool DeleteCard(const std::string& path, std::string* error);
         std::vector<std::string> OnPortal() const; // the seated paths
         // The figures the page shows, into `shown`, cut by collection::Group's shelf for Game(): every figure once,
-        // favourites first, then what the game took (newest first), then by element (Sort::Recent; the other sorts ignore
-        // favourites); unknown toys and the toys the game
+        // favorites first, then what the game took (newest first), then by element (Sort::Recent; the other sorts ignore
+        // favorites); unknown toys and the toys the game
         // does not read after (none of those when choosing for a seat). The untouched starters the game made on its own
         // are left out unless seated; `hidden` (optional) counts them.
         std::vector<collection::Section> Shelf(const ShelfFilter& filter, std::vector<collection::Figure>& shown, int* hidden = nullptr) const;

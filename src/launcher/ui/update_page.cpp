@@ -1,5 +1,5 @@
 // Updates in the window: the check at start, the banner ("Update available" and its progress), What's new, and the About
-// page (version, "Check now", credits and licences). The logic is in launcher/updater.cpp (docs/updates.md).
+// page (version, "Check now", credits and licenses). The logic is in launcher/updater.cpp (docs/updates.md).
 #include "launcher/ui/launcher_app.h"
 #include "launcher/ui/text_fit.h"
 #include <ctime>
@@ -337,7 +337,7 @@ namespace launcher_ui
         if (ui::Button(Tr("Project page")))
             SDL_OpenURL(Project);
         ImGui::SameLine();
-        if (ui::Button(Tr("Licences")))
+        if (ui::Button(Tr("Licenses")))
             SDL_OpenURL((std::string(Project) + "/blob/main/THIRD_PARTY_NOTICES.md").c_str());
         ImGui::SameLine();
         if (ui::Button(Tr("Report a bug")))

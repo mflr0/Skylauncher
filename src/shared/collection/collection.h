@@ -2,7 +2,7 @@
 
 // The player's Skylanders collection, shared by every game and the launcher (docs/runtime/host/collection.md, docs/runtime/host/collection_api.md):
 // one folder of figure dumps (the source of truth for each figure's progress), collection.json beside them for what
-// the dumps do not hold (labels, favourites, editions, last use, migrations), a <dump>.lock file while a game has
+// the dumps do not hold (labels, favorites, editions, last use, migrations), a <dump>.lock file while a game has
 // the figure on its portal, and backups/<dump>/ for saved copies.
 #include "catalogue.h"
 #include "../figures/figure_tag.h"
@@ -177,7 +177,7 @@ namespace collection
     bool ChangeHalf(const std::string& keep, const std::string& replacement, std::string* error = nullptr);
 
     // What a shelf shows for one figure or one swapper: `first` is the figure itself, or a swapper's top (it stands for
-    // the card: its name, label, favourite, last use and picture, "Level N"); `second` is the swapper's bottom, null for
+    // the card: its name, label, favorite, last use and picture, "Level N"); `second` is the swapper's bottom, null for
     // any other figure (also a half with no partner).
     struct Card
     {
@@ -205,7 +205,7 @@ namespace collection
     // --- Ownership and the tidy ------------------------------------------------------------------------------------------
 
     // A never-played dump the game made on its own (older builds made one per character at every start): blank, its
-    // starter file name ("<type> <name>.sky"), plain variant, and nothing the player did (no origin, label, favourite,
+    // starter file name ("<type> <name>.sky"), plain variant, and nothing the player did (no origin, label, favorite,
     // edition). The player's own figures are every other dump.
     bool UntouchedStarter(const Figure& figure);
     std::vector<std::string> UntouchedStarters();
@@ -258,7 +258,7 @@ namespace collection
     {
         std::string group = "smart"; // smart, element, game, category, series, level, name
         std::string order = "recent"; // recent, level, name, toy
-        std::string show = "all";     // all, favourites, played, new
+        std::string show = "all";     // all, favorites, played, new
         bool foldForeign = true;      // "Not for this game": folded at the end, else hidden
 
         bool operator==(const View&) const = default;
@@ -302,7 +302,7 @@ namespace collection
         std::vector<size_t> items; // indices into the list; a linked swapper is its top's index only (the bottom is left out)
     };
     // Sections of `list` for `game`. Smart is the shelf (Toy Box and Skylauncher alike): one section where every figure
-    // shows once, favourites first, then the figures `game` took (newest first), then by element and category, a
+    // shows once, favorites first, then the figures `game` took (newest first), then by element and category, a
     // character's variants next to it. The other groupings cut the list by element, game, category, series, level or
     // name. Every grouping ends with Unknown toys and the toys the game does not read (Foreign; none when `game` is
     // empty). A figure is in one section only; empty sections are left out.
