@@ -1171,9 +1171,10 @@ int main(int argc, char** argv)
     EXPECT(giants != nullptr && giants->releases[0].titleId == 0x415608DA && std::string(giants->releases[0].defaultXexSha256).size() == 64);
 
     const GameInfo* trapTeam = FindGame("trapteam");
-    EXPECT(trapTeam != nullptr && std::string(trapTeam->runtime) == "TTRecomp" && trapTeam->releases.size() == 1);
+    EXPECT(trapTeam != nullptr && std::string(trapTeam->runtime) == "TTRecomp" && trapTeam->releases.size() == 2);
     EXPECT(std::string(trapTeam->name) == "Skylanders: Trap Team" &&
-        std::string(trapTeam->releases[0].defaultXexSha256) == "f1d2373e4507e21cc371e6f22d02e909602a1b5bc4704896c3c099cc64002a35");
+        std::string(trapTeam->releases[0].defaultXexSha256) == "f1d2373e4507e21cc371e6f22d02e909602a1b5bc4704896c3c099cc64002a35" &&
+        trapTeam->releases[1].mediaId == 0x3AF0B6AF);
     LauncherConfig experimental;
     auto countEnabled = [](const LauncherConfig& config) {
         size_t count = 0;
