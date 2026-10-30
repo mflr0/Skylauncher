@@ -120,10 +120,25 @@ namespace
         SETTINGS_EXPECT(config["video"]["fps_limit"] == "30" && config["video"].count("vsync") == 0 && config["video"]["custom"] == "kept");
         ApplyGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["video"]["fps_limit"] == "60" && config["video"]["vsync"] == "0");
-        // A game with no frame rate yet gets the page's default, the display's.
+        // A game with no frame rate yet gets its default: 60 for Giants and Swap Force, 30 for SSA.
         config["swapforce.video"]["vsync"] = "1";
         ApplyGameVideo(config, "swapforce");
-        SETTINGS_EXPECT(config["video"]["fps_limit"] == "display" && config["video"]["vsync"] == "1");
+        SETTINGS_EXPECT(config["video"]["fps_limit"] == "60" && config["video"]["vsync"] == "1");
+        LauncherConfig none;
+        for (auto [id, rate] : { std::pair<const char*, const char*>{ "ssa", "30" }, { "giants", "60" }, { "swapforce", "60" } })
+        {
+            none["video"]["fps_limit"] = "120"; // another game's leftover
+            ApplyGameVideo(none, id);
+            SETTINGS_EXPECT(none["video"]["fps_limit"] == rate && std::string(DefaultFrameRate(id)) == rate);
+        }
+        // A saved value is left alone, whatever the default: SSA's 60, Giants' 30, Swap Force's "display" and 144.
+        for (auto [id, saved] : { std::pair<const char*, const char*>{ "ssa", "60" }, { "giants", "30" }, { "swapforce", "display" }, { "ssa", "144" } })
+        {
+            LauncherConfig kept;
+            kept[GameVideoSection(id)]["fps_limit"] = saved;
+            ApplyGameVideo(kept, id);
+            SETTINGS_EXPECT(kept["video"]["fps_limit"] == saved && kept[GameVideoSection(id)]["fps_limit"] == saved);
+        }
 
         // The runtime changes [video] while the game runs: kept as that game's, the other game's copy untouched.
         config["video"]["resolution_scale"] = "3";

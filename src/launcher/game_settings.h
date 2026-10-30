@@ -18,6 +18,9 @@ std::span<const char* const> GameVideoKeys();
 std::string GameVideoSection(std::string_view gameId); // "giants.video"
 // Starts a game's copy from the shared [video] the first time (nothing happens when the copy exists).
 void SeedGameVideo(LauncherConfig& config, std::string_view gameId);
+// The frame rate a game gets when the player has saved none ("30" or "60"): the page shows it and PLAY writes it. The one place a
+// game's default is decided.
+const char* DefaultFrameRate(std::string_view gameId);
 // PLAY: the game's copy replaces [video].
 void ApplyGameVideo(LauncherConfig& config, std::string_view gameId);
 // The game ended: [video] (what the runtime may have changed) is the game's copy again.

@@ -114,8 +114,8 @@ Portal of Power. Then click **Test the portal**.
 ## Settings
 
 - **Resolution scale:** Auto picks x1 on integrated graphics and x2 on dedicated cards. If the game is slow, use x1.
-- **Frame rate:** the default follows the display's refresh rate, up to 60. 30 is the original; 60, 120, 144, 240 and
-  unlimited are experimental.
+- **Frame rate:** the default is 60 for Giants and Swap Force and 30 (the original) for Spyro's Adventure. 60, 120, 144, 240
+  and unlimited are experimental; "Display refresh rate" follows the screen, up to 60.
 - **Portable mode:** put an empty file named `portable.txt` next to the launcher (on macOS, next to the app). The
   settings, saves, figures and games then live in a `data` folder beside it, for the launcher and for every game it
   starts. Move the folder and everything comes along.
