@@ -30,6 +30,7 @@ game as far as you like and tell us in an issue what worked and what did not (Se
 
 - Your own copy of *Skylanders: Spyro's Adventure*, *Skylanders: Giants* or *Skylanders: Swap Force* for Xbox 360, as a disc image (`.iso`).
 - Windows 10 or 11 (64-bit), a Mac with Apple Silicon, or a Linux PC (below).
+- Apple Silicon Mac required (M1 or later).
 - An internet connection the first time: INSTALL downloads the game tools (about 30 to 40 MB) and the compiler.
 - **Linux:** an x86_64 PC with a Vulkan driver (Mesa or NVIDIA), about 6 GB free, and a distribution from 2022 or later
   (glibc 2.34+: Ubuntu 22.04+, Fedora, Arch; SteamOS on the Steam Deck should work but has not been tested yet). No compiler or root is needed: INSTALL
@@ -59,7 +60,7 @@ Another edition is refused with a message. If you have one, tell us in an issue.
 
 1. Download Arkeyan Launcher from the [Releases page](https://github.com/mflr0/Skylauncher/releases):
    - **Windows:** `ArkeyanLauncher.exe`. If SmartScreen warns you, choose More info, then Run anyway.
-   - **Mac:** `ArkeyanLauncher-macOS.dmg`. The app is not notarized: the first time, macOS blocks it; go to System Settings > Privacy & Security and choose Open Anyway (macOS 14 and earlier: right-click the app and choose Open). Apple Silicon only.
+   - **Mac:** `ArkeyanLauncher-macOS.dmg`. The app is not notarized: the first time, macOS blocks it; go to System Settings > Privacy & Security and choose Open Anyway (macOS 14 and earlier: right-click the app and choose Open).
    - **Linux:** `ArkeyanLauncher-x86_64.AppImage`, after `chmod +x`.
 2. Drop your `.iso` on the window, or click the button to choose it. The disc is checked.
 3. Click **INSTALL**. The game is built from your disc. It takes 10 to 20 minutes depending on the game, and happens
