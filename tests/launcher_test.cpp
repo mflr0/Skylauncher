@@ -339,7 +339,7 @@ namespace
         const collection::Game& ssa = *catalogue.FindGame("ssa");
         std::string anvil = collection::PathOf("200 Anvil Rain.sky");
         std::string session = launcher_ui::SessionFile(ssa);
-        EXPECT(session == (save / "portal.txt").string());
+        EXPECT(fs::path(session) == save / "portal.txt"); // as paths: the override joins with "/", which Windows reads the same
         EXPECT(launcher_ui::WriteSeats(ssa, session, { gill, "", anvil, "" }));
         std::vector<std::string> seats = launcher_ui::ReadSeats(ssa, session);
         EXPECT(seats.size() == 4 && seats[0] == gill && seats[1].empty() && seats[2] == anvil && seats[3].empty());
@@ -474,7 +474,7 @@ namespace
             EXPECT(everything > 0 && shown.size() == everything);
             EXPECT(collection::LevelText(*model.Find(gill), "ssa") == "Level 10" && collection::LevelText(*model.Find(anvil), "ssa").empty());
             // Giants starts with prepared seats too; the games with no runtime yet have none.
-            EXPECT(!launcher_ui::SessionFile(*catalogue.FindGame("giants")).empty() && launcher_ui::SessionFile(*catalogue.FindGame("swapforce")) == (save / "portal.txt").string() &&
+            EXPECT(!launcher_ui::SessionFile(*catalogue.FindGame("giants")).empty() && fs::path(launcher_ui::SessionFile(*catalogue.FindGame("swapforce"))) == save / "portal.txt" &&
                 launcher_ui::SessionFile(*catalogue.FindGame("trap_team")).empty());
         }
 
@@ -917,7 +917,7 @@ static void KitFlowChecks(const std::filesystem::path& scratch, const std::strin
         set("SKY_LAUNCHER_NO_UPDATE_CHECK", "1");
         set("SKY_LAUNCHER_BASE_PATH", (root / "base").string());
         bool updates = std::string_view(test.mode) == "updates", offline = std::string_view(test.mode) == "offline";
-        set("SKY_LAUNCHER_UPDATE_URL", "file://" + (scratch / "kitflow" / (updates ? "release-updates" : offline ? "no-release" : "release") / "latest.json").string());
+        set("SKY_LAUNCHER_UPDATE_URL", TestFileUrl(scratch / "kitflow" / (updates ? "release-updates" : offline ? "no-release" : "release") / "latest.json"));
         set("FAKE_SSABUILD_DELAY", "0.01");
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "FAKE_SSABUILD_FAIL");
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");

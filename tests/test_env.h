@@ -4,6 +4,8 @@
 
 #include <SDL3/SDL.h>
 #include <cstdlib>
+#include <filesystem>
+#include <string>
 
 inline int TestSetEnv(const char* name, const char* value)
 {
@@ -23,4 +25,11 @@ inline int TestUnsetEnv(const char* name)
 #else
     return unsetenv(name);
 #endif
+}
+
+// A file:// address for a path: three slashes and forward slashes on Windows ("file:///D:/a/x"), valid inside JSON too.
+inline std::string TestFileUrl(const std::filesystem::path& file)
+{
+    std::string path = file.generic_string();
+    return (path.starts_with("/") ? "file://" : "file:///") + path;
 }

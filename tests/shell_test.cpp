@@ -9,6 +9,7 @@
 #include "shared/collection/save_backup.h"
 #include "shared/dir_list.h"
 #include "shared/mini_json.h"
+#include "test_env.h"
 #include <miniz.h>
 #include <SDL3/SDL.h>
 #include <cstdio>
@@ -143,7 +144,7 @@ namespace
         // A stand-in runtime: a shell script that prints, then exits with a code, or answers --portal-probe.
         std::filesystem::path logs = scratch / "logs";
         std::filesystem::create_directories(logs);
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR", logs.string().c_str(), true);
+        TestSetEnv("SKY_LAUNCHER_LOG_DIR", logs.string().c_str());
         std::filesystem::path script = scratch / "fake_runtime.sh";
         std::ofstream(script) << "#!/bin/sh\nif [ \"$1\" = --portal-probe ]; then echo '{\"kind\":\"hid\",\"vid\":\"1430\",\"pid\":\"0150\","
             "\"product\":\"Fake\",\"opened\":true,\"status\":\"ok\"}'; echo '{\"done\":true,\"count\":1}'; exit 0; fi\n"
@@ -167,7 +168,7 @@ namespace
         // The tail starts on a whole line.
         std::ofstream(logs / "big.log") << "aaaa\nbbbb\ncccc\n";
         SHELL_EXPECT(ReadLogTail(logs / "big.log", 7) == "cccc\n" && ReadLogTail(logs / "big.log", 100) == "aaaa\nbbbb\ncccc\n");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR");
+        TestUnsetEnv("SKY_LAUNCHER_LOG_DIR");
 #endif
         printf("Game run: capture of stdout and stderr, exit code, logs text and portal probe checked\n");
     }
@@ -181,7 +182,7 @@ namespace
         namespace fs = std::filesystem;
         const fs::path root = scratch / "session";
         fs::create_directories(root / "logs");
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR", (root / "logs").string().c_str(), true);
+        TestSetEnv("SKY_LAUNCHER_LOG_DIR", (root / "logs").string().c_str());
         auto script = [&](const char* name, const std::string& body) {
             const fs::path path = root / name;
             std::ofstream(path) << "#!/bin/sh\n" << body;
@@ -249,7 +250,7 @@ namespace
         SHELL_EXPECT(!second.Start("ssa", launch, "disc.iso", error));
         ended = waitEnd(second);
         SHELL_EXPECT(ended && ended->game == "ssa" && !ended->ours && second.Running().empty());
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_LOG_DIR");
+        TestUnsetEnv("SKY_LAUNCHER_LOG_DIR");
         printf("One game at a time: start, refusals, exit codes, markers and a launcher restarted while its game runs checked\n");
 #else
         (void)scratch;
@@ -273,7 +274,7 @@ namespace
 
     std::string Sha(const std::string& data) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(data.data()), data.size() }); }
 
-    std::string FileUrl(const std::filesystem::path& file) { return "file://" + file.string(); }
+    std::string FileUrl(const std::filesystem::path& file) { return TestFileUrl(file); }
 
     // A fake release in `folder`: latest.json, SHA256SUMS and the assets given as name -> content. `sumsFor` lists the hashes.
     void MakeRelease(const std::filesystem::path& folder, const std::string& tag, const std::map<std::string, std::string>& assets,
@@ -423,7 +424,7 @@ namespace
         }
 
         // The manager: a check against the fake latest.json, then the kit update from it.
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r1" / "latest.json").c_str(), true);
+        TestSetEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r1" / "latest.json").c_str());
         UpdateManager manager;
         UpdateManager::Settings settings;
         manager.Check(settings);
@@ -431,11 +432,11 @@ namespace
         UpdateManager::State state = manager.Snapshot();
         SHELL_EXPECT(state.checked && state.launcherNewer && state.launcher.tag == "v99.0.0" && state.games.empty() && state.phase == UpdateManager::Phase::Idle);
         MakeRelease(updates / "r4", "v0.0.1", { { "ArkeyanLauncher.exe", "x" } }, {});
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r4" / "latest.json").c_str(), true);
+        TestSetEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r4" / "latest.json").c_str());
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(manager.Snapshot().checked && !manager.Snapshot().launcherNewer);
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "none.json").c_str(), true);
+        TestSetEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "none.json").c_str());
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(!manager.Snapshot().checked && !manager.Snapshot().checkError.empty());
@@ -445,7 +446,7 @@ namespace
         ParseGamesLineChecks();
         const std::string withLine = "Notes.\n\n<!-- games: ssa=0.9.0 giants=0.8.2 x=? -->";
         MakeRelease(updates / "r5", "v2.0.0", { { "ArkeyanLauncher.exe", "x" } }, {}, true, withLine);
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5" / "latest.json").c_str(), true);
+        TestSetEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5" / "latest.json").c_str());
         settings.kitRepo = "someone/kit";
         manager.Check(settings);
         WaitFor(manager);
@@ -453,13 +454,13 @@ namespace
         SHELL_EXPECT(state.checked && state.games.size() == 2 && state.games[1].id == "giants" && state.games[1].version == "0.8.2" &&
             state.games[1].kit == "v2.0.0");
         MakeRelease(updates / "r5c", "v2.0.0", { { "ArkeyanLauncher.exe", "x" } }, {});
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5c" / "latest.json").c_str(), true);
+        TestSetEnv("SKY_LAUNCHER_UPDATE_URL", FileUrl(updates / "r5c" / "latest.json").c_str());
         manager.Check(settings);
         WaitFor(manager);
         SHELL_EXPECT(manager.Snapshot().checked && manager.Snapshot().games.empty()); // a body without the line
         // The kit download INSTALL starts with: the release of this launcher's tag, else the latest, verified, then found.
-        auto setEnv = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
+        auto setEnv = [](const char* name, const std::string& value) { TestSetEnv(name, value.c_str()); };
+        TestUnsetEnv("SKY_LAUNCHER_KIT");
         setEnv("SKY_LAUNCHER_DATA", (updates / "data").string());
         std::string launcherTag = "v" + LauncherVersion();
         std::string dlZip = MakeZip(updates / "dl" / KitAssetName(), { { "ssa-kit/", "" }, { "ssa-kit/SSABuild", "dl kit" }, { "ssa-kit/SSABuild.exe", "dl kit" }, { "ssa-kit/kit.txt", "build=b9\n" } });
@@ -508,8 +509,8 @@ namespace
             SDL_Delay(20);
         KitDownloader::Snapshot_ result = downloader.Snapshot();
         SHELL_EXPECT(result.state == KitDownloader::State::Done && result.tag == "v77.0.0" && std::filesystem::exists(result.folder / "SSABuild"));
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_DATA");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_UPDATE_URL");
+        TestUnsetEnv("SKY_LAUNCHER_DATA");
+        TestUnsetEnv("SKY_LAUNCHER_UPDATE_URL");
         printf("Updater: versions, release JSON, SHA-256 check, swap with rollback, kit zip and the manager checked\n");
     }
 
@@ -692,13 +693,13 @@ namespace
     void KitFollowChecks(const std::filesystem::path& scratch)
     {
         std::filesystem::path root = scratch / "kitfollow";
-        auto setEnv = [](const char* name, const std::string& value) { SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true); };
+        auto setEnv = [](const char* name, const std::string& value) { TestSetEnv(name, value.c_str()); };
         auto kit = [&](const std::filesystem::path& folder, const std::string& text) {
             WriteBytes(folder / "SSABuild", "x");
             WriteBytes(folder / "SSABuild.exe", "x");
             WriteBytes(folder / "kit.txt", text);
         };
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
+        TestUnsetEnv("SKY_LAUNCHER_KIT");
         setEnv("SKY_LAUNCHER_DATA", (root / "data").string());
 
         // What a kit builds: games= in kit.txt; a kit from before 0.5.0 says nothing and builds Spyro's Adventure only.
@@ -735,9 +736,9 @@ namespace
         setEnv("SKY_LAUNCHER_KIT", (root / "old").string());
         found = FindInstallKit({});
         SHELL_EXPECT(found && found->chosen && found->version == "a" && !KitOlderThanLauncher(*found, "9.0.0"));
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_KIT");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_BASE_PATH");
-        SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), "SKY_LAUNCHER_DATA");
+        TestUnsetEnv("SKY_LAUNCHER_KIT");
+        TestUnsetEnv("SKY_LAUNCHER_BASE_PATH");
+        TestUnsetEnv("SKY_LAUNCHER_DATA");
         printf("Kit: games=, the release it comes from, next to the launcher against downloaded, the player's own\n");
     }
 }

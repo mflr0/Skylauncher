@@ -242,8 +242,13 @@ namespace
         UN_EXPECT(DefaultRoot(Os::Windows, dirs) == fs::path("/win/AppData/Roaming") / "Skylanders");
         UN_EXPECT(DefaultRoot(Os::MacOS, dirs) == fs::path("/home/p/Library/Application Support/Skylanders"));
         UN_EXPECT(DefaultRoot(Os::Linux, dirs) == fs::path("/home/p/.local/share/Skylanders"));
-        dirs.xdgData = "/xdg/data";
-        UN_EXPECT(DefaultRoot(Os::Linux, dirs) == fs::path("/xdg/data/Skylanders"));
+#ifdef _WIN32
+        const fs::path xdg = "C:/xdg/data"; // absolute here: "/xdg/data" has no drive, so it counts as relative on Windows
+#else
+        const fs::path xdg = "/xdg/data";
+#endif
+        dirs.xdgData = xdg;
+        UN_EXPECT(DefaultRoot(Os::Linux, dirs) == xdg / "Skylanders");
         dirs.xdgData = "relative/data"; // the specification: a relative XDG_DATA_HOME is ignored
         UN_EXPECT(DefaultRoot(Os::Linux, dirs) == fs::path("/home/p/.local/share/Skylanders"));
         UN_EXPECT(DefaultRoot(Os::Windows, {}).empty() && DefaultRoot(Os::MacOS, {}).empty());
@@ -624,6 +629,7 @@ namespace
             UN_EXPECT(Decode(EncodeForPowerShell("a\xC3\xA9 b")) == "a\xC3\xA9 b" && Decode(EncodeForPowerShell("")).empty());
         }
 
+#ifndef _WIN32 // the macOS and Linux helpers are /bin/sh scripts, which Windows does not have; its own helper is a PowerShell script, checked as text above
         // The helper itself, run for real on a copy of a dummy in scratch (macOS and Linux scripts; the process it waits for is gone).
         const fs::path run = base / "helper";
         fs::remove_all(run);
@@ -672,6 +678,7 @@ namespace
                 SDL_DestroyProcess(live);
             }
         }
+#endif
         printf("Uninstall of the launcher: each system's rules, the refusals, the commands, the helper run on a dummy in scratch\n");
     }
 
