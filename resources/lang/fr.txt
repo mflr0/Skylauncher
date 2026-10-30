@@ -44,7 +44,11 @@ Not an Xbox 360 disc image, or the file is incomplete.	Ce n'est pas une image di
 1 gamepad connected.	1 manette connectée.
 16:9 (with bars)	16:9 (avec bandes)
 30 (original)	30 (d'origine)
-60 (experimental)	60 (expérimental)
+Display refresh rate (up to 60)	Fréquence de l'écran (jusqu'à 60)
+120 (experimental)	120 (expérimental)
+144 (experimental)	144 (expérimental)
+240 (experimental)	240 (expérimental)
+Unlimited (experimental)	Illimité (expérimental)
 Only contacts github.com.	Contacte seulement github.com.
 Couldn't write to the game folder.	Impossible d'écrire dans le dossier du jeu.
 A launcher for the native PC ports of Skylanders. No game code or art: it all comes from your disc.	Un launcher pour les portages PC natifs de Skylanders. Aucun code ni image du jeu : tout vient de votre disque.
@@ -341,7 +345,7 @@ Couldn't download the game tools. Check your connection.	Téléchargement des ou
 The game tools are incomplete.	Les outils du jeu sont incomplets.
 Same as text	Identique au texte
 These game tools can't build {}	Ces outils ne permettent pas de créer {}
-Made for 30 FPS; 60 is experimental.	Conçu pour 30 FPS ; 60 est expérimental.
+Made for 30 FPS; above 60 is experimental.	Conçu pour 30 FPS ; au-delà de 60 est expérimental.
 Choose the disc image first	Choisissez d'abord l'image disque
 Menus, subtitles and on-screen text.	Menus, sous-titres et textes à l'écran.
 Spoken lines and cutscenes.	Voix et cinématiques.

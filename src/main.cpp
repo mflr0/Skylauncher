@@ -23,6 +23,7 @@ int main(int argc, char** argv)
     }
     for (const std::string& unknown : arguments.unknown)
         fprintf(stderr, "launcher: ignoring the option %s (--help lists them)\n", unknown.c_str());
+    datadir::ApplyPortable(); // portable.txt beside the launcher: its data folder, the games' too
     datadir::MigrateOnce(); // the older folders into <data root> (docs/install.md), before any path is used
     std::string configPath = LauncherConfigPath();
     LauncherConfig config = LoadLauncherConfig(configPath);

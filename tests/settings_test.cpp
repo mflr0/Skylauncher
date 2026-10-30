@@ -91,6 +91,10 @@ namespace
         SETTINGS_EXPECT(config["video"]["fps_limit"] == "30" && config["video"].count("vsync") == 0 && config["video"]["custom"] == "kept");
         ApplyGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["video"]["fps_limit"] == "60" && config["video"]["vsync"] == "0");
+        // A game with no frame rate yet gets the page's default, the display's.
+        config["swapforce.video"]["vsync"] = "1";
+        ApplyGameVideo(config, "swapforce");
+        SETTINGS_EXPECT(config["video"]["fps_limit"] == "display" && config["video"]["vsync"] == "1");
 
         // The runtime changes [video] while the game runs: kept as that game's, the other game's copy untouched.
         config["video"]["resolution_scale"] = "3";

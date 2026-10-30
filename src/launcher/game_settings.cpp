@@ -155,7 +155,12 @@ namespace
     }
 }
 
-void ApplyGameVideo(LauncherConfig& config, std::string_view gameId) { CopyVideo(config, GameVideoSection(gameId), "video"); }
+void ApplyGameVideo(LauncherConfig& config, std::string_view gameId)
+{
+    CopyVideo(config, GameVideoSection(gameId), "video");
+    // The page shows "Display refresh rate" for a game that has no frame rate yet: the game gets it too, since its own default is 30.
+    config["video"].emplace("fps_limit", "display");
+}
 
 void StoreGameVideo(LauncherConfig& config, std::string_view gameId) { CopyVideo(config, "video", GameVideoSection(gameId)); }
 

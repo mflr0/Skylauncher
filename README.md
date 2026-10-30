@@ -113,7 +113,11 @@ Portal of Power. Then click **Test the portal**.
 ## Settings
 
 - **Resolution scale:** Auto picks x1 on integrated graphics and x2 on dedicated cards. If the game is slow, use x1.
-- **Frame rate:** 30 is the original. 60 is experimental.
+- **Frame rate:** the default follows the display's refresh rate, up to 60. 30 is the original; 60, 120, 144, 240 and
+  unlimited are experimental.
+- **Portable mode:** put an empty file named `portable.txt` next to the launcher (on macOS, next to the app). The
+  settings, saves, figures and games then live in a `data` folder beside it, for the launcher and for every game it
+  starts. Move the folder and everything comes along.
 - The launcher and the games share one settings file, `launcher.ini`.
 - **Language:** the launcher is available in English and French (Settings, Launcher tab).
 - **Your saves are safe:** each save is written in one go, and the previous version is kept before it is replaced. To go

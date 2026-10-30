@@ -50,8 +50,10 @@ namespace launcher_ui
         const char* aliases = nullptr; // other values of the settings file that show as this choice (space separated)
     };
 
-    // The runtime runs at 30 or 60: any other limit it is given means 60 (docs/settings.md).
-    inline constexpr Choice FpsChoices[] = { { "30", N_("30 (original)") }, { "60", N_("60 (experimental)"), "0 120 144 240" } };
+    // "display": the display's refresh rate, up to 60 for now (the runtime reads it as 60); above 60 the runtime paces the frames itself.
+    inline constexpr Choice FpsChoices[] = { { "display", N_("Display refresh rate (up to 60)") }, { "30", N_("30 (original)") },
+        { "60", "60" }, { "120", N_("120 (experimental)") }, { "144", N_("144 (experimental)") }, { "240", N_("240 (experimental)") },
+        { "0", N_("Unlimited (experimental)") } };
     inline constexpr Choice VolumeChoices[] = { { "0", "0 %" }, { "10", "10 %" }, { "20", "20 %" }, { "30", "30 %" }, { "40", "40 %" },
         { "50", "50 %" }, { "60", "60 %" }, { "70", "70 %" }, { "80", "80 %" }, { "90", "90 %" }, { "100", "100 %" } };
     inline constexpr Choice RumbleChoices[] = { { "off", N_("Off") }, { "low", N_("Low") }, { "normal", N_("Normal") }, { "strong", N_("Strong") } };

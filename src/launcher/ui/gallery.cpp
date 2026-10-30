@@ -332,7 +332,7 @@ namespace launcher_ui
             {
                 ui::SettingRow(Tr("Fullscreen"));
                 ui::Toggle("##fullscreen", &fullscreen);
-                ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 is experimental."));
+                ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; above 60 is experimental."));
                 ui::SelectOptions select;
                 if (ui::BeginSelect("##fps", Tr(FpsChoices[0].label), select))
                     ui::EndSelect();
