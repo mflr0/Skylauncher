@@ -175,6 +175,7 @@ namespace launcher_ui
         std::vector<ImVec2> m_crossAt;  // where each seat's X was drawn this frame (-1: none), for the test
         int m_navSeat = -1;             // the seat with the keyboard or pad focus this frame, -1: none
         int m_testMenu = 0;             // the screenshot test opens a menu on its own: 1 Manage's, 2 the figure sheet's, 3 its Put on the portal
+        bool m_testScrollBottom = false; // the screenshot test shows the shelf's last row and its bottom spacing
         int m_hoverSeat = -1;           // the seat under the mouse this frame
         int m_focusSeat = -1;           // the D-pad crosses between the seats and the shelf: focus this seat next frame,
         bool m_focusCard = false;       // or the shelf's first card

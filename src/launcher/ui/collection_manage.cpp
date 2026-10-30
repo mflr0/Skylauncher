@@ -316,7 +316,8 @@ namespace launcher_ui
             "39-choose-empty", "40-add-search-version", "41-giants-variant-sheet", "42-swapforce-portal", "43-swapper-sheet",
             "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-versions", "47-search-element", "48-search-level",
             "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name", "53-all-swappers", "54-mixed-swapper-sheet",
-            "55-add-swapper-versions", "56-add-no-match", "57-manage-menu", "58-figure-menu", "59-put-on-menu", "60-focus-card", "61-focus-seat" };
+            "55-add-swapper-versions", "56-add-no-match", "57-manage-menu", "58-figure-menu", "59-put-on-menu", "60-focus-card", "61-focus-seat",
+            "collection-bottom" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -452,6 +453,7 @@ namespace launcher_ui
         m_addSearch[0] = 0;
         m_closeFilters = true;
         m_testMenu = 0;
+        m_testScrollBottom = false;
         auto figureOf = [&](uint16_t type) -> std::string {
             for (const Figure& figure : m_model.figures)
                 if (figure.type == type && !collection::UntouchedStarter(figure) && figure.level > 1)
@@ -721,6 +723,9 @@ namespace launcher_ui
             break;
         case 41: // and on the first seat
             m_focusSeat = 0;
+            break;
+        case 42: // the shelf scrolled to its very end
+            m_testScrollBottom = true;
             break;
         default: break;
         }

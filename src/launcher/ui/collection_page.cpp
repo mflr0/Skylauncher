@@ -590,6 +590,8 @@ namespace launcher_ui
         ui::BeginRoomyChild("##shelf", ImVec2(0, -legend), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
         ImGui::SetScrollX(0.0f);
         DrawList();
+        if (m_testScrollBottom)
+            ImGui::SetScrollY(ImGui::GetScrollMaxY());
         ui::EndRoomyChild();
         // A figure dragged off a seat and dropped on the shelf leaves the seat.
         if (ImGui::BeginDragDropTarget())

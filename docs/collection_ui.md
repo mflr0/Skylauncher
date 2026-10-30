@@ -225,7 +225,7 @@ At the first visit to the page (`CollectionPage::Open`):
   swapper on Player 1, the swapper's sheet, Change the bottom, choosing for Player 1, and a Giants toy's versions (the plain toy, then the versions Giants tells apart, no
   second row with the toy's own name), then the smart search (an element, a level, a typo: `47-` to `49-`), the Filters panel
   (`50-`), the tags with a count (`51-`) and a sort (`52-`), the menus open (`57-` Manage's, `58-` the sheet's, `59-` Put on the portal) and the
-  focus ring on a card and on a seat (`60-`, `61-`). `SKY_LAUNCHER_TEST_COLLECTION=pad` shows the page as a pad player sees it (the legend). With `SKY_LAUNCHER_TEST_SWAPPERS=1` the collection also holds all
+  focus ring on a card and on a seat (`60-`, `61-`), then `collection-bottom` with the shelf scrolled to its end and the space under its last row visible. `SKY_LAUNCHER_TEST_COLLECTION=pad` shows the page as a pad player sees it (the legend). With `SKY_LAUNCHER_TEST_SWAPPERS=1` the collection also holds all
   16 swappers matched and four mixed ones, and `53-all-swappers` (Swap Force's swapper cards; use `SKY_LAUNCHER_TEST_SIZE=1700x1500`
   to see them all), `54-mixed-swapper-sheet` and `55-add-swapper-versions` are written. Set `SKYLANDERS_DATA`
   to a folder holding the discs' cached pictures to see them (else the drawn icons).
