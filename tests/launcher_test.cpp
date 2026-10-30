@@ -802,6 +802,8 @@ int SettingsChecks(const std::filesystem::path& scratch); // tests/settings_test
 int I18nChecks(); // tests/i18n_test.cpp
 int UninstallChecks(const std::filesystem::path& scratch); // tests/uninstall_test.cpp
 int TextFitChecks(); // tests/text_fit_test.cpp
+int AccentChecks(const std::filesystem::path& scratch); // tests/accent_test.cpp, in a process of its own
+int AccentChecksInChild(const char* executable, const std::filesystem::path& scratch);
 int CopyChecks(const std::filesystem::path& scratch, const std::string& ssaIso, const std::string& giantsIso); // tests/copy_test.cpp
 
 // The launcher window switching games in place (App::TestSwitchScript, in an offscreen window): both discs checked, a
@@ -1087,6 +1089,8 @@ int AchievementChecks()
 
 int main(int argc, char** argv)
 {
+    if (argc >= 3 && std::string_view(argv[1]) == "--accents") // started by the run below: the accented folder checks alone
+        return AccentChecks(std::filesystem::path(argv[2])) == 0 ? 0 : 1;
     // --no-disc <scratch dir>: only the checks that need no disc image (what CI runs).
     const bool noDisc = argc >= 3 && std::string_view(argv[1]) == "--no-disc";
     if (argc < 3)
@@ -1144,6 +1148,7 @@ int main(int argc, char** argv)
     g_failures += UninstallChecks(scratch);
     g_failures += I18nChecks();
     g_failures += TextFitChecks();
+    g_failures += AccentChecksInChild(argv[0], scratch);
     g_failures += AchievementChecks();
 
     // FIPS 180-4 examples, covering one- and two-block padding.
