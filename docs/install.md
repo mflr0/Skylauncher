@@ -109,7 +109,7 @@ versions (`SKYLAUNCHER_<X>`, `SSA_LAUNCHER_<X>`, `SSA_<X>`), so every old script
 older names (`src/shared/env.h`). A game the launcher starts gets both names of each variable that is set (`CreateGameEnvironment`: the launcher's own environment is not changed):
 a game built by an older kit reads only the `SSA_` names. `SKYLANDERS_DATA` never changed.
 
-`SKYLANDERS_DATA` replaces the root (tests, portable use). `SKY_LAUNCHER_DATA` still replaces the launcher's part of it
+`SKYLANDERS_DATA` replaces the root (tests). **Portable mode**: a file `portable.txt` next to the launcher (on macOS next to the `.app`) makes `<that folder>/data` the root; `datadir::ApplyPortable()` sets `SKYLANDERS_DATA` to it at the start of `main`, so the games the launcher starts inherit it and no older folder is migrated. `SKY_LAUNCHER_DATA` still replaces the launcher's part of it
 (the game folder, the kits, the logs). The launcher settings (the gear) > Launcher > **Show in folder** opens the root, and each game's settings > Game > Folders > **Game files** opens its own folder.
 
 **Save backups.** The game's settings > Saves lists the backups the game keeps of its saves (`SSA/saves-backup/<time>/`, see

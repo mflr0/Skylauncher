@@ -1,6 +1,7 @@
 // ArkeyanLauncherTest's checks for the settings split: each game's own video settings, the command line, the desktop shortcut
 // files of every system, and what delete data and uninstall remove. Scratch folders only: nothing here touches the real
 // data folder or the real Desktop. Called from launcher_test.cpp's main; returns the number of failures.
+#include "test_env.h"
 #include "launcher/env.h"
 #include "launcher/game_install.h"
 #include "launcher/game_keys.h"
@@ -60,13 +61,72 @@ namespace
         if (value.empty())
         {
             SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name);
-            SDL_unsetenv_unsafe(name);
+            TestUnsetEnv(name);
         }
         else
         {
             SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true);
-            SDL_setenv_unsafe(name, value.c_str(), 1);
+            TestSetEnv(name, value.c_str());
         }
+    }
+
+    // ---- Frame rates of an older file ----------------------------------------------------------------------------------------
+
+    void FrameRateMigration()
+    {
+        LauncherConfig config;
+        config["video"]["fps_limit"] = "0";
+        config["ssa.video"]["fps_limit"] = "144";
+        config["giants.video"]["fps_limit"] = "30";
+        config["swapforce.video"]["fps_limit"] = "60";
+        config["other"]["fps_limit"] = "240"; // not a video section
+        MigrateFrameRates(config);
+        SETTINGS_EXPECT(config["video"]["fps_limit"] == "60" && config["ssa.video"]["fps_limit"] == "60");
+        SETTINGS_EXPECT(config["giants.video"]["fps_limit"] == "30" && config["swapforce.video"]["fps_limit"] == "60");
+        SETTINGS_EXPECT(config["other"]["fps_limit"] == "240" && config["launcher"]["frame_rates"] == "1");
+        // A choice made afterwards stays, through a save and a load.
+        config["ssa.video"]["fps_limit"] = "120";
+        config["video"]["fps_limit"] = "0";
+        fs::path file = fs::temp_directory_path() / "skylauncher-frame-rates.ini";
+        SETTINGS_EXPECT(SaveLauncherConfig(datadir::Text(file), config));
+        LauncherConfig again = LoadLauncherConfig(datadir::Text(file));
+        MigrateFrameRates(again);
+        SETTINGS_EXPECT(again["ssa.video"]["fps_limit"] == "120" && again["video"]["fps_limit"] == "0");
+        fs::remove(file);
+        // A file with no marker and no frame rate gets the marker only.
+        LauncherConfig fresh;
+        MigrateFrameRates(fresh);
+        SETTINGS_EXPECT(fresh["launcher"]["frame_rates"] == "1" && fresh.count("video") == 0);
+    }
+
+    // ---- Giants' cap ---------------------------------------------------------------------------------------------------------
+
+    void GiantsCap()
+    {
+        SETTINGS_EXPECT(MaxFrameRate("giants") == 60 && MaxFrameRate("ssa") == 0 && MaxFrameRate("swapforce") == 0);
+        SETTINGS_EXPECT(launcher_ui::FrameRateChoices("giants").size() == 3 && std::string(launcher_ui::FrameRateChoices("giants").back().value) == "60");
+        SETTINGS_EXPECT(launcher_ui::FrameRateChoices("ssa").size() == std::size(launcher_ui::FpsChoices) && launcher_ui::FrameRateChoices("swapforce").size() == std::size(launcher_ui::FpsChoices));
+        // A file from the version before the cap (frame rates already migrated): Giants' higher values become 60, once; the others stay.
+        for (const char* old : { "0", "120", "144", "240" })
+        {
+            LauncherConfig config;
+            config["launcher"]["frame_rates"] = "1";
+            config["giants.video"]["fps_limit"] = old;
+            config["ssa.video"]["fps_limit"] = old;
+            config["swapforce.video"]["fps_limit"] = old;
+            MigrateFrameRates(config);
+            SETTINGS_EXPECT(config["giants.video"]["fps_limit"] == "60" && config["ssa.video"]["fps_limit"] == old && config["swapforce.video"]["fps_limit"] == old);
+            config["giants.video"]["fps_limit"] = "30";
+            MigrateFrameRates(config);
+            SETTINGS_EXPECT(config["giants.video"]["fps_limit"] == "30" && config["launcher"]["giants_cap"] == "1");
+        }
+        LauncherConfig kept; // a Giants copy already at 30 or 60, or none, is left as it is
+        kept["giants.video"]["fps_limit"] = "30";
+        MigrateFrameRates(kept);
+        SETTINGS_EXPECT(kept["giants.video"]["fps_limit"] == "30");
+        LauncherConfig none;
+        MigrateFrameRates(none);
+        SETTINGS_EXPECT(none.count("giants.video") == 0);
     }
 
     // ---- Per-game video settings ---------------------------------------------------------------------------------------
@@ -91,6 +151,25 @@ namespace
         SETTINGS_EXPECT(config["video"]["fps_limit"] == "30" && config["video"].count("vsync") == 0 && config["video"]["custom"] == "kept");
         ApplyGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["video"]["fps_limit"] == "60" && config["video"]["vsync"] == "0");
+        // A game with no frame rate yet gets its default: 60 for Giants and Swap Force, 30 for SSA.
+        config["swapforce.video"]["vsync"] = "1";
+        ApplyGameVideo(config, "swapforce");
+        SETTINGS_EXPECT(config["video"]["fps_limit"] == "60" && config["video"]["vsync"] == "1");
+        LauncherConfig none;
+        for (auto [id, rate] : { std::pair<const char*, const char*>{ "ssa", "30" }, { "giants", "60" }, { "swapforce", "60" } })
+        {
+            none["video"]["fps_limit"] = "120"; // another game's leftover
+            ApplyGameVideo(none, id);
+            SETTINGS_EXPECT(none["video"]["fps_limit"] == rate && std::string(DefaultFrameRate(id)) == rate);
+        }
+        // A saved value is left alone, whatever the default: SSA's 60, Giants' 30, Swap Force's "display" and 144.
+        for (auto [id, saved] : { std::pair<const char*, const char*>{ "ssa", "60" }, { "giants", "30" }, { "swapforce", "display" }, { "ssa", "144" } })
+        {
+            LauncherConfig kept;
+            kept[GameVideoSection(id)]["fps_limit"] = saved;
+            ApplyGameVideo(kept, id);
+            SETTINGS_EXPECT(kept["video"]["fps_limit"] == saved && kept[GameVideoSection(id)]["fps_limit"] == saved);
+        }
 
         // The runtime changes [video] while the game runs: kept as that game's, the other game's copy untouched.
         config["video"]["resolution_scale"] = "3";
@@ -711,6 +790,8 @@ int SettingsChecks(const fs::path& scratch)
 {
     fs::create_directories(scratch);
     VideoChecks();
+    FrameRateMigration();
+    GiantsCap();
     KeyChecks();
     PadChecks();
     ArgumentChecks();

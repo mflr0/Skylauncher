@@ -2,6 +2,7 @@
 // interrupted then resumed, damaged and the fall back to the disc image, removal), then the window on stand-in discs (the
 // real default.xex alone): the wrong-disc button, the copy through its states, playing with no disc image (App::TestCopyScript).
 // The real discs are read only; every copy goes to a scratch folder.
+#include "test_env.h"
 #include "launcher/game_copy.h"
 #include "launcher/env.h"
 #include "launcher/game_install.h"
@@ -31,13 +32,13 @@ namespace
     void SetEnv(const char* name, const std::string& value)
     {
         SDL_SetEnvironmentVariable(SDL_GetEnvironment(), name, value.c_str(), true);
-        SDL_setenv_unsafe(name, value.c_str(), 1);
+        TestSetEnv(name, value.c_str());
     }
 
     void UnsetEnv(const char* name)
     {
         SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), name);
-        SDL_unsetenv_unsafe(name);
+        TestUnsetEnv(name);
     }
 
     // Nothing may reach the player's own data folders: stop a check whose folders are not under the scratch folder.
