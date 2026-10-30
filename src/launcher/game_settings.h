@@ -23,6 +23,11 @@ void ApplyGameVideo(LauncherConfig& config, std::string_view gameId);
 // The game ended: [video] (what the runtime may have changed) is the game's copy again.
 void StoreGameVideo(LauncherConfig& config, std::string_view gameId);
 
+// Once per settings file ([launcher] frame_rates=1 says it was done): the frame rates 0, 120, 144 and 240, which older versions
+// accepted and ran as 60, become 60 in [video] and [<game>.video], so an update does not change what a player had. A choice made
+// afterwards stays.
+void MigrateFrameRates(LauncherConfig& config);
+
 // What a game keeps in its folder (<data>/SSA, <data>/Giants), told apart for the delete and uninstall buttons.
 struct GameFolders
 {

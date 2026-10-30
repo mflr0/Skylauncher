@@ -108,7 +108,7 @@ namespace launcher_ui
         ui::SettingRow(Tr("Resolution scale"), scaleHint.c_str());
         SettingSelect("##scale", video, "resolution_scale", ScaleChoices, 0);
 
-        ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; above 60 is experimental."));
+        ui::SettingRow(Tr("Frame rate limit"), Tr("Made for 30 FPS; 60 and above are experimental."));
         SettingSelect("##fps", video, "fps_limit", FpsChoices, 0);
 
         ui::SettingRow(Tr("FPS counter"), Tr("A small frame rate readout in the game (F3 in the game turns it on too)."));

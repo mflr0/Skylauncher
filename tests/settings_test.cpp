@@ -69,6 +69,35 @@ namespace
         }
     }
 
+    // ---- Frame rates of an older file ----------------------------------------------------------------------------------------
+
+    void FrameRateMigration()
+    {
+        LauncherConfig config;
+        config["video"]["fps_limit"] = "0";
+        config["ssa.video"]["fps_limit"] = "144";
+        config["giants.video"]["fps_limit"] = "30";
+        config["swapforce.video"]["fps_limit"] = "60";
+        config["other"]["fps_limit"] = "240"; // not a video section
+        MigrateFrameRates(config);
+        SETTINGS_EXPECT(config["video"]["fps_limit"] == "60" && config["ssa.video"]["fps_limit"] == "60");
+        SETTINGS_EXPECT(config["giants.video"]["fps_limit"] == "30" && config["swapforce.video"]["fps_limit"] == "60");
+        SETTINGS_EXPECT(config["other"]["fps_limit"] == "240" && config["launcher"]["frame_rates"] == "1");
+        // A choice made afterwards stays, through a save and a load.
+        config["ssa.video"]["fps_limit"] = "120";
+        config["video"]["fps_limit"] = "0";
+        fs::path file = fs::temp_directory_path() / "skylauncher-frame-rates.ini";
+        SETTINGS_EXPECT(SaveLauncherConfig(datadir::Text(file), config));
+        LauncherConfig again = LoadLauncherConfig(datadir::Text(file));
+        MigrateFrameRates(again);
+        SETTINGS_EXPECT(again["ssa.video"]["fps_limit"] == "120" && again["video"]["fps_limit"] == "0");
+        fs::remove(file);
+        // A file with no marker and no frame rate gets the marker only.
+        LauncherConfig fresh;
+        MigrateFrameRates(fresh);
+        SETTINGS_EXPECT(fresh["launcher"]["frame_rates"] == "1" && fresh.count("video") == 0);
+    }
+
     // ---- Per-game video settings ---------------------------------------------------------------------------------------
 
     void VideoChecks()
@@ -715,6 +744,7 @@ int SettingsChecks(const fs::path& scratch)
 {
     fs::create_directories(scratch);
     VideoChecks();
+    FrameRateMigration();
     KeyChecks();
     PadChecks();
     ArgumentChecks();

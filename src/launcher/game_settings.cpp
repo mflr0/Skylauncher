@@ -164,6 +164,21 @@ void ApplyGameVideo(LauncherConfig& config, std::string_view gameId)
 
 void StoreGameVideo(LauncherConfig& config, std::string_view gameId) { CopyVideo(config, "video", GameVideoSection(gameId)); }
 
+void MigrateFrameRates(LauncherConfig& config)
+{
+    std::string& done = config["launcher"]["frame_rates"];
+    if (done == "1")
+        return;
+    done = "1";
+    for (auto& [name, section] : config)
+    {
+        bool video = name == "video" || (name.size() > 6 && name.compare(name.size() - 6, 6, ".video") == 0);
+        if (auto limit = section.find("fps_limit"); video && limit != section.end() &&
+            (limit->second == "0" || limit->second == "120" || limit->second == "144" || limit->second == "240"))
+            limit->second = "60";
+    }
+}
+
 GameFolders FoldersOf(std::string_view gameId)
 {
     GameFolders folders;
