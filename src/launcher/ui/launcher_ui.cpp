@@ -355,6 +355,9 @@ namespace launcher_ui
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = nullptr;
         io.ConfigDebugHighlightIdConflicts = false;
+#ifdef NDEBUG
+        io.ConfigErrorRecoveryEnableTooltip = false; // a player never sees Dear ImGui's own panel
+#endif
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
         Apply(ImGui::GetStyle());
         if (!LoadFonts())
@@ -1608,7 +1611,14 @@ namespace launcher_ui
         const float panelH = panelW < ui::hero::PanelWidth ? ui::hero::CompactPanelHeight : ui::hero::PanelHeight;
 
         // One lower edge for the portal and the commands; the painting remains visible between the columns.
-        const float hintH = (running ? 4 : 2) * ui::type::Body + ui::space::XS;
+        float hintH = (running ? 4 : 2) * ui::type::Body + ui::space::XS;
+        if (!m_testHero && m_s->disc == DiscState::Failed)
+        {
+            // The disc's message can run to several lines (the supported releases), and a button may follow it.
+            ui::PushText(ui::TextStyle::Caption);
+            hintH = std::max(hintH, ImGui::CalcTextSize(m_s->check.message.c_str(), nullptr, false, leftW).y + ui::height::Normal + ui::space::XS);
+            ui::PopText();
+        }
         const float pillY = foot - ui::height::Small - hintH - ui::space::M;
         const float buttonY = pillY - ui::space::M - (installing ? 2 * ui::height::Normal + ui::space::L : ui::height::Main);
         const float statusY = buttonY - ui::space::L - ui::type::Body;
@@ -1758,10 +1768,12 @@ namespace launcher_ui
         else if (!m_testHero && m_s->disc == DiscState::Failed)
         {
             ui::Text(ui::TextStyle::Caption, m_s->check.message.c_str(), ui::color::Danger, leftW);
-            ImGui::SetCursorScreenPos(ImVec2(left, ImGui::GetCursorScreenPos().y));
             if (const GameInfo* other = FindEnabledGame(m_s->check.otherGame, m_config); other != nullptr && m_s->check.status == GameSourceStatus::WrongGame)
+            {
+                ImGui::SetCursorScreenPos(ImVec2(left, ImGui::GetCursorScreenPos().y));
                 if (ui::Button(Tf("Use it for {}", other->name).c_str(), { .kind = ui::ButtonKind::Primary }))
                     UseDiscForOtherGame();
+            }
         }
         else if (update && !installing && state.buttonEnabled)
         {
