@@ -127,8 +127,16 @@ namespace
         fs::create_directories(kits / ".download", error);
         fs::copy_file(plain, kits / ".download" / "kit.zip", fs::copy_options::overwrite_existing, error);
         ACCENT_EXPECT(!error && fs::exists(kits / ".download" / "kit.zip"));
+        // The same unpacking with the accents on one side only, and with none: what fails tells which path it is.
+        const fs::path accented = kits / ".download" / "kit.zip";
         std::string why;
-        ACCENT_EXPECT(InstallKitZip(kits / ".download" / "kit.zip", kits / "v0.0.1", why));
+        ACCENT_EXPECT(ExtractZip(plain, scratch / "plain-out", why));
+        ACCENT_EXPECT(ExtractZip(plain, kits / "from-plain", why));
+        ACCENT_EXPECT(ExtractZip(accented, scratch / "plain-out2", why));
+        why.clear();
+        ACCENT_EXPECT(InstallKitZip(accented, kits / "v0.0.1", why));
+        if (!why.empty())
+            printf("accent_test: InstallKitZip said: %s\n", why.c_str());
         ACCENT_EXPECT(Slurp(kits / "v0.0.1" / "kit.txt") == "build=b1\n" && Lists(kits, "v0.0.1"));
         ACCENT_EXPECT(fs::remove_all(kits / "v0.0.1", error) > 0 && !fs::exists(kits / "v0.0.1"));
         ACCENT_EXPECT(fs::remove(install / "install.log", error) && !fs::exists(install / "install.log"));
