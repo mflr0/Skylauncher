@@ -111,8 +111,8 @@ jobs:
 
   release:
     needs: [windows, linux, macos]
-    # Only a v* tag publishes.
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/tags/v')
+    # Only a v* tag publishes, and never a pre-release tag (v1.2.3-beta.1): those are published by hand, marked as pre-releases.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-')
     runs-on: ubuntu-latest
     permissions:
       contents: write

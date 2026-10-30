@@ -341,6 +341,7 @@ namespace
         SHELL_EXPECT(ParseSemVer("kit-2.10.1-beta.2+build5").major == 2 && ParseSemVer("kit-2.10.1-beta.2+build5").pre == "beta.2");
         SHELL_EXPECT(IsNewer("v0.10.0", "0.9.9") && !IsNewer("v0.9.9", "0.10.0") && !IsNewer("v1.0.0", "1.0.0"));
         SHELL_EXPECT(IsNewer("v1.0.0", "1.0.0-rc.1") && !IsNewer("v1.0.0-rc.1", "1.0.0") && !IsNewer("nonsense", "1.0.0"));
+        SHELL_EXPECT(IsNewer("0.7.0", "0.7.0-beta.1") && !IsNewer("0.7.0-beta.1", "0.7.0"));
         SHELL_EXPECT(ParseSemVer(LauncherVersion()).valid);
 
         // JSON and the release answer.
