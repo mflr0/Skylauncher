@@ -1201,6 +1201,7 @@ namespace launcher_ui
             ImGui::PopID();
             ImGui::Dummy(ImVec2(0, ui::space::XS));
         }
+        ImGui::Dummy(ImVec2(0, ui::space::L)); // the last row is never cut flush with the shelf's edge
     }
 
     void CollectionPage::HandleShortcuts()
