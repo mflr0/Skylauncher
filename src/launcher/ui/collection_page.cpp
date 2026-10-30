@@ -735,6 +735,8 @@ namespace launcher_ui
             m_heroLoaded = true;
         }
         if (!m_heroFixture) m_model.Poll(SDL_GetTicks());
+        if (m_model.Game() == nullptr)
+            return; // a game the catalogue doesn't list yet has no seats to show
         ImGui::SetCursorScreenPos(at);
         ui::BeginCard("##hero-portal", size, { .panel = true, .padding = ui::space::M, .edge = live ? ui::color::Success : 0 });
         ui::Text(ui::TextStyle::Body, Tr("On the portal"), ui::color::Dim, -1, true);
