@@ -233,6 +233,9 @@ Opening the disc image	Ouverture de l'image disque
 Opens a new issue on GitHub	Ouvre un nouveau ticket sur GitHub
 Original resolution	Résolution d'origine
 The 3D scene at the console's size.	La scène 3D à la taille de la console.
+Edge smoothing	Lissage des bords
+FXAA also softens texture detail; Gentle keeps more of it.	Le FXAA adoucit aussi le détail des textures ; Doux en garde davantage.
+Gentle	Doux
 PLAY	JOUER
 PLAY WITH	JOUER AVEC
 Play {}	Jouer à {}

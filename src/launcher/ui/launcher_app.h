@@ -70,6 +70,8 @@ namespace launcher_ui
         { "xboxone", N_("Xbox One / Series"), "xbox" }, { "playstation", "PlayStation" }, { "nintendo", "Nintendo" }, { "keyboard", N_("Keyboard") } };
     inline constexpr Choice FilterChoices[] = { { "1", N_("Trilinear") }, { "2", N_("Anisotropic 2x") }, { "4", N_("Anisotropic 4x") },
         { "8", N_("Anisotropic 8x") }, { "16", N_("Anisotropic 16x") } };
+    // The game's FXAA pass (Swap Force, Trap Team): the values are the runtime's edge_smoothing (docs/settings.md).
+    inline constexpr Choice EdgeSmoothingChoices[] = { { "game", N_("Game") }, { "light", N_("Gentle") }, { "off", N_("None") } };
     inline constexpr Choice PortalChoices[] = { { "auto", N_("Auto: a real portal if plugged in, else virtual") }, { "emulated", N_("Virtual (no portal needed)") },
         { "real", N_("Real portal (Wii, PlayStation, Xbox)"), "hid usb" } };
     inline constexpr Choice LanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },

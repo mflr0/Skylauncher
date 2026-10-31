@@ -185,7 +185,7 @@ namespace
         config["video"]["resolution_scale"] = "3";
         StoreGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["ssa.video"]["resolution_scale"] == "3" && config["giants.video"].count("resolution_scale") == 0);
-        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 11);
+        SETTINGS_EXPECT(GameVideoSection("giants") == "giants.video" && GameVideoKeys().size() == 12);
 
         // Original resolution (Swap Force): kept in [swapforce.video], put in [video] when it plays, absent for the other games.
         config["swapforce.video"]["original_resolution"] = "1";
@@ -196,6 +196,16 @@ namespace
         SETTINGS_EXPECT(config["swapforce.video"]["original_resolution"] == "0");
         ApplyGameVideo(config, "ssa");
         SETTINGS_EXPECT(config["video"].count("original_resolution") == 0 && config["ssa.video"].count("original_resolution") == 0);
+
+        // Edge smoothing (Swap Force, Trap Team): the same way, a key of the game's copy.
+        config["trapteam.video"]["edge_smoothing"] = "off";
+        ApplyGameVideo(config, "trapteam");
+        SETTINGS_EXPECT(config["video"]["edge_smoothing"] == "off");
+        config["video"]["edge_smoothing"] = "light";
+        StoreGameVideo(config, "trapteam");
+        SETTINGS_EXPECT(config["trapteam.video"]["edge_smoothing"] == "light");
+        ApplyGameVideo(config, "ssa");
+        SETTINGS_EXPECT(config["video"].count("edge_smoothing") == 0 && config["ssa.video"].count("edge_smoothing") == 0);
 
         // Through the settings file, sections with a dot included.
         fs::path scratch = fs::temp_directory_path() / "skylauncher-video-test.ini";
