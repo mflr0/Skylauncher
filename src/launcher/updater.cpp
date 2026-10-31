@@ -11,6 +11,11 @@
 #include <fstream>
 #include <initializer_list>
 #include <miniz.h>
+#if defined(_WIN32)
+#include <sys/utime.h>
+#else
+#include <utime.h>
+#endif
 
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
@@ -529,10 +534,46 @@ void CleanupOldUpdate(const fs::path& target)
     fs::remove_all(target.parent_path() / ".skylauncher-update", error);
 }
 
+// miniz opens a narrow path in the ANSI code page on Windows, so a folder with accents (a user name) is out of its reach:
+// the zip is read and the files are written through streams opened from their std::filesystem::path.
+namespace
+{
+    size_t ReadZipAt(void* opaque, mz_uint64 offset, void* buffer, size_t size)
+    {
+        std::ifstream& stream = *static_cast<std::ifstream*>(opaque);
+        stream.clear();
+        stream.seekg(std::streamoff(offset));
+        stream.read(static_cast<char*>(buffer), std::streamsize(size));
+        return size_t(stream.gcount());
+    }
+
+    size_t WriteZipTo(void* opaque, mz_uint64, const void* buffer, size_t size)
+    {
+        std::ofstream& stream = *static_cast<std::ofstream*>(opaque);
+        stream.write(static_cast<const char*>(buffer), std::streamsize(size));
+        return stream ? size : 0;
+    }
+
+    // The date the file has in the zip, as miniz sets it after writing a file (a kit with no version file is told by its date).
+    void SetZipTime(const fs::path& file, time_t time)
+    {
+#if defined(_WIN32)
+        _utimbuf times{ time, time };
+        _wutime(file.c_str(), &times);
+#else
+        utimbuf times{ time, time };
+        utime(file.c_str(), &times);
+#endif
+    }
+}
+
 bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
 {
+    std::ifstream zipFile(zip, std::ios::binary | std::ios::ate);
     mz_zip_archive archive{};
-    if (!mz_zip_reader_init_file(&archive, ToUtf8(zip).c_str(), 0))
+    archive.m_pRead = ReadZipAt;
+    archive.m_pIO_opaque = &zipFile;
+    if (!zipFile || !mz_zip_reader_init(&archive, mz_uint64(zipFile.tellg()), 0))
     {
         error = Tr("The download isn't a zip file");
         return false;
@@ -575,12 +616,16 @@ bool ExtractZip(const fs::path& zip, const fs::path& folder, std::string& error)
             }
             continue;
         }
-        if (!mz_zip_reader_extract_to_file(&archive, i, ToUtf8(out).c_str(), 0))
+        std::ofstream file(out, std::ios::binary | std::ios::trunc);
+        const bool unpacked = file && mz_zip_reader_extract_to_callback(&archive, i, WriteZipTo, &file, 0);
+        file.close();
+        if (!unpacked || !file)
         {
             error = Tf("Couldn't unpack {}", name);
             ok = false;
             break;
         }
+        SetZipTime(out, stat.m_time);
         if (fromUnix && mode != 0)
             fs::permissions(out, fs::perms(mode), fs::perm_options::replace, fsError);
     }
