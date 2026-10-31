@@ -1,12 +1,15 @@
 // The game page in each game's own look (docs/launcher_ui.md, "Each game's look"): the disc's pictures as textures, the
 // logo's arrival, and the action button (ui::MainAction) in the game's colours.
 #include "launcher/ui/launcher_app.h"
+#include "launcher/env.h"
 #include "launcher/install_checklist.h"
+#include "shared/art/game_art.h"
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <fmt/format.h>
+#include <random>
 #include <imgui_internal.h>
 #if defined(__APPLE__)
 #include <CoreFoundation/CoreFoundation.h>
@@ -131,13 +134,39 @@ namespace launcher_ui
         return ParseBool(value);
     }
 
+    std::string App::SceneOf(const char* game)
+    {
+        if (auto found = m_scene.find(game); found != m_scene.end())
+            return art::CachedScene(game, found->second);
+        std::vector<std::string> cached;
+        for (const std::string& name : art::SceneNames(game))
+            if (!art::CachedScene(game, name).empty())
+                cached.push_back(name);
+        std::string last = SettingGet(m_config, game, "last_scene");
+        std::string name = art::PickScene(cached, last, std::random_device{}());
+        // The screenshot tests show a given scene (SKY_LAUNCHER_TEST_SCENE), else the manifest's first: the hero checks
+        // compare the painting with the plain page, which a dark scene would not pass.
+        if (const char* forced = LauncherEnv("SKY_LAUNCHER_TEST_SCENE"); forced != nullptr && !art::CachedScene(game, forced).empty())
+            name = forced;
+        else if (m_testHero && !cached.empty())
+            name = cached.front();
+        if (name.empty())
+            return LauncherAssets::Cached(game, LauncherAssets::Role::HeroBackground).path; // the disc's scenes are not read yet
+        m_scene[game] = name;
+        if (name != last)
+            Set(game, "last_scene", name);
+        return art::CachedScene(game, name);
+    }
+
     const ArtTexture* App::CachedArt(const char* game, LauncherAssets::Role role, int maxWidth)
     {
         std::string key = fmt::format("{} {} {}", game, int(role), maxWidth);
         auto found = m_cachedArt.find(key);
         if (found == m_cachedArt.end())
         {
-            LauncherAssets::Asset asset = LauncherAssets::Cached(game, role);
+            LauncherAssets::Asset asset = role == LauncherAssets::Role::HeroBackground
+                ? LauncherAssets::Asset{ SceneOf(game), true } : LauncherAssets::Cached(game, role);
+            asset.valid = asset.valid && !asset.path.empty();
             found = m_cachedArt.emplace(key, asset.valid ? LoadArt(m_renderer, asset.path, role == LauncherAssets::Role::Logo, maxWidth) : ArtTexture{}).first;
         }
         return found->second ? &found->second : nullptr;

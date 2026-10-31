@@ -5,6 +5,7 @@
 #include "launcher/env.h"
 #include "launcher/ui/text_fit.h"
 #include "launcher/install_checklist.h"
+#include "shared/art/game_art.h"
 #include "launcher/problem_report.h"
 #include "launcher/ui/launcher_app.h"
 #include "shared/collection/datadir.h"
@@ -258,6 +259,19 @@ namespace launcher_ui
             { std::lock_guard lock(mutex); check = std::move(result); meta = std::move(metadata); assets = std::move(art); }
             progress = 1;
             done = true;
+        });
+    }
+
+    void VerifyJob::StartScenes(const std::string& image, const std::string& game)
+    {
+        StopScenes();
+        if (art::ScenesRead(game))
+            return;
+        stopScenes = false;
+        scenes = std::thread([this, image, game] {
+            DiscFileSystem disc;
+            if (disc.Open(image.c_str()))
+                art::ExtractScenes(game, art::ReadFrom(disc), &stopScenes);
         });
     }
 
@@ -532,7 +546,10 @@ namespace launcher_ui
     {
         m_portal.Stop();
         for (auto& slot : m_slots)
+        {
             slot->verify.Join();
+            slot->verify.StopScenes();
+        }
         if (ImGui::GetCurrentContext() != nullptr)
         {
             ImGui_ImplSDLRenderer3_Shutdown();
@@ -820,6 +837,7 @@ namespace launcher_ui
         StoreDiscLanguages(m_config, m_s->game.id, m_s->check.languages);
         if (!SaveLauncherConfig(m_configPath, m_config))
             Toast(Tr("Couldn't save the settings"), ui::ToastKind::Error);
+        m_s->verify.StartScenes(m_s->discPath, m_s->game.id);
         m_s->disc = DiscState::Ready;
         RefreshInstall();
     }

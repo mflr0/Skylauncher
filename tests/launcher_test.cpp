@@ -1054,6 +1054,42 @@ static void RunningChecks(const std::filesystem::path& scratch, const std::strin
 
 // The achievements and the play time as the game page shows them (game_progress.h): rows from a list and the unlocks, the hidden
 // ones, the texts of the play time line. No disc: the disc's list is checked with each game's pictures below.
+// The launcher's random scene of each game (shared/art/game_art.h): the manifests' lists and the pick.
+static void SceneChecks(const std::filesystem::path& scratch)
+{
+    printf("Scenes:\n");
+    for (const char* id : { "ssa", "giants", "swapforce", "trapteam" })
+    {
+        std::vector<std::string> names = art::SceneNames(id);
+        std::set<std::string> unique(names.begin(), names.end());
+        printf("  %s: %zu scenes\n", id, names.size());
+        EXPECT(names.size() >= 4 && unique.size() == names.size()); // enough to change at every start, none twice
+    }
+    EXPECT(art::SceneNames("nothing").empty() && art::PickScene({}, "", 7).empty());
+    EXPECT(art::PickScene({ "a" }, "a", 3) == "a"); // the only one is kept
+    std::vector<std::string> three = { "a", "b", "c" };
+    std::set<std::string> seen, seenWithLast;
+    bool again = false;
+    for (uint32_t random = 0; random < 60; random++)
+    {
+        seen.insert(art::PickScene(three, "", random));
+        std::string next = art::PickScene(three, "b", random);
+        seenWithLast.insert(next);
+        again = again || next == "b";
+    }
+    EXPECT(seen.size() == 3 && !again && seenWithLast == std::set<std::string>({ "a", "c" })); // never the last run's
+    EXPECT(art::PickScene(three, "gone", 1) != "" && art::PickScene({ "a", "b" }, "a", 0) == "b" && art::PickScene({ "a", "b" }, "a", 9) == "b");
+    // Nothing cached before a disc was read: no scene file, and the reader asks for the disc.
+    const char* dataBefore = getenv("SKYLANDERS_DATA");
+    std::string saved = dataBefore != nullptr ? dataBefore : "";
+    TestSetEnv("SKYLANDERS_DATA", (scratch / "scenes-data").string().c_str());
+    EXPECT(art::CachedScene("ssa", art::SceneNames("ssa").front()).empty() && !art::ScenesRead("ssa") && art::ScenesRead("nothing"));
+    if (saved.empty())
+        TestUnsetEnv("SKYLANDERS_DATA");
+    else
+        TestSetEnv("SKYLANDERS_DATA", saved.c_str());
+}
+
 int AchievementChecks()
 {
     int before = g_failures;
@@ -1158,6 +1194,7 @@ int main(int argc, char** argv)
     g_failures += TextFitChecks();
     g_failures += AccentChecksInChild(argv[0], scratch);
     g_failures += AchievementChecks();
+    SceneChecks(scratch);
 
     // FIPS 180-4 examples, covering one- and two-block padding.
     auto sha256 = [](std::string_view text) { return Sha256Hex({ reinterpret_cast<const uint8_t*>(text.data()), text.size() }); };
@@ -1274,6 +1311,14 @@ int main(int argc, char** argv)
         EXPECT(provider.Get(LauncherAssets::Role::Logo).valid && provider.Get(LauncherAssets::Role::HeroBackground).valid);
         EXPECT(provider.Get(LauncherAssets::Role::TitleIcon).valid && LauncherAssets::Cached(id, LauncherAssets::Role::Logo).valid);
         EXPECT(found.portraits >= minimumPortraits);
+        // The scenes of the launcher's backgrounds: every one of the manifest's is on the disc, read once.
+        auto scenesBegan = Clock::now();
+        art::ExtractScenes(id, art::ReadFrom(gameDisc));
+        size_t cachedScenes = 0;
+        for (const std::string& name : art::SceneNames(id))
+            cachedScenes += !art::CachedScene(id, name).empty();
+        printf("  %s: %zu of %zu scenes, read in %lld ms\n", id, cachedScenes, art::SceneNames(id).size(), milliseconds(scenesBegan));
+        EXPECT(cachedScenes == art::SceneNames(id).size() && art::ScenesRead(id));
         // The achievements the disc check caches (game_progress.h), then what the game recorded: its own data folder, not SKY_SAVE_DIR.
         {
             const char* saveDir = getenv("SKY_SAVE_DIR");

@@ -5,6 +5,15 @@
   "about": "Where Swap Force keeps its pictures on the disc (docs/runtime/host/game_art.md, games/swapforce/docs/art.md). Names only: the pictures are read from the player's own disc.",
   "logo": { "archive": "archives/defaultloadscreen.pak", "entry": "textures\\juicestandard_title_00.igz" },
   "background": { "archive": "archives/juicedomain_frontend.pak", "entry": "textures\\juicestandard_mainmenu_background_10.igz" },
+  "scenes": [
+    { "archive": "archives/juicedomain_frontend.pak", "names": [ "textures\\juicestandard_mainmenu_background_10.igz" ] },
+    { "archive": "archives/levelsummarymaterials.pak", "names": [
+      "textures\\juicestandard_bg_toweroftime_10.igz",
+      "textures\\juicestandard_bg_sheepwreck_10.igz",
+      "textures\\juicestandard_bg_barrens1_10.igz",
+      "textures\\juicestandard_bg_barrens2_10.igz",
+      "textures\\juicestandard_bg_wildwoods1_10.igz",
+      "textures\\juicestandard_bg_frostguard2_10.igz" ] } ],
   "portraits": { "materials": [
     { "archive": "archives/toycollectionimages.pak", "folder": "materialinstances\\toycollection\\" },
     { "archive": "archives/collectibleicons.pak", "folder": "materialinstances\\haticon_ufo_materials" } ] },
