@@ -1264,17 +1264,24 @@ namespace launcher_ui
                 {
                     // The figures in the box of each game's starter pack.
                     if (m_model.gameId == "giants")
-                        for (uint16_t type : { 112, 100, 32 }) // Tree Rex, Jet-Vac, Cynder
-                            collection::Create(type);
+                    {
+                        collection::Create(112);        // Tree Rex
+                        collection::Create(100);        // Jet-Vac
+                        collection::Create(32, 0x1801); // Series 2 Cynder
+                    }
                     else if (m_model.gameId == "swapforce")
                     {
                         collection::CreateSwapper(2015, 1015); // Wash Buckler
                         collection::CreateSwapper(2004, 1004); // Blast Zone
-                        collection::Create(109);               // Ninjini
+                        collection::Create(26, 0x2805);        // Ninja Stealth Elf
                     }
                     else if (m_model.gameId == "trapteam")
-                        for (uint16_t type : { 462, 476 }) // Snap Shot, Food Fight
-                            collection::Create(type);
+                    {
+                        collection::Create(462);         // Snap Shot
+                        collection::Create(476);         // Food Fight
+                        collection::Create(211, 0x3001); // a Water Trap
+                        collection::Create(217, 0x3003); // a Life Trap
+                    }
                     else
                         for (uint16_t type : { 16, 14, 19 }) // Spyro, Gill Grunt, Trigger Happy
                             collection::Create(type);
