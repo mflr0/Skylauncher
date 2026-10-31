@@ -81,8 +81,14 @@ namespace launcher_ui
     inline constexpr Choice GiantsLanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
         { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" }, { "sv", "Svenska" },
         { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
-    // Swap Force's disc has English and French (USA, Australia) or Spanish and Italian (Europe).
-    inline constexpr Choice SwapForceLanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "es", "Español" }, { "it", "Italiano" } };
+    // Every language a disc of Swap Force or Trap Team can hold (art::LanguagesOnDisc names them, in this order): Giants' twelve, then
+    // the other languages of the engines' list. A name the font cannot draw (Cyrillic, Greek, Japanese, Korean, Chinese) is the
+    // launcher's own word for the language, translated; the others are the language's own name, as above.
+    inline constexpr Choice AllLanguageChoices[] = { { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" }, { "es", "Español" },
+        { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" }, { "sv", "Svenska" },
+        { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" }, { "pl", "Polski" }, { "ru", N_("Russian") }, { "cs", "Čeština" },
+        { "hu", "Magyar" }, { "tr", "Türkçe" }, { "el", N_("Greek") }, { "ja", N_("Japanese") }, { "ko", N_("Korean") },
+        { "zh", N_("Chinese") } };
     inline constexpr Choice GiantsVoiceChoices[] = { { "", N_("Same as text") }, { "en", "English" }, { "fr", "Français" }, { "de", "Deutsch" },
         { "es", "Español" }, { "es-419", "Español (Latinoamérica)" }, { "it", "Italiano" }, { "nl", "Nederlands" }, { "pt", "Português" },
         { "sv", "Svenska" }, { "no", "Norsk" }, { "da", "Dansk" }, { "fi", "Suomi" } };
@@ -108,20 +114,28 @@ namespace launcher_ui
         return shown;
     }
 
-    // A game's text (`voice` false) or voice language choices: those its disc holds (stored at the last disc check), else today's full
-    // list (a game checked before this was stored; Swap Force's was English and French). The choice shown when the saved one is not
-    // among them is the first, the game's default.
+    // A game's text (`voice` false) or voice language choices: those its disc holds (stored at the last disc check), else a short list
+    // (a game checked before this was stored: Swap Force's was English and French, Trap Team's is English, the one language every disc
+    // of it can hold). Swap Force and Trap Team name any language of AllLanguageChoices, the discs differing by release. The choice
+    // shown when the saved one is not among them is the first, the game's default.
     inline std::vector<Choice> GameLanguageChoices(const LauncherConfig& config, std::string_view game, bool voice)
     {
-        art::DiscLanguages onDisc = StoredDiscLanguages(config, game);
-        if (game == "swapforce" && onDisc.text.empty())
-            onDisc.text = onDisc.voice = { "en", "fr" };
-        std::span<const Choice> all = LanguageChoices;
+        const art::DiscLanguages onDisc = StoredDiscLanguages(config, game);
+        std::vector<std::string> fewer;
         if (game == "swapforce")
-            all = SwapForceLanguageChoices;
+            fewer = { "en", "fr" };
+        else if (game == "trapteam")
+            fewer = { "en" };
+        std::span<const Choice> all = LanguageChoices;
+        if (game == "swapforce" || game == "trapteam")
+            all = AllLanguageChoices;
         else if (game == "giants")
             all = voice ? std::span<const Choice>(GiantsVoiceChoices) : std::span<const Choice>(GiantsLanguageChoices);
-        return ChoicesOnDisc(all, voice ? onDisc.voice : onDisc.text);
+        const std::vector<std::string>& held = voice ? onDisc.voice : onDisc.text;
+        std::vector<Choice> shown = ChoicesOnDisc(all, held.empty() ? fewer : held);
+        if (shown.empty()) // a stored list of codes the launcher does not know: as if it were not stored
+            shown = ChoicesOnDisc(all, fewer);
+        return shown;
     }
 
     // ---- Files and images -----------------------------------------------------------------------------------------

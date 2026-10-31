@@ -19,6 +19,8 @@ namespace launcher_ui
             constexpr const char* GameTextHint = N_("Menus, subtitles and on-screen text.");
             constexpr const char* GameVoices = N_("Game voices");
             constexpr const char* GameVoicesHint = N_("Spoken lines and cutscenes.");
+            constexpr const char* GameLanguage = N_("Game language");
+            constexpr const char* GameLanguageHint = N_("Menus, subtitles, spoken lines and cutscenes.");
             constexpr const char* RestoreSaves = N_("Restore");
             constexpr const char* RestoreSavesHint = N_("Hold to restore; your current saves are kept first.");
             constexpr const char* Reinstall = N_("Reinstall");
@@ -370,12 +372,18 @@ namespace launcher_ui
     {
         if (!ui::BeginSettings("##language"))
             return;
-        ui::SettingRow(Tr(strings::GameText), Tr(strings::GameTextHint));
+        // Trap Team's voices come with the text (its language packs hold both): one choice for the two.
+        const bool together = m_s->game.id == std::string_view("trapteam");
+        ui::SettingRow(Tr(together ? strings::GameLanguage : strings::GameText),
+            Tr(together ? strings::GameLanguageHint : strings::GameTextHint));
         const std::vector<Choice> text = GameLanguageChoices(m_config, m_s->game.id, false);
         SettingSelect("##text", m_s->game.id, "language", text, 0);
-        ui::SettingRow(Tr(strings::GameVoices), Tr(strings::GameVoicesHint));
-        const std::vector<Choice> voice = GameLanguageChoices(m_config, m_s->game.id, true);
-        SettingSelect("##voice", m_s->game.id, "voice_language", voice, 0);
+        if (!together)
+        {
+            ui::SettingRow(Tr(strings::GameVoices), Tr(strings::GameVoicesHint));
+            const std::vector<Choice> voice = GameLanguageChoices(m_config, m_s->game.id, true);
+            SettingSelect("##voice", m_s->game.id, "voice_language", voice, 0);
+        }
         ui::EndSettings();
     }
 

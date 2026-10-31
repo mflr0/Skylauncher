@@ -29,9 +29,10 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `ssa` | `language` | `en` `fr` `de` `es` `it` `nl` `sv` `no` `da` `fi` | Text language | yes |
 | `ssa` | `voice_language` | same codes | Voice language | yes |
 | `giants` | `language`, `voice_language` | `en` `fr` `de` `es` `es-419` `it` `nl` `pt` `sv` `no` `da` `fi` | Text and voice language (the disc's twelve); `voice_language` empty or absent: the voices follow the text | yes |
-| `swapforce` | `language`, `voice_language` | `en` `fr` (USA, Australia disc) or `es` `it` (Europe disc) | Text and voice language (the disc's two) | yes |
+| `swapforce` | `language`, `voice_language` | `en` `fr` (USA, Australia disc) or `es` `it` (Europe disc) | Text and voice language (the disc's two); any language of the list in "Languages a disc holds" below that its disc has | yes |
+| `trapteam` | `language` | the codes of the disc (the English and German disc: `en` `de`; the French and Dutch disc: `fr` `nl`; the list below) | Text **and voice** language: Trap Team's language packs hold both, so the Language tab has one choice (a `voice_language` is ignored) | yes |
 | `swapforce` | `nightmare_from_start` | `0` (default), `1` | The Nightmare difficulty is offered before the story is beaten; the save is not changed (Swap Force's settings > Game > Difficulty). The other games have no locked difficulty | yes |
-| each game | `disc_text_languages`, `disc_voice_languages` | codes joined by commas | Written by the launcher at each disc check: the languages the disc holds, which the Language tab lists (absent: the full list). Not for editing | no |
+| each game | `disc_text_languages`, `disc_voice_languages` | codes joined by commas | Written by the launcher at each disc check: the languages the disc holds, which the Language tab lists (absent: the full list; Swap Force English and French, Trap Team English). Not for editing | no |
 | `video` | `fullscreen` | `0`, `1` | Play in fullscreen | yes (the key is per game: see "Per-game video" below) |
 | `video` | `resolution_scale` | `auto` (default), `1` to `10` | 3D rendered at this multiple of 1120x704; `auto` picks x1 on integrated GPUs | yes |
 | `video` | `fps_limit` | `display`, `30`, `60`, `120`, `144`, `240`, `0` (unlimited) | Frame rate cap (the game is made for 30; above 60 is experimental; a computer that cannot hold 60 gets a steady 30). `display` is the display's refresh rate up to 60 and is 60 for now; it is a choice, no game's default. A game with no saved frame rate gets 60 (Giants, Swap Force) or 30 (SSA, until its 60 at scale 2 is merged), the value its page shows (`DefaultFrameRate`); PLAY writes it, and a saved value is never changed. Another number goes down to the rate below it. **Giants stops at 60**: its page lists `display`, 30 and 60, and a higher value saved for it (`[giants.video]`) becomes 60 once (`[launcher] giants_cap=1`) | yes |
@@ -60,6 +61,17 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 
 Removing the settings: Settings > Launcher > Uninstall everything deletes `launcher.ini` with everything else (`docs/install.md`, "Uninstall everything");
 the launcher then writes no settings until it is started again.
+
+## Languages a disc holds
+The Language tab lists what the disc holds (`[<game>] disc_text_languages` / `disc_voice_languages`, written at each disc check by
+`art::LanguagesOnDisc`, `src/shared/art/disc_languages.h`, a copy of the workshop's file with its tests). The codes, in the order of
+the lists: `en fr de es es-419 it nl pt sv no da fi pl ru cs hu tr el ja ko zh`. Spyro's Adventure: the `text/<folder>/` and
+`audio/<folder>/voice.bnk` folders. Swap Force: the `<name>_<code>.pak` archives, any code of the list. Giants: always the twelve first
+codes. Trap Team: its files have the same names on every release, so the check reads the entry names of `character/Init_Setup.bld`
+(`ENGLISH.pak`, `GERMAN.pak`...: the text) and of the first character archives (the voice folders `german/`, `french/`, `dutch/`...;
+English has none); it reads names only, a few hundred kilobytes at most. The English and German disc gives `en,de`, the French and Dutch
+disc `fr,nl`, for both lists. A name the font cannot draw is the launcher's word in the launcher's language (Russian/Russe, Greek/Grec,
+Japanese/Japonais, Korean/Coréen, Chinese/Chinois); an unknown code is ignored, and a list of unknown codes alone is read as not stored.
 
 ## Per-game video
 

@@ -775,11 +775,51 @@ namespace
         StoreDiscLanguages(config, "giants", { { "en", "fr" }, { "en", "fr" } });
         SETTINGS_EXPECT(values(GameLanguageChoices(config, "giants", true)) == V({ "", "en", "fr" }));
 
-        // Nothing stored (a game checked before this version): today's full lists; Swap Force's was English and French.
+        // Trap Team: the languages of the disc, text and voices, in the launcher's order, whatever order they were stored in.
+        StoreDiscLanguages(config, "trapteam", { { "fr", "nl" }, { "fr", "nl" } });
+        SETTINGS_EXPECT(config["trapteam"]["disc_text_languages"] == "fr,nl");
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "trapteam", false)) == V({ "fr", "nl" }));
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "trapteam", true)) == V({ "fr", "nl" }));
+        StoreDiscLanguages(config, "trapteam", { { "de", "en" }, { "en" } });
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "trapteam", false)) == V({ "en", "de" }));
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "trapteam", true)) == V({ "en" }));
+
+        // Languages beyond Giants' twelve are named, with a word of the launcher's where the font cannot draw the language's own,
+        // in English and in French; a code nobody knows is ignored (and a list of such codes alone is as if nothing were stored).
+        StoreDiscLanguages(config, "swapforce", { { "ru", "pl", "ja", "xx", "en" }, { "en", "ru" } });
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "swapforce", false)) == V({ "en", "pl", "ru", "ja" }));
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "swapforce", true)) == V({ "en", "ru" }));
+        for (const char* code : { "es-419", "pt", "pl", "ru", "cs", "hu", "tr", "el", "ja", "ko", "zh", "sv" })
+        {
+            const Choice* named = nullptr;
+            for (const Choice& choice : AllLanguageChoices)
+                if (std::string(choice.value) == code)
+                    named = &choice;
+            SETTINGS_EXPECT(named != nullptr);
+            i18n::SetLanguage("fr");
+            const std::string french = named != nullptr ? i18n::Tr(named->label) : "";
+            i18n::SetLanguage("en");
+            const std::string english = named != nullptr ? i18n::Tr(named->label) : "";
+            SETTINGS_EXPECT(!english.empty() && !french.empty());
+            if (std::string(code) == "ru" || std::string(code) == "el" || std::string(code) == "ja" ||
+                std::string(code) == "ko" || std::string(code) == "zh")
+                SETTINGS_EXPECT(french != english); // a word of the launcher's: translated
+            else
+                SETTINGS_EXPECT(french == english); // the language's own name
+        }
+        StoreDiscLanguages(config, "trapteam", { { "xx", "yy" }, { "zz" } });
+        SETTINGS_EXPECT(values(GameLanguageChoices(config, "trapteam", false)) == V({ "en" }) &&
+                        values(GameLanguageChoices(config, "trapteam", true)) == V({ "en" }));
+        StoreDiscLanguages(config, "ssa", { { "xx" }, { "xx" } });
+        SETTINGS_EXPECT(GameLanguageChoices(config, "ssa", false).size() == 10);
+
+        // Nothing stored (a game checked before this version): today's full lists; Swap Force's was English and French, Trap Team's
+        // is English.
         LauncherConfig old;
         SETTINGS_EXPECT(GameLanguageChoices(old, "ssa", false).size() == 10 && GameLanguageChoices(old, "giants", false).size() == 12);
         SETTINGS_EXPECT(GameLanguageChoices(old, "giants", true).size() == 13);
         SETTINGS_EXPECT(values(GameLanguageChoices(old, "swapforce", true)) == V({ "en", "fr" }));
+        SETTINGS_EXPECT(values(GameLanguageChoices(old, "trapteam", false)) == V({ "en" }));
         // Forgetting the disc clears them.
         StoreDiscLanguages(config, "swapforce", {});
         SETTINGS_EXPECT(config["swapforce"].count("disc_text_languages") == 0 && StoredDiscLanguages(config, "swapforce").text.empty());

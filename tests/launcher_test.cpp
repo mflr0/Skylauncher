@@ -1229,6 +1229,16 @@ int main(int argc, char** argv)
         printf("Swap Force (Europe) languages: text %s, voices %s\n", art::JoinLanguages(europe.languages.text).c_str(), art::JoinLanguages(europe.languages.voice).c_str());
         EXPECT(europe.status == GameSourceStatus::Ok && art::JoinLanguages(europe.languages.text) == "es,it" && art::JoinLanguages(europe.languages.voice) == "es,it");
     }
+    // A Trap Team disc (SKY_LAUNCHER_TEST_TRAPTEAM_ISO) and the languages it holds (SKY_LAUNCHER_TEST_TRAPTEAM_LANGUAGES, "fr,nl"):
+    // the text and the voices, read from the entries of its archives.
+    if (const char* trapIso = skyenv::Get("SKY_LAUNCHER_TEST_TRAPTEAM_ISO"); trapIso != nullptr && FindGame("trapteam") != nullptr)
+    {
+        GameSourceCheck trap = CheckGameSource(trapIso, *FindGame("trapteam"));
+        printf("Trap Team languages: text %s, voices %s\n", art::JoinLanguages(trap.languages.text).c_str(), art::JoinLanguages(trap.languages.voice).c_str());
+        const char* expected = skyenv::Get("SKY_LAUNCHER_TEST_TRAPTEAM_LANGUAGES");
+        EXPECT(trap.status == GameSourceStatus::Ok && expected != nullptr && art::JoinLanguages(trap.languages.text) == expected &&
+               art::JoinLanguages(trap.languages.voice) == expected);
+    }
     printf("  verified in %lld ms\n", milliseconds(start));
 
     DiscFileSystem disc;
