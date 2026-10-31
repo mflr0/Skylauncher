@@ -3919,9 +3919,9 @@ std::span<const LauncherGameEntry> LauncherGameCatalog(const LauncherConfig& con
 std::string LauncherLanguageLabel(const LauncherConfig& config, const GameInfo& game)
 {
     std::string code = SettingGet(config, game.id, "language", "en");
-    for (const Choice& choice : GiantsLanguageChoices) // a superset of the other game's
+    for (const Choice& choice : AllLanguageChoices) // a superset of every game's
         if (code == choice.value)
-            return choice.label;
+            return Tr(choice.label);
     return code;
 }
 
@@ -3931,9 +3931,9 @@ std::string LauncherVoiceLabel(const LauncherConfig& config, const GameInfo& gam
     std::string code = SettingGet(config, game.id, "voice_language", giants ? "" : "en");
     if (code.empty())
         return LauncherLanguageLabel(config, game); // Giants' voices follow the text
-    for (const Choice& choice : GiantsLanguageChoices)
+    for (const Choice& choice : AllLanguageChoices)
         if (code == choice.value)
-            return choice.label;
+            return Tr(choice.label);
     return code;
 }
 

@@ -342,11 +342,18 @@ The game stopped unexpectedly	Le jeu s'est arrêté de façon inattendue
 Couldn't download the game tools. Check your connection.	Téléchargement des outils impossible. Vérifiez votre connexion.
 The game tools are incomplete.	Les outils du jeu sont incomplets.
 Same as text	Identique au texte
+Russian	Russe
+Greek	Grec
+Japanese	Japonais
+Korean	Coréen
+Chinese	Chinois
 These game tools can't build {}	Ces outils ne permettent pas de créer {}
 Made for 30 FPS; 60 and above are experimental.	Conçu pour 30 FPS ; 60 et plus sont expérimentaux.
 Choose the disc image first	Choisissez d'abord l'image disque
 Menus, subtitles and on-screen text.	Menus, sous-titres et textes à l'écran.
 Spoken lines and cutscenes.	Voix et cinématiques.
+Game language	Langue du jeu
+Menus, subtitles, spoken lines and cutscenes.	Menus, sous-titres, voix et cinématiques.
 The installer couldn't start.	L'installateur n'a pas pu démarrer.
 Game kit not found. Put the skylanders-kit folder next to Arkeyan Launcher, then press Retry.	Kit du jeu introuvable. Placez le dossier skylanders-kit à côté d'Arkeyan Launcher, puis appuyez sur Réessayer.
 The earlier install is still stopping. Resume in a moment.	L'installation précédente s'arrête encore. Reprenez dans un instant.

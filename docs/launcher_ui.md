@@ -570,10 +570,15 @@ GitHub issue) and the GitHub link bottom right. The launcher's own language is i
    - Language: game text and game voices (`[<game>] language`, `voice_language`). Giants' disc has twelve languages for both (English,
      French, German, Spanish, Latin-American Spanish `es-419`, Italian, Dutch, Portuguese, Swedish, Norwegian, Danish, Finnish) and its
      voices default to **Same as text** (an empty `voice_language`); Spyro's Adventure has ten, its voices default to English; Swap Force's
-     disc has English and French (USA, Australia) or Spanish and Italian (Europe).
-     **The lists show only what the disc holds**: read from its file names at each disc check (`shared/art/disc_languages.h`) and kept
-     in `[<game>] disc_text_languages` / `disc_voice_languages`. A saved language the disc lacks shows the list's first entry (the
-     default); a game not checked since this was added shows today's full list.
+     disc has English and French (USA, Australia) or Spanish and Italian (Europe); Trap Team's has two (English and German, or French
+     and Dutch), one choice for text and voices together (its language packs hold both).
+     **The lists show only what the disc holds**: read from its file names (Trap Team: the entry names of two or three of its
+     archives) at each disc check (`shared/art/disc_languages.h`) and kept in `[<game>] disc_text_languages` / `disc_voice_languages`.
+     A saved language the disc lacks shows the list's first entry (the default); a game not checked since this was added shows a
+     short list (English and French for Swap Force, English for Trap Team, today's full list for the others). Beyond Giants' twelve a
+     disc may hold Polish, Russian, Czech, Hungarian, Turkish, Greek, Japanese, Korean and Chinese (`docs/settings.md`, "Languages a
+     disc holds"): Russian, Greek, Japanese, Korean and Chinese are named by the launcher's own word (the font has no glyphs for
+     them), translated; a code nobody knows in the stored list is ignored.
    - Disc: the image's file name and state; **Choose... / Change...**, **Remove** (the launcher forgets it; the file is not
      touched), **Show in folder**. Disabled while a check or an install runs.
    - Saves: **Open saves folder** and the save backups with Restore (held, refused while the game runs).

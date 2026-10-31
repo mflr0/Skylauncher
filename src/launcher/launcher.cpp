@@ -3,6 +3,7 @@
 #include "launcher/i18n.h"
 #include "launcher/ui/launcher_ui.h"
 #include "shared/collection/datadir.h"
+#include "shared/art/alchemy_archive.h"
 #include "shared/collection/game_data.h"
 #include "shared/vfs.h"
 #include <SDL3/SDL.h>
@@ -252,7 +253,20 @@ GameSourceCheck CheckGameSource(const std::string& path, const GameInfo& game, c
             std::vector<std::string> names;
             for (const auto& file : disc.Files())
                 names.push_back(file.first);
-            return { Ok, {}, sha256, {}, art::LanguagesOnDisc(game.id, names) };
+            // Trap Team's languages are entries inside two or three of its archives: their names, read from the headers.
+            auto archiveNames = [&disc](const std::string& path) {
+                std::vector<std::string> entries;
+                const DiscFileSystem::Entry* file = disc.Find(path);
+                if (file == nullptr || file->directory)
+                    return entries;
+                auto archive = art::alchemy::IgaArchive::Open(
+                    [&](uint64_t offset, size_t size, uint8_t* out) { return disc.Read(*file, offset, out, uint32_t(size)) == size; },
+                    file->size);
+                for (size_t i = 0; archive && i < archive->Count(); i++)
+                    entries.push_back(archive->Name(i));
+                return entries;
+            };
+            return { Ok, {}, sha256, {}, art::LanguagesOnDisc(game.id, names, archiveNames) };
         }
     }
     for (const GameRelease& release : game.releases)
