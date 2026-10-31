@@ -1456,7 +1456,7 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(ImVec2(origin.x, top));
         DrawUpdateAll(ImVec2(origin.x + width, origin.y));
 
-        // The playable games: a card each, in the game's colours, its logo, its state at the bottom.
+        // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
         std::vector<const LauncherGameEntry*> playable, later;
         for (const LauncherGameEntry& entry : LauncherGameCatalog(m_config))
             (entry.enabled && FindGame(entry.id) != nullptr ? playable : later).push_back(&entry);
@@ -1501,8 +1501,20 @@ namespace launcher_ui
 
             const GameStyle& style = StyleOf(entry.id);
             ui::SoftShadow(draw, at, end, ui::radius::Panel, ui::space::XS, ui::space::S, ui::elevation::Raised.shadowAlpha);
-            // The game's colours, the same way on every card: the discs' paintings are too unlike each other here.
-            ui::GradientRect(draw, at, end, Rgb(style.bottom), Rgb(style.outline), ui::radius::Panel);
+            if (const ArtTexture* art = CachedArt(entry.id, LauncherAssets::Role::HeroBackground, 640))
+            {
+                float w, h;
+                SDL_GetTextureSize(art->texture, &w, &h);
+                float scale = std::max(cardW / w, cardH / h), u = cardW / (w * scale), v = cardH / (h * scale);
+                draw->AddImageRounded(Ref(art->texture), at, end, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2),
+                    ui::Col(0xFFFFFF, hovered ? 1.0f : 0.88f), ui::radius::Panel);
+                draw->AddRectFilled(at, end, ui::Col(ui::color::Scrim, ArtDim), ui::radius::Panel);
+            }
+            else
+            {
+                // Not read yet: the game's colours, as its buttons have them.
+                ui::GradientRect(draw, at, end, Rgb(style.bottom), Rgb(style.outline), ui::radius::Panel);
+            }
             // The bottom fades to dark for the name; the logo sits in the upper part.
             ui::GradientRect(draw, ImVec2(at.x, at.y + cardH * 0.45f), end, ui::Col(ui::color::Scrim, 0), ui::Col(ui::color::Scrim, 0.92f), ui::radius::Panel,
                 ImDrawFlags_RoundCornersBottom);
