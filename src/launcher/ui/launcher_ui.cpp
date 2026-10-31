@@ -1456,28 +1456,32 @@ namespace launcher_ui
         ImGui::SetCursorScreenPos(ImVec2(origin.x, top));
         DrawUpdateAll(ImVec2(origin.x + width, origin.y));
 
-        // The playable games: a card each, the game's painting behind its logo, its state at the bottom.
+        // The playable games: a card each, in the game's colours, its logo, its state at the bottom.
         std::vector<const LauncherGameEntry*> playable, later;
         for (const LauncherGameEntry& entry : LauncherGameCatalog(m_config))
             (entry.enabled && FindGame(entry.id) != nullptr ? playable : later).push_back(&entry);
         const float gap = ui::space::L;
-        const float cardW = (width - gap * float(playable.size() - 1)) / float(std::max<size_t>(playable.size(), 1));
+        // Two games a row: room for the logo and the text.
+        constexpr size_t Columns = 2;
+        const size_t rows = std::max<size_t>((playable.size() + Columns - 1) / Columns, 1);
+        const float cardW = (width - gap * float(Columns - 1)) / float(Columns);
         const float below = ui::space::XL + ui::SizeOf(ui::TextStyle::Caption) + 3 * ui::height::Normal; // the coming-later row and the links
-        const float cardH = std::min(cardW * 0.85f, size.y - origin.y - below - ui::height::Large);
+        const float cardH = std::min(cardW * 0.5f, (size.y - origin.y - below - ui::height::Large - gap * float(rows - 1)) / float(rows));
         const ImVec2 row = ImGui::GetCursorScreenPos();
         // Every card says the game's full name, all at one size: the largest at which the longest fits (never cut, never
         // the short name on one card and the full name on another). A card without the disc's logo shows the short name in
         // its place, like a logo's big word, at one size too.
-        float nameSize = ui::type::Label, logoNameSize = ui::type::Display;
+        float nameSize = ui::type::Title, logoNameSize = ui::type::Display;
         for (const LauncherGameEntry* entry : playable)
         {
-            nameSize = std::min(nameSize, ui::FitSize(ui::Ctx().fonts.bold, ui::type::Label, GameName(entry->id), cardW - 2 * ui::space::L));
+            nameSize = std::min(nameSize, ui::FitSize(ui::Ctx().fonts.bold, ui::type::Title, GameName(entry->id), cardW - 2 * ui::space::L));
             logoNameSize = std::min(logoNameSize, ui::FitSize(ui::Ctx().fonts.title, ui::type::Display, GameName(entry->id, GameNameForm::Short), cardW * 0.84f));
         }
         for (size_t i = 0; i < playable.size(); i++)
         {
             const LauncherGameEntry& entry = *playable[i];
-            const ImVec2 at(row.x + float(i) * (cardW + gap), row.y), end(at.x + cardW, at.y + cardH);
+            const ImVec2 at(row.x + float(i % Columns) * (cardW + gap), row.y + float(i / Columns) * (cardH + gap)),
+                end(at.x + cardW, at.y + cardH);
             ImGui::SetCursorScreenPos(at);
             ImGui::PushID(entry.id);
             const bool pressed = ui::Hit("##card", ImVec2(cardW, cardH));
@@ -1497,20 +1501,8 @@ namespace launcher_ui
 
             const GameStyle& style = StyleOf(entry.id);
             ui::SoftShadow(draw, at, end, ui::radius::Panel, ui::space::XS, ui::space::S, ui::elevation::Raised.shadowAlpha);
-            if (const ArtTexture* art = CachedArt(entry.id, LauncherAssets::Role::HeroBackground, 640))
-            {
-                float w, h;
-                SDL_GetTextureSize(art->texture, &w, &h);
-                float scale = std::max(cardW / w, cardH / h), u = cardW / (w * scale), v = cardH / (h * scale);
-                draw->AddImageRounded(Ref(art->texture), at, end, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2),
-                    ui::Col(0xFFFFFF, hovered ? 1.0f : 0.88f), ui::radius::Panel);
-                draw->AddRectFilled(at, end, ui::Col(ui::color::Scrim, ArtDim), ui::radius::Panel);
-            }
-            else
-            {
-                // Not read yet: the game's colours, as its buttons have them.
-                ui::GradientRect(draw, at, end, Rgb(style.bottom), Rgb(style.outline), ui::radius::Panel);
-            }
+            // The game's colours, the same way on every card: the discs' paintings are too unlike each other here.
+            ui::GradientRect(draw, at, end, Rgb(style.bottom), Rgb(style.outline), ui::radius::Panel);
             // The bottom fades to dark for the name; the logo sits in the upper part.
             ui::GradientRect(draw, ImVec2(at.x, at.y + cardH * 0.45f), end, ui::Col(ui::color::Scrim, 0), ui::Col(ui::color::Scrim, 0.92f), ui::radius::Panel,
                 ImDrawFlags_RoundCornersBottom);
@@ -1546,7 +1538,7 @@ namespace launcher_ui
                 ui::FocusRing(at, end, ui::radius::Panel);
         }
         // The games still to come, a section's air (XL) below: their names, in their colours, quietly.
-        const float laterTop = row.y + cardH + ui::space::XL;
+        const float laterTop = row.y + float(rows) * cardH + gap * float(rows - 1) + ui::space::XL;
         ui::PushText(ui::TextStyle::Caption, true);
         ui::DrawText(draw, ImVec2(row.x, laterTop), ui::Col(ui::color::Dim), Tr("COMING LATER"));
         ui::PopText();

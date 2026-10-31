@@ -93,7 +93,7 @@ namespace LauncherTheme
     inline constexpr float LogoDropMs = 300, LogoDropDistance = 44;
     inline constexpr unsigned BackdropTopShade = 120, BackdropBottomShade = 235; // alpha of SkyTop over the game's painting
     inline constexpr int BackdropArtW = 1024; // the painting's width as a texture (Giants' is 1600 px)
-    inline constexpr float ArtDim = 0.25f; // alpha of Scrim over every game's painting (the game page, Home's cards)
+    inline constexpr float ArtDim = 0.25f; // alpha of Scrim over every game's painting (the game page)
     // The sidebar's game rows: the logo's box on the left, the name and status beside it.
     inline constexpr float GameLogoW = 72, GameLogoH = 38;
 
