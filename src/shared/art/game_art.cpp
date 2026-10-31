@@ -31,7 +31,8 @@ namespace art
     namespace
     {
         // Bump when a picture is read or composed differently: the cached pictures (not the portraits) are made again.
-        constexpr int CacheVersion = 5; // 5: the scenes (<cache>/scenes/); 4: Swap Force's logo from its lossless 32-bit picture
+        constexpr int CacheVersion =
+            5; // 5: the scenes (<cache>/scenes/); 4: Swap Force's logo from its lossless 32-bit picture
 
         std::string Lower(std::string text)
         {
@@ -479,8 +480,8 @@ namespace art
 
         // Reads the scenes of `m` into `folder`, one by one (a disc that lacks one skips it); false when `stop` was raised
         // before the end.
-        bool ReadScenes(const Manifest& m, const Disc& disc, const std::filesystem::path& folder,
-            const std::atomic<bool>* stop)
+        bool ReadScenes(
+            const Manifest& m, const Disc& disc, const std::filesystem::path& folder, const std::atomic<bool>* stop)
         {
             std::error_code error;
             for (const SceneGroup& group : m.scenes)
@@ -851,7 +852,8 @@ namespace art
         std::error_code error;
         std::filesystem::create_directories(folder, error);
         if (!ScenesRead(game) && ReadScenes(*where, disc, folder, stop))
-            std::ofstream(folder / "done", std::ios::trunc) << CacheVersion << "\n"; // asked no more until the reader changes
+            std::ofstream(folder / "done", std::ios::trunc)
+                << CacheVersion << "\n"; // asked no more until the reader changes
         int present = 0;
         for (const auto& entry : ListDirectory(folder, error))
             present += entry.path().extension() == ".png";
