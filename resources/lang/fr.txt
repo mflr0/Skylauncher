@@ -605,6 +605,7 @@ Other	Autre
 Pick one below	Voir ci-dessous
 Player {}	Joueur {}
 Playing now	En jeu
+Playing now · {} this session	En jeu · {} cette session
 Plays in	Joue dans
 Put back	Remettre
 Put back: 	Remise : 
@@ -861,7 +862,6 @@ Live	En direct
 Not installed yet	Pas encore installé
 Installing · {}	Installation · {}
 Ready · {} played	Prêt · {} de jeu
-Close or switch to the game in its own window.	Fermez le jeu ou retrouvez sa fenêtre directement.
 Show the game	Afficher le jeu
 Stopping...	Arrêt en cours...
 Couldn't show the game window.	Impossible d’afficher la fenêtre du jeu.
