@@ -12,6 +12,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #elif defined(_WIN32)
 #include <windows.h>
+#undef DrawText // ui::DrawText
 #endif
 
 namespace LauncherTheme
