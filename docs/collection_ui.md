@@ -138,8 +138,11 @@ At the first visit to the page (`CollectionPage::Open`):
 - **Sort** (the Select of the bar): Recent (the default: favorites first, then what the game took, then by element), Name, Level (highest
   first), Element, Game. The other four ignore favorites. `ShelfFilter::sort`.
 - **The shelf** (`CollectionModel::Shelf`, `collection::Group` Smart for the portal's game): every figure once,
-  favorites first, then the ones that game took (newest first), then by element; "Unknown toys" and "Not for
-  Spyro's Adventure" (greyed: they can't go on this portal) after it. The untouched starters the game made on its own
+  favorites first, then the ones that game took (newest first), then by element; "Unknown toys" follow it.
+  Figures the selected game cannot read stay in their usual places for every sort, greyed, with "Not for <game>"
+  in the existing state line. Clicking one shows the existing incompatibility toast and leaves the seats unchanged;
+  right click still opens its sheet. The saved `fold_foreign` setting has no effect on this shelf.
+  The untouched starters the game made on its own
   are left out (Manage > Tidy). A card: the picture, the name (the label, else the toy's name with the game's nickname:
   "Gill Grunt (Splash)"), the level line for the portal's game, the star, the variant's name, P1/P2/"On" for the seats.
   The Toy Box draws the same card.
@@ -211,7 +214,9 @@ At the first visit to the page (`CollectionPage::Open`):
   backups, restore, reset, duplicate, trash, import dedupe, JSON locks (live, stale), seats and `portal.txt`, live
   refresh, settings move, unknown toy naming, icons for every catalogue toy (and the family's mark on items and packs),
   **the shelf** (every figure once, none left out, favorites first; choosing for the Magic item seat shows only the
-  item; for a player seat only characters; the Element, Game and search filters, the smart search in both languages with a typo and a level, the sort), the card's level ("Level 10"), and
+  item; for a player seat only characters; the Element, Game and search filters, the smart search in both languages with a typo and a level, the sort;
+  six games mixed on one shelf, incompatible figures in every sort, per-game Recent dates, both saved `fold_foreign`
+  values, changing games, and refusing an incompatible seat without changing `portal.txt`), the card's level ("Level 10"), and
   that Giants and Swap Force can be prepared but not the games without a runtime, **the swapper cards** (a swapper once on the
   shelf whichever half a search or a filter matches, one seat and two lines of `portal.txt` for it, a bottom first in the
   file still one seat, Change the bottom, Delete and Undelete of both halves, a lone half deleted alone). Seat X: 12 of 12. Everything runs in a scratch
@@ -227,7 +232,8 @@ At the first visit to the page (`CollectionPage::Open`):
   focus ring on a card and on a seat (`60-`, `61-`), a Trap Team trap's sheet and its Edit (`62-`, `63-`: the villain list and the Evolved switch), then `collection-bottom` with the shelf scrolled to its end and the space under its last row visible. `SKY_LAUNCHER_TEST_COLLECTION=pad` shows the page as a pad player sees it (the legend). With `SKY_LAUNCHER_TEST_SWAPPERS=1` the collection also holds all
   16 swappers matched and four mixed ones, and `53-all-swappers` (Swap Force's swapper cards; use `SKY_LAUNCHER_TEST_SIZE=1700x1500`
   to see them all), `54-mixed-swapper-sheet` and `55-add-swapper-versions` are written. Set `SKYLANDERS_DATA`
-  to a folder holding the discs' cached pictures to see them (else the drawn icons).
+  to a folder holding the discs' cached pictures to see them (else the drawn icons). `62-trapteam-greyed` shows figures
+  from several games with Trap Team selected, sorted by name, including the later figures greyed on the main shelf.
 - End to end with the real game: seats prepared by the launcher, the game started with the same
   `SKY_COLLECTION`/`SKY_SAVE_DIR`, no `SKY_PORTAL_PLACE`: its log says which figures it took and the launcher shows the
   locks while it runs and the stats after.

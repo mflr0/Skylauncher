@@ -83,8 +83,9 @@ namespace launcher_ui
         // The game holding a figure right now ("ssa"), empty when none: its portal is live, the seats are read-only.
         std::string RunningGame() const;
         bool CanEditSeats() const;
+        bool Incompatible(const collection::Figure& figure) const;
         // Puts the figure on the seat (taking it off any other seat), or clears the seat with an empty path, and writes
-        // the session file. False when the seats cannot be changed now.
+        // the session file. False when the seats cannot be changed now or the game cannot read the figure.
         bool SetSeat(size_t seat, const std::string& path);
         int SeatOf(const std::string& path) const; // -1 if on no seat
         // Moves the figure to the trash (collection::Delete), takes it off its seat and reloads. False, with the reason,
@@ -95,8 +96,8 @@ namespace launcher_ui
         std::vector<std::string> OnPortal() const; // the seated paths
         // The figures the page shows, into `shown`, cut by collection::Group's shelf for Game(): every figure once,
         // favorites first, then what the game took (newest first), then by element (Sort::Recent; the other sorts ignore
-        // favorites); unknown toys and the toys the game
-        // does not read after (none of those when choosing for a seat). The untouched starters the game made on its own
+        // favorites); incompatible figures keep their normal place, unknown toys follow the shelf. Choosing for a seat
+        // leaves out incompatible figures. The untouched starters the game made on its own
         // are left out unless seated; `hidden` (optional) counts them.
         std::vector<collection::Section> Shelf(const ShelfFilter& filter, std::vector<collection::Figure>& shown, int* hidden = nullptr) const;
 

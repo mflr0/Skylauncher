@@ -482,6 +482,82 @@ namespace
             EXPECT(catalogue.FindGame("trapteam") != nullptr && catalogue.Accepts("trapteam", 14));
         }
 
+        // Incompatible figures stay in their normal places for every sort; the selected game's dates still order Recent.
+        {
+            launcher_ui::CollectionModel mixed;
+            mixed.gameId = "trapteam";
+            for (const std::string game : { "ssa", "giants", "swapforce", "trapteam", "superchargers", "imaginators" })
+                for (const collection::Toy& toy : catalogue.Toys())
+                    if (toy.game == game && (toy.category == collection::Category::Core ||
+                        toy.category == collection::Category::SuperCharger || toy.category == collection::Category::Sensei))
+                    {
+                        collection::Figure f;
+                        f.toy = &toy;
+                        f.type = toy.type;
+                        f.path = f.file = game + ".sky";
+                        f.origin = "created";
+                        f.level = 7 - int(mixed.figures.size());
+                        mixed.figures.push_back(f);
+                        break;
+                    }
+            EXPECT(mixed.figures.size() == 6);
+            mixed.figures[0].uses = { { "trapteam", "2026-10-28", 1 } };
+            mixed.figures[1].uses = { { "trapteam", "2026-10-29", 1 } };
+            mixed.figures[2].uses = { { "giants", "2026-10-30", 1 } };
+            mixed.figures.back().favourite = true;
+            for (size_t i = 0; i < mixed.figures.size(); ++i)
+                EXPECT(mixed.Incompatible(mixed.figures[i]) == (i >= 4));
+            std::vector<collection::Figure> shown;
+            for (bool folded : { false, true })
+            {
+                collection::View view = collection::GetView("trapteam", "launcher");
+                view.foldForeign = folded;
+                EXPECT(collection::SetView("trapteam", "launcher", view));
+                for (int sort = 0; sort < int(collection::Sort::Count); ++sort)
+                {
+                    launcher_ui::ShelfFilter filter;
+                    filter.sort = collection::Sort(sort);
+                    auto sections = mixed.Shelf(filter, shown);
+                    EXPECT(sections.size() == 1 && sections[0].kind == collection::Section::Kind::Shelf);
+                    if (sections.empty())
+                        continue;
+                    const auto& items = sections[0].items;
+                    EXPECT(items.size() == 6 && std::set<size_t>(items.begin(), items.end()).size() == 6);
+                    EXPECT(shown[0].LastUsedIn("trapteam") == "2026-10-28" && shown[0].LastUsedIn("").empty());
+                    if (filter.sort == collection::Sort::Recent)
+                        EXPECT(items[0] == 5 && items[1] == 1 && items[2] == 0);
+                    if (filter.sort == collection::Sort::Name)
+                    {
+                        std::vector<std::string> names;
+                        for (size_t i : items)
+                            names.push_back(collection::Fold(shown[i].DisplayName()));
+                        EXPECT(std::is_sorted(names.begin(), names.end()));
+                    }
+                    if (filter.sort == collection::Sort::Level || filter.sort == collection::Sort::Game)
+                        EXPECT(items == std::vector<size_t>({ 0, 1, 2, 3, 4, 5 }));
+                }
+            }
+            launcher_ui::ShelfFilter filter;
+            filter.game = "trapteam";
+            mixed.Shelf(filter, shown);
+            EXPECT(shown.size() == 4 && std::none_of(shown.begin(), shown.end(), [&](const auto& f) { return mixed.Incompatible(f); }));
+            filter.game.clear();
+            filter.seat = 0;
+            mixed.Shelf(filter, shown);
+            EXPECT(shown.size() == 4);
+            mixed.gameId = "imaginators";
+            EXPECT(std::none_of(mixed.figures.begin(), mixed.figures.end(), [&](const auto& f) { return mixed.Incompatible(f); }));
+            mixed.gameId = "ssa";
+            EXPECT(mixed.Incompatible(mixed.figures[1]) && !mixed.Incompatible(mixed.figures[0]));
+            // Refusing a later figure must leave the current seats and portal.txt unchanged.
+            mixed.seats = model.seats;
+            const auto seatsBefore = mixed.seats;
+            const auto sessionBefore = bytesOf(session);
+            EXPECT(!mixed.SetSeat(0, mixed.figures[1].path) && mixed.seats == seatsBefore && bytesOf(session) == sessionBefore);
+            collection::Figure unknown;
+            EXPECT(!mixed.Incompatible(unknown));
+        }
+
         // The launcher's own earlier state moves over: favorites and "starts on the portal", by name.
         fs::remove(session);
         std::vector<std::string> moved = launcher_ui::MoveLauncherSettings(ssa, legacy.string(), { "016 Spyro.sky" }, { "200 Anvil Rain.sky", "014 Gill Grunt.sky", "new:5" });

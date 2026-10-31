@@ -317,7 +317,7 @@ namespace launcher_ui
             "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-versions", "47-search-element", "48-search-level",
             "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name", "53-all-swappers", "54-mixed-swapper-sheet",
             "55-add-swapper-versions", "56-add-no-match", "57-manage-menu", "58-figure-menu", "59-put-on-menu", "60-focus-card", "61-focus-seat",
-            "62-trap-sheet", "63-trap-edit", "collection-bottom" };
+            "62-trap-sheet", "63-trap-edit", "collection-bottom", "64-trapteam-greyed" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -381,7 +381,7 @@ namespace launcher_ui
         for (const std::string& path : { gill, spyro, trigger, bash, legendary })
             collection::Touch(path, "ssa");
         collection::Backup(gill);
-        // A toy of a later game, shown in "Not for this game".
+        // A toy of a later game, greyed on an earlier game's shelf.
         for (const collection::Toy& toy : collection::Catalogue::Get().Toys())
             if (toy.game == "giants" && toy.category == collection::Category::Giant)
             {
@@ -740,6 +740,19 @@ namespace launcher_ui
         }
         case 44: // the shelf scrolled to its very end
             m_testScrollBottom = true;
+            break;
+        case 43: // Trap Team: figures from each game share the shelf, later figures greyed in their usual places.
+            SelectPortalGame("trapteam");
+            for (const collection::Game& game : collection::Catalogue::Get().Games())
+                for (const collection::Toy& toy : collection::Catalogue::Get().Toys())
+                    if (toy.game == game.id && (toy.category == collection::Category::Core ||
+                        toy.category == collection::Category::SuperCharger || toy.category == collection::Category::Sensei))
+                    {
+                        collection::Create(toy.type);
+                        break;
+                    }
+            Reload();
+            m_filter.sort = collection::Sort::Name;
             break;
         default: break;
         }
