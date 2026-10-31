@@ -24,9 +24,17 @@ namespace collection
     // An empty query matches everything. `game` ("ssa", "swapforce"...) fixes the level cap the card shows.
     bool SearchMatches(const std::string& query, const Card& card, const std::string& game);
 
-    // How the shelf is ordered. Recent is the shelf of old: favorites first, then what the game took last, then by
-    // element; the others ignore favorites.
-    enum class Sort { Recent, Name, Level, Element, Game, Count };
+    // How the shelf is ordered. Recent is the shelf of old: favourites first, then what the game took last, then by
+    // element; the others ignore favourites.
+    enum class Sort
+    {
+        Recent,
+        Name,
+        Level,
+        Element,
+        Game,
+        Count
+    };
     const char* SortId(Sort sort);          // "recent", "name", "level", "element", "game"
     Sort ParseSort(const std::string& id);  // Recent when unknown
     // The sort's name in the apps' menus and tags ("Recent" / "Récents"), the same words in both apps.
