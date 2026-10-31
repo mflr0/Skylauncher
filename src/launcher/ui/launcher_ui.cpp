@@ -1066,6 +1066,8 @@ namespace launcher_ui
                     const float right = std::min(x + tileW, size.x), bottom = std::min(y + tileH, size.y);
                     draw->AddImage(Ref(background), ImVec2(x, y), ImVec2(right, bottom), uv(x, y), uv(right, bottom));
                 }
+            // One light dim over the whole painting, the same for every game, so the logo and the text read on pale art.
+            draw->AddRectFilled(page, size, ui::Col(ui::color::Scrim, ArtDim));
             // Continuous shades across the painting: the title's left and the controls' lower edge.
             draw->AddRectFilledMultiColor(page, size, ui::Col(ui::color::Scrim, 0.9f), ui::Col(ui::color::Scrim, 0.12f),
                 ui::Col(ui::color::Scrim, 0.12f), ui::Col(ui::color::Scrim, 0.9f));
@@ -1502,6 +1504,7 @@ namespace launcher_ui
                 float scale = std::max(cardW / w, cardH / h), u = cardW / (w * scale), v = cardH / (h * scale);
                 draw->AddImageRounded(Ref(art->texture), at, end, ImVec2((1 - u) / 2, (1 - v) / 2), ImVec2((1 + u) / 2, (1 + v) / 2),
                     ui::Col(0xFFFFFF, hovered ? 1.0f : 0.88f), ui::radius::Panel);
+                draw->AddRectFilled(at, end, ui::Col(ui::color::Scrim, ArtDim), ui::radius::Panel);
             }
             else
             {

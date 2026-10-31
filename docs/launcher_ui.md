@@ -621,7 +621,9 @@ every game shows its real state and art at once ("Update all" on Home's title li
 ## Game page hero
 The page keeps XL margins and an L gap between two columns. The left contains the disc's logo, fitted with its aspect
 kept and aligned to the title edge, or a Bungee name under Skylanders. The right panel and the controls share a lower
-edge. Continuous dark gradients cover the painting's left and lower edges. Without art the current night sky remains.
+edge. Continuous dark gradients cover the painting's left and lower edges, under one light dim over the whole painting
+(`ArtDim` 0.25 of the Scrim colour, in `launcher_theme.h`; the same on every game's page and on Home's cards, so pale art
+keeps the logo and the status line readable). Without art the current night sky remains.
 The portal column narrows from 400 to 264 points at small window sizes; longer names wrap or ellipsize inside their column.
 
 - **Ready**: the logo or name, Ready to play (with the recorded play time and last-played date when available), Play,
