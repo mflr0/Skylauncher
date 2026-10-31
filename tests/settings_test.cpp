@@ -142,7 +142,14 @@ namespace
         SETTINGS_EXPECT(config["ssa.video"]["fps_limit"] == "60" && config["giants.video"]["vsync"] == "0");
         SETTINGS_EXPECT(config["ssa.video"].count("custom") == 0);
 
-        SETTINGS_EXPECT(GameKeys("trapteam").size() == GameKeys("swapforce").size());
+        // Trap Team has its own controls: LT is its tag team, LB and RB are not among them.
+        bool tagTeam = false, shoulders = false;
+        for (const GameKey& key : GameKeys("trapteam"))
+        {
+            tagTeam = tagTeam || (std::string_view(key.action) == "lt" && std::string_view(key.label) == "Switch Skylander / Villain");
+            shoulders = shoulders || std::string_view(key.action) == "lb" || std::string_view(key.action) == "rb";
+        }
+        SETTINGS_EXPECT(tagTeam && !shoulders);
         SeedGameVideo(config, "trapteam");
         SETTINGS_EXPECT(config["trapteam.video"]["fps_limit"] == "30" && config["trapteam.video"]["vsync"] == "0");
         config["trapteam.video"]["fps_limit"] = "60";

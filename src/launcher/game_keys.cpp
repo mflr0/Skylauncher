@@ -37,6 +37,14 @@ namespace
         { "lt", N_("Interact"), "LT", SDL_SCANCODE_1 }, { "rt", N_("Interact"), "RT", SDL_SCANCODE_3 },
         { "back", N_("Skylanders Stats"), "Back", SDL_SCANCODE_BACKSPACE }, { "start", N_("Pause"), "Start", SDL_SCANCODE_RETURN },
     };
+    // LT is the game's tag team. LB and RB are not in its controls: Swap Force's extra attacks are not proved here.
+    constexpr GameKey TrapTeam[] = {
+        MOVE_ROWS,
+        { "a", N_("Jump"), "A", SDL_SCANCODE_SPACE }, { "x", N_("Attack 1"), "X", SDL_SCANCODE_C },
+        { "b", N_("Attack 2"), "B", SDL_SCANCODE_X }, { "y", N_("Attack 3"), "Y", SDL_SCANCODE_V },
+        { "lt", N_("Switch Skylander / Villain"), "LT", SDL_SCANCODE_1 }, { "rt", N_("Interact"), "RT", SDL_SCANCODE_3 },
+        { "back", N_("Skylander/Villain Stats"), "Back", SDL_SCANCODE_BACKSPACE }, { "start", N_("Pause"), "Start", SDL_SCANCODE_RETURN },
+    };
 
     // The SDL names of the keys the launcher words in the player's language (the others, letters and digits, are the same everywhere).
     constexpr std::array<const char*, 16> KeyNames = { N_("Space"), N_("Return"), N_("Backspace"), N_("Escape"), N_("Up"), N_("Down"),
@@ -69,8 +77,10 @@ std::span<const GameKey> GameKeys(std::string_view gameId)
         return Ssa;
     if (gameId == "giants")
         return Giants;
-    if (gameId == "swapforce" || gameId == "trapteam")
+    if (gameId == "swapforce")
         return SwapForce;
+    if (gameId == "trapteam")
+        return TrapTeam;
     return {};
 }
 

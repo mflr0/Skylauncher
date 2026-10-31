@@ -756,6 +756,8 @@ Attack 2	Attaque 2
 Attack 3	Attaque 3
 Attack 3 / Back	Attaque 3 / Retour
 Jump	Sauter
+Switch Skylander / Villain	Changer Skylander / Vilain
+Skylander/Villain Stats	Stats Skylander/Vilain
 Skylanders Stats	Stats Skylanders
 Pause	Pause
 Hold to reset every key of this game.	Maintenez pour réinitialiser toutes les touches de ce jeu.
