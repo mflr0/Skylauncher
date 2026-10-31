@@ -129,8 +129,7 @@ At the first visit to the page (`CollectionPage::Open`):
   reads: Giants reads every Spyro's Adventure toy, Spyro's Adventure no Giants toy) and **Type** (the types the collection has), and **Clear all**.
   Under the bar, only when something is on, the **tags**: one filter Chip per filter (a check; a click turns it off), **Clear
   all**, and the count at the right ("12 figures", "1 figure"; French "12 figurines"). Nothing matches: an EmptyState "No figure
-  matches" with "Clear search and filters"; an empty collection: an EmptyState with "Add a figure" and, under it, "Start with
-  Spyro, Gill Grunt, Trigger Happy".
+  matches" with "Clear search and filters"; an empty collection: an EmptyState with "Add a figure" and, under it, "Create the <game> starter pack" (the game chosen: its starter pack's figures).
 - **The smart search** (`collection::SearchMatches`, shared with the game): the words all have to match; a name
   (label, nickname, toy, version, file), an element ("fire", "feu"), a game ("giants", "swap force"), a type ("item",
   "objet", "adventure", "mini", "swapper"), a version ("legendary", "lightcore"), "level 10" / "niveau 10"; case and

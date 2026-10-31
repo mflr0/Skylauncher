@@ -633,7 +633,7 @@ Show the collection folder	Afficher le dossier de la collection
 Silver	Argent
 Skylanders	Skylanders
 Standard	Standard
-Start with Spyro, Gill Grunt, Trigger Happy	Commencer avec Spyro, Gill Grunt, Trigger Happy
+Create the {} starter pack	Créer le starter pack {}
 SuperChargers	SuperChargers
 Swap Force bottoms	Swap Force (bas)
 Swap Force tops	Swap Force (haut)
