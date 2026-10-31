@@ -5,6 +5,9 @@
   "about": "Where Spyro's Adventure keeps its pictures on the disc (docs/runtime/host/game_art.md). Names only: the pictures are read from the player's own disc.",
   "logo": { "stream": "uiimage.str", "picture": "skylanderslogo" },
   "background": { "stream": "uiimage.str", "picture": "fullscreen_000" },
+  "scenes": [ { "stream": "uiimage.str", "names": [ "fullscreen_000" ] },
+              { "stream": "uigameimage.str", "names": [ "fullscreen_001", "fullscreen_003", "fullscreen_008", "fullscreen_009",
+                                                          "fullscreen_018", "fullscreen_challenge_018" ] } ],
   "portraits": { "stream": "uigameimage.str", "pictures": ["toy_{name}_hud", "{name}_vs"], "images": true },
   "upgrades": { "stream": "global.str", "text": "text/{language}/global.lxb", "languages": { "en": "eng", "fr": "fre" } }
 }

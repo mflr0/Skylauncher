@@ -910,10 +910,27 @@ differs per game is the provider's table.
 | Role | Spyro's Adventure | Giants | Swap Force | File |
 | --- | --- | --- | --- | --- |
 | Logo (game page, sidebar, Home) | `skylanderslogo` in `uiimage.str` (1024x512, DXT5) | composed from the title's sprite sheet (`level/Title.bld`, 1033x541, with the plate and the medallions) | the title picture of `defaultloadscreen.pak` (`juicestandard_title_00.igz`, 872x400, the 32-bit lossless one; the disc has no larger logo) | `<data>/<Game>/launcher-cache/logo.png` |
-| Background (game page, Home) | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | the main menu's background of `juicedomain_frontend.pak` (1280x720) | `.../background.png` |
+| Background (game page, Home): the first of the scenes below, kept as `background.png` | `fullscreen_000` in `uiimage.str` (512x512, the painted sky) | `ui_levelfullscreen/mainmenu.png` in `permanent/global.arc` (1600x960) | the main menu's background of `juicedomain_frontend.pak` (1280x720) | `.../background.png` |
 | Title icon | `default.xex` XDBF resource | the same | the same | `.../title_icon.png` |
 | Toy portraits (collection) | `toy_<name>_hud` (128 px), `<name>_vs` (512 px), 4 items and 3 family icons (potion, compass, paw) of `uigameimage.str`: 81 | the collection screen's 123 portraits (256 px) | the toy collection's portraits and the collectible icons of `toycollectionimages.pak` and `collectibleicons.pak`: 209 | `<data>/<Game>/portraits/` |
 
+- **A random scene of each game.** The game page and the Home card show no character: one painted scene of the game, picked
+  at random at each launcher start (no setting, no button). The manifest's `scenes` lists them (the first is the
+  background above); each is a whole-window picture of the disc without a character or a word in it, and sharp enough
+  at about 1500 px wide: Trap Team's `levelload_3xx` worlds (15 of 22: the others have a character, or are too dark),
+  Giants' and Spyro's Adventure's painted skies plus Giants' main menu painting (their `level_*` pictures are thumbnails
+  with a baked frame, 1024x430 and posterised: left out), Swap Force's menu painting and the skies of its level summaries
+  (`levelsummarymaterials.pak`; `pvpmenu` has a word on it, the 600x340 skies with no shape at all were left out).
+  Every other picture of a disc was looked at on a contact sheet; a disc that lacks one of the listed skips it.
+  - `art::ExtractScenes` reads them into `launcher-cache/scenes/<name>.png`, **apart from the check**: the worker of
+    `VerifyJob::StartScenes` runs it after the check and its page is shown (Giants' take about 2 s), and stops at the next
+    scene when the launcher quits. `scenes/done` records that this version of the reader has looked, so a later start reads
+    nothing; the first start shows the menu painting (`background.png`) and the scenes come at the next one.
+  - `App::SceneOf(game)`, used by `CachedArt` for the background of the page and of the Home card (the same scene on both),
+    picks among the scenes cached with `art::PickScene` at the first need of the run and keeps it; never the one of the
+    last run (`last_scene` of the game's section of `launcher.ini`, `docs/settings.md`) when there are two or more. The
+    dim and the shades of `DrawBackdrop` are the same for all, so the logo, the status and PLAY stay readable on the
+    palest sky. `SKY_LAUNCHER_TEST_SCENE=<name>` shows a given one; the hero screenshot test shows the first.
 - Already cached pictures are kept (a second check reads nothing); `manifest.ini` records the reader's version and what
   was found. Deleting the folders is always safe. The cache of older launchers (`SSA/launcher-cache/<title id>/`, for every
   game) is removed at the next check.

@@ -166,8 +166,15 @@ namespace launcher_ui
         TitleMetadata meta;
         LauncherAssets::Provider assets; // the disc's art and figure pictures, cached here too (4 s on the UI thread before)
 
-        ~VerifyJob() { Join(); }
+        // The game's scenes (art::ExtractScenes), read from the disc after the check: Giants' take a few seconds, and
+        // the page already shows the menu painting meanwhile. Stopped at the next scene when the launcher quits.
+        std::thread scenes;
+        std::atomic<bool> stopScenes{ false };
+
+        ~VerifyJob() { Join(); StopScenes(); }
         void Join() { if (thread.joinable()) thread.join(); }
+        void StopScenes() { stopScenes = true; if (scenes.joinable()) scenes.join(); }
+        void StartScenes(const std::string& image, const std::string& game);
         std::string Stage() { std::lock_guard lock(mutex); return stage; }
         void Start(const std::string& image, const GameInfo& game);
     };
@@ -427,6 +434,10 @@ namespace launcher_ui
         // before the game's disc was ever read. The sidebar and Home use them for games not yet shown too.
         const ArtTexture* CachedArt(const char* game, LauncherAssets::Role role, int maxWidth);
         void ForgetCachedArt(const char* game); // its disc was read again
+        // The picture behind a game's page and its Home card: one of the game's cached scenes, picked at random at the
+        // first need of this run and kept (never the one of the last run when there are two or more, which settings'
+        // `last_scene` records); the disc's menu painting while the scenes are not read yet; empty before any read.
+        std::string SceneOf(const char* game);
         bool ReduceMotion() const;
 
         // A page's centred column (the cursor is at its left): it reaches a few points past each side and over the page's
@@ -617,6 +628,7 @@ namespace launcher_ui
         uint64_t m_progressAt = 0;
         std::map<std::string, ArtTexture> m_achievementIcons; // by file
         std::map<std::string, ArtTexture> m_cachedArt; // CachedArt's, by "<game> <role> <width>"
+        std::map<std::string, std::string> m_scene; // SceneOf's pick of this run, by game
 
         ui::Toasts m_toasts; // newest last; drawn at the bottom right, upwards
         std::vector<ImVec4> m_stars; // x, y (0..1), radius, phase
