@@ -140,6 +140,14 @@ namespace launcher_ui
         ui::SettingRow(Tr("Texture filtering"), Tr("Keeps textures sharp at an angle."));
         SettingSelect("##filter", video, "anisotropy", FilterChoices, 0);
 
+        // The games whose FXAA pass the runtime knows. Not chosen, the runtime picks Gentle from resolution scale 2 (the automatic
+        // scale is 2 on Apple silicon and discrete GPUs, 1 on integrated ones: the page shows Gentle, the runtime may use Game there).
+        if (m_s->game.id == std::string_view("swapforce") || m_s->game.id == std::string_view("trapteam"))
+        {
+            ui::SettingRow(Tr("Edge smoothing"), Tr("FXAA also softens texture detail; Gentle keeps more of it."));
+            SettingSelect("##edgesmoothing", video, "edge_smoothing", EdgeSmoothingChoices, SettingInt(m_config, video, "resolution_scale", 0) == 1 ? 0 : 1);
+        }
+
         ui::SettingRow(Tr("Widescreen"), Tr("Auto shows more when wide; 16:9 adds bars."));
         SettingSelect("##aspect", video, "aspect", AspectChoices, 0);
 

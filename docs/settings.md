@@ -45,6 +45,7 @@ Linux; docs/install.md). Lines are `[section]`, `key=value` or `# comment`.
 | `video` | `texture_packs` | `1` (default), `0` | Use the HD textures of the game's `textures/` folder (<game> settings > Video > Show in folder) | yes |
 | `video` | `texture_dump` | `0` (default), `1` | Write the game's textures as DDS files, for pack makers (<game> settings > Video > Advanced) | yes |
 | `video` | `original_resolution` | `0` (default), `1` | Swap Force only: keep the console's 3D image (1040x620) stretched to the screen instead of the full frame (<game> settings > Video > Original resolution) | yes |
+| `video` | `edge_smoothing` | `game`, `light`, `off` (not set: `light` from resolution scale 2, `game` at 1) | Swap Force and Trap Team only: the game's FXAA pass, which also softens texture detail. `game` leaves it, `light` filters only strong edges, `off` draws a plain copy (<game> settings > Video > Edge smoothing: Game, Gentle, None; the game's F3 menu writes it too) | yes |
 | `input` | `device` | `auto`, `keyboard`, `gamepad` | What the game listens to | yes |
 | `input` | `gamepad` | SDL GUID | The gamepad chosen when `device=gamepad` | yes |
 | `input` | `key_<action>` | SDL scancode name (`Space`, `Return`, `W`...): a key's **physical place**, shown with the player's layout | Keyboard binding | yes |
@@ -63,12 +64,12 @@ the launcher then writes no settings until it is started again.
 ## Per-game video
 
 The runtime reads one `[video]` section, but the games do not have to share it. Each game keeps its own copy of the
-eleven keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
-`anisotropy`, `aspect`, `texture_packs`, `texture_dump`, `original_resolution`, `show_fps`) in **`[ssa.video]`**, **`[giants.video]`**, **`[swapforce.video]`** and **`[trapteam.video]`**:
+twelve keys that belong to a game (`fullscreen`, `resolution_scale`, `fps_limit`, `skip_intro_movies`, `vsync`,
+`anisotropy`, `aspect`, `texture_packs`, `texture_dump`, `original_resolution`, `show_fps`, `edge_smoothing`) in **`[ssa.video]`**, **`[giants.video]`**, **`[swapforce.video]`** and **`[trapteam.video]`**:
 
 | Section | Key | Meaning |
 | --- | --- | --- |
-| `<game>.video` | the eleven `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
+| `<game>.video` | the twelve `video` keys above | The game's own video settings. The game's settings page (Video tab) edits this copy. |
 
 - The first time, a game's copy starts from the `[video]` the player already had (`SeedGameVideo`). Trap Team starts at 30 FPS even if the shared limit is 60; later choices are kept.
 - **PLAY** puts the copy of the game that starts into `[video]` (keys it lacks are dropped, so the runtime's defaults apply):
