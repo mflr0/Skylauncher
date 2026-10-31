@@ -4,7 +4,7 @@
   "engine": "alchemy",
   "about": "Where Trap Team keeps its pictures on the disc (docs/runtime/host/game_art.md, games/trapteam/docs/art.md). Names only: the pictures are read from the player's own disc.",
   "logo": { "archive": "permanent/global.arc", "entry": "ui_sky4/titlelogo/titlelogo_001.png" },
-  "background": { "archive": "permanent/global.arc", "entry": "ui_sky4/screens/loadingscreen/textures/levelload_title.png" },
+  "background": { "archive": "permanent/global.arc", "entry": "ui_sky4/screens/loadingscreen/textures/levelload_313.png" },
   "portraits": { "streams": [
     { "archive": "misc/UI_Collection_Champions.arc", "folder": "collection_images/skylander_toys/" },
     { "archive": "misc/ui_collection_traps.arc", "folder": "collection_images/traps/square/" },
