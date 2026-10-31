@@ -341,6 +341,8 @@ namespace launcher_ui
     // has it on its portal (the tooltip and the sheet say which).
     std::string CollectionPage::Detail(const Figure& figure) const
     {
+        if (m_model.Incompatible(figure))
+            return Tf("Not for {}", ShortGameName(m_model.gameId));
         collection::Card card = CardOf(figure);
         if (card.Busy())
             return Tr("Playing now");
@@ -457,7 +459,7 @@ namespace launcher_ui
                                              : Tr("The game is running: use its Toy Box"));
             return;
         }
-        if (figure->toy != nullptr && !collection::Catalogue::Get().Accepts(m_model.gameId, figure->type))
+        if (m_model.Incompatible(*figure))
             Toast(Tf("{} is not for {}", Name(*figure), FullGameName(m_model.gameId)), ui::ToastKind::Error);
         else if (!SeatAccepts(game->seats[seat], *figure))
             Toast(Tf("{} doesn't go on {}", Name(*figure), SeatName(seat)), ui::ToastKind::Error);
@@ -1170,10 +1172,10 @@ namespace launcher_ui
             ImGui::EndDragDropSource();
         }
         std::string tip = Name(figure);
-        if (busy)
-            tip += "\n" + Tf("On the portal in {}: read-only", LiveGame(figure));
-        else if (dim)
+        if (dim)
             tip += "\n" + Tf("Not for {}", FullGameName(m_model.gameId));
+        else if (busy)
+            tip += "\n" + Tf("On the portal in {}: read-only", LiveGame(figure));
         else if (m_choosing >= 0)
             tip += "\n" + Tf("Click: put it on {}", SeatName(size_t(m_choosing)));
         else
@@ -1185,7 +1187,9 @@ namespace launcher_ui
         if (pressed)
         {
             m_selected = figure.path;
-            if (m_choosing >= 0 && !dim)
+            if (dim)
+                Toast(Tf("{} is not for {}", Name(figure), FullGameName(m_model.gameId)), ui::ToastKind::Error);
+            else if (m_choosing >= 0)
                 PutOn(size_t(m_choosing), figure.path);
             else
                 OpenFigure(figure.path);
@@ -1223,10 +1227,6 @@ namespace launcher_ui
             ui::DrawText(draw, ImVec2(at.x + (width - w) / 2, y), ui::Col(color), cut.c_str());
             ui::PopText();
         };
-        centred(ui::TextStyle::Caption, true, ui::color::Ink, Name(figure), textY);
-        if (std::string detail = Detail(figure); !detail.empty())
-            centred(ui::TextStyle::Caption, false, busy ? ui::color::Success : ui::color::Dim, detail, textY + ui::type::Caption + ui::space::XXS);
-
         // Marks: the variant, favorite, seat.
         collection::VariantKind kind = figure.Kind();
         if (kind != collection::VariantKind::Base)
@@ -1237,6 +1237,9 @@ namespace launcher_ui
             ui::DrawBadge(draw, ImVec2(at.x + ui::space::XS, picture.y + art - ui::space::L), SeatTag(size_t(seat)).c_str(), ui::color::AccentFill, ui::color::OnAccent);
         if (dim)
             draw->AddRectFilled(at, end, ui::Col(ui::color::Scrim, float(ui::elevation::ScrimAlpha) / 255.0f), ui::radius::Card);
+        centred(ui::TextStyle::Caption, true, dim ? ui::color::Dim : ui::color::Ink, Name(figure), textY);
+        if (std::string detail = Detail(figure); !detail.empty())
+            centred(ui::TextStyle::Caption, false, !dim && busy ? ui::color::Success : ui::color::Dim, detail, textY + ui::type::Caption + ui::space::XXS);
         return pressed;
     }
 
@@ -1300,7 +1303,6 @@ namespace launcher_ui
         for (size_t s = 0; s < m_sections.size(); s++)
         {
             const Section& section = m_sections[s];
-            bool foreign = section.kind == Section::Kind::Foreign;
             // The shelf has no title (the bar says what it shows); what follows does.
             if (section.kind != Section::Kind::Shelf)
             {
@@ -1313,7 +1315,8 @@ namespace launcher_ui
             {
                 if (i % columns != 0)
                     ImGui::SameLine(0, ShelfGap);
-                DrawCard(m_list[section.items[i]], cell, foreign);
+                const Figure& figure = m_list[section.items[i]];
+                DrawCard(figure, cell, m_model.Incompatible(figure));
                 if (s == 0 && i < size_t(columns) && ImGui::IsItemFocused())
                     m_navTopCard = true;
             }

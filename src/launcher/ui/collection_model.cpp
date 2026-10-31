@@ -370,11 +370,18 @@ namespace launcher_ui
         return game != nullptr && !SessionFile(*game).empty() && RunningGame() != gameId;
     }
 
+    bool CollectionModel::Incompatible(const collection::Figure& figure) const
+    {
+        return figure.toy != nullptr && !gameId.empty() && !collection::Catalogue::Get().Accepts(gameId, figure.type);
+    }
+
     bool CollectionModel::SetSeat(size_t seat, const std::string& path)
     {
         if (!CanEditSeats() || seat >= seats.size())
             return false;
         const std::string spelled = Canonical(path);
+        if (const collection::Figure* figure = Find(spelled); figure != nullptr && Incompatible(*figure))
+            return false;
         if (!spelled.empty())
         {
             // A figure sits on one seat, and so does a toy: another file of the same serial leaves its seat too.
@@ -467,7 +474,12 @@ namespace launcher_ui
             if (!hiddenStarter[i] && (passes[i] || partnerPasses))
                 shown.push_back(figures[i]);
         }
-        return collection::Shelf(shown, filter.sort, gameId);
+        // A neutral game keeps all known toys on the main shelf. Project only the chosen game's use dates into
+        // that sorting view, so Recent still means this game's recent figures; the returned figures stay intact.
+        std::vector<collection::Figure> sorting = shown;
+        for (collection::Figure& figure : sorting)
+            figure.uses = { { "", figure.LastUsedIn(gameId), 0 } };
+        return collection::Shelf(sorting, filter.sort, "");
     }
 
     std::vector<std::string> CollectionModel::OnPortal() const
