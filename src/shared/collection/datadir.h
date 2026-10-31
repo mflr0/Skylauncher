@@ -23,7 +23,7 @@
 namespace datadir
 {
     std::filesystem::path Root();
-    // A game's folder from its catalogue id: "ssa" is "SSA", "giants" is "Giants", "swapforce" is "SwapForce".
+    // A game's folder from its catalogue id: "ssa" is "SSA", "giants" is "Giants", "swapforce" is "SwapForce", "trapteam" is "TrapTeam".
     std::string GameFolderName(std::string_view id);
     std::filesystem::path Game(std::string_view id = "ssa");
     std::filesystem::path LauncherIni();
@@ -85,7 +85,8 @@ namespace datadir
         int rewritten = 0; // launcher.ini values updated
         bool Changed() const { return moved + copied + kept + dropped + failed + rewritten > 0; }
     };
-    MigrationReport Migrate(const OldRoots& old, const std::filesystem::path& root, const MigrationOptions& options = {});
+    MigrationReport Migrate(
+        const OldRoots& old, const std::filesystem::path& root, const MigrationOptions& options = {});
 
     // The old folders of this machine.
     OldRoots RealOldRoots();

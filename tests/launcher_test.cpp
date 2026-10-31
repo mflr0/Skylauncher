@@ -477,7 +477,9 @@ namespace
             EXPECT(collection::LevelText(*model.Find(gill), "ssa") == "Level 10" && collection::LevelText(*model.Find(anvil), "ssa").empty());
             // Giants starts with prepared seats too; the games with no runtime yet have none.
             EXPECT(!launcher_ui::SessionFile(*catalogue.FindGame("giants")).empty() && fs::path(launcher_ui::SessionFile(*catalogue.FindGame("swapforce"))) == save / "portal.txt" &&
-                launcher_ui::SessionFile(*catalogue.FindGame("trap_team")).empty());
+                launcher_ui::SessionFile(*catalogue.FindGame("superchargers")).empty());
+            // Trap Team is the launcher's id for the game, and it reads the toys of the games before it (Gill Grunt).
+            EXPECT(catalogue.FindGame("trapteam") != nullptr && catalogue.Accepts("trapteam", 14));
         }
 
         // The launcher's own earlier state moves over: favorites and "starts on the portal", by name.

@@ -35,6 +35,10 @@ namespace collection
     // Folders: SKY_PORTRAITS, else "portraits" in the game's data folder.
     std::string GamePortraitPath(const std::string& gameId, const Toy& toy, uint16_t variant = 0, bool large = false);
 
+    // A villain's picture from the game's disc (Game::villains; Trap Team's vault: "captured" is the villain held in a trap,
+    // else the one escaped). Empty when it is not cached.
+    std::string VillainPicturePath(const std::string& gameId, const Villain& villain, bool captured = true);
+
     // A toy family's picture from one game's disc (Game::kindPictures: SSA's magic item, location and sidekick icons),
     // empty when that game has none cached.
     std::string GameKindPicturePath(const std::string& gameId, Category category);
@@ -68,7 +72,8 @@ namespace collection
     std::string DiscImagePath(const Toy& toy);
 
     // The picture PortraitPath finds, else the generated one, `size` pixels square, with the badge of `kind`.
-    Image Portrait(const std::string& gameId, const Toy* toy, VariantKind kind, int size, uint16_t variant = 0, bool* fromDisc = nullptr);
+    Image Portrait(const std::string& gameId, const Toy* toy, VariantKind kind, int size, uint16_t variant = 0,
+        bool* fromDisc = nullptr);
     // Portrait with no game being viewed.
     Image Icon(const Toy* toy, VariantKind kind, int size, bool* fromDisc = nullptr);
 

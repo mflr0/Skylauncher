@@ -2,8 +2,8 @@
 
 // [Alchemy] IGA archives (the .arc and .bld files) and the IGZ files inside them, as far as reading pictures and shaders
 // needs. One reader for every version, each a row of a table in the .cpp: IGA v8 and IGZ v6 (Giants) are verified on the
-// disc; IGA v10 and IGZ v7 (Swap Force, big-endian) are verified on its disc; IGA v11 and IGZ v8-v9 (the later games)
-// follow public format descriptions [?] (games/swapforce/docs/art.md).
+// disc; IGA v10 and IGZ v7 (Swap Force, big-endian) are verified on its disc; IGA v11 is verified on Trap Team's; IGZ
+// v8-v9 (the later games) follow public format descriptions [?] (games/swapforce/docs/art.md).
 // Formats: games/giants/docs/shaders.md (IGA, IGZ sections), games/giants/docs/art.md (IGZ objects and images),
 // docs/runtime/host/game_art.md (the versions). Shared by the runtime, SkyBuild and Skylauncher.
 #include "xenos_texture.h"
@@ -76,10 +76,11 @@ namespace art::alchemy
 
         struct Picture
         {
-            std::string name;     // the source path ("levels/includes/.../portraits/cynder.png"; v7: the .tga it was made from); empty in streamed .arc files
+            std::string
+                name; // the source path ("levels/includes/.../portraits/cynder.png"; v7: the .tga it was made from); empty in streamed .arc files
             uint32_t width = 0, height = 0;
-            uint32_t format = 0;  // the format's hash (an external id); see TextureFormatOf
-            uint64_t object = 0;  // file offset of the igImage2
+            uint32_t format = 0; // the format's hash (an external id); see TextureFormatOf
+            uint64_t object = 0; // file offset of the igImage2
         };
         std::vector<Picture> Pictures() const;
         // The picture's pixel bytes as stored (tiled, big-endian words); empty if they can't be found.

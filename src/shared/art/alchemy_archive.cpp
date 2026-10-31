@@ -14,27 +14,26 @@ namespace art::alchemy
     {
         // --- LZMA --------------------------------------------------------------------------------------------------
 
-    
         constexpr int LcBits = 3, LpBits = 0, PbBits = 2;
         constexpr int ProbBits = 11, MoveBits = 5;
         constexpr uint16_t ProbInit = 1 << (ProbBits - 1);
-    
+
         struct RangeDecoder
         {
             const uint8_t* p;
             const uint8_t* end;
             uint32_t range = 0xFFFFFFFF;
             uint32_t code = 0;
-    
+
             uint8_t Next() { return p < end ? *p++ : (p++, uint8_t(0)); }
-    
+
             void Init()
             {
                 Next(); // the first byte of a range coder stream is 0
                 for (int i = 0; i < 4; i++)
                     code = (code << 8) | Next();
             }
-    
+
             void Normalize()
             {
                 if (range < (1u << 24))
@@ -43,7 +42,7 @@ namespace art::alchemy
                     code = (code << 8) | Next();
                 }
             }
-    
+
             unsigned Bit(uint16_t& prob)
             {
                 uint32_t bound = (range >> ProbBits) * prob;
@@ -64,7 +63,7 @@ namespace art::alchemy
                 Normalize();
                 return bit;
             }
-    
+
             unsigned Direct(int count)
             {
                 unsigned result = 0;
@@ -79,7 +78,7 @@ namespace art::alchemy
                 }
                 return result;
             }
-    
+
             unsigned Tree(uint16_t* probs, int bits)
             {
                 unsigned m = 1;
@@ -87,7 +86,7 @@ namespace art::alchemy
                     m = (m << 1) + Bit(probs[m]);
                 return m - (1u << bits);
             }
-    
+
             unsigned ReverseTree(uint16_t* probs, int bits)
             {
                 unsigned m = 1, symbol = 0;
@@ -100,12 +99,12 @@ namespace art::alchemy
                 return symbol;
             }
         };
-    
+
         struct LengthDecoder
         {
             uint16_t choice, choice2;
             uint16_t low[16][8], mid[16][8], high[256];
-    
+
             void Init()
             {
                 choice = choice2 = ProbInit;
@@ -115,7 +114,7 @@ namespace art::alchemy
                     std::fill(std::begin(row), std::end(row), ProbInit);
                 std::fill(std::begin(high), std::end(high), ProbInit);
             }
-    
+
             unsigned Decode(RangeDecoder& rc, unsigned posState)
             {
                 if (!rc.Bit(choice))
@@ -125,10 +124,10 @@ namespace art::alchemy
                 return 16 + rc.Tree(high, 8);
             }
         };
-    
-        constexpr int States = 12, PosStates = 1 << PbBits, LenToPosStates = 4, EndPosModel = 14, FullDistances = 1 << (EndPosModel >> 1),
-            AlignBits = 4;
-    
+
+        constexpr int States = 12, PosStates = 1 << PbBits, LenToPosStates = 4, EndPosModel = 14,
+                      FullDistances = 1 << (EndPosModel >> 1), AlignBits = 4;
+
         struct LzmaState
         {
             uint16_t isMatch[States][PosStates], isRep[States], isRepG0[States], isRepG1[States], isRepG2[States],
@@ -136,7 +135,7 @@ namespace art::alchemy
             uint16_t posSlot[LenToPosStates][64], posSpecial[1 + FullDistances - EndPosModel], align[1 << AlignBits];
             LengthDecoder len, repLen;
             uint16_t literal[0x300 << (LcBits + LpBits)];
-    
+
             void Init()
             {
                 auto fill = [](auto& array) {
@@ -182,7 +181,8 @@ namespace art::alchemy
             if (!rc.Bit(state.isMatch[st][posState]))
             {
                 unsigned prev = pos ? out[pos - 1] : 0;
-                uint16_t* probs = state.literal + 0x300 * (((unsigned(pos) & ((1u << LpBits) - 1)) << LcBits) + (prev >> (8 - LcBits)));
+                uint16_t* probs = state.literal +
+                                  0x300 * (((unsigned(pos) & ((1u << LpBits) - 1)) << LcBits) + (prev >> (8 - LcBits)));
                 unsigned symbol = 1;
                 if (st >= 7)
                 {
@@ -292,27 +292,30 @@ namespace art::alchemy
     namespace
     {
         // [Alchemy] Where each IGA version keeps its tables. The file starts "IGA\x1a", u32 version, u32 table size,
-        // u32 entry count; then the header's other fields, u32 name hashes[n] and the entries { u32 offset, u32 size,
-        // u32 mode } (v10: a leading u32 first). v8 is Giants' [V: every archive of its disc]. v10 is Swap Force's [V:
-        // every archive of its disc]: big-endian throughout (the magic reads "\x1aAGI"), header 0x38, the name table's
-        // position at 0x2C and size at 0x30, 16-byte entries, chunks 0x800-aligned (games/swapforce/docs/art.md). v11
-        // (the later games) is from public format descriptions, never seen here [?]: the name table's position 64-bit.
+        // u32 entry count; then the header's other fields, u32 name hashes[n] and the entries (entrySize bytes each, with
+        // the words { offset, size, mode } at the layout's indexes). v8 is Giants' [V: every archive of its disc]. v10 is
+        // Swap Force's [V: every archive of its disc]: big-endian throughout (the magic reads "\x1aAGI"), header 0x38, the
+        // name table's position at 0x2C and size at 0x30, 16-byte entries { ?, offset, size, mode }, chunks 0x800-aligned
+        // (games/swapforce/docs/art.md). v11 is Trap Team's [V: all 1916 archives of its disc, listed and unpacked]: little-
+        // endian, header 0x38, the name table's position (64-bit) at 0x28 and size at 0x30, 16-byte entries { offset, ?,
+        // size, mode }, chunks 0x100-aligned; the second word is no offset or size we need [?].
         struct IgaLayout
         {
             uint32_t version;
-            uint32_t header;     // header size: the name hashes follow it
-            uint32_t namesAt;    // header offset of the name table's file position
-            uint32_t namesSize;  // ... and of its size
-            bool namesAt64;      // the position is 64-bit (little-endian)
-            bool bigEndian;      // every header and table field (not the chunks' u16 sizes)
-            uint32_t entrySize;  // bytes per entry; { offset, size, mode } are its last three words
+            uint32_t header; // header size: the name hashes follow it
+            uint32_t namesAt; // header offset of the name table's file position
+            uint32_t namesSize; // ... and of its size
+            bool namesAt64; // the position is 64-bit (little-endian)
+            bool bigEndian; // every header and table field (not the chunks' u16 sizes)
+            uint32_t entrySize; // bytes per entry
+            uint32_t offsetWord, sizeWord, modeWord; // the entry's words (4 bytes each) holding these
             uint32_t chunkAlign; // compressed chunks start at multiples of this
             bool verified;
         };
         constexpr IgaLayout IgaLayouts[] = {
-            { 8, 0x34, 0x1C, 0x20, false, false, 12, 0x100, true },
-            { 10, 0x38, 0x2C, 0x30, false, true, 16, 0x800, true },
-            { 11, 0x38, 0x28, 0x30, true, false, 12, 0x100, false },
+            { 8, 0x34, 0x1C, 0x20, false, false, 12, 0, 1, 2, 0x100, true },
+            { 10, 0x38, 0x2C, 0x30, false, true, 16, 1, 2, 3, 0x800, true },
+            { 11, 0x38, 0x28, 0x30, true, false, 16, 0, 2, 3, 0x100, true },
         };
     }
 
@@ -329,7 +332,10 @@ namespace art::alchemy
         uint8_t header[0x38] = {};
         if (length < 0x34 || !reader(0, size_t(std::min<uint64_t>(length, sizeof(header))), header))
             return std::nullopt;
-        const bool big = memcmp(header, "\x1a" "AGI", 4) == 0;
+        const bool big = memcmp(header,
+                             "\x1a"
+                             "AGI",
+                             4) == 0;
         if (!big && memcmp(header, "IGA\x1a", 4) != 0)
             return std::nullopt;
         auto u32 = [big](const uint8_t* p) { return big ? ReadBe32(p) : Le32(p); };
@@ -346,7 +352,7 @@ namespace art::alchemy
         const size_t stride = 4 + layout->entrySize;
         if (count == 0 || count > 0x100000 || layout->header + stride * uint64_t(count) > length)
             return std::nullopt;
-        // u32 hashes[n], then n entries ending in { u32 offset, u32 size, u32 mode }.
+        // u32 hashes[n], then the n entries.
         std::vector<uint8_t> tables(stride * size_t(count));
         if (!reader(layout->header, tables.size(), tables.data()))
             return std::nullopt;
@@ -359,8 +365,9 @@ namespace art::alchemy
         archive.m_entries.resize(count);
         for (uint32_t i = 0; i < count; i++)
         {
-            const uint8_t* entry = &tables[4 * size_t(count) + layout->entrySize * size_t(i) + layout->entrySize - 12];
-            archive.m_entries[i] = { u32(entry), u32(entry + 4), u32(entry + 8), {} };
+            const uint8_t* entry = &tables[4 * size_t(count) + layout->entrySize * size_t(i)];
+            archive.m_entries[i] = { u32(entry + 4 * layout->offsetWord), u32(entry + 4 * layout->sizeWord),
+                u32(entry + 4 * layout->modeWord), {} };
         }
         // The name table: u32 offsets[n] from the table's start, then the NUL-terminated names.
         if (namesSize >= 4 * uint64_t(count) && namesSize < 0x4000000 && namesAt + namesSize <= length)
@@ -375,7 +382,8 @@ namespace art::alchemy
                         continue;
                     const uint8_t* end = static_cast<const uint8_t*>(memchr(&names[at], 0, names.size() - at));
                     if (end != nullptr)
-                        archive.m_entries[i].name.assign(reinterpret_cast<const char*>(&names[at]), reinterpret_cast<const char*>(end));
+                        archive.m_entries[i].name.assign(
+                            reinterpret_cast<const char*>(&names[at]), reinterpret_cast<const char*>(end));
                 }
             }
         }
@@ -387,7 +395,8 @@ namespace art::alchemy
         const Entry& entry = m_entries[index];
         size = size == 0 ? entry.size : std::min<size_t>(size, entry.size);
         auto read = [&](uint64_t offset, size_t count) {
-            std::vector<uint8_t> out(count, 0); // bytes past the end read as zero (the LZMA decoder looks a few bytes beyond)
+            std::vector<uint8_t> out(
+                count, 0); // bytes past the end read as zero (the LZMA decoder looks a few bytes beyond)
             if (offset < m_length)
             {
                 size_t available = size_t(std::min<uint64_t>(count, m_length - offset));
@@ -440,7 +449,8 @@ namespace art::alchemy
     std::optional<size_t> IgaArchive::Find(const std::string& part) const
     {
         auto lower = [](std::string text) {
-            std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+            std::transform(
+                text.begin(), text.end(), text.begin(), [](unsigned char c) { return char(std::tolower(c)); });
             return text;
         };
         std::string wanted = lower(part);
@@ -460,43 +470,71 @@ namespace art::alchemy
         // 0x14 as { ?, offset, size, alignment }, records named by a four-character tag stored byte-swapped ("TMET"
         // reads "TEMT") with a 16-byte header { tag, count, length, data start }, memory handles in TMHN as { kind << 24
         // | size, pool << 27 | offset }, a pointer's pool in its top 5 bits, igImage2's name an index in the strings
-        // (TSTR), its other fields where v6 has them. v8 and v9 (the later games) are from public format descriptions,
+        // (TSTR), its other fields where v6 has them. v8 is Trap Team's [V: its disc, 2026-10-30]: as v7, but every name in
+        // the types and strings records is padded to 2 bytes. v9 (the later games) is from public format descriptions,
         // never seen here [?]: tags not swapped, sections { id, offset, size, alignment } at 0x10, handles in RHND.
         struct IgzLayout
         {
             uint32_t version;
-            uint32_t sectionTable;               // where the section entries start
+            uint32_t sectionTable; // where the section entries start
             uint32_t sectionOffset, sectionSize; // word index of a section entry's offset and size
-            bool tagged;                         // records named by a four-character tag (else a number)
-            bool ownHeader;                      // section 0 starts with its own header, its length at +0x0C (v6)
+            bool tagged; // records named by a four-character tag (else a number)
+            bool ownHeader; // section 0 starts with its own header, its length at +0x0C (v6)
             uint32_t countAt, lengthAt, startAt; // a record's count, length and data start (from the record)
-            uint32_t tables[6];                  // types, external ids, objects, memory handles, strings, dependencies
-            uint32_t poolShift;                  // a pointer's pool index is above this bit
-            uint32_t handleSizeBits;             // a memory handle's size is its first word's low bits (the kind above)
-            bool nameIsString;                   // igImage2's name is an index in the strings (else a pointer)
+            uint32_t tables[6]; // types, external ids, objects, memory handles, strings, dependencies
+            uint32_t poolShift; // a pointer's pool index is above this bit
+            uint32_t handleSizeBits; // a memory handle's size is its first word's low bits (the kind above)
+            bool nameIsString; // igImage2's name is an index in the strings (else a pointer)
             uint32_t imageName, imageWidth, imageFormat, imageHandle, imageSize; // igImage2's fields
+            uint32_t stringAlign; // each name in the types and strings records is padded to a multiple of this
             bool verified;
         };
-        enum Table { Types, ExternalIds, Objects, Handles, Strings, Dependencies };
-        constexpr uint32_t Tag(const char (&t)[5]) { return uint32_t(uint8_t(t[0])) << 24 | uint32_t(uint8_t(t[1])) << 16 | uint32_t(uint8_t(t[2])) << 8 | uint8_t(t[3]); }
-        constexpr uint32_t Swapped(const char (&t)[5]) { return uint32_t(uint8_t(t[3])) << 24 | uint32_t(uint8_t(t[2])) << 16 | uint32_t(uint8_t(t[1])) << 8 | uint8_t(t[0]); }
+        enum Table
+        {
+            Types,
+            ExternalIds,
+            Objects,
+            Handles,
+            Strings,
+            Dependencies
+        };
+        constexpr uint32_t Tag(const char (&t)[5])
+        {
+            return uint32_t(uint8_t(t[0])) << 24 | uint32_t(uint8_t(t[1])) << 16 | uint32_t(uint8_t(t[2])) << 8 |
+                   uint8_t(t[3]);
+        }
+        constexpr uint32_t Swapped(const char (&t)[5])
+        {
+            return uint32_t(uint8_t(t[3])) << 24 | uint32_t(uint8_t(t[2])) << 16 | uint32_t(uint8_t(t[1])) << 8 |
+                   uint8_t(t[0]);
+        }
         constexpr uint32_t None = 0xFFFFFFFF; // a table this version does not have
         constexpr IgzLayout IgzLayouts[] = {
-            { 6, 0x10, 0, 1, false, true, 12, 16, 20, { 0, 2, 5, 0xA, None, None }, 24, 28, false, 0x08, 0x30, 0x3C, 0x48, 0x60, true },
-            { 7, 0x14, 1, 2, true, false, 4, 8, 12, { Swapped("TMET"), Swapped("EXID"), Swapped("RVTB"), Swapped("TMHN"), Swapped("TSTR"), Swapped("TDEP") },
-              27, 24, true, 0x08, 0x30, 0x3C, 0x48, 0x60, true },
-            { 8, 0x10, 1, 2, true, false, 4, 8, 12, { Tag("TMET"), Tag("EXID"), Tag("RVTB"), Tag("RHND"), Tag("TSTR"), Tag("TDEP") }, 27, 28, false, 0x08, 0x30, 0x3C, 0x48, 0x60, false },
-            { 9, 0x10, 1, 2, true, false, 4, 8, 12, { Tag("TMET"), Tag("EXID"), Tag("RVTB"), Tag("RHND"), Tag("TSTR"), Tag("TDEP") }, 27, 28, false, 0x08, 0x30, 0x3C, 0x48, 0x60, false },
+            { 6, 0x10, 0, 1, false, true, 12, 16, 20, { 0, 2, 5, 0xA, None, None }, 24, 28, false, 0x08, 0x30, 0x3C,
+                0x48, 0x60, 1, true },
+            { 7, 0x14, 1, 2, true, false, 4, 8, 12,
+                { Swapped("TMET"), Swapped("EXID"), Swapped("RVTB"), Swapped("TMHN"), Swapped("TSTR"),
+                    Swapped("TDEP") },
+                27, 24, true, 0x08, 0x30, 0x3C, 0x48, 0x60, 1, true },
+            { 8, 0x14, 1, 2, true, false, 4, 8, 12,
+                { Swapped("TMET"), Swapped("EXID"), Swapped("RVTB"), Swapped("TMHN"), Swapped("TSTR"),
+                    Swapped("TDEP") },
+                27, 24, true, 0x08, 0x30, 0x3C, 0x48, 0x60, 2, true },
+            { 9, 0x10, 1, 2, true, false, 4, 8, 12,
+                { Tag("TMET"), Tag("EXID"), Tag("RVTB"), Tag("RHND"), Tag("TSTR"), Tag("TDEP") }, 27, 28, false, 0x08,
+                0x30, 0x3C, 0x48, 0x60, 1, false },
         };
 
         // The NUL-terminated strings of a record, `count` of them.
-        std::vector<std::string> StringList(const IgzFile& file, size_t start, size_t end, uint32_t count)
+        std::vector<std::string> StringList(
+            const IgzFile& file, size_t start, size_t end, uint32_t count, uint32_t align)
         {
             std::vector<std::string> out;
             for (size_t p = start; out.size() < count && p < end;)
             {
                 out.push_back(file.String(p));
                 p += out.back().size() + 1;
+                p = start + (p - start + align - 1) / align * align;
             }
             return out;
         }
@@ -532,7 +570,8 @@ namespace art::alchemy
         for (uint32_t i = 0; i < 16; i++)
         {
             const uint32_t entry = layout.sectionTable + 16 * i;
-            uint32_t offset = ReadBe32(&b[entry + 4 * layout.sectionOffset]), size = ReadBe32(&b[entry + 4 * layout.sectionSize]);
+            uint32_t offset = ReadBe32(&b[entry + 4 * layout.sectionOffset]),
+                     size = ReadBe32(&b[entry + 4 * layout.sectionSize]);
             if (offset == 0 || size == 0)
                 break;
             sections.emplace_back(offset, size);
@@ -548,8 +587,8 @@ namespace art::alchemy
         const uint32_t header = layout.startAt + 4;
         for (size_t p = base + (layout.ownHeader ? ReadBe32(&b[base + 0x0C]) : 0); p + header <= end;)
         {
-            uint32_t id = ReadBe32(&b[p]), count = ReadBe32(&b[p + layout.countAt]), length = ReadBe32(&b[p + layout.lengthAt]),
-                     start = ReadBe32(&b[p + layout.startAt]);
+            uint32_t id = ReadBe32(&b[p]), count = ReadBe32(&b[p + layout.countAt]),
+                     length = ReadBe32(&b[p + layout.lengthAt]), start = ReadBe32(&b[p + layout.startAt]);
             if (length < header || p + length > end || start > length)
                 break;
             for (uint32_t table = 0; table < std::size(layout.tables); table++)
@@ -559,19 +598,16 @@ namespace art::alchemy
         }
         // The class names, one NUL-terminated string each: an object's first word is its index here.
         if (const Fixup* types = file.FindFixup(Types))
-            file.m_types = StringList(file, types->start, types->end, types->count);
+            file.m_types = StringList(file, types->start, types->end, types->count, layout.stringAlign);
         // v7: the strings the objects name by index (TSTR).
         if (const Fixup* strings = file.FindFixup(Strings))
-            file.m_strings = StringList(file, strings->start, strings->end, strings->count);
+            file.m_strings = StringList(file, strings->start, strings->end, strings->count, layout.stringAlign);
         if (file.m_types.empty() || file.FindFixup(Objects) == nullptr)
             return std::nullopt;
         return file;
     }
 
-    uint32_t IgzFile::Be32(uint64_t at) const
-    {
-        return at + 4 <= m_bytes.size() ? ReadBe32(&m_bytes[size_t(at)]) : 0;
-    }
+    uint32_t IgzFile::Be32(uint64_t at) const { return at + 4 <= m_bytes.size() ? ReadBe32(&m_bytes[size_t(at)]) : 0; }
 
     std::optional<uint64_t> IgzFile::Pointer(uint32_t value) const
     {
@@ -692,7 +728,8 @@ namespace art::alchemy
         std::vector<std::string> out;
         if (const Fixup* dependencies = FindFixup(Table::Dependencies))
         {
-            std::vector<std::string> strings = StringList(*this, dependencies->start, dependencies->end, 2 * dependencies->count);
+            std::vector<std::string> strings = StringList(*this, dependencies->start, dependencies->end,
+                2 * dependencies->count, IgzLayouts[m_layout].stringAlign);
             for (size_t i = 1; i < strings.size(); i += 2)
                 out.push_back(strings[i]);
         }
@@ -714,10 +751,17 @@ namespace art::alchemy
             bool tiled;
         };
         static constexpr Known Formats[] = {
-            { 0xB9BCDC57, TextureFormat::Dxt5, true }, { 0xDC78A2E3, TextureFormat::Dxt1, true }, { 0x19E29222, TextureFormat::L8, true },
-            { 0x50A19F21, TextureFormat::Dxt3, true }, { 0x049D7FAA, TextureFormat::Dxt5, false }, { 0x93566F0B, TextureFormat::Dxt5, false },
-            { 0xD936ADEE, TextureFormat::Dxt1, false }, { 0xCC82E927, TextureFormat::Dxt1, false }, { 0xCBBED02C, TextureFormat::Dxt3, false },
-            { 0xEABABF45, TextureFormat::Dxt3, false }, { 0x250C4EF0, TextureFormat::Argb8, true },
+            { 0xB9BCDC57, TextureFormat::Dxt5, true },
+            { 0xDC78A2E3, TextureFormat::Dxt1, true },
+            { 0x19E29222, TextureFormat::L8, true },
+            { 0x50A19F21, TextureFormat::Dxt3, true },
+            { 0x049D7FAA, TextureFormat::Dxt5, false },
+            { 0x93566F0B, TextureFormat::Dxt5, false },
+            { 0xD936ADEE, TextureFormat::Dxt1, false },
+            { 0xCC82E927, TextureFormat::Dxt1, false },
+            { 0xCBBED02C, TextureFormat::Dxt3, false },
+            { 0xEABABF45, TextureFormat::Dxt3, false },
+            { 0x250C4EF0, TextureFormat::Argb8, true },
         };
         for (const Known& known : Formats)
         {
@@ -725,7 +769,9 @@ namespace art::alchemy
                 continue;
             texture.format = known.format;
             texture.tiled = known.tiled;
-            texture.endian = known.format == TextureFormat::L8 ? TextureEndian::None : known.format == TextureFormat::Argb8 ? TextureEndian::In32 : TextureEndian::In16;
+            texture.endian = known.format == TextureFormat::L8      ? TextureEndian::None
+                             : known.format == TextureFormat::Argb8 ? TextureEndian::In32
+                                                                    : TextureEndian::In16;
             texture.pitch = 0;
             return true;
         }

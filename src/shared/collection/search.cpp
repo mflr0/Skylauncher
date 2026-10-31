@@ -107,7 +107,7 @@ namespace collection
         const char* GameWords(const std::string& id)
         {
             static const std::map<std::string, const char*> Words = { { "ssa", "ssa spyro spyros" }, { "giants", "giants giant geants geant" },
-                { "swapforce", "swapforce swap force" }, { "trap_team", "trapteam trap team" },
+                { "swapforce", "swapforce swap force" }, { "trapteam", "trapteam trap team" },
                 { "superchargers", "superchargers supercharger super chargers" }, { "imaginators", "imaginators imaginator" } };
             auto it = Words.find(id);
             return it != Words.end() ? it->second : id.c_str();
