@@ -142,14 +142,15 @@ namespace
         SETTINGS_EXPECT(config["ssa.video"]["fps_limit"] == "60" && config["giants.video"]["vsync"] == "0");
         SETTINGS_EXPECT(config["ssa.video"].count("custom") == 0);
 
-        // Trap Team has its own controls: LT is its tag team, LB and RB are not among them.
-        bool tagTeam = false, shoulders = false;
+        // Trap Team has its own controls: LT is its tag team, RB an attack like B, and LB (which fires nothing) is not among them.
+        bool tagTeam = false, rightBumper = false, leftBumper = false;
         for (const GameKey& key : GameKeys("trapteam"))
         {
             tagTeam = tagTeam || (std::string_view(key.action) == "lt" && std::string_view(key.label) == "Switch Skylander / Villain");
-            shoulders = shoulders || std::string_view(key.action) == "lb" || std::string_view(key.action) == "rb";
+            rightBumper = rightBumper || (std::string_view(key.action) == "rb" && std::string_view(key.label) == "Attack 2");
+            leftBumper = leftBumper || std::string_view(key.action) == "lb";
         }
-        SETTINGS_EXPECT(tagTeam && !shoulders);
+        SETTINGS_EXPECT(tagTeam && rightBumper && !leftBumper);
         SeedGameVideo(config, "trapteam");
         SETTINGS_EXPECT(config["trapteam.video"]["fps_limit"] == "30" && config["trapteam.video"]["vsync"] == "0");
         config["trapteam.video"]["fps_limit"] = "60";

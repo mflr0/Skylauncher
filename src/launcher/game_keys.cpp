@@ -37,11 +37,12 @@ namespace
         { "lt", N_("Interact"), "LT", SDL_SCANCODE_1 }, { "rt", N_("Interact"), "RT", SDL_SCANCODE_3 },
         { "back", N_("Skylanders Stats"), "Back", SDL_SCANCODE_BACKSPACE }, { "start", N_("Pause"), "Start", SDL_SCANCODE_RETURN },
     };
-    // LT is the game's tag team. LB and RB are not in its controls: Swap Force's extra attacks are not proved here.
+    // LT is the game's tag team. RB fires an attack like B in the tutorial; LB fires nothing there (nor does Y), so it has no row.
     constexpr GameKey TrapTeam[] = {
         MOVE_ROWS,
         { "a", N_("Jump"), "A", SDL_SCANCODE_SPACE }, { "x", N_("Attack 1"), "X", SDL_SCANCODE_C },
         { "b", N_("Attack 2"), "B", SDL_SCANCODE_X }, { "y", N_("Attack 3"), "Y", SDL_SCANCODE_V },
+        { "rb", N_("Attack 2"), "RB", SDL_SCANCODE_E },
         { "lt", N_("Switch Skylander / Villain"), "LT", SDL_SCANCODE_1 }, { "rt", N_("Interact"), "RT", SDL_SCANCODE_3 },
         { "back", N_("Skylander/Villain Stats"), "Back", SDL_SCANCODE_BACKSPACE }, { "start", N_("Pause"), "Start", SDL_SCANCODE_RETURN },
     };

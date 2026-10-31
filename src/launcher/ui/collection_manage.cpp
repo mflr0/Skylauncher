@@ -317,7 +317,7 @@ namespace launcher_ui
             "44-change-the-bottom", "45-swapforce-choose-player-1", "46-add-versions", "47-search-element", "48-search-level",
             "49-search-typo", "50-filters-panel", "51-filters-tags", "52-sort-name", "53-all-swappers", "54-mixed-swapper-sheet",
             "55-add-swapper-versions", "56-add-no-match", "57-manage-menu", "58-figure-menu", "59-put-on-menu", "60-focus-card", "61-focus-seat",
-            "collection-bottom" };
+            "62-trap-sheet", "63-trap-edit", "collection-bottom" };
     }
 
     const char* CollectionPage::TestShotName(int step)
@@ -410,6 +410,9 @@ namespace launcher_ui
                     collection::CreateSwapper(top, bottom);
             }
         }
+        // A Water Trap holding an evolved villain (shots 62 and 63).
+        if (std::string trap = collection::Create(211, 0x3002); !trap.empty())
+            collection::SetTrapVillain(trap, 9, true);
         // Level 15 and a hat (Giants' part of the figure): Giants shows 15, Spyro's Adventure 10.
         std::string eruptor = collection::Create(9);
         Figure high;
@@ -724,7 +727,18 @@ namespace launcher_ui
         case 41: // and on the first seat
             m_focusSeat = 0;
             break;
-        case 42: // the shelf scrolled to its very end
+        case 42: // a trap's sheet with its villain, then its Edit (the villain list and the Evolved switch)
+        case 43:
+        {
+            SelectPortalGame("ssa");
+            for (const Figure& figure : m_model.figures)
+                if (figure.type == 211 && figure.stats.villain != 0)
+                    OpenFigure(figure.path);
+            if (const Figure* figure = step == 43 ? m_model.Find(m_figure) : nullptr)
+                OpenEdit(*figure);
+            break;
+        }
+        case 44: // the shelf scrolled to its very end
             m_testScrollBottom = true;
             break;
         default: break;

@@ -17,6 +17,20 @@ namespace launcher_ui
     namespace fs = std::filesystem;
     using collection::Figure;
 
+    bool IsTrap(const Figure& f) { return f.toy != nullptr && f.toy->category == collection::Category::Trap; }
+
+    // The villains a trap of this element can hold: Trap Team's own table.
+    std::vector<const collection::Villain*> VillainsOf(const Figure& f)
+    {
+        std::vector<const collection::Villain*> list;
+        const collection::Game* game = collection::Catalogue::Get().FindGame("trapteam");
+        if (game != nullptr && IsTrap(f))
+            for (const collection::Villain& villain : game->villains)
+                if (villain.element == f.toy->element)
+                    list.push_back(&villain);
+        return list;
+    }
+
     float OverlayBody(float chrome, float least, float most)
     {
         return std::clamp(ImGui::GetIO().DisplaySize.y - 2 * ui::space::XL - chrome, least, most);
@@ -241,6 +255,10 @@ namespace launcher_ui
             ui::Text(ui::TextStyle::Caption, Tf("{} XP · {}", ui::FormatNumber(xp), next).c_str(), ui::color::Dim);
         }
         std::vector<std::pair<std::string, std::string>> rows;
+        if (IsTrap(f) && f.stats.villain != 0)
+            for (const collection::Villain* villain : VillainsOf(f))
+                if (villain->id == f.stats.villain + figures::VillainResourceBase)
+                    rows.push_back({ Tr("Villain"), f.stats.villainEvolved ? Tf("{} · Evolved", villain->name) : villain->name });
         if (collection::HasProgress(f) && f.state == figures::AreaState::Valid)
             rows.push_back({ Tr("Gold"), Tf("{} · {} played", ui::FormatNumber(f.stats.gold), PlayTime(f.stats.playSeconds)) });
         // A never-played figure already says so above: no "Last played: Never" row for it.
@@ -759,6 +777,7 @@ namespace launcher_ui
     void CollectionPage::DrawEditStats(const Figure& f)
     {
         bool stats = collection::HasProgress(f) && f.state != figures::AreaState::Damaged;
+        const bool trap = IsTrap(f) && f.state != figures::AreaState::Damaged && !VillainsOf(f).empty();
         ui::Text(ui::TextStyle::Body, (f.variantInfo.name != Name(f) ? Name(f) + " · " + f.variantInfo.name : Name(f)).c_str(), ui::color::InkSoft);
         // The fields scroll above the Save row (the upgrades list makes the sheet taller than a small window).
         if (std::exchange(m_sheetTop, false))
@@ -771,6 +790,27 @@ namespace launcher_ui
             ui::TextFieldOptions nameOptions;
             nameOptions.hint = f.variantInfo.name.c_str();
             ui::TextField("##label", m_label, sizeof(m_label), nameOptions);
+            if (trap)
+            {
+                // One list and one switch: the villain the trap plays, and whether it is evolved. The game reads them
+                // when the trap is put on the portal, so the trap is off it while this is open (Edit needs it free).
+                const std::vector<const collection::Villain*> villains = VillainsOf(f);
+                const auto chosen = std::find_if(villains.begin(), villains.end(), [&](const collection::Villain* v) { return v->id == m_edit.villain + figures::VillainResourceBase; });
+                ui::SettingRow(Tr("Villain"), Tr("The one this trap holds"));
+                if (ui::BeginSelect("##villain", chosen != villains.end() ? (*chosen)->name.c_str() : Tr("None")))
+                {
+                    for (const collection::Villain* villain : villains)
+                        if (const uint16_t stored = uint16_t(villain->id - figures::VillainResourceBase);
+                            ui::SelectOption(fmt::format("{}##villain{}", villain->name, villain->id).c_str(), m_edit.villain == stored) && m_edit.villain != stored)
+                        {
+                            m_edit.villain = stored;
+                            m_edit.villainEvolved = false;
+                        }
+                    ui::EndSelect();
+                }
+                ui::SettingRow(Tr("Evolved"), Tr("Its evolved look"));
+                ui::Toggle("##evolved", &m_edit.villainEvolved, m_edit.villain == 0);
+            }
             if (stats)
             {
                 // The limits of the portal's game: Spyro's Adventure edits its own part (up to level 10, its hat in the first
@@ -847,6 +887,8 @@ namespace launcher_ui
                 if (changed)
                     saved = collection::WriteStats(f.path, edited, &error);
             }
+            if (saved && trap && m_edit.villain != 0 && (m_edit.villain != m_editBase.villain || m_edit.villainEvolved != m_editBase.villainEvolved))
+                saved = collection::SetTrapVillain(f.path, uint8_t(m_edit.villain), m_edit.villainEvolved, &error);
             if (saved)
             {
                 Toast(Tr("Saved"), ui::ToastKind::Success);

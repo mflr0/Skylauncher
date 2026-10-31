@@ -565,6 +565,11 @@ Glow in the Dark	Phosphorescent
 Gold	Or
 Hat	Chapeau
 Hero points	Points de héros
+Villain	Méchant
+The one this trap holds	Celui que ce piège contient
+Evolved	Évolué
+Its evolved look	Son apparence évoluée
+{} · Evolved	{} · Évolué
 Hold if its game has quit.	Maintenez si son jeu est fermé.
 Hold to delete it for good.	Maintenez pour la supprimer pour de bon.
 Import a folder...	Importer un dossier...
