@@ -741,7 +741,7 @@ namespace launcher_ui
         case 44: // the shelf scrolled to its very end
             m_testScrollBottom = true;
             break;
-        case 43: // Trap Team: figures from each game share the shelf, later figures greyed in their usual places.
+        case 45: // Trap Team: figures from each game share the shelf, later figures greyed in their usual places.
             SelectPortalGame("trapteam");
             for (const collection::Game& game : collection::Catalogue::Get().Games())
                 for (const collection::Toy& toy : collection::Catalogue::Get().Toys())
